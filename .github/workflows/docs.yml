@@ -1,4 +1,4 @@
-name: 文書検査
+name: Documentation checks
 
 on:
   pull_request:
@@ -10,23 +10,23 @@ permissions:
 
 jobs:
   verify-lockfile:
-    name: Actionsロック検証
+    name: Verify Actions lockfile
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: 検証ツールを固定版で導入
+      - name: Install pinned verification tool
         run: gh extension install github/gh-actions-lock --pin v0.4.0
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: Actionsの固定内容と取得元を検証
+      - name: Verify pinned Actions and their sources
         run: gh actions-lock --verify
         env:
           GH_TOKEN: ${{ github.token }}
   docs:
-    name: 書式・リンク・見出しアンカー
+    name: Check formatting, links, and heading anchors
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -41,7 +41,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - name: 文書検査の依存を導入
+      - name: Install documentation check dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: 設定整合性・型・テスト・文書を検査
+      - name: Check configuration, types, tests, and documentation
         run: pnpm check

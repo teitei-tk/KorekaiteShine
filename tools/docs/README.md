@@ -40,6 +40,18 @@ pnpmはルートの[package.json](../../package.json)の`packageManager`で固�
 
 仕様の根拠：[pnpm依存解決設定](https://pnpm.io/settings/dependency-resolution)、[ビルド設定](https://pnpm.io/settings/build)。
 
+## Dependabotによる依存更新
+
+[Dependabot設定](../../.github/dependabot.yml)で、`daily`（平日9時、日本時間）にnpm依存とGitHub Actionsの更新を確認します。更新PRの上限はそれぞれ10件です。メジャー更新も対象とし、自動マージは設定しません。
+
+npmの設定はルートの共有ロックファイルを起点にします。現在の`tools/docs`と、今後同じpnpmワークスペースへ追加する`apps/*`の依存を対象にします。別の言語や独立したロックファイルを採用するアプリには、対応する設定を追加してください。通常のnpm更新には公開後1日の待機期間を設け、CIでも既存のpnpm保護設定を確認します。
+
+2026年10月24日の[GitHub公式の対応表](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#package-ecosystem)にはpnpm v7〜v10が掲載されており、本リポジトリのpnpm 12.15.0は対応表にありません。設定をデフォルトブランチへ反映した後、Dependabotの実行ログでマニフェストの検出とロック更新の成否を確認してください。現時点ではpnpm 12での自動更新は未検証です。
+
+Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合わせて確認します。`actions.lock`が更新されていなければ、PRのブランチで`gh actions-lock`と`gh actions-lock --verify`を実行し、生成結果を同じPRへ追加します。ロック検証が通るまでマージしません。
+
+`.node-version`のNode.js、`packageManager`のpnpm本体、シェル内で固定した`gh-actions-lock`の版は、この設定による自動更新を保証しません。これらは関連設定と互換性を確認して別途更新します。更新PRは`pnpm check`とActionsロック検証の成功後にレビューします。
+
 ## CIでの実行
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。

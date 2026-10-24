@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # ルートの共有ロックと、apps/*・tools/*のワークスペースを対象にする。
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 10
+    # pnpm側の公開後24時間の待機方針に合わせる。
+    cooldown:
+      default-days: 1
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+      time: '09:00'
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 10

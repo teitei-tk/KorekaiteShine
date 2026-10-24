@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "hooks:install": "lefthook install",
+    "check:ai-settings": "node tools/ai-review/check-settings.ts",
     "check": "pnpm check:node && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm check:docs",
     "check:node": "pnpm --dir tools/docs check:node",
     "typecheck": "pnpm --dir tools/docs typecheck && pnpm --dir tools/ai-review typecheck",

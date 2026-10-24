@@ -4,14 +4,18 @@
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm --dir tools/docs typecheck
-pnpm --dir tools/docs test
-pnpm --dir tools/docs check
+pnpm check
 ```
 
 pnpmはルートの[package.json](../../package.json)の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
 
+`pnpm check`はNode.js設定の整合性・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
+
+ネットワークとGitHub認証が必要なActions検証は`pnpm check:actions`に分けます。CIのActions検証ジョブはNode.js・pnpmの準備に依存しないよう、同じ`gh actions-lock --verify`を直接実行します。
+
 ## 検査する内容
+
+- Node.js設定：`.node-version`がルートおよび各パッケージに宣言された`engines.node`の範囲内か、`@types/node`が同じメジャーか、各ワークフローの`actions/setup-node`が`.node-version`を参照しているかを検査します。Git管理対象と未追跡ファイルを対象にし、依存・生成物はGitの除外設定に従います。
 
 - Markdownの書式：markdownlintを使用します。日本語の段落・長いURLのため行長制限を無効にし、表の列幅揃えも要求しません。同名の見出しは同じ階層の兄弟間で検査します。
 - 番号付きリストの開始番号は制約しません。仕様書のユーザーストーリーは、見出しをまたぐ通し番号を維持します。

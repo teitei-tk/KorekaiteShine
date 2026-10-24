@@ -43,9 +43,5 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: 文書検査の依存を導入
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: TypeScriptの型検査
-        run: pnpm --dir tools/docs typecheck
-      - name: リンク検査の回帰テスト
-        run: pnpm --dir tools/docs test
-      - name: 文書を検査
-        run: pnpm --dir tools/docs check
+      - name: 設定整合性・型・テスト・文書を検査
+        run: pnpm check

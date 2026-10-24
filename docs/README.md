@@ -11,21 +11,25 @@
 3. 関係するADR：現在の選択に至った理由と引き受ける負担。
 4. [技術調査記録](research/platform-integration.md)：公式資料の根拠と、実動作で確認すべき事項。
 
+AIコードレビューは[導入設計](research/ai-code-review.md)と[初期設定・確認手順](runbooks/ai-review.md)を参照してください。Workflowは実装済みですが、実アカウントのWIF認証・モデル呼び出し・投稿は未検証です。
+
+エージェントによる認証設定の確認・調査結果の扱い・レビュー委譲は[エージェント作業手順](runbooks/agent-workflow.md)を参照してください。
+
 ## 設計判断の記録
 
-| ADR | 判断 |
-|---|---|
-| [0001](adr/0001-server-relayed-interviews.md) | 音声をサーバーで中継し、面接ごとのDOで状態を管理する |
-| [0002](adr/0002-queued-evaluation.md) | 評価をQueuesとDLQで音声面接から分離する |
-| [0003](adr/0003-immutable-evaluation-evidence.md) | 評価の根拠を固定し、追記メモを分離する |
-| [0004](adr/0004-tanstack-start-with-void.md) | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する |
+| ADR                                               | 判断                                                         |
+| ------------------------------------------------- | ------------------------------------------------------------ |
+| [0001](adr/0001-server-relayed-interviews.md)     | 音声をサーバーで中継し、面接ごとのDOで状態を管理する         |
+| [0002](adr/0002-queued-evaluation.md)             | 評価をQueuesとDLQで音声面接から分離する                      |
+| [0003](adr/0003-immutable-evaluation-evidence.md) | 評価の根拠を固定し、追記メモを分離する                       |
+| [0004](adr/0004-tanstack-start-with-void.md)      | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する |
 
 ## 文書ごとの役割
 
 - `spec`：現在満たすべき要件を記述します。動作の正式な記載先です。
 - `adr`：変更の負担が大きく、背景がないと意図が伝わりにくい、実際のトレードオフを伴う判断だけを記録します。
 - `research`：確認日、出典、公式資料の記載、実動作の検証状況を記録します。製品の最新仕様を保証する文書ではありません。
-- `runbooks`：ローカル起動・配置・障害対応の手順を、実際に検証できた段階で追加します。現時点では作成しません。
+- `runbooks`：初期設定・配置・障害対応の手順です。未検証の手順はその状態を明記し、実動作の確認後に更新します。
 
 未確定事項は[仕様書の補足事項](spec/mvp.md#補足事項)へ集約します。同じ仕様を複数文書で管理せず、判断理由と調査証拠はリンクで結びます。
 
@@ -41,4 +45,4 @@
 - [用語集書式](https://github.com/mattpocock/skills/blob/5beb35b040e3de97e54fa9e386d7e42d15c295c2/skills/engineering/domain-modeling/GLOSSARY-FORMAT.md)に従い、ルートに`GLOSSARY.md`を置きます。旧称は`CONTEXT.md`です。
 - [ADR書式](https://github.com/mattpocock/skills/blob/5beb35b040e3de97e54fa9e386d7e42d15c295c2/skills/engineering/domain-modeling/ADR-FORMAT.md)に従い、連番・短いタイトル・背景と決定理由を基本とします。
 
-`research`と将来の`runbooks`は、このプロジェクト向けに追加した区分です。
+`research`と`runbooks`は、このプロジェクト向けに追加した区分です。

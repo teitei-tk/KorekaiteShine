@@ -1,0 +1,7 @@
+# main側の信頼する設定。PR側の設定は読み込まない。
+web_search = "disabled"
+
+[features]
+shell_tool = false
+multi_agent = false
+goals = false

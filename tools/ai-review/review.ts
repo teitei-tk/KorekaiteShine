@@ -69,19 +69,32 @@ export async function generateReview(
   }
 }
 
+export async function writeReviewArtifact(
+  directory: string,
+  token: string,
+  summaryPath: string,
+  fetcher: typeof fetch = fetch,
+): Promise<void> {
+  const metadata = JSON.parse(readFileSync(join(directory, 'metadata.json'), 'utf8')) as Material;
+  const { value, usage } = await generateReview(
+    token,
+    readFileSync(join(directory, 'prompt.txt'), 'utf8'),
+    metadata.lines,
+    fetcher,
+  );
+  writeFileSync(join(directory, 'result.json'), JSON.stringify(value));
+  appendFileSync(
+    summaryPath,
+    `Responses API使用量: input=${usage.input ?? '不明'}, output=${usage.output ?? '不明'}, total=${usage.total ?? '不明'} tokens\n`,
+  );
+}
+
 if (import.meta.main) {
   try {
-    const directory = process.env.REVIEW_DIRECTORY!;
-    const metadata = JSON.parse(readFileSync(join(directory, 'metadata.json'), 'utf8')) as Material;
-    const { value, usage } = await generateReview(
+    await writeReviewArtifact(
+      process.env.REVIEW_DIRECTORY!,
       process.env.OPENAI_ACCESS_TOKEN ?? '',
-      readFileSync(join(directory, 'prompt.txt'), 'utf8'),
-      metadata.lines,
-    );
-    writeFileSync(join(directory, 'result.json'), JSON.stringify(value));
-    appendFileSync(
       process.env.GITHUB_STEP_SUMMARY!,
-      `Responses API使用量: input=${usage.input ?? '不明'}, output=${usage.output ?? '不明'}, total=${usage.total ?? '不明'} tokens\n`,
     );
   } catch (error) {
     console.error(

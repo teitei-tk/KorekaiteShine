@@ -36,18 +36,29 @@ function readJson(path: string, max: number): unknown {
   if (!stat.isFile() || stat.size > max) throw new Error('成果物のサイズまたは形式が不正です');
   return JSON.parse(readFileSync(path, 'utf8'));
 }
+export function readReviewArtifact(
+  directory: string,
+  expected: Pick<Material, 'number' | 'head' | 'base'>,
+) {
+  const metadata = readJson(join(directory, 'metadata.json'), 100_000) as Material;
+  // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
+  if (
+    metadata.number !== expected.number ||
+    metadata.head !== expected.head ||
+    metadata.base !== expected.base
+  )
+    throw new Error('成果物の対象が一致しません');
+  const review = validReview(readJson(join(directory, 'result.json'), 30_000), metadata.lines);
+  return { metadata, review };
+}
+
 if (import.meta.main) {
   try {
-    const directory = process.env.REVIEW_DIRECTORY!;
-    const metadata = readJson(join(directory, 'metadata.json'), 100_000) as Material;
-    // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
-    if (
-      metadata.number !== Number(process.env.PR_NUMBER) ||
-      metadata.head !== process.env.PR_HEAD ||
-      metadata.base !== process.env.PR_BASE
-    )
-      throw new Error('成果物の対象が一致しません');
-    const review = validReview(readJson(join(directory, 'result.json'), 30_000), metadata.lines);
+    const { metadata, review } = readReviewArtifact(process.env.REVIEW_DIRECTORY!, {
+      number: Number(process.env.PR_NUMBER),
+      head: process.env.PR_HEAD!,
+      base: process.env.PR_BASE!,
+    });
     if (process.argv[2] === 'validate') {
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY!,

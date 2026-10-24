@@ -11,7 +11,7 @@
 3. 関係するADR：現在の選択に至った理由と引き受ける負担。
 4. [技術調査記録](research/platform-integration.md)：公式資料の根拠と、実動作で確認すべき事項。
 
-AIコードレビューは[導入設計](research/ai-code-review.md)と[初期設定・確認手順](runbooks/ai-review.md)を参照してください。Workflowは実装済みですが、実アカウントのWIF認証・モデル呼び出し・投稿は未検証です。
+AIコードレビューは[導入設計](research/ai-code-review.md)と[初期設定・確認手順](runbooks/ai-review.md)を参照してください。Workflowは実装済みですが、実アカウントのWIF交換は成功しています。SDK版のモデル呼び出し・投稿はmain反映後に検証します。
 
 エージェントによる認証設定の確認・調査結果の扱い・レビュー委譲は[エージェント作業手順](runbooks/agent-workflow.md)を参照してください。
 

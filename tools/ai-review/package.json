@@ -6,6 +6,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "openai": "7.43.0"
+  },
   "devDependencies": {
     "@types/node": "26.6.5",
     "typescript": "7.0.2",

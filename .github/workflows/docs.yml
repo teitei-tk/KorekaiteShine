@@ -1,0 +1,30 @@
+name: 文書検査
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: 書式・リンク・見出しアンカー
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/docs/package-lock.json
+      - name: 文書検査の依存を導入
+        run: npm ci --prefix tools/docs --ignore-scripts
+      - name: リンク検査の回帰テスト
+        run: npm --prefix tools/docs test
+      - name: 文書を検査
+        run: npm --prefix tools/docs run check

@@ -19,6 +19,8 @@
 
 本人が同一リポジトリのブランチからmain向けの非Draft PRを作成または更新し、通常CIの完了を待ちます。Actionsの`AI review`を開き、Summaryの「OIDCクレーム（秘密値なし）」を確認します。このモードはGitHub OIDCの確認だけで、OpenAIへのトークン交換・モデル呼び出し・コメント投稿は行いません。
 
+診断では`gate`と`generate`の成功に加え、`Diagnose claims or exchange a short-lived token`ステップが実行されたことを確認します。`publish`とモデル呼び出しのスキップは正常です。Workflow全体が成功していても、対象外判定で診断までスキップされた場合はOIDC確認済みとは扱いません。
+
 次の条件と一致することを確認してください。`sub`も表示されますが、環境・GitHubのsubject設定によって異なるため、推測した値で設定しません。生トークンをコピーしたり、外部のJWT解析サイトへ貼り付けたりする必要はありません。
 
 | Key                   | Value                                                                      |

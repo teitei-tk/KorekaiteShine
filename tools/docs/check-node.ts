@@ -28,13 +28,21 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
       const manifest: Manifest = JSON.parse(await readFile(path.join(root, file), 'utf8'));
       const engine = manifest.engines?.node;
       if (file === 'package.json' && !engine) errors.push(`${file}: engines.nodeが必要です`);
-      if (engine !== undefined && (!semver.validRange(engine) || !semver.satisfies(version, engine))) {
+      if (
+        engine !== undefined &&
+        (!semver.validRange(engine) || !semver.satisfies(version, engine))
+      ) {
         errors.push(`${file}: engines.node (${engine}) がNode.js ${version}を許容していません`);
       }
       for (const section of ['dependencies', 'devDependencies'] as const) {
         const types = manifest[section]?.['@types/node'];
-        if (types !== undefined && (!semver.validRange(types) || !semver.subset(types, `${nodeMajor}.x`))) {
-          errors.push(`${file}: ${section}の@types/node (${types}) をNode.js ${nodeMajor}系に合わせてください`);
+        if (
+          types !== undefined &&
+          (!semver.validRange(types) || !semver.subset(types, `${nodeMajor}.x`))
+        ) {
+          errors.push(
+            `${file}: ${section}の@types/node (${types}) をNode.js ${nodeMajor}系に合わせてください`,
+          );
         }
       }
     }
@@ -43,8 +51,13 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
       for (const [job, config] of Object.entries(workflow.jobs ?? {})) {
         for (const step of config.steps ?? []) {
           if (!step.uses?.startsWith('actions/setup-node@')) continue;
-          if (step.with?.['node-version-file'] !== '.node-version' || 'node-version' in (step.with ?? {})) {
-            errors.push(`${file} (${job}): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください`);
+          if (
+            step.with?.['node-version-file'] !== '.node-version' ||
+            'node-version' in (step.with ?? {})
+          ) {
+            errors.push(
+              `${file} (${job}): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください`,
+            );
           }
         }
       }
@@ -54,9 +67,16 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
 }
 
 async function main() {
-  const files = [...new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
-    cwd: repository, encoding: 'utf8',
-  }).split('\0').filter(Boolean))];
+  const files = [
+    ...new Set(
+      execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
+        cwd: repository,
+        encoding: 'utf8',
+      })
+        .split('\0')
+        .filter(Boolean),
+    ),
+  ];
   const errors = await checkNodeSettings(repository, files);
   if (errors.length) {
     console.error(errors.join('\n'));

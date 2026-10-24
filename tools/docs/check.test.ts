@@ -7,13 +7,15 @@ import { checkLinks } from './check.ts';
 async function fixture(contents: Record<string, string>) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'korekaite-doc-links-'));
   onTestFinished(() => rm(root, { recursive: true, force: true }));
-  for (const [name, source] of Object.entries(contents)) await writeFile(path.join(root, name), source);
+  for (const [name, source] of Object.entries(contents))
+    await writeFile(path.join(root, name), source);
   return root;
 }
 
 test('日本語・装飾・コード・重複見出しと参照形式リンクを解決する', async () => {
   const root = await fixture({
-    'README.md': '# 案内\n\n[参照][target]\n\n[target]: <用語 集.md#判断の根拠-1>\n\n[先頭](用語%20集.md#%E5%88%A4%E6%96%AD%E3%81%AE%E6%A0%B9%E6%8B%A0)\n',
+    'README.md':
+      '# 案内\n\n[参照][target]\n\n[target]: <用語 集.md#判断の根拠-1>\n\n[先頭](用語%20集.md#%E5%88%A4%E6%96%AD%E3%81%AE%E6%A0%B9%E6%8B%A0)\n',
     '用語 集.md': '# **判断**の`根拠`\n\n## 判断の根拠\n',
   });
   expect(await checkLinks(root, ['README.md', '用語 集.md'])).toEqual([]);
@@ -40,7 +42,8 @@ test('ファイル欠落と見出し欠落を別々に報告する', async () =>
 
 test('コード例と外部URLはリンク検査の対象外', async () => {
   const root = await fixture({
-    'README.md': '# 案内\n\n```md\n[例](missing.md)\n```\n\n`[例](missing.md)`\n\n[外部](https://example.invalid/)\n',
+    'README.md':
+      '# 案内\n\n```md\n[例](missing.md)\n```\n\n`[例](missing.md)`\n\n[外部](https://example.invalid/)\n',
   });
   expect(await checkLinks(root, ['README.md'])).toEqual([]);
 });

@@ -12,25 +12,25 @@
 
 [Repository Variables](https://github.com/teitei-tk/KorekaiteShine/settings/variables/actions)を開き、次を登録します。Secretsではありません。
 
-| Name | Value |
-|---|---|
+| Name                  | Value                       |
+| --------------------- | --------------------------- |
 | `OPENAI_WIF_AUDIENCE` | `https://api.openai.com/v1` |
-| `AI_REVIEW_MODE` | `claims` |
+| `AI_REVIEW_MODE`      | `claims`                    |
 
 本人が同一リポジトリのブランチからmain向けの非Draft PRを作成または更新し、通常CIの完了を待ちます。Actionsの`AI review`を開き、Summaryの「OIDCクレーム（秘密値なし）」を確認します。このモードはGitHub OIDCの確認だけで、OpenAIへのトークン交換・モデル呼び出し・コメント投稿は行いません。
 
 次の条件と一致することを確認してください。`sub`も表示されますが、環境・GitHubのsubject設定によって異なるため、推測した値で設定しません。生トークンをコピーしたり、外部のJWT解析サイトへ貼り付けたりする必要はありません。
 
-| Key | Value |
-|---|---|
-| `iss` | `https://token.actions.githubusercontent.com` |
-| `aud` | `https://api.openai.com/v1` |
-| `repository` | `teitei-tk/KorekaiteShine` |
-| `repository_id` | `1426899426` |
-| `repository_owner_id` | `1324680` |
-| `ref` | `refs/heads/main` |
-| `workflow_ref` | `teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main` |
-| `event_name` | `workflow_run` |
+| Key                   | Value                                                                      |
+| --------------------- | -------------------------------------------------------------------------- |
+| `iss`                 | `https://token.actions.githubusercontent.com`                              |
+| `aud`                 | `https://api.openai.com/v1`                                                |
+| `repository`          | `teitei-tk/KorekaiteShine`                                                 |
+| `repository_id`       | `1426899426`                                                               |
+| `repository_owner_id` | `1324680`                                                                  |
+| `ref`                 | `refs/heads/main`                                                          |
+| `workflow_ref`        | `teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main` |
+| `event_name`          | `workflow_run`                                                             |
 
 refがmainなのは、PRコードではなくmainにある後続Workflowで認証するためです。条件が合わない場合は実装と実値を確認し、ワイルドカードに変更して通さないでください。
 
@@ -51,15 +51,15 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 
 新しいProviderに次を入力します。
 
-| 項目 | 設定値 |
-|---|---|
-| Name | `korekaite-github-actions` |
-| Description | `KorekaiteShineの本人PRレビュー専用` |
-| OIDC Issuer URL | `https://token.actions.githubusercontent.com` |
-| Audience | `https://api.openai.com/v1` |
-| Use uploaded JWKS for token verification | 無効 |
-| Custom OIDC discovery | 無効。GitHubの標準discoveryを使用 |
-| Attribute transformations | 追加不要 |
+| 項目                                     | 設定値                                        |
+| ---------------------------------------- | --------------------------------------------- |
+| Name                                     | `korekaite-github-actions`                    |
+| Description                              | `KorekaiteShineの本人PRレビュー専用`          |
+| OIDC Issuer URL                          | `https://token.actions.githubusercontent.com` |
+| Audience                                 | `https://api.openai.com/v1`                   |
+| Use uploaded JWKS for token verification | 無効                                          |
+| Custom OIDC discovery                    | 無効。GitHubの標準discoveryを使用             |
+| Attribute transformations                | 追加不要                                      |
 
 保存後、ProviderのIDを控えます。これは秘密値ではありません。
 
@@ -79,10 +79,10 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 
 [Repository Variables](https://github.com/teitei-tk/KorekaiteShine/settings/variables/actions)に追加します。
 
-| Name | Value |
-|---|---|
-| `OPENAI_IDENTITY_PROVIDER_ID` | 手順4で作成したProviderのID |
-| `OPENAI_SERVICE_ACCOUNT_ID` | 手順5で選択したサービスアカウントのID |
+| Name                          | Value                                 |
+| ----------------------------- | ------------------------------------- |
+| `OPENAI_IDENTITY_PROVIDER_ID` | 手順4で作成したProviderのID           |
+| `OPENAI_SERVICE_ACCOUNT_ID`   | 手順5で選択したサービスアカウントのID |
 
 設定を確認後、`AI_REVIEW_MODE`を`claims`から`review`へ変更します。これ以降、対象PRの通常CI成功後に有料のモデル呼び出しが実行されます。モデルは`gpt-6-luna`、推論強度は`medium`です。
 
@@ -110,16 +110,16 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 
 `AI_REVIEW_MODE`を削除するか`off`に変更すると、次の実行から認証・生成を停止します。進行中の実行はActions画面でキャンセルしてください。
 
-| 状況 | 確認すること |
-|---|---|
-| Workflowが起動しない | mainへの反映、対象CI名、Variables、非Draftか、本人・同一リポジトリのPRか |
-| クレーム不一致 | SummaryとProvider条件、Workflowのファイル名・ref・イベント |
-| WIF HTTP 400/401/403 | Provider/サービスアカウントID、マッピング、有効状態、Organizationの設定権限 |
-| 残存時間が240秒未満 | トークン期限、交換の遅延。期限検査を外さない |
-| モデル実行の認証・権限エラー | ProjectのLuna利用可否、サービスアカウントの実効権限、短命Bearerとの互換性 |
-| 3分以内に完了しない | 入力量とインストール時間。長時間化する場合はSDKのWIF対応案へ切り替える |
-| 不正な出力・位置 | Schemaと資料の整合。未完了を問題なしと扱わない |
-| コメントがない | 投稿前のSHA変更、重複判定、出力検証、GitHubのPR書き込み権限 |
+| 状況                         | 確認すること                                                                |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| Workflowが起動しない         | mainへの反映、対象CI名、Variables、非Draftか、本人・同一リポジトリのPRか    |
+| クレーム不一致               | SummaryとProvider条件、Workflowのファイル名・ref・イベント                  |
+| WIF HTTP 400/401/403         | Provider/サービスアカウントID、マッピング、有効状態、Organizationの設定権限 |
+| 残存時間が240秒未満          | トークン期限、交換の遅延。期限検査を外さない                                |
+| モデル実行の認証・権限エラー | ProjectのLuna利用可否、サービスアカウントの実効権限、短命Bearerとの互換性   |
+| 3分以内に完了しない          | 入力量とインストール時間。長時間化する場合はSDKのWIF対応案へ切り替える      |
+| 不正な出力・位置             | Schemaと資料の整合。未完了を問題なしと扱わない                              |
+| コメントがない               | 投稿前のSHA変更、重複判定、出力検証、GitHubのPR書き込み権限                 |
 
 公式Actionと短命Bearerの組み合わせは、実際の成功を確認するまでは検証中です。SDK案への切り替えは別途実装が必要で、このWorkflowが自動で切り替えるわけではありません。
 
@@ -137,8 +137,8 @@ pnpm check
 gh actions-lock --verify
 ```
 
-`pnpm check`には`tools/ai-review`のoxlintとoxfmtによる検査も含まれます。整形を修正する場合は、ルートで`pnpm format`を実行してください。
+`pnpm check`にはリポジトリ全体のoxlintとoxfmtによる検査も含まれます。整形を修正する場合は、ルートで`pnpm format`を実行してください。
 
-GitHub Actionsでは`Documentation checks`の`AI review tooling checks`ジョブで、Lint・整形確認・型検査・テストを確認できます。このジョブはPRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
+GitHub Actionsでは`Documentation checks`の`Repository lint, format and AI review checks`ジョブで、全体のLint・整形確認とAIレビューツールの型検査・テストを確認できます。このジョブはPRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
 
 認証・モデル・投稿の実検証はGitHubとOpenAIの設定後に別途行います。ローカルのテストは外部APIを模擬し、実際のアカウントへの接続成功を意味しません。

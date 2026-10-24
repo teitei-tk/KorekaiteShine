@@ -1,0 +1,6 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "proseWrap": "preserve",
+  "ignorePatterns": ["pnpm-lock.yaml", ".github/workflows/actions.lock"]
+}

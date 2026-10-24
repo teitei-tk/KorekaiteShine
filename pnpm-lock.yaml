@@ -169,18 +169,18 @@ importers:
       lefthook:
         specifier: 2.2.1
         version: 2.2.1
-
-  tools/ai-review:
-    devDependencies:
-      '@types/node':
-        specifier: 26.6.5
-        version: 26.6.5
       oxfmt:
         specifier: 0.74.0
         version: 0.74.0
       oxlint:
         specifier: 1.89.0
         version: 1.89.0
+
+  tools/ai-review:
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.5
+        version: 26.6.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2

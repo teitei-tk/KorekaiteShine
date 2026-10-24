@@ -15,12 +15,12 @@ AIコードレビューは[導入設計](research/ai-code-review.md)と[初期�
 
 ## 設計判断の記録
 
-| ADR | 判断 |
-|---|---|
-| [0001](adr/0001-server-relayed-interviews.md) | 音声をサーバーで中継し、面接ごとのDOで状態を管理する |
-| [0002](adr/0002-queued-evaluation.md) | 評価をQueuesとDLQで音声面接から分離する |
-| [0003](adr/0003-immutable-evaluation-evidence.md) | 評価の根拠を固定し、追記メモを分離する |
-| [0004](adr/0004-tanstack-start-with-void.md) | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する |
+| ADR                                               | 判断                                                         |
+| ------------------------------------------------- | ------------------------------------------------------------ |
+| [0001](adr/0001-server-relayed-interviews.md)     | 音声をサーバーで中継し、面接ごとのDOで状態を管理する         |
+| [0002](adr/0002-queued-evaluation.md)             | 評価をQueuesとDLQで音声面接から分離する                      |
+| [0003](adr/0003-immutable-evaluation-evidence.md) | 評価の根拠を固定し、追記メモを分離する                       |
+| [0004](adr/0004-tanstack-start-with-void.md)      | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する |
 
 ## 文書ごとの役割
 

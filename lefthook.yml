@@ -1,4 +1,4 @@
-# 作業ツリー全体を検査し、自動修正・自動stageは行わない。
+# ルート共通設定で全体をlint・format確認する。自動修正・自動stageは行わない。
 lefthook: pnpm exec lefthook
 
 pre-commit:

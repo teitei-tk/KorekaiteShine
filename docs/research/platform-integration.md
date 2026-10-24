@@ -6,27 +6,27 @@
 
 ## Void・TanStack Start・UI
 
-| 資料上で確認した内容 | 公式資料 |
-|---|---|
-| VoidとTanStack StartのViteプラグインを組み合わせる連携手順がある | [TanStack Start連携](https://void.cloud/integrations/frameworks/tanstack-start) |
-| カスタムWorkerエントリからDOクラスを公開し、Cloudflareのバインディングを設定する方式がある | [同・カスタムWorkerエントリ](https://void.cloud/integrations/frameworks/tanstack-start#custom-worker-entry) |
-| native Void向けDO自動検出と、メタフレームワーク構成のDO組み込みは区別が必要 | [Durable State](https://void.cloud/guide/durable-state) |
-| Void標準の型付きWebSocketルートはnative Void向けで、直接のバイナリメッセージには対応しない | [WebSockets](https://void.cloud/guide/websockets) |
-| shadcn/uiにTanStack Router向けの導入案内がある | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router) |
-| TanStack StartにCloudflareへの配置とカスタムエントリの案内がある | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
+| 資料上で確認した内容                                                                       | 公式資料                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VoidとTanStack StartのViteプラグインを組み合わせる連携手順がある                           | [TanStack Start連携](https://void.cloud/integrations/frameworks/tanstack-start)                                                                                                           |
+| カスタムWorkerエントリからDOクラスを公開し、Cloudflareのバインディングを設定する方式がある | [同・カスタムWorkerエントリ](https://void.cloud/integrations/frameworks/tanstack-start#custom-worker-entry)                                                                               |
+| native Void向けDO自動検出と、メタフレームワーク構成のDO組み込みは区別が必要                | [Durable State](https://void.cloud/guide/durable-state)                                                                                                                                   |
+| Void標準の型付きWebSocketルートはnative Void向けで、直接のバイナリメッセージには対応しない | [WebSockets](https://void.cloud/guide/websockets)                                                                                                                                         |
+| shadcn/uiにTanStack Router向けの導入案内がある                                             | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router)                                                                                                                      |
+| TanStack StartにCloudflareへの配置とカスタムエントリの案内がある                           | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
 
 採用構成全体の互換性と具体的なパッケージバージョンは未検証です。資料の存在だけで、音声中継・D1・Queue・DLQが一体で動くとは判断しません。
 
 ## WebSocket・再開・外部保持
 
-| 資料上で確認した内容 | 公式資料 |
-|---|---|
-| 通常WorkerとDOの両方でWebSocketを扱える | [Workers WebSockets](https://developers.cloudflare.com/workers/runtime-apis/websockets/) |
-| DOの外向きWebSocketは休止の対象外 | [DO WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) |
-| DOのメモリと接続は再起動をまたいで保証されないため、永続状態からの復旧が必要 | [DOのライフサイクル](https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/) |
-| Geminiの接続時間には制限があり、終了予告と再開用ハンドルを扱う必要がある。参照時の案内は接続約10分、圧縮なしの音声セッション15分 | [Geminiセッション管理](https://ai.google.dev/gemini-api/docs/live-api/session-management) |
-| Geminiのセッション再開を有効にすると、音声を含む会話状態が最大24時間保持される | [Googleのデータ保持](https://ai.google.dev/gemini-api/docs/zdr) |
-| 学習・製品改善への利用条件と、サービスのデータ保持は別の条件 | [Gemini API利用条件](https://ai.google.dev/gemini-api/terms) |
+| 資料上で確認した内容                                                                                                             | 公式資料                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 通常WorkerとDOの両方でWebSocketを扱える                                                                                          | [Workers WebSockets](https://developers.cloudflare.com/workers/runtime-apis/websockets/)                   |
+| DOの外向きWebSocketは休止の対象外                                                                                                | [DO WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/)              |
+| DOのメモリと接続は再起動をまたいで保証されないため、永続状態からの復旧が必要                                                     | [DOのライフサイクル](https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/) |
+| Geminiの接続時間には制限があり、終了予告と再開用ハンドルを扱う必要がある。参照時の案内は接続約10分、圧縮なしの音声セッション15分 | [Geminiセッション管理](https://ai.google.dev/gemini-api/docs/live-api/session-management)                  |
+| Geminiのセッション再開を有効にすると、音声を含む会話状態が最大24時間保持される                                                   | [Googleのデータ保持](https://ai.google.dev/gemini-api/docs/zdr)                                            |
+| 学習・製品改善への利用条件と、サービスのデータ保持は別の条件                                                                     | [Gemini API利用条件](https://ai.google.dev/gemini-api/terms)                                               |
 
 日本語の対話・文字起こし、発言の確定タイミング、切断直前の欠落、再開可能な状態、再開失敗時の動作は未検証です。モデル名を調査時の例から採用済みとして転記しません。実際の利用アカウントでの可用性も確認が必要です。
 

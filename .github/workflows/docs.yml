@@ -52,7 +52,7 @@ jobs:
       - name: Check documentation
         run: pnpm check:docs
   ai-review-tooling:
-    name: AI review tooling checks
+    name: Repository lint, format and AI review checks
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -69,10 +69,10 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Lint AI review tooling with oxlint
-        run: pnpm --dir tools/ai-review lint
-      - name: Check AI review tooling formatting with oxfmt
-        run: pnpm --dir tools/ai-review format:check
+      - name: Lint repository with oxlint
+        run: pnpm lint
+      - name: Check repository formatting with oxfmt
+        run: pnpm format:check
       - name: Check AI review tooling types
         run: pnpm --dir tools/ai-review typecheck
       - name: Test AI review tooling

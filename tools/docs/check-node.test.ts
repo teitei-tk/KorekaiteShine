@@ -16,11 +16,14 @@ async function inspect(contents: Record<string, string>) {
 }
 
 test('ルートと子パッケージの範囲・型定義・CIの参照が一致すれば成功する', async () => {
-  expect(await inspect({
-    'package.json': JSON.stringify({ engines: { node: '>=26.12.1 <27' } }),
-    'apps/worker/package.json': JSON.stringify({ devDependencies: { '@types/node': '^26.6.5' } }),
-    '.github/workflows/docs.yml': 'jobs:\n  docs:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: .node-version\n',
-  })).toEqual([]);
+  expect(
+    await inspect({
+      'package.json': JSON.stringify({ engines: { node: '>=26.12.1 <27' } }),
+      'apps/worker/package.json': JSON.stringify({ devDependencies: { '@types/node': '^26.6.5' } }),
+      '.github/workflows/docs.yml':
+        'jobs:\n  docs:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: .node-version\n',
+    }),
+  ).toEqual([]);
 });
 
 test('Nodeの更新後に残った古いengineと型定義をそれぞれ検出する', async () => {

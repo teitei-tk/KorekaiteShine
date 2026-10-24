@@ -14,10 +14,10 @@
 
 ## 実行基盤の選択
 
-| 案 | 利点 | 制約と採用条件 |
-|---|---|---|
+| 案                                             | 利点                                                                              | 制約と採用条件                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 第一候補：`openai/codex-action`と事前のWIF交換 | 関連コードを自律的に読む既存基盤、プロンプト・JSON Schema・モデル指定を利用できる | WIF専用入力や更新機構は確認できない。交換済みBearerを入力する接続と、期限内の完了を実証する |
-| 代替：公式SDKのWIF対応とResponses API | 公式のWIF経路を使い、入力・出力上限と使用量を管理しやすい | 関連ファイルを収集する処理が必要。単純な差分だけのレビューにはしない |
+| 代替：公式SDKのWIF対応とResponses API          | 公式のWIF経路を使い、入力・出力上限と使用量を管理しやすい                         | 関連ファイルを収集する処理が必要。単純な差分だけのレビューにはしない                        |
 
 利用者指定の第一候補から検証します。PR-AgentはLuna・WIFの互換性確認と追加設定が必要になるため、この二案で成立しない場合に再検討します。
 
@@ -60,26 +60,26 @@ Googleのレビュー観点と判断基準を主軸に、設計・動作・複�
 3. Provider名を`korekaite-github-actions`、Issuerを`https://token.actions.githubusercontent.com`、Audienceを`https://api.openai.com/v1`とします。GitHubのOIDC discoveryを使い、JWKSの手動アップロードは無効にします。
 4. サービスアカウントへのマッピングに次の条件をすべて設定します。初回はAPIを呼ばず、許可したクレーム項目だけを表示して実値を照合します。値が違う場合は理由を調べ、安易にワイルドカードへ緩めません。
 
-| Key | Value |
-|---|---|
-| `iss` | `https://token.actions.githubusercontent.com` |
-| `aud` | `https://api.openai.com/v1` |
-| `repository` | `teitei-tk/KorekaiteShine` |
-| `repository_id` | `1426899426` |
-| `repository_owner_id` | `1324680` |
-| `ref` | `refs/heads/main` |
-| `workflow_ref` | `teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main` |
-| `event_name` | `workflow_run` |
+| Key                   | Value                                                                      |
+| --------------------- | -------------------------------------------------------------------------- |
+| `iss`                 | `https://token.actions.githubusercontent.com`                              |
+| `aud`                 | `https://api.openai.com/v1`                                                |
+| `repository`          | `teitei-tk/KorekaiteShine`                                                 |
+| `repository_id`       | `1426899426`                                                               |
+| `repository_owner_id` | `1324680`                                                                  |
+| `ref`                 | `refs/heads/main`                                                          |
+| `workflow_ref`        | `teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main` |
+| `event_name`          | `workflow_run`                                                             |
 
 このrefはPRのheadではなく、信頼する後続Workflowのrefです。通常の`pull_request`で直接認証する構成へ変更した場合は使い回せません。`sub`も実値を確認します。環境やGitHubのsubject設定で形式が変わるため、未確認の値を固定しません。[GitHub OIDC仕様](https://docs.github.com/en/actions/reference/security/oidc)を参照してください。
 
 マッピングのPermissionsは`api.model.request`を基本に、採用するクライアントが必要とする場合だけモデル参照権限を追加します。GitHubのRepository Variablesに次を保存します。Provider・サービスアカウントのIDは実際に作成された値を使います。
 
-| Variable | 値 |
-|---|---|
-| `OPENAI_WIF_AUDIENCE` | `https://api.openai.com/v1` |
-| `OPENAI_IDENTITY_PROVIDER_ID` | 作成したProviderのID |
-| `OPENAI_SERVICE_ACCOUNT_ID` | レビュー専用サービスアカウントのID |
+| Variable                      | 値                                 |
+| ----------------------------- | ---------------------------------- |
+| `OPENAI_WIF_AUDIENCE`         | `https://api.openai.com/v1`        |
+| `OPENAI_IDENTITY_PROVIDER_ID` | 作成したProviderのID               |
+| `OPENAI_SERVICE_ACCOUNT_ID`   | レビュー専用サービスアカウントのID |
 
 トークンは取得直後にマスクし、ログ・成果物・ジョブ間出力に保存しません。生の認証エラー本文も出さず、HTTP状態と機密値を含まない分類を記録します。
 

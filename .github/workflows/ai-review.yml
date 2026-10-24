@@ -67,12 +67,17 @@ jobs:
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
+      - uses: pnpm/action-setup@v6.1.0
+        if: vars.AI_REVIEW_MODE == 'review'
+        with:
+          package_json_file: package.json
+      - name: Install trusted review dependencies before authentication
+        if: vars.AI_REVIEW_MODE == 'review'
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Keep the repository Node version for validation
         run: |
           echo "REVIEW_NODE=$(command -v node)" >> "$GITHUB_ENV"
           echo "REVIEW_DIRECTORY=$RUNNER_TEMP/ai-review-material" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/ai-review-codex"
-          cp tools/ai-review/codex.toml "$RUNNER_TEMP/ai-review-codex/config.toml"
       - name: Recheck target and collect inert text without executing PR code
         id: material
         env:
@@ -98,26 +103,13 @@ jobs:
         id: review
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
         timeout-minutes: 3
-        uses: openai/codex-action@v1.13
         env:
-          # Codexの子プロセスへOIDC再取得権限やGitHub認証を渡さない。
+          OPENAI_ACCESS_TOKEN: ${{ steps.wif.outputs.token }}
           ACTIONS_ID_TOKEN_REQUEST_URL: ''
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ''
           GH_TOKEN: ''
           GITHUB_TOKEN: ''
-        with:
-          openai-api-key: ${{ steps.wif.outputs.token }}
-          model: gpt-6-luna
-          effort: medium
-          codex-version: 0.164.0
-          permission-profile: ':read-only'
-          safety-strategy: drop-sudo
-          codex-home: ${{ runner.temp }}/ai-review-codex
-          working-directory: ${{ runner.temp }}/ai-review-material
-          prompt-file: ${{ runner.temp }}/ai-review-material/prompt.txt
-          output-schema-file: ${{ github.workspace }}/tools/ai-review/schema.json
-          output-file: ${{ runner.temp }}/ai-review-material/result.json
-          codex-args: '["--json", "--ephemeral"]'
+        run: node tools/ai-review/review.ts
       - name: Validate output before handing it to the posting job
         id: validate
         if: steps.review.outcome == 'success'

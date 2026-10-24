@@ -91,7 +91,7 @@ if (import.meta.main) {
       `### OIDCクレーム（秘密値なし）\n\n\x60\x60\x60json\n${JSON.stringify(result.claims, null, 2)}\n\x60\x60\x60\n`,
     );
     if (result.accessToken) {
-      // 同じジョブ内の次のActionにだけ渡す。ジョブ出力やartifactには含めない。
+      // 同じジョブ内のSDK実行ステップにだけ渡す。ジョブ出力やartifactには含めない。
       appendFileSync(process.env.GITHUB_OUTPUT!, `token=${result.accessToken}\n`);
     }
   } catch (error) {

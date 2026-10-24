@@ -39,3 +39,21 @@ pnpmは`package.json`の`packageManager`で固定します。検査ツールと�
 ## CIでの実行
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。
+
+### Actionsのロック
+
+[gh-actions-lock](https://github.com/github/gh-actions-lock) v0.4.0で[actions.lock](../../.github/workflows/actions.lock)を生成します。ワークフローの`uses:`には具体的なタグを残し、完全なコミットSHAと取得元の識別情報はロックファイルで固定します。
+
+GitHub CLIの認証後、リポジトリルートで実行します。
+
+```sh
+gh extension install github/gh-actions-lock --pin v0.4.0
+gh actions-lock
+gh actions-lock --verify
+```
+
+拡張を導入済みの場合はインストールを省略します。ワークフローや`uses:`を変更したら再生成し、ワークフローとロックファイルの差分を一緒にレビューします。ロックファイルは手編集しません。CIも固定版のツールで`--verify`を実行し、読み取り専用の`github.token`をそのステップにだけ渡します。
+
+既存の参照先を更新する場合は`gh actions-lock --relock`を使い、変更されたSHAと更新理由を確認します。`--accept-moved`で自動的に受け入れる運用は行いません。`--verify-local`はネットワーク不要の対応関係の検査であり、取得元を確認する`--verify`の代わりにはしません。
+
+このツールは公開プレビューです。更新時はツールの版・ロック形式・CIの互換性を確認します。シェル内で導入するCLIやnpm依存はActionsロックの対象外であり、別途バージョン固定とpnpmの保護設定を維持します。

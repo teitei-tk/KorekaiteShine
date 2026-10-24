@@ -9,18 +9,34 @@ permissions:
   contents: read
 
 jobs:
+  verify-lockfile:
+    name: Actionsロック検証
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+      - name: 検証ツールを固定版で導入
+        run: gh extension install github/gh-actions-lock --pin v0.4.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Actionsの固定内容と取得元を検証
+        run: gh actions-lock --verify
+        env:
+          GH_TOKEN: ${{ github.token }}
   docs:
     name: 書式・リンク・見出しアンカー
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4.3.0
         with:
           package_json_file: tools/docs/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version-file: .node-version
           cache: pnpm

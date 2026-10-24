@@ -36,7 +36,7 @@ describe('SDKレビュー', () => {
       });
       return response();
     };
-    const result = await generateReview(token, 'review data', fetcher);
+    const result = await generateReview(token, 'review data', {}, fetcher);
     expect(result.value).toEqual(review);
     expect(result.usage).toEqual({ input: 10, output: 20, total: 30 });
     expect(calls).toBe(1);
@@ -44,7 +44,7 @@ describe('SDKレビュー', () => {
   it('429でも再試行せず、外部エラー本文を漏らさない', async () => {
     let calls = 0;
     await expect(
-      generateReview('test-token', 'data', async () => {
+      generateReview('test-token', 'data', {}, async () => {
         calls++;
         return Response.json({ error: { message: 'SECRET error body' } }, { status: 429 });
       }),
@@ -53,17 +53,44 @@ describe('SDKレビュー', () => {
   });
   it.each(['incomplete', 'failed', 'cancelled'])('APIの%sを成功扱いしない', async (status) => {
     await expect(
-      generateReview('test-token', 'data', async () => response(status)),
+      generateReview('test-token', 'data', {}, async () => response(status)),
     ).rejects.toThrow('レビュー生成に失敗しました');
   });
   it.each(['', 'not-json', 'x'.repeat(30001)])('空・不正・過大出力を拒否する', async (text) => {
     await expect(
-      generateReview('test-token', 'data', async () => response('completed', text)),
+      generateReview('test-token', 'data', {}, async () => response('completed', text)),
+    ).rejects.toThrow('レビュー生成に失敗しました');
+  });
+  it('JSONとして正常でもレビュー形式が不正なら拒否する', async () => {
+    await expect(
+      generateReview('test-token', 'data', {}, async () =>
+        response('completed', '{"status":"complete"}'),
+      ),
+    ).rejects.toThrow('レビュー生成に失敗しました');
+  });
+  it('差分にない行への指摘をSDK境界で拒否する', async () => {
+    const invalid = {
+      ...review,
+      findings: [
+        {
+          priority: 'P1',
+          path: 'app.ts',
+          line: 10,
+          condition: '条件',
+          impact: '影響',
+          fix: '修正',
+        },
+      ],
+    };
+    await expect(
+      generateReview('test-token', 'data', { 'app.ts': [1] }, async () =>
+        response('completed', JSON.stringify(invalid)),
+      ),
     ).rejects.toThrow('レビュー生成に失敗しました');
   });
   it('通信例外の内容を漏らさない', async () => {
     await expect(
-      generateReview('test-token', 'data', async () => {
+      generateReview('test-token', 'data', {}, async () => {
         throw new Error('SECRET');
       }),
     ).rejects.toThrow(/^レビュー生成に失敗しました。$/);

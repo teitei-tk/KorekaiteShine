@@ -1,12 +1,15 @@
 # 文書検査
 
-文書変更時に、リポジトリルートから次を実行します。Node.js 22以降とnpmを使い、依存は文書検査専用のこのディレクトリで管理します。
+文書変更時に、リポジトリルートから次を実行します。Node.js 22.18以降とpnpm 12.15.0を使い、依存は文書検査専用のこのディレクトリで管理します。
 
 ```sh
-npm ci --prefix tools/docs --ignore-scripts
-npm --prefix tools/docs test
-npm --prefix tools/docs run check
+pnpm --dir tools/docs install --frozen-lockfile --ignore-scripts
+pnpm --dir tools/docs typecheck
+pnpm --dir tools/docs test
+pnpm --dir tools/docs check
 ```
+
+pnpmは`package.json`の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述し、Node.jsの型除去機能で直接実行します。`typecheck`で型検査を別途行います。
 
 ## 検査する内容
 

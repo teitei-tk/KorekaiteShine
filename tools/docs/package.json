@@ -3,15 +3,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node check.mjs",
-    "test": "node --test check.test.mjs"
+    "check": "node check.ts",
+    "test": "node --test check.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "github-slugger": "2.0.0",
     "markdown-it": "15.0.3",
-    "markdownlint": "0.42.0"
-  }
+    "markdownlint": "0.42.0",
+    "typescript": "7.0.2"
+  },
+  "packageManager": "pnpm@12.15.0"
 }

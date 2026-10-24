@@ -17,14 +17,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: tools/docs/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: tools/docs/package-lock.json
+          cache: pnpm
+          cache-dependency-path: tools/docs/pnpm-lock.yaml
       - name: 文書検査の依存を導入
-        run: npm ci --prefix tools/docs --ignore-scripts
+        run: pnpm --dir tools/docs install --frozen-lockfile --ignore-scripts
+      - name: TypeScriptの型検査
+        run: pnpm --dir tools/docs typecheck
       - name: リンク検査の回帰テスト
-        run: npm --prefix tools/docs test
+        run: pnpm --dir tools/docs test
       - name: 文書を検査
-        run: npm --prefix tools/docs run check
+        run: pnpm --dir tools/docs check

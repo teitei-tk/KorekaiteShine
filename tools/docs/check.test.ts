@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
-import { checkLinks } from './check.mjs';
+import test, { type TestContext } from 'node:test';
+import { checkLinks } from './check.ts';
 
-async function fixture(t, contents) {
+async function fixture(t: TestContext, contents: Record<string, string>) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'korekaite-doc-links-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   for (const [name, source] of Object.entries(contents)) await writeFile(path.join(root, name), source);

@@ -7,10 +7,11 @@ import GithubSlugger from 'github-slugger';
 import { lint } from 'markdownlint/promise';
 
 const markdown = new MarkdownIt();
+type Token = ReturnType<typeof markdown.parse>[number];
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-function plainText(tokens = []) {
-  return tokens.map((token) => {
+function plainText(tokens: Token[] | null | undefined = []): string {
+  return (tokens ?? []).map((token) => {
     if (token.type === 'image') return plainText(token.children);
     if (token.type === 'text' || token.type === 'code_inline') return token.content;
     if (token.type === 'softbreak' || token.type === 'hardbreak') return ' ';
@@ -18,11 +19,11 @@ function plainText(tokens = []) {
   }).join('');
 }
 
-function parse(source) {
+function parse(source: string) {
   const tokens = markdown.parse(source, {});
   const slugger = new GithubSlugger();
-  const anchors = new Set();
-  const links = [];
+  const anchors = new Set<string>();
+  const links: { url: string; line: number }[] = [];
   let line = 1;
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index];
@@ -35,25 +36,28 @@ function parse(source) {
       for (const child of token.children ?? []) {
         const url = child.type === 'link_open' ? child.attrGet('href')
           : child.type === 'image' ? child.attrGet('src') : null;
-        if (url) links.push({ url, line });
+        if (typeof url === 'string' && url) links.push({ url, line });
       }
     }
   }
   return { anchors, links };
 }
 
-function within(root, target) {
+function within(root: string, target: string) {
   const relative = path.relative(root, target);
   return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-export async function checkLinks(root, files) {
+export async function checkLinks(root: string, files: string[]) {
   root = await realpath(root);
-  const documents = new Map();
-  const errors = [];
-  async function document(file) {
-    if (!documents.has(file)) documents.set(file, parse(await readFile(file, 'utf8')));
-    return documents.get(file);
+  const documents = new Map<string, ReturnType<typeof parse>>();
+  const errors: string[] = [];
+  async function document(file: string) {
+    const cached = documents.get(file);
+    if (cached) return cached;
+    const parsed = parse(await readFile(file, 'utf8'));
+    documents.set(file, parsed);
+    return parsed;
   }
   for (const file of files) {
     const source = path.resolve(root, file);
@@ -79,7 +83,7 @@ export async function checkLinks(root, files) {
           if (!(await document(target)).anchors.has(fragment)) throw new Error('見出しが存在しない');
         }
       } catch (error) {
-        const reason = error.code === 'ENOENT' ? 'ファイルが存在しない' : error.message;
+        const reason = error instanceof Error && 'code' in error && error.code === 'ENOENT' ? 'ファイルが存在しない' : error instanceof Error ? error.message : String(error);
         errors.push(`${file}:${line}: ${reason}: ${url}`);
       }
     }
@@ -98,7 +102,7 @@ async function main() {
       await stat(path.join(repository, file));
       existing.push(file);
     } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
     }
   }
   const config = JSON.parse(await readFile(path.join(repository, '.markdownlint.json'), 'utf8'));

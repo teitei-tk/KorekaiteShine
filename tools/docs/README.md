@@ -22,6 +22,20 @@ pnpmは`package.json`の`packageManager`で固定します。検査ツールと�
 
 外部URLには接続せず、到達性や資料の正確さは検査しません。HTMLで独自に付けたアンカー、Markdown以外へのフラグメントリンクは未対応です。仕様・ADRの意味の整合性と合意事項の網羅性は、人またはレビュー担当エージェントが確認します。
 
-## CI
+## 依存のサプライチェーン対策
+
+設定は[pnpm-workspace.yaml](pnpm-workspace.yaml)で管理し、この文書検査パッケージに適用します。
+
+- `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
+- `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。
+- `blockExoticSubdeps: true`：推移依存からの未信頼なGit・tarball URL等を制限します。直接依存の取得元は別途レビューします。
+- `trustPolicy: no-downgrade`：以前の公開版より信頼情報が弱い版を拒否します。すべてのパッケージにprovenanceを要求する設定ではありません。
+- `trustLockfile: false`：ロック済み依存も待機期間・信頼情報の検証対象にします。
+
+例外指定は追加していません。拒否された場合は対象版と理由を確認し、設定全体を無効化して回避しません。待機期間は攻撃の検出猶予であり、安全性の保証ではありません。緊急の修正版も待機対象になります。
+
+仕様の根拠：[pnpm依存解決設定](https://pnpm.io/settings/dependency-resolution)、[ビルド設定](https://pnpm.io/settings/build)。
+
+## CIでの実行
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。

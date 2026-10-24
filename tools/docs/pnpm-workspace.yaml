@@ -1,0 +1,10 @@
+# 新規公開から24時間待ち、条件を確認できない場合も拒否する。
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: true
+minimumReleaseAgeIgnoreMissingTime: false
+
+# 未審査の依存ビルドと、推移依存の不正な取得経路を拒否する。
+strictDepBuilds: true
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+trustLockfile: false

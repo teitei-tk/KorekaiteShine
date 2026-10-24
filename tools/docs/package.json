@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "check": "node check.ts",
-    "test": "node --test check.test.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -15,7 +15,8 @@
     "github-slugger": "2.0.0",
     "markdown-it": "15.0.3",
     "markdownlint": "0.42.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
   },
   "packageManager": "pnpm@12.15.0"
 }

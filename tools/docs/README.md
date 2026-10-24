@@ -9,7 +9,7 @@ pnpm --dir tools/docs test
 pnpm --dir tools/docs check
 ```
 
-pnpmは`package.json`の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述し、Node.jsの型除去機能で直接実行します。`typecheck`で型検査を別途行います。
+pnpmは`package.json`の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
 
 ## 検査する内容
 

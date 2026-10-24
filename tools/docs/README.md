@@ -1,15 +1,15 @@
 # 文書検査
 
-文書変更時に、リポジトリルートから次を実行します。Node.jsはルートの[.node-version](../../.node-version)に合わせ、pnpm 12.15.0を使います。依存は文書検査専用のこのディレクトリで管理します。
+文書変更時に、リポジトリルートから次を実行します。Node.jsはルートの[.node-version](../../.node-version)に合わせ、pnpm 12.15.0を使います。文書検査の依存宣言はこのディレクトリに置き、ロックファイルはルートで共有します。
 
 ```sh
-pnpm --dir tools/docs install --frozen-lockfile --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm --dir tools/docs typecheck
 pnpm --dir tools/docs test
 pnpm --dir tools/docs check
 ```
 
-pnpmは`package.json`の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
+pnpmはルートの[package.json](../../package.json)の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
 
 ## 検査する内容
 
@@ -24,7 +24,7 @@ pnpmは`package.json`の`packageManager`で固定します。検査ツールと�
 
 ## 依存のサプライチェーン対策
 
-設定は[pnpm-workspace.yaml](pnpm-workspace.yaml)で管理し、この文書検査パッケージに適用します。
+設定はルートの[pnpm-workspace.yaml](../../pnpm-workspace.yaml)で管理します。`packages`で`tools/*`と`apps/*`を対象にするため、将来追加する`apps/worker`・`apps/frontend`にも共通の保護設定が適用されます。各パッケージには`package.json`を置き、入れ子の`pnpm-workspace.yaml`で別ワークスペースに分離しない方針です。アプリのディレクトリや雛形はまだ作成していません。
 
 - `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
 - `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。

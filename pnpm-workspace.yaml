@@ -1,3 +1,7 @@
+packages:
+  - 'apps/*'
+  - 'tools/*'
+
 # 新規公開から24時間待ち、条件を確認できない場合も拒否する。
 minimumReleaseAge: 1440
 minimumReleaseAgeStrict: true

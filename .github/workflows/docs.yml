@@ -35,14 +35,14 @@ jobs:
           persist-credentials: false
       - uses: pnpm/action-setup@v4.3.0
         with:
-          package_json_file: tools/docs/package.json
+          package_json_file: package.json
       - uses: actions/setup-node@v4.4.0
         with:
           node-version-file: .node-version
           cache: pnpm
-          cache-dependency-path: tools/docs/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
       - name: 文書検査の依存を導入
-        run: pnpm --dir tools/docs install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: TypeScriptの型検査
         run: pnpm --dir tools/docs typecheck
       - name: リンク検査の回帰テスト

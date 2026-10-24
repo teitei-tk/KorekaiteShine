@@ -164,7 +164,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  tools/docs:
     devDependencies:
       '@types/node':
         specifier: 26.6.5

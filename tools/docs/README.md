@@ -1,6 +1,6 @@
 # 文書検査
 
-文書変更時に、リポジトリルートから次を実行します。Node.js 22.18以降とpnpm 12.15.0を使い、依存は文書検査専用のこのディレクトリで管理します。
+文書変更時に、リポジトリルートから次を実行します。Node.jsはルートの[.node-version](../../.node-version)に合わせ、pnpm 12.15.0を使います。依存は文書検査専用のこのディレクトリで管理します。
 
 ```sh
 pnpm --dir tools/docs install --frozen-lockfile --ignore-scripts
@@ -24,4 +24,4 @@ pnpmは`package.json`の`packageManager`で固定します。検査ツールと�
 
 ## CI
 
-GitHub Actionsでも同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。
+GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。

@@ -9,9 +9,26 @@ pnpm check
 
 pnpmはルートの[package.json](../../package.json)の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
 
-`pnpm check`はNode.js設定の整合性・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
+`pnpm check`はNode.js設定の整合性・Lint・整形確認・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。型検査とVitestは`tools/docs`と`tools/ai-review`の両方を対象にします。AIレビューの設定は[専用手順](../../docs/runbooks/ai-review.md)を参照してください。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
+
+`tools/ai-review`にはoxlintとoxfmtを使用します。リポジトリルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。対象は`tools/ai-review`内に限定し、設定と固定バージョンも同パッケージで管理します。oxlintはcorrectnessをエラーとして検査し、警告も終了コードを失敗にします。型検査は従来のTypeScriptを併用します。CIが呼ぶ`pnpm check`では整形の書き換えを行いません。
 
 ネットワークとGitHub認証が必要なActions検証は`pnpm check:actions`に分けます。CIのActions検証ジョブはNode.js・pnpmの準備に依存しないよう、同じ`gh actions-lock --verify`を直接実行します。
+
+## commit・push前の検査
+
+[Lefthook設定](../../lefthook.yml)で、commit前とpush前の両方に`pnpm lint`、`pnpm format:check`、`pnpm test`を実行します。検査が失敗すると操作を中止します。作業ツリー全体が対象で、整形の自動修正や自動stageは行いません。部分stage時も未stageの内容を含むため、commit対象そのものの検証はCIでも行います。
+
+clone後は依存をインストールし、フックを明示的に有効化してください。依存のインストールスクリプトは許可しません。
+
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm hooks:install
+```
+
+既存の秘密値検査を維持するため、pre-commitでは`git secrets --pre_commit_hook`も実行します。`git-secrets`を利用可能にし、既存の検出ルールを維持してください。Lefthook導入時に既存pre-commitは`pre-commit.old`へ退避されますが、検査自体はLefthookのコマンドとして実行します。既存のcommit-msg・prepare-commit-msgフックは変更しません。`git secrets --install --force`でpre-commitを上書きしないでください。
+
+Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2はpnpmの`trustPolicy: no-downgrade`に拒否されたため、保護設定を維持して直前の版を採用しました。[公式のインストール手順](https://lefthook.dev/usage/commands/install/)に沿って、CIではなく開発者のcloneでフックを有効化します。
 
 ## 検査する内容
 
@@ -54,7 +71,11 @@ Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合
 
 ## CIでの実行
 
-GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。既存のローカルgit-secretsフックは変更しません。
+GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。ローカルのgit-secretsによるpre-commit検査はLefthookから実行します。
+
+`Documentation checks`内で、文書検査・Actionsロック検証・`AI review tooling checks`を独立したジョブとして実行します。AIレビュー検査ジョブは`tools/ai-review`のoxlint、oxfmtの整形確認、TypeScript、Vitestを個別ステップで実行します。CIでは整形を書き換えず、OpenAIへの通信も行いません。ローカルの`pnpm check`はこれらのコード・文書検査をまとめて実行する入口として維持します。
+
+有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。
 
 ### Actionsのロック
 

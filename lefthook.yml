@@ -1,0 +1,24 @@
+# 作業ツリー全体を検査し、自動修正・自動stageは行わない。
+lefthook: pnpm exec lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    git-secrets:
+      run: git secrets --pre_commit_hook
+    lint:
+      run: pnpm lint
+    format:
+      run: pnpm format:check
+    test:
+      run: pnpm test
+
+pre-push:
+  parallel: true
+  commands:
+    lint:
+      run: pnpm lint
+    format:
+      run: pnpm format:check
+    test:
+      run: pnpm test

@@ -43,5 +43,37 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install documentation check dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Check configuration, types, tests, and documentation
-        run: pnpm check
+      - name: Check Node.js configuration
+        run: pnpm check:node
+      - name: Check documentation tooling types
+        run: pnpm --dir tools/docs typecheck
+      - name: Test documentation tooling
+        run: pnpm --dir tools/docs test
+      - name: Check documentation
+        run: pnpm check:docs
+  ai-review-tooling:
+    name: AI review tooling checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Lint AI review tooling with oxlint
+        run: pnpm --dir tools/ai-review lint
+      - name: Check AI review tooling formatting with oxfmt
+        run: pnpm --dir tools/ai-review format:check
+      - name: Check AI review tooling types
+        run: pnpm --dir tools/ai-review typecheck
+      - name: Test AI review tooling
+        run: pnpm --dir tools/ai-review test

@@ -6,11 +6,18 @@
     "node": ">=26.12.1 <27"
   },
   "scripts": {
-    "check": "pnpm check:node && pnpm typecheck && pnpm test && pnpm check:docs",
+    "hooks:install": "lefthook install",
+    "check": "pnpm check:node && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm check:docs",
     "check:node": "pnpm --dir tools/docs check:node",
-    "typecheck": "pnpm --dir tools/docs typecheck",
-    "test": "pnpm --dir tools/docs test",
+    "typecheck": "pnpm --dir tools/docs typecheck && pnpm --dir tools/ai-review typecheck",
+    "test": "pnpm --dir tools/docs test && pnpm --dir tools/ai-review test",
     "check:docs": "pnpm --dir tools/docs check",
-    "check:actions": "gh actions-lock --verify"
+    "check:actions": "gh actions-lock --verify",
+    "lint": "pnpm --dir tools/ai-review lint",
+    "format": "pnpm --dir tools/ai-review format",
+    "format:check": "pnpm --dir tools/ai-review format:check"
+  },
+  "devDependencies": {
+    "lefthook": "2.2.1"
   }
 }

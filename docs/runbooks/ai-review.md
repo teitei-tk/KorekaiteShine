@@ -140,7 +140,7 @@ IDは画面で確認した`idp_`、`user-`形式を検査します。形式OKだ
 
 通知は実行ID単位で直列化し、`queue: max`で最大100件の待機を許可する。既定の単一待機枠では、再実行の開始通知が直前の完了通知を置き換えてしまうためである。待機上限や通知Workflow自体の障害で通知が失われた場合は、完了通知を再実行する。[GitHubの同時実行制御](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)を参照。
 
-開始時は実行中、投稿まで完了すると成功を表示する。失敗時は`対象: collect、理由: BUDGET_EXCEEDED`等をチェックの概要で確認できる。`Details`から元の実行・試行のログを開く。指摘がある場合も処理が完了すれば成功であり、スレッドのResolveは人間が行う。
+開始時は実行中、投稿まで完了すると成功を表示する。失敗時は`対象: collect、理由: BUDGET_EXCEEDED`等をチェックの概要で確認できる。GitHubが詳細URLを標準チェックURLへ書き換える場合があるため、概要内の「AIレビューの実行ログ」リンクから元の実行・試行を開く。指摘がある場合も処理が完了すれば成功であり、スレッドのResolveは人間が行う。
 
 結果はジョブ別の`ai-review-status-<run>-<attempt>-<job>` Artifactに保存し、保持期間は1日とする。通知側はファイル上限4KB、実行ID・試行番号・ジョブ・対象ID・固定理由コードを検証する。単一Artifactは展開先直下の`status.json`、複数ArtifactはArtifact名のサブディレクトリから読む。両形式の混在は不正として拒否する。取得や形式検証に失敗した結果から成功を推測しない。実行が失敗し詳細記録がない場合は`EXECUTION_FAILED`または`PUBLISH_FAILED`、正常終了でも投稿記録がなければ`REPORT_MISSING`となる。
 

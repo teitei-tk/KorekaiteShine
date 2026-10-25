@@ -67,7 +67,10 @@ export function writeStatusReport(
   target: string,
   reason: StatusReason,
 ): void {
-  if (!env.AI_REVIEW_REPORT) return;
+  const path =
+    env.AI_REVIEW_REPORT ??
+    (env.RUNNER_TEMP && env.AI_REVIEW_JOB ? join(env.RUNNER_TEMP, 'status.json') : undefined);
+  if (!path) return;
   const value = {
     version: 1,
     run: env.GITHUB_RUN_ID,
@@ -78,7 +81,7 @@ export function writeStatusReport(
     reason,
   };
   if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
-  writeFileSync(env.AI_REVIEW_REPORT, JSON.stringify(value));
+  writeFileSync(path, JSON.stringify(value));
 }
 export function readStatusReports(
   directory: string | undefined,

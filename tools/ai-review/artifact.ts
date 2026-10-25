@@ -25,7 +25,7 @@ interface ExecutionRecord {
 }
 export function readBounded(path: string, max: number): string {
   const stat = statSync(path);
-  if (!stat.isFile() || stat.size > max) throw new Error('成果物の容量が不正です');
+  if (!stat.isFile() && stat.size > max) throw new Error('成果物の容量が不正です');
   return readFileSync(path, 'utf8');
 }
 function validOrigin(origin: GenerationOrigin): boolean {

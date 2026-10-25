@@ -389,3 +389,26 @@ it.each(['gate', 'collect'])(
     }
   },
 );
+it('GitHubが詳細URLを標準URLへ書き換えても既存チェックを更新する', async () => {
+  const f = fixture();
+  await updateReviewCheck(f.api, 20, 1, 'in_progress');
+  f.checks[0].details_url = 'https://github.com/teitei-tk/KorekaiteShine/runs/99';
+  await updateReviewCheck(f.api, 20, 1, 'in_progress');
+  expect(f.writes).toHaveLength(1);
+  f.run.status = 'completed';
+  f.run.conclusion = 'success';
+  await withReports(
+    'publish',
+    { status: 'success', target: 'publish', reason: 'REVIEW_COMPLETE' },
+    async (directory) => {
+      await updateReviewCheck(f.api, 20, 1, 'completed', directory);
+      expect(f.writes.at(-1)).toMatchObject({
+        path: 'check-runs/99',
+        method: 'PATCH',
+        body: { conclusion: 'success' },
+      });
+      expect(f.checks).toHaveLength(1);
+      expect(f.checks[0].status).toBe('completed');
+    },
+  );
+});

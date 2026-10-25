@@ -1,3 +1,4 @@
+import { failureMessage } from './failure-message.ts';
 import { appendFileSync } from 'node:fs';
 import { completedOutcome } from './check-status.ts';
 import type { ReviewRun } from './check-status.ts';
@@ -66,11 +67,14 @@ export async function notifyFailure(
   // 表示するのは検証済み固定分類・ID・SHAだけ。外部エラー本文やモデル出力は使わない。
   const body = [
     marker,
-    '### AIレビューに失敗しました',
+    '### AIレビューを完了できませんでした',
+    failureMessage(outcome.reason, outcome.diagnostic?.subcode),
     '**レビュー全体は未完了です。** 既に投稿された指摘・返信はそのまま残ります。',
+    `[実行記録を確認](https://github.com/${REPOSITORY}/actions/runs/${id}/attempts/${attempt})`,
+    '<details>\n<summary>調査用の詳細</summary>\n',
     `段階: ${outcome.target}。失敗理由: ${outcome.reason}${outcome.diagnostic ? ' / ' + outcome.diagnostic.subcode : ''}。`,
     `対象: ${head} / base: ${base}`,
-    `[実行記録を確認](https://github.com/${REPOSITORY}/actions/runs/${id}/attempts/${attempt})`,
+    '</details>',
   ].join('\n\n');
   const prior = (await comments(api, number)).filter(
     (c) =>

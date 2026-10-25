@@ -198,3 +198,25 @@ it('成功実行のArtifactが取得不能・期限切れでも失敗通知し�
   expect(await notifyFailure(f.api, 20, 1)).toMatchObject({ status: 'skipped' });
   expect(f.posted).toHaveLength(0);
 });
+
+it('未解決参照を日本語の原因・対処で説明し、機械用コードは詳細に収める', async () => {
+  const f = fixture('UNRESOLVED_REFERENCE');
+  await notifyFailure(f.api, 20, 1, f.directory);
+  const body = f.posted[0];
+  expect(body).toContain('参照先のファイルを見つけられず');
+  expect(body).toContain('import先やリンク先');
+  expect(body).toContain('<summary>調査用の詳細</summary>');
+  expect(body.indexOf('UNRESOLVED_REFERENCE')).toBeGreaterThan(body.indexOf('<details>'));
+});
+
+it('処理上限の通知は容量に断定せず、件数・時間も含めて実行記録の確認を案内する', async () => {
+  const f = fixture('BUDGET_EXCEEDED');
+  await notifyFailure(f.api, 20, 1, f.directory);
+  const body = f.posted[0];
+  expect(body).toContain('容量・件数・時間のいずれかの処理上限');
+  expect(body).toContain('実行記録で停止した処理と該当する上限を確認してください');
+  expect(body).toContain('料金の上限超過を示すものではありません');
+  expect(body).not.toContain('容量を超えました');
+  expect(body).not.toContain('PRを関連する変更ごとに分割してください');
+  expect(body).toContain('https://github.com/teitei-tk/KorekaiteShine/actions/runs/20/attempts/1');
+});

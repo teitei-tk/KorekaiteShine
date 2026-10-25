@@ -245,3 +245,9 @@ it('完了結果の取得中に再試行が始まった場合も旧成功を返�
     rmSync(directory, { recursive: true, force: true });
   }
 });
+it('監視開始日時が不正なら実行一覧を照合しない', async () => {
+  const f = fixture();
+  f.revision.since = 'invalid-date';
+  await expect(inspectReview(f.api, f.revision)).rejects.toThrow('監視対象が不正です');
+  expect(f.calls).toEqual([]);
+});

@@ -19,3 +19,18 @@ it('履歴作業は担当IDと件数をSchemaへ固定し、他の呼び出し�
     expect(taskSchema(task).properties[key].items.properties.id.enum).toBeUndefined();
   }
 });
+it('39件の確認対象を担当IDと件数で制約し、別作業へ持ち越さない', () => {
+  const obligations = Array.from({ length: 39 }, (_, i) => i.toString(16).padStart(16, '0'));
+  const coverage = taskSchema({ ...task, obligations }).properties.coverage;
+  expect(coverage.items.enum).toEqual(obligations);
+  expect(coverage.minItems).toBe(39);
+  expect(coverage.maxItems).toBe(39);
+  const next = taskSchema({ ...task, obligations: ['f'.repeat(16)] }).properties.coverage;
+  expect(next.items.enum).toEqual(['f'.repeat(16)]);
+  expect(next.minItems).toBe(1);
+  expect(next.maxItems).toBe(1);
+  const empty = taskSchema(task).properties.coverage;
+  expect(empty.minItems).toBe(0);
+  expect(empty.maxItems).toBe(0);
+  expect(empty.items.enum).toBeUndefined();
+});

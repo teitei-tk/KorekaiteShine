@@ -616,3 +616,25 @@ it('修正済み履歴はhistoryだけが判定し、単位作業と統合して
     }),
   );
 });
+it('39件のcoverageで欠落・重複・担当外IDを拒否し、順序だけの違いは許容する', () => {
+  const plan = fixture();
+  const input = preflight(plan)[0];
+  const obligations = Array.from({ length: 39 }, (_, i) => i.toString(16).padStart(16, '0'));
+  const task = { ...input.task, obligations };
+  for (const coverage of [
+    obligations.slice(1),
+    [...obligations.slice(1), obligations[1]],
+    [...obligations.slice(1), 'f'.repeat(16)],
+  ]) {
+    expect(() => validateTaskResult({ ...response(input), coverage }, plan, task)).toThrow(
+      expect.objectContaining({
+        reason: 'OUTPUT_INVALID',
+        detail: { subcode: 'COVERAGE_MISMATCH', missing: [] },
+      }),
+    );
+  }
+  expect(
+    validateTaskResult({ ...response(input), coverage: [...obligations].reverse() }, plan, task)
+      .coverage,
+  ).toHaveLength(39);
+});

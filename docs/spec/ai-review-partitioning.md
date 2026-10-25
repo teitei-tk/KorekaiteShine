@@ -133,3 +133,5 @@
 分割時の`metadata.priorFindings`は重複回避の全履歴であり、修正確認を返す対象は`task.priorIds`だけとする。共通プロンプトもこの区別に従い、担当外の履歴に対する`checks`を要求しない。担当のない作業では`checks`と`checkSources`を空配列に制限し、履歴作業では担当IDと件数を応答Schemaへ設定する。受信後もIDの重複・欠落、判定、根拠資料を検証し、Schemaだけを信用しない。
 
 修正確認の対象不一致は`CHECK_TARGET_MISMATCH`、判定・根拠文の不正は`CHECK_RESULT_INVALID`として記録する。レビューの基本形式、指摘位置、指摘重複はそれぞれ`REVIEW_FORMAT_INVALID`、`FINDING_LOCATION_INVALID`、`FINDING_DUPLICATE`で区別する。モデル生出力や秘密値は診断へ含めず、失敗時には部分的な返信を投稿しない。
+
+確認範囲の`coverage`も担当する`task.obligations`のIDと件数で応答Schemaを制限する。受信後に完全一致を検証し、欠落・重複・担当外IDを`COVERAGE_MISMATCH`として拒否する。Schemaによる形式制約を、実際に全範囲を確認した証拠とはみなさない。

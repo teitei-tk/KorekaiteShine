@@ -38,3 +38,11 @@ it('baseとheadで同じ内容の資料を二重送信しない', async () => {
   ]);
   expect(reserved).toEqual(['export const value = 1;']);
 });
+
+it('資料の累積バイト数を400KBまで許可し、超過を拒否する', async () => {
+  const { materialBudget } = await import('./material.ts');
+  const reserve = materialBudget();
+  expect(() => reserve('あ'.repeat(100001))).not.toThrow();
+  expect(() => reserve('x'.repeat(99997))).not.toThrow();
+  expect(() => reserve('x')).toThrow('資料が400KB');
+});

@@ -82,11 +82,7 @@ export function collect(
   if (paths.length > 80) throw new Error('変更ファイル数が80件を超えました');
   const lines: Record<string, number[]> = Object.create(null);
   const patches: { path: string; patch: string }[] = [];
-  let bytes = 0;
-  const reserve = (text: string) => {
-    bytes += Buffer.byteLength(text);
-    if (bytes > 300_000) throw new Error('資料が300KBを超えました。PRを分割してください');
-  };
+  const reserve = materialBudget();
   const excluded = paths.filter((path) => !isMaterialPath(path));
   for (const path of paths.filter(isMaterialPath)) {
     const patch = git(
@@ -121,12 +117,21 @@ export function collect(
     patches,
     files,
   });
-  if (Buffer.byteLength(bundle) > 400_000) throw new Error('JSON資料が400KBを超えました');
+  if (Buffer.byteLength(bundle) > 450_000) throw new Error('JSON資料が450KBを超えました');
   if (Buffer.byteLength(JSON.stringify(metadata)) > 400_000)
     throw new Error('変更行と指摘履歴の情報が400KBを超えました');
   writeFileSync(join(directory, 'material.json'), bundle);
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
   return metadata;
+}
+
+// JSONの構造分と固定プロンプトの余裕を残し、モデル入力500KB以内に収める。
+export function materialBudget(): (text: string) => void {
+  let bytes = 0;
+  return (text: string) => {
+    bytes += Buffer.byteLength(text);
+    if (bytes > 400_000) throw new Error('資料が400KBを超えました。PRを分割してください');
+  };
 }
 
 export function snapshotFiles(

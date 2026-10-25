@@ -1,16 +1,18 @@
+import { readHistory } from './history.ts';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { githubApi, target } from './github.ts';
+import { githubApi, target, comments } from './github.ts';
 import { join } from 'node:path';
 import { collect } from './material.ts';
 
 try {
-  const pr = await target(githubApi(process.env.GH_TOKEN ?? ''), Number(process.env.SOURCE_RUN_ID));
+  const api = githubApi(process.env.GH_TOKEN ?? '');
+  const pr = await target(api, Number(process.env.SOURCE_RUN_ID));
   if (pr) {
     if (process.argv[2] === 'collect' && process.env.AI_REVIEW_MODE === 'review') {
       const directory = process.env.REVIEW_DIRECTORY;
       if (!directory) throw new Error('資料ディレクトリがありません');
       mkdirSync(directory, { recursive: true });
-      collect(pr, directory);
+      collect(pr, directory, readHistory(await comments(api, pr.number)));
       const prompt = readFileSync(new URL('./prompt.md', import.meta.url), 'utf8');
       const material = readFileSync(join(directory, 'material.json'), 'utf8');
       writeFileSync(

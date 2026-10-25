@@ -1,13 +1,26 @@
 import { appendFileSync } from 'node:fs';
 import { remainingLifetime, REPOSITORY } from './policy.ts';
 
+interface OidcClaims {
+  iss: string;
+  aud: string;
+  repository: string;
+  repository_id: string;
+  repository_owner_id: string;
+  ref: string;
+  workflow_ref: string;
+  event_name: string;
+  sub?: string;
+  iat?: number;
+  exp?: number;
+}
 type Settings = Record<string, string | undefined>;
 export async function authenticate(
   env: Settings,
   mode: string,
   request: typeof fetch = fetch,
   mask: (secret: string) => void = () => {},
-): Promise<{ claims: Record<string, unknown>; accessToken?: string; expiresAt?: number }> {
+): Promise<{ claims: Partial<OidcClaims>; accessToken?: string; expiresAt?: number }> {
   if (!['claims', 'review'].includes(mode)) throw new Error('WIFモードが不正です');
   const required = [
     'ACTIONS_ID_TOKEN_REQUEST_URL',
@@ -25,13 +38,13 @@ export async function authenticate(
     redirect: 'error',
   });
   if (!oidc.ok) throw new Error(`OIDC HTTP ${oidc.status}`);
-  const token = ((await oidc.json()) as { value: unknown }).value;
+  const token = ((await oidc.json()) as { value?: string }).value;
   if (typeof token !== 'string' || token.split('.').length !== 3)
     throw new Error('OIDC応答が不正です');
   mask(token);
   const claims = JSON.parse(
     Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
-  ) as Record<string, unknown>;
+  ) as OidcClaims;
   const expected = {
     iss: 'https://token.actions.githubusercontent.com',
     aud: env.OPENAI_WIF_AUDIENCE,
@@ -42,11 +55,14 @@ export async function authenticate(
     workflow_ref: `${REPOSITORY}/.github/workflows/ai-review.yml@refs/heads/main`,
     event_name: 'workflow_run',
   };
-  for (const [key, value] of Object.entries(expected)) {
+  for (const [key, value] of Object.entries(expected) as [keyof typeof expected, string][]) {
     if (claims[key] !== value) throw new Error(`OIDCクレーム不一致: ${key}`);
   }
   const selected = Object.fromEntries(
-    [...Object.keys(expected), 'sub', 'iat', 'exp'].map((key) => [key, claims[key]]),
+    ([...Object.keys(expected), 'sub', 'iat', 'exp'] as (keyof OidcClaims)[]).map((key) => [
+      key,
+      claims[key],
+    ]),
   );
   // ローカルのdecodeは署名検証ではない。交換時にOpenAIが署名とマッピングを検証する。
   if (mode === 'claims') return { claims: selected };
@@ -64,7 +80,7 @@ export async function authenticate(
     redirect: 'error',
   });
   if (!response.ok) throw new Error(`WIF交換 HTTP ${response.status}`);
-  const result = (await response.json()) as { access_token?: unknown; expires_at?: number };
+  const result = (await response.json()) as { access_token?: string; expires_at?: number };
   if (typeof result.access_token !== 'string' || !/^[\x21-\x7e]+$/.test(result.access_token))
     throw new Error('WIF応答が不正です');
   mask(result.access_token);

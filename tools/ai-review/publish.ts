@@ -1,12 +1,18 @@
+import { readHistory, historyMarker } from './history.ts';
+import { REPOSITORY, safe } from './policy.ts';
 import { readFileSync, statSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubApi, comments, ownComment } from './github.ts';
 import type { Api } from './github.ts';
 import { eligible, validReview, renderReview, revisionMarker } from './policy.ts';
-import type { PullRequest } from './policy.ts';
+import type { PullRequest, ReviewInput } from './policy.ts';
 import type { Material } from './material.ts';
 
-export async function publish(api: Api, metadata: Material, value: unknown): Promise<boolean> {
+export async function publish(
+  api: Api,
+  metadata: Material,
+  value: ReviewInput | null,
+): Promise<boolean> {
   if (
     !Number.isSafeInteger(metadata.number) ||
     metadata.number < 1 ||
@@ -14,10 +20,13 @@ export async function publish(api: Api, metadata: Material, value: unknown): Pro
     !/^[a-f0-9]{40}$/.test(metadata.base)
   )
     throw new Error('対象情報が不正です');
-  const review = validReview(value, metadata.lines);
+  const review = validReview(value, metadata.lines, metadata.priorFindings);
   const prior = (await comments(api, metadata.number)).filter(ownComment);
   if (prior.some((c) => c.body.includes(revisionMarker(metadata.head, metadata.base))))
     return false;
+  const history = readHistory(prior);
+  if (JSON.stringify(history) !== JSON.stringify(metadata.priorFindings ?? []))
+    throw new Error('レビュー中に指摘履歴が変わりました');
   const pr = await api<PullRequest>(`pulls/${metadata.number}`);
   if (
     !eligible(pr) ||
@@ -26,12 +35,27 @@ export async function publish(api: Api, metadata: Material, value: unknown): Pro
     pr.base.sha !== metadata.base
   )
     return false;
-  const body = renderReview(review, metadata.head, metadata.base);
-  if (prior.length) await api(`issues/comments/${prior[0].id}`, 'PATCH', { body });
-  else await api(`issues/${metadata.number}/comments`, 'POST', { body });
+  const followups = (review.checks ?? []).map((check) => {
+    const original = history.find((f) => f.id === check.id)!;
+    const label = check.status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません';
+    const reason =
+      check.status === 'unverified'
+        ? '確認不能'
+        : check.status === 'unfixed'
+          ? '未修正'
+          : '修正済み';
+    return `### 指摘 ${check.id}: ${label}\n\n[元の指摘](https://github.com/${REPOSITORY}/pull/${metadata.number}#issuecomment-${check.id.split(':')[0]}) — ${safe(original.path)}:${original.line}\n\n${reason}: ${safe(check.evidence)}`;
+  });
+  const body = [
+    renderReview(review, metadata.head, metadata.base),
+    ...followups,
+    historyMarker(review.findings),
+  ].join('\n\n');
+  if (body.length > 60000) throw new Error('コメントの上限を超えました');
+  await api(`issues/${metadata.number}/comments`, 'POST', { body });
   return true;
 }
-function readJson(path: string, max: number): unknown {
+function readJson<T>(path: string, max: number): T {
   const stat = statSync(path);
   if (!stat.isFile() || stat.size > max) throw new Error('成果物のサイズまたは形式が不正です');
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -40,7 +64,7 @@ export function readReviewArtifact(
   directory: string,
   expected: Pick<Material, 'number' | 'head' | 'base'>,
 ) {
-  const metadata = readJson(join(directory, 'metadata.json'), 100_000) as Material;
+  const metadata = readJson<Material>(join(directory, 'metadata.json'), 400_000);
   // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
   if (
     metadata.number !== expected.number ||
@@ -48,7 +72,11 @@ export function readReviewArtifact(
     metadata.base !== expected.base
   )
     throw new Error('成果物の対象が一致しません');
-  const review = validReview(readJson(join(directory, 'result.json'), 30_000), metadata.lines);
+  const review = validReview(
+    readJson<ReviewInput>(join(directory, 'result.json'), 30_000),
+    metadata.lines,
+    metadata.priorFindings,
+  );
   return { metadata, review };
 }
 
@@ -67,7 +95,7 @@ if (import.meta.main) {
     } else {
       const posted = await publish(githubApi(process.env.GH_TOKEN ?? ''), metadata, review);
       console.log(
-        posted ? 'レビューコメントを更新しました' : '対象更新または投稿済みのため投稿しません',
+        posted ? 'レビューコメントを投稿しました' : '対象更新または投稿済みのため投稿しません',
       );
     }
   } catch {

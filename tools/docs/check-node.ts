@@ -13,7 +13,12 @@ type Manifest = {
   devDependencies?: Record<string, string>;
 };
 type Workflow = {
-  jobs?: Record<string, { steps?: { uses?: string; with?: Record<string, unknown> }[] }>;
+  jobs?: Record<
+    string,
+    {
+      steps?: { uses?: string; with?: { 'node-version-file'?: string; 'node-version'?: string } }[];
+    }
+  >;
 };
 
 export async function checkNodeSettings(root: string, files: string[]): Promise<string[]> {
@@ -87,7 +92,7 @@ async function main() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error: unknown) => {
+  main().catch((error: Error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });

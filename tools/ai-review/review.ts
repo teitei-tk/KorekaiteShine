@@ -1,3 +1,4 @@
+import type { PriorFinding } from './history.ts';
 import OpenAI from 'openai';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,6 +18,7 @@ export async function generateReview(
   prompt: string,
   lines: Record<string, number[]>,
   fetcher: typeof fetch = fetch,
+  prior: PriorFinding[] = [],
 ): Promise<ReviewResult> {
   try {
     if (!token || Buffer.byteLength(prompt) > 500_000) throw new Error('invalid input');
@@ -48,7 +50,7 @@ export async function generateReview(
       Buffer.byteLength(result.output_text) > 30_000
     )
       throw new Error('incomplete output');
-    const value = validReview(JSON.parse(result.output_text), lines);
+    const value = validReview(JSON.parse(result.output_text), lines, prior);
     const count = (n: number | undefined) =>
       typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;
     return {
@@ -81,6 +83,7 @@ export async function writeReviewArtifact(
     readFileSync(join(directory, 'prompt.txt'), 'utf8'),
     metadata.lines,
     fetcher,
+    metadata.priorFindings,
   );
   writeFileSync(join(directory, 'result.json'), JSON.stringify(value));
   appendFileSync(

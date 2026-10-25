@@ -66,7 +66,10 @@ describe('SDKレビュー', () => {
       generateReview('test-token', 'data', {}, async () =>
         response('completed', '{"status":"complete"}'),
       ),
-    ).rejects.toThrow('レビュー生成に失敗しました');
+    ).rejects.toMatchObject({
+      reason: 'OUTPUT_INVALID',
+      detail: { subcode: 'REVIEW_FORMAT_INVALID', missing: [] },
+    });
   });
   it('差分にない行への指摘をSDK境界で拒否する', async () => {
     const invalid = {
@@ -86,7 +89,10 @@ describe('SDKレビュー', () => {
       generateReview('test-token', 'data', { 'app.ts': [1] }, async () =>
         response('completed', JSON.stringify(invalid)),
       ),
-    ).rejects.toThrow('レビュー生成に失敗しました');
+    ).rejects.toMatchObject({
+      reason: 'OUTPUT_INVALID',
+      detail: { subcode: 'FINDING_LOCATION_INVALID', missing: [] },
+    });
   });
   it('通信例外の内容を漏らさない', async () => {
     await expect(

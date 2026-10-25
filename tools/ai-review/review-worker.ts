@@ -1,5 +1,5 @@
 import { ReviewFailure, workerFailure } from './failure.ts';
-import { readFileSync } from 'node:fs';
+import { taskSchema } from './task-schema.ts';
 import { requestStructuredReview } from './review.ts';
 import { validateTaskResult } from './partition-review.ts';
 import type { TaskInvocation, TaskResult } from './partition-review.ts';
@@ -24,9 +24,7 @@ if (import.meta.main) {
     };
     try {
       validatePlan(plan);
-      const schema = JSON.parse(
-        readFileSync(new URL('./partition-schema.json', import.meta.url), 'utf8'),
-      );
+      const schema = taskSchema(input.task);
       const result = await requestStructuredReview<TaskResult>(
         process.env.OPENAI_ACCESS_TOKEN ?? '',
         input.prompt,

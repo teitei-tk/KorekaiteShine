@@ -53,3 +53,22 @@ it('予算結果を投稿ジョブへ渡し、失敗時にも費用記録を保�
   expect(backend).toMatch(/name: Preserve review cost record\n\s+if: always\(\)/);
   expect(backend).toContain('name: ai-review-cost-${{ github.run_id }}-${{ github.run_attempt }}');
 });
+
+it('失敗通知は終了イベントから信頼済みコードだけで実行し、OIDC権限を持たない', () => {
+  const notify = workflow('ai-review-notify');
+  expect(notify).toContain('workflows: [AI review execution]');
+  expect(notify).toContain('types: [completed]');
+  expect(notify).toContain('ref: ${{ github.sha }}');
+  expect(notify).toContain('persist-credentials: false');
+  expect(notify).toContain('actions: read');
+  expect(notify).toContain('pull-requests: write');
+  expect(notify).not.toMatch(/id-token:|checks: write|pnpm install|secrets\./);
+  expect(notify).toContain('node tools/ai-review/failure-notify.ts prepare');
+  expect(notify).toContain('node tools/ai-review/failure-notify.ts publish');
+  expect(notify).toContain('run-id: ${{ github.event.workflow_run.id }}');
+  expect(notify).toContain(
+    'pattern: ai-review-status-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-*',
+  );
+  expect(notify).toContain('continue-on-error: true');
+  expect(notify).toContain("if: always() && steps.target.outputs.allowed == 'true'");
+});

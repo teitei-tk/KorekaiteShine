@@ -93,3 +93,17 @@ it.each(['post', 'duplicate', 'changed', 'failure', 'conflict', 'spoof'])(
     );
   },
 );
+
+it('多数の精算後も20KBを超える予算通知Artifactを読み取れる', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'budget-many-'));
+  const ledger = new BudgetLedger(join(directory, 'budget.json'), origin, target, 100_000_000);
+  for (let i = 0; i < 120; i++) {
+    ledger.reserve(100, 'd'.repeat(64));
+    ledger.settle({ input: 100, cached: 0, written: 0, output: 20, total: 120 });
+  }
+  expect(() => ledger.reserve(900_000, 'd'.repeat(64))).toThrow();
+  const serialized = JSON.stringify(ledger.snapshot());
+  expect(Buffer.byteLength(serialized)).toBeGreaterThan(20_000);
+  writeFileSync(join(directory, 'budget-result.json'), serialized);
+  expect(readBudgetArtifact(directory, target, origin).entries).toHaveLength(120);
+});

@@ -315,8 +315,6 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
         pending.shift();
       }
       plan.tasks.push(task);
-      if (plan.tasks.length > 10)
-        throw new ReviewFailure('BUDGET_EXCEEDED', '必須作業が呼び出し予算を超えました');
     }
   }
   validatePlan(plan);
@@ -333,8 +331,7 @@ export function validatePlan(plan: ReviewPlan): ReviewPlan {
     !Array.isArray(plan.obligations) ||
     !Array.isArray(plan.excluded) ||
     !plan.excluded.every((p) => typeof p === 'string') ||
-    plan.tasks.length < 1 ||
-    plan.tasks.length > 10
+    plan.tasks.length < 1
   )
     throw new Error('作業台帳の形式が不正です');
   if (

@@ -1,3 +1,4 @@
+import { withReviewDeadline, REVIEW_TIME_MS, timeFailure } from './deadline.ts';
 import { ReviewFailure, validFailureReason, workerFailure } from './failure.ts';
 import type { FailureReason } from './failure.ts';
 import { detail, validDetail, taskScope, renderDiagnostic } from './diagnostics.ts';
@@ -24,7 +25,9 @@ export async function callWorker(
   token: string,
   plan: ReviewPlan,
   budget: BudgetLedger,
+  signal?: AbortSignal,
 ): Promise<ReviewResult<TaskResult>> {
+  if (signal?.aborted) throw timeFailure();
   return new Promise((resolve, reject) => {
     const child = fork(fileURLToPath(new URL('./review-worker.ts', import.meta.url)), [], {
       env: workerEnvironment(token),
@@ -38,11 +41,14 @@ export async function callWorker(
       if (done) return;
       done = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
       child.kill();
       if (error) reject(error);
       else resolve(result!);
     };
     const timer = setTimeout(() => finish(new Error('モデル子プロセスが時間切れです')), 200000);
+    const abort = () => finish(timeFailure());
+    signal?.addEventListener('abort', abort, { once: true });
     child.on('error', () => finish(new Error('モデル子プロセスが失敗しました')));
     child.on('exit', () => finish(new Error('モデル子プロセスが終了しました')));
     child.on(
@@ -116,9 +122,11 @@ export async function generatePartitionArtifact(
     token: string,
     plan: ReviewPlan,
     budget: BudgetLedger,
+    signal?: AbortSignal,
   ) => Promise<ReviewResult<TaskResult>> = callWorker,
   mask: (secret: string) => void = () => {},
   budgetLimit = LIMIT,
+  timeLimitMs = REVIEW_TIME_MS,
 ): Promise<void> {
   // 前回の部分生成物を完了成果物として使わない。
   for (const path of ['result.json', 'execution.json', 'budget-result.json', 'budget.json'])
@@ -134,37 +142,49 @@ export async function generatePartitionArtifact(
     if (JSON.stringify(plan.metadata) !== readBounded(join(directory, 'metadata.json'), 400_000))
       throw new Error('入力の対象情報が一致しません');
     total = Array.isArray(plan?.tasks) ? plan.tasks.length : 0;
-    preflight(plan);
-    budget = new BudgetLedger(
-      join(directory, 'budget.json'),
-      {
-        run: env.GITHUB_RUN_ID ?? '',
-        attempt: env.GITHUB_RUN_ATTEMPT ?? '',
-        sha: env.GITHUB_SHA ?? '',
-      },
-      { number: plan.metadata.number, head: plan.metadata.head, base: plan.metadata.base },
-      budgetLimit,
-    );
-    const result = await runPartitionReview(
-      plan,
-      async (input) => {
-        fallback = 'AUTH_FAILED';
-        const auth = await authenticate(env, 'review', request, mask);
-        if (!auth.accessToken) throw new Error('WIFトークンがありません');
-        fallback = 'MODEL_FAILED';
-        const response = await worker(input, auth.accessToken, plan, budget!);
-        fallback = 'OUTPUT_INVALID';
-        return response;
-      },
-      (count) => {
-        completed = count;
-      },
-      (task) => {
-        target = /^(task|reconcile)-[1-9]\d*$/.test(task.id) ? task.id : 'invalid-task-id';
-        scope = taskScope(plan, task);
-        fallback = 'OUTPUT_INVALID';
-      },
-    );
+    const result = await withReviewDeadline(async (signal, checkTime) => {
+      preflight(plan);
+      budget = new BudgetLedger(
+        join(directory, 'budget.json'),
+        {
+          run: env.GITHUB_RUN_ID ?? '',
+          attempt: env.GITHUB_RUN_ATTEMPT ?? '',
+          sha: env.GITHUB_SHA ?? '',
+        },
+        { number: plan.metadata.number, head: plan.metadata.head, base: plan.metadata.base },
+        budgetLimit,
+      );
+      return await runPartitionReview(
+        plan,
+        async (input) => {
+          fallback = 'AUTH_FAILED';
+          checkTime();
+          const boundedRequest: typeof fetch = (url, init) => {
+            checkTime();
+            return request(url, {
+              ...init,
+              signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal,
+            });
+          };
+          const auth = await authenticate(env, 'review', boundedRequest, mask);
+          checkTime();
+          if (!auth.accessToken) throw new Error('WIFトークンがありません');
+          fallback = 'MODEL_FAILED';
+          const response = await worker(input, auth.accessToken, plan, budget!, signal);
+          fallback = 'OUTPUT_INVALID';
+          return response;
+        },
+        (count) => {
+          completed = count;
+        },
+        (task) => {
+          target = /^(task|reconcile)-[1-9]\d*$/.test(task.id) ? task.id : 'invalid-task-id';
+          scope = taskScope(plan, task);
+          fallback = 'OUTPUT_INVALID';
+        },
+        checkTime,
+      );
+    }, timeLimitMs);
     target = 'artifact';
     scope = undefined;
     fallback = 'ARTIFACT_INVALID';

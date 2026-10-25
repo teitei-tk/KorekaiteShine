@@ -302,3 +302,58 @@ it('子プロセスの未知分類・自由文を診断として受け入れな�
     expect.objectContaining({ reason: 'INCOMPLETE' }),
   );
 });
+
+it('認証中の総時間超過を固定理由で保存し、予算通知や部分結果を作らない', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'review-timeout-'));
+  try {
+    const index = indexSources(
+      (...args) =>
+        args[0] === 'ls-tree'
+          ? `100644 blob ${'c'.repeat(40)}\tapp.ts\0`
+          : 'export const value = 1;',
+      [base, head],
+    );
+    const plan = planReview(
+      { number: 1, head, base, partitionVersion: 1, lines: { 'app.ts': [1] } },
+      index,
+      [{ path: 'app.ts', patch: '@@ -1 +1 @@\n-old\n+new\n' }],
+    );
+    writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
+    writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
+    let aborted = false,
+      calls = 0;
+    await expect(
+      generatePartitionArtifact(
+        directory,
+        {
+          ...env,
+          AI_REVIEW_JOB: 'generate',
+          AI_REVIEW_REPORT: join(directory, 'status.json'),
+          GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
+        },
+        async (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              aborted = true;
+              reject(new Error('SECRET'));
+            });
+          }),
+        async () => {
+          calls++;
+          throw new Error('モデルは開始しない');
+        },
+        () => {},
+        LIMIT,
+        20,
+      ),
+    ).rejects.toThrow();
+    expect(aborted).toBe(true);
+    expect(calls).toBe(0);
+    expect(readFileSync(join(directory, 'status.json'), 'utf8')).toContain('TIME_BUDGET_EXCEEDED');
+    expect(readFileSync(join(directory, 'summary.md'), 'utf8')).not.toContain('SECRET');
+    for (const path of ['result.json', 'execution.json', 'budget-result.json'])
+      expect(existsSync(join(directory, path))).toBe(false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

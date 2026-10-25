@@ -1,3 +1,7 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { writePartitionArtifact } from './artifact.ts';
 import { expect, it } from 'vitest';
 import { runPartitionReview, preflight, validateTaskResult } from './partition-review.ts';
 import type { TaskResult, TaskInvocation } from './partition-review.ts';
@@ -250,10 +254,10 @@ it('既存指摘との対応を候補整理が覆したら停止する', async (
     }),
   ).rejects.toThrow(/既存指摘/);
 });
-it('合計入力3MBを超えても1回の容量内なら分割レビューを実行できる', async () => {
+it('13作業・合計3MB超でも1回の容量内なら分割レビューを完了できる', async () => {
   const base = 'b'.repeat(40),
     head = 'a'.repeat(40);
-  const paths = Array.from({ length: 10 }, (_, i) => `f${i}.ts`);
+  const paths = Array.from({ length: 13 }, (_, i) => `f${i}.ts`);
   const index = indexSources(
     (...args) =>
       args[0] === 'ls-tree'
@@ -262,17 +266,33 @@ it('合計入力3MBを超えても1回の容量内なら分割レビューを実
     [base, head],
   );
   const plan = planReview(
-    { number: 1, head, base, lines: Object.fromEntries(paths.map((p) => [p, [1]])) },
+    {
+      number: 1,
+      head,
+      base,
+      partitionVersion: 1,
+      lines: Object.fromEntries(paths.map((p) => [p, [1]])),
+    },
     index,
     paths.map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
   );
   let calls = 0;
   const result = await runPartitionReview(plan, async (input) => {
     calls++;
-    return { value: response(input), usage: { input: 1, output: 1, total: 2 } };
+    return { value: response(input), usage: { input: 1, output: 8000, total: 8001 } };
   });
   expect(result.inputBytes).toBeGreaterThan(3_000_000);
-  expect(calls).toBe(10);
+  expect(calls).toBe(13);
+  const directory = mkdtempSync(join(tmpdir(), 'review-many-'));
+  writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
+  writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
+  expect(() =>
+    writePartitionArtifact(directory, plan, result, {
+      run: '1',
+      attempt: '1',
+      sha: head,
+    }),
+  ).not.toThrow();
 });
 it('指摘行を含まない別ファイルだけを根拠として返す応答を拒否する', () => {
   const base = 'b'.repeat(40),
@@ -464,4 +484,70 @@ it('モデル診断の未知コードや自由文を記録しない', () => {
       detail: { subcode: 'INVALID_DIAGNOSTIC', missing: [] },
     }),
   );
+});
+
+it('候補整理を3作業以上へ分割して全候補を確認する', async () => {
+  const base = 'b'.repeat(40),
+    head = 'a'.repeat(40);
+  const paths = Array.from({ length: 3 }, (_, i) => `f${i}.ts`);
+  const index = indexSources(
+    (...args) =>
+      args[0] === 'ls-tree'
+        ? paths.map((p, i) => `100644 blob ${i.toString(16).padStart(40, '0')}\t${p}\0`).join('')
+        : `export const value = '${'x'.repeat(298000)}';`,
+    [base, head],
+  );
+  const plan = planReview(
+    {
+      number: 1,
+      head,
+      base,
+      partitionVersion: 1,
+      lines: Object.fromEntries(paths.map((p) => [p, [1]])),
+    },
+    index,
+    paths.map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
+  );
+  let calls = 0;
+  const result = await runPartitionReview(plan, async (input) => {
+    calls++;
+    const value = response(input);
+    if (input.task.kind === 'reconcile') {
+      value.decisions = input.candidates
+        .filter((c) => input.task.candidateIds?.includes(c.id))
+        .map((c) => ({
+          id: c.id,
+          disposition: 'keep',
+          duplicateOf: null,
+          reason: '原文確認',
+          sources: c.sources,
+        }));
+    } else {
+      const source = plan.sources.find((source) => input.task.sources.includes(source.id))!;
+      value.findings = [
+        {
+          priority: 'P2',
+          path: source.path,
+          line: 1,
+          condition: '条件',
+          impact: '影響',
+          fix: '修正',
+        },
+      ];
+      value.evidence = [{ finding: 0, sources: [source.id], priorId: null }];
+    }
+    return { value, usage: { input: 1, output: 1, total: 2 } };
+  });
+  expect(result.review.findings).toHaveLength(3);
+  expect(calls).toBe(6);
+  const directory = mkdtempSync(join(tmpdir(), 'review-many-'));
+  writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
+  writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
+  expect(() =>
+    writePartitionArtifact(directory, plan, result, {
+      run: '1',
+      attempt: '1',
+      sha: head,
+    }),
+  ).not.toThrow();
 });

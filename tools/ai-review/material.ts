@@ -128,7 +128,10 @@ export function collectFromGit(
   const index = indexSources(git, [ancestor, pr.base.sha, pr.head.sha]);
   index.excluded = [...new Set([...index.excluded, ...paths.filter((p) => !isMaterialPath(p))])];
   const plan = planReview(metadata, index, patches);
-  writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
+  const serializedPlan = JSON.stringify(plan);
+  if (Buffer.byteLength(serializedPlan) > 6_000_000)
+    throw new ReviewFailure('BUDGET_EXCEEDED', '分割計画の容量を超えました');
+  writeFileSync(join(directory, 'plan.json'), serializedPlan);
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
   return metadata;
 }

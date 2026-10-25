@@ -200,6 +200,7 @@ export async function runPartitionReview(
   invoke: (input: TaskInvocation) => Promise<ReviewResult<TaskResult>>,
   progress: (completed: number, total: number) => void = () => {},
   onTask: (task: ReviewTask) => void = () => {},
+  checkTime: () => void = () => {},
 ): Promise<PartitionResult> {
   const inputs = preflight(plan);
   const completed: string[] = [],
@@ -211,11 +212,13 @@ export async function runPartitionReview(
   let calls = 0,
     inputBytes = 0;
   const execute = async (input: TaskInvocation) => {
+    checkTime();
     const bytes = Buffer.byteLength(input.prompt);
     inputBytes += bytes;
-    if (++calls > 12 || bytes > 500_000)
-      throw new ReviewFailure('BUDGET_EXCEEDED', '実行予算を超えました');
+    calls++;
+    if (bytes > 500_000) throw new ReviewFailure('BUDGET_EXCEEDED', '実行予算を超えました');
     const result = await invoke(input);
+    checkTime();
     let value: TaskResult;
     try {
       value = validateTaskResult(result.value, plan, input.task);
@@ -233,7 +236,7 @@ export async function runPartitionReview(
         throw new ReviewFailure('OUTPUT_INVALID', '使用量が不明です');
       usage[key] += count;
     }
-    if (result.usage.output! > 8000 || usage.output > 96000)
+    if (result.usage.output! > 8000)
       throw new ReviewFailure('BUDGET_EXCEEDED', '出力予算を超えました');
     return value;
   };
@@ -266,7 +269,7 @@ export async function runPartitionReview(
     uncertainties.push(...value.uncertainties);
     progress(completed.length, inputs.length);
   }
-  // 候補を全件まとめられない場合はパス単位の2作業まで。異なるパスの意味上の重複も照合できるよう全候補の本文を渡す。
+  // 候補の原文が1回に収まらなければ容量内の作業へ分割する。異なるパスの意味上の重複も照合できるよう全候補の本文を渡す。
   const relatedChecks = (batch: Candidate[]) =>
     assessments.filter((a) =>
       batch.some(
@@ -302,7 +305,6 @@ export async function runPartitionReview(
     }
     batch.push(candidate);
   }
-  if (batches.length > 2) throw new ReviewFailure('BUDGET_EXCEEDED', '候補整理の予算を超えました');
   const decisions: Decision[] = [];
   for (const [index, batch] of batches.entries()) {
     const task: ReviewTask = {

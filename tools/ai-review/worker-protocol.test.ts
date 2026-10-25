@@ -21,7 +21,7 @@ const plan: ReviewPlan = {
   excluded: [],
 };
 const input = { task, prompt: 'fixture', candidates: [], priorChecks: [] };
-it.each(['invalid-json', 'exit', 'budget'])(
+it.each(['invalid-json', 'exit', 'budget', 'timeout'])(
   '子の生成・検証より先に親が費用を保存する: %s',
   async (scenario) => {
     const path = join(mkdtempSync(join(tmpdir(), 'budget-ipc-')), 'budget.json');
@@ -45,13 +45,15 @@ it.each(['invalid-json', 'exit', 'budget'])(
       return true;
     };
     vi.mocked(fork).mockReturnValue(child);
-    const result = callWorker(input, 'TOKEN', plan, ledger);
+    const controller = new AbortController();
+    const result = callWorker(input, 'TOKEN', plan, ledger, controller.signal);
     const rejected = expect(result).rejects.toThrow();
     child.emit('message', { kind: 'reserve', input: 100, hash: 'd'.repeat(64) });
     if (scenario === 'budget') expect(saved).toHaveLength(0);
     else {
       expect(saved[0]).toMatchObject({ entries: [{ input: 100, actual: null }] });
-      if (scenario === 'exit') child.emit('exit', 1);
+      if (scenario === 'timeout') controller.abort();
+      else if (scenario === 'exit') child.emit('exit', 1);
       else {
         child.emit('message', {
           kind: 'settle',
@@ -67,6 +69,7 @@ it.each(['invalid-json', 'exit', 'budget'])(
     await rejected;
     expect(child.kill).toHaveBeenCalled();
     expect(readFileSync(path, 'utf8')).not.toContain('TOKEN');
-    if (scenario === 'exit') expect(ledger.snapshot().entries[0].actual).toBeNull();
+    if (scenario === 'exit' || scenario === 'timeout')
+      expect(ledger.snapshot().entries[0].actual).toBeNull();
   },
 );

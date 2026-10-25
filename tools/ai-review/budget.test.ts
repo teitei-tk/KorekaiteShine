@@ -70,3 +70,12 @@ it('実際の1ドル境界で次の生成を止める', () => {
   expect(() => ledger.reserve(0, hash)).toThrow('予算');
   expect(ledger.snapshot().entries).toHaveLength(6);
 });
+it('12回を超えても費用内なら予約と精算を継続する', () => {
+  const ledger = create();
+  for (let i = 0; i < 30; i++) {
+    ledger.reserve(100, hash);
+    ledger.settle(usage);
+  }
+  expect(validBudget(ledger.snapshot())).toBe(true);
+  expect(ledger.snapshot().entries).toHaveLength(30);
+});

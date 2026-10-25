@@ -1,6 +1,6 @@
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { validBudget, spent, LIMIT } from './budget.ts';
+import { validBudget, spent, LIMIT, BUDGET_RECORD_BYTES } from './budget.ts';
 import type { BudgetRecord, BudgetTarget } from './budget.ts';
 import { readBounded } from './artifact.ts';
 import type { GenerationOrigin } from './artifact.ts';
@@ -16,7 +16,7 @@ export function readBudgetArtifact(
   origin: GenerationOrigin,
 ): BudgetRecord {
   const record = JSON.parse(
-    readBounded(join(directory, 'budget-result.json'), 20000),
+    readBounded(join(directory, 'budget-result.json'), BUDGET_RECORD_BYTES),
   ) as BudgetRecord;
   if (
     !overBudget(record) ||

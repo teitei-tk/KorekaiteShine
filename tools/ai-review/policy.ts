@@ -1,3 +1,5 @@
+import { ReviewFailure } from './failure.ts';
+import { detail } from './diagnostics.ts';
 import type { PriorFinding } from './history.ts';
 export const REPOSITORY = 'teitei-tk/KorekaiteShine';
 export const REPOSITORY_ID = 1426899426;
@@ -111,11 +113,19 @@ export function validReview(
     r.uncertainties.length > 5 ||
     !r.uncertainties.every((x) => shortText(x, 500))
   )
-    throw new Error('レビュー形式が不正です');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      'レビュー形式が不正です',
+      detail('REVIEW_FORMAT_INVALID'),
+    );
   const findings = validFindings(r.findings);
   for (const f of findings) {
     if (!Object.hasOwn(lines, f.path) || !lines[f.path]?.includes(f.line))
-      throw new Error('指摘の変更行が不正です');
+      throw new ReviewFailure(
+        'OUTPUT_INVALID',
+        '指摘の変更行が不正です',
+        detail('FINDING_LOCATION_INVALID'),
+      );
   }
   if (
     r.findings.some((f, index) =>
@@ -124,21 +134,33 @@ export function validReview(
       ),
     )
   )
-    throw new Error('既存または新規の指摘が重複しています');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '既存または新規の指摘が重複しています',
+      detail('FINDING_DUPLICATE'),
+    );
   const checks = r.checks ?? [];
   if (
     !Array.isArray(checks) ||
     checks.length !== prior.length ||
     new Set(checks.map((c) => c?.id)).size !== checks.length ||
+    checks.some((c) => !c || !prior.some((f) => f.id === c.id))
+  )
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '修正確認の対象または根拠が不正です',
+      detail('CHECK_TARGET_MISMATCH'),
+    );
+  if (
     checks.some(
-      (c) =>
-        !c ||
-        !prior.some((f) => f.id === c.id) ||
-        !['fixed', 'unfixed', 'unverified'].includes(c.status) ||
-        !shortText(c.evidence, 500),
+      (c) => !['fixed', 'unfixed', 'unverified'].includes(c.status) || !shortText(c.evidence, 500),
     )
   )
-    throw new Error('修正確認の対象または根拠が不正です');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '修正確認の対象または根拠が不正です',
+      detail('CHECK_RESULT_INVALID'),
+    );
   return r;
 }
 // MarkdownをHTML化して挿入させず、@による通知も発生させない。

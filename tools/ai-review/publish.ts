@@ -1,3 +1,5 @@
+import { verifyPartitionArtifact } from './artifact.ts';
+import type { GenerationOrigin } from './artifact.ts';
 import { reviewHistory, readInlineHistory, historyMarker } from './history.ts';
 import { REPOSITORY, safe, MARKER } from './policy.ts';
 import { readFileSync, statSync, appendFileSync } from 'node:fs';
@@ -32,6 +34,7 @@ export async function publish(
   )
     throw new Error('対象情報が不正です');
   const review = validReview(value, metadata.lines, metadata.priorFindings);
+  if (review.status !== 'complete') throw new Error('未完了の結果は投稿できません');
   const prior = (await comments(api, metadata.number)).filter(ownComment);
   if (prior.some((c) => c.body.includes(revisionMarker(metadata.head, metadata.base))))
     return false;
@@ -129,8 +132,11 @@ function readJson<T>(path: string, max: number): T {
 export function readReviewArtifact(
   directory: string,
   expected: Pick<Material, 'number' | 'head' | 'base'>,
+  generation?: GenerationOrigin,
 ) {
+  if (generation) verifyPartitionArtifact(directory, generation);
   const metadata = readJson<Material>(join(directory, 'metadata.json'), 400_000);
+  if (metadata.partitionVersion && !generation) throw new Error('生成元の照合が必要です');
   // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
   if (
     metadata.number !== expected.number ||
@@ -139,7 +145,7 @@ export function readReviewArtifact(
   )
     throw new Error('成果物の対象が一致しません');
   const review = validReview(
-    readJson<ReviewInput>(join(directory, 'result.json'), 30_000),
+    readJson<ReviewInput>(join(directory, 'result.json'), generation ? 100_000 : 30_000),
     metadata.lines,
     metadata.priorFindings,
   );
@@ -148,11 +154,19 @@ export function readReviewArtifact(
 
 if (import.meta.main) {
   try {
-    const { metadata, review } = readReviewArtifact(process.env.REVIEW_DIRECTORY!, {
-      number: Number(process.env.PR_NUMBER),
-      head: process.env.PR_HEAD!,
-      base: process.env.PR_BASE!,
-    });
+    const { metadata, review } = readReviewArtifact(
+      process.env.REVIEW_DIRECTORY!,
+      {
+        number: Number(process.env.PR_NUMBER),
+        head: process.env.PR_HEAD!,
+        base: process.env.PR_BASE!,
+      },
+      {
+        run: process.env.GITHUB_RUN_ID!,
+        attempt: process.env.GENERATION_ATTEMPT!,
+        sha: process.env.GITHUB_SHA!,
+      },
+    );
     if (process.argv[2] === 'validate') {
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY!,

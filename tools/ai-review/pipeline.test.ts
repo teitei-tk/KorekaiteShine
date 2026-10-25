@@ -199,7 +199,7 @@ it.each(['fixed', 'unfixed', 'unverified', 'missing', 'changed-history'])(
                   type: 'output_text',
                   annotations: [],
                   text: JSON.stringify({
-                    status: status === 'unverified' ? 'incomplete' : 'complete',
+                    status: 'complete',
                     summary: '再確認',
                     uncertainties: [],
                     findings: [],

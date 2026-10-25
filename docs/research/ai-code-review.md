@@ -16,9 +16,9 @@
 
 第一候補の`openai/codex-action` v1.13 / CLI 0.164.0は、[実行検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40082397153)でWIF交換に成功したものの、内蔵プロキシの認証文字列1,024バイト制限で停止しました。モデル実行・投稿には到達していません。
 
-代替案として公式[OpenAI Node SDK](https://github.com/openai/openai-node) 7.43.0からResponses APIを呼びます。既存のWIF交換で得た短命BearerをSDKの`apiKey`へ渡し、長期APIキーは保存しません。SDK組み込みの自動WIF更新は使わず、交換後240秒以上の残存時間を確認して一回のリクエストを行います。依存インストールと資料収集は交換前に完了させます。
+代替案として公式[OpenAI Node SDK](https://github.com/openai/openai-node) 7.43.0からResponses APIを呼びます。既存のWIF交換で得た短命BearerをSDKの`apiKey`へ渡し、長期APIキーは保存しません。SDK組み込みの自動WIF更新は使わず、各要求の直前に交換し、240秒以上の残存時間を確認して一回のリクエストを行います。依存インストールと資料収集は交換前に完了させます。
 
-[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)を使い、既存Schemaを`text.format`へ指定します。モデルは`gpt-6-luna`、推論強度は`medium`、出力は推論を含む8,000トークン、リクエスト期限は150秒です。SDKの再試行を無効にし、`store: false`と空のツール一覧を明示します。入力は500KB、応答テキストは30KBを上限とし、未完了・拒否・不正JSONを成功扱いしません。使用量は数値だけをSummaryへ記録し、SDKログと外部エラー本文は出力しません。
+[Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)を使い、既存Schemaを`text.format`へ指定します。モデルは`gpt-6-luna`、推論強度は`medium`、出力は推論を含む8,000トークン、リクエスト期限は150秒です。SDKの再試行を無効にし、`store: false`と空のツール一覧を明示します。1回の入力は500KB、応答テキストは30KBを上限とし、未完了・拒否・不正JSONを成功扱いしません。使用量は数値だけをSummaryへ記録し、SDKログと外部エラー本文は出力しません。
 
 SDKとロックファイルはmain側の信頼する版を使用します。PR側の依存をインストールせず、pnpmの供給網保護と`--ignore-scripts`を維持します。実アカウントのSDK呼び出しと投稿はmain反映後に検証します。PR-Agentは今回採用しません。
 
@@ -91,3 +91,5 @@ Googleのレビュー観点と判断基準を主軸に、設計・動作・複�
 未確認なのは、対象アカウントのWIF設定権限、サービスアカウントの実効権限、Luna利用可否、Actionの短命トークン接続・期限、費用と精度です。これらを確認するまで運用開始済みとは扱いません。外部PRの受け入れ方針は未確認ですが、本案ではAIレビュー対象から除外できます。
 
 行への投稿には[レビュー作成API](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)の対象コミット、ファイル、行、RIGHT側を指定します。返信には[レビューコメントへの返信API](https://docs.github.com/en/rest/pulls/comments#create-a-reply-for-a-review-comment)を使い、元コメントIDを維持します。Resolve・再オープンのAPIは使用しません。
+
+2026年10月25日追記: 全資料の一括送信は[分割と横断確認](../spec/ai-review-partitioning.md)へ変更しました。根拠を残した静的な資料選択、全体予算、未完了時の投稿停止を実装し、実PRでの有料検証は未実施です。

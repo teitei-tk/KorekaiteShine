@@ -1,3 +1,4 @@
+import { ReviewFailure } from './failure.ts';
 import type { PriorFinding } from './history.ts';
 import OpenAI from 'openai';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
@@ -8,8 +9,8 @@ import type { Material } from './material.ts';
 
 const schema = JSON.parse(readFileSync(new URL('./schema.json', import.meta.url), 'utf8'));
 
-interface ReviewResult {
-  value: Review;
+export interface ReviewResult<T = Review> {
+  value: T;
   usage: { input: number | null; output: number | null; total: number | null };
 }
 
@@ -20,6 +21,21 @@ export async function generateReview(
   fetcher: typeof fetch = fetch,
   prior: PriorFinding[] = [],
 ): Promise<ReviewResult> {
+  return requestStructuredReview(
+    token,
+    prompt,
+    (value) => validReview(value, lines, prior),
+    fetcher,
+  );
+}
+
+export async function requestStructuredReview<T>(
+  token: string,
+  prompt: string,
+  validate: (value: T) => T,
+  fetcher: typeof fetch = fetch,
+  outputSchema = schema,
+): Promise<ReviewResult<T>> {
   try {
     if (!token || Buffer.byteLength(prompt) > 500_000) throw new Error('invalid input');
     const client = new OpenAI({
@@ -40,7 +56,9 @@ export async function generateReview(
         tools: [],
         store: false,
         max_output_tokens: 8000,
-        text: { format: { type: 'json_schema', name: 'code_review', strict: true, schema } },
+        text: {
+          format: { type: 'json_schema', name: 'code_review', strict: true, schema: outputSchema },
+        },
       },
       { signal: AbortSignal.timeout(150_000) },
     );
@@ -49,8 +67,14 @@ export async function generateReview(
       !result.output_text ||
       Buffer.byteLength(result.output_text) > 30_000
     )
-      throw new Error('incomplete output');
-    const value = validReview(JSON.parse(result.output_text), lines, prior);
+      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。');
+    let value: T;
+    try {
+      value = validate(JSON.parse(result.output_text));
+    } catch (error) {
+      if (error instanceof ReviewFailure) throw error;
+      throw new ReviewFailure('OUTPUT_INVALID', 'レビュー生成に失敗しました。');
+    }
     const count = (n: number | undefined) =>
       typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;
     return {
@@ -62,6 +86,7 @@ export async function generateReview(
       },
     };
   } catch (error) {
+    if (error instanceof ReviewFailure) throw error;
     const status =
       error instanceof OpenAI.APIError && Number.isInteger(error.status)
         ? `（HTTP ${error.status}）`

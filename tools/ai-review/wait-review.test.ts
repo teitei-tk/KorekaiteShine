@@ -183,3 +183,39 @@ it('モデル側の失敗・キャンセルも終端結果として返す', asyn
   f.review.conclusion = 'cancelled';
   expect((await finishReview(f.api, f.revision, 20, 1)).reason).toBe('CANCELLED');
 });
+
+it('完了結果の取得中に再試行が始まった場合も旧成功を返さない', async () => {
+  const f = fixture();
+  const api: Api<CheckRequest> = async <T>(path: string) => {
+    const value = await f.api<T>(path);
+    if (path === 'actions/runs/20/attempts/1') {
+      const frozen = { ...f.review };
+      f.review.run_attempt = 2;
+      f.review.status = 'in_progress';
+      return frozen as T;
+    }
+    return value;
+  };
+  const directory = mkdtempSync(join(tmpdir(), 'ai-monitor-rerun-'));
+  try {
+    writeFileSync(
+      join(directory, 'status.json'),
+      JSON.stringify({
+        version: 1,
+        run: '20',
+        attempt: '1',
+        job: 'publish',
+        status: 'success',
+        target: 'publish',
+        reason: 'REVIEW_COMPLETE',
+      }),
+    );
+    expect(await finishReview(api, f.revision, 20, 1, directory)).toEqual({
+      conclusion: 'failure',
+      target: 'workflow',
+      reason: 'SUPERSEDED',
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

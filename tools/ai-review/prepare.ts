@@ -1,6 +1,6 @@
-import { readHistory } from './history.ts';
+import { reviewHistory } from './history.ts';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { githubApi, target, comments } from './github.ts';
+import { githubApi, target, comments, reviewComments } from './github.ts';
 import { join } from 'node:path';
 import { collect } from './material.ts';
 
@@ -12,7 +12,11 @@ try {
       const directory = process.env.REVIEW_DIRECTORY;
       if (!directory) throw new Error('資料ディレクトリがありません');
       mkdirSync(directory, { recursive: true });
-      collect(pr, directory, readHistory(await comments(api, pr.number)));
+      const [legacy, inline] = await Promise.all([
+        comments(api, pr.number),
+        reviewComments(api, pr.number),
+      ]);
+      collect(pr, directory, reviewHistory(legacy, inline, pr.head.sha, pr.base.sha));
       const prompt = readFileSync(new URL('./prompt.md', import.meta.url), 'utf8');
       const material = readFileSync(join(directory, 'material.json'), 'utf8');
       writeFileSync(

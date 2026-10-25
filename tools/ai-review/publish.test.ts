@@ -9,6 +9,7 @@ it('投稿直前のhead変更では書き込みを行わない', async () => {
   const writes: ({ body: string } | undefined)[] = [];
   const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
     if (method) writes.push(body);
+    if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
     if (path.startsWith('issues/')) return [] as T;
     return {
       number: 7,
@@ -47,6 +48,7 @@ it('本人の最新PRには投稿し、他人に変わっていれば投稿し�
         writes.push({ path, method, body });
         return {} as T;
       }
+      if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
       if (path.startsWith('issues/')) return [] as T;
       return {
         number: 7,
@@ -75,6 +77,7 @@ it('同じ対象への再投稿を抑止し、人間のコメントは更新し�
         writes.push(`${method} ${path}`);
         return {} as T;
       }
+      if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
       if (path.startsWith('issues/'))
         return [
           {
@@ -134,6 +137,7 @@ it('過去の指摘を保持して修正結果を新規投稿し、再実行は�
       stored.push({ id: 11, user: old.user, body: (body as { body: string }).body });
       return {} as T;
     }
+    if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
     if (path.startsWith('issues/')) return stored as T;
     return {
       number: 7,
@@ -150,10 +154,10 @@ it('過去の指摘を保持して修正結果を新規投稿し、再実行は�
   };
   expect(await publish(api, { ...metadata, priorFindings }, result)).toBe(true);
   expect(stored[0]).toEqual(old);
-  expect(writes).toEqual(['POST']);
+  expect(writes).toEqual(['POST', 'POST']);
   expect(stored[1].body).toContain('☑️: 修正を確認しました');
   expect(stored[1].body).toContain('issuecomment-10');
   expect(stored[1].body).toContain('app.tsの解放処理を確認');
   expect(await publish(api, { ...metadata, priorFindings }, result)).toBe(false);
-  expect(writes).toHaveLength(1);
+  expect(writes).toHaveLength(2);
 });

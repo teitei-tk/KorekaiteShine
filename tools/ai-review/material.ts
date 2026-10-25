@@ -1,3 +1,6 @@
+import { ReviewFailure } from './failure.ts';
+import { indexSources } from './source-index.ts';
+import { planReview } from './partition.ts';
 import type { PriorFinding } from './history.ts';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -38,6 +41,10 @@ export interface Material {
   base: string;
   lines: Record<string, number[]>;
   priorFindings?: PriorFinding[];
+  ancestor?: string;
+  partitionVersion?: 1;
+  title?: string;
+  body?: string | null;
 }
 export function collect(
   pr: PullRequest,
@@ -74,21 +81,23 @@ export function collect(
     pr.base.sha,
     pr.head.sha,
   );
+  return collectFromGit(pr, directory, git, priorFindings);
+}
+
+export function collectFromGit(
+  pr: PullRequest,
+  directory: string,
+  git: (...args: string[]) => string,
+  priorFindings: PriorFinding[] = [],
+): Material {
   const ancestor = git('merge-base', pr.base.sha, pr.head.sha).trim();
   if (!/^[a-f0-9]{40}$/.test(ancestor)) throw new Error('比較元を確定できません');
   const paths = git('diff', '--name-only', '-z', '--no-renames', ancestor, pr.head.sha)
     .split('\0')
     .filter(Boolean);
-  if (paths.length > 80) throw new Error('変更ファイル数が80件を超えました');
+  if (paths.length > 5000) throw new ReviewFailure('BUDGET_EXCEEDED', '変更一覧の上限を超えました');
   const lines: Record<string, number[]> = Object.create(null);
-  const patches: { path: string; patch: string }[] = [];
-  let bytes = 0;
-  const reserve = (text: string) => {
-    bytes += Buffer.byteLength(text);
-    if (bytes > 300_000) throw new Error('資料が300KBを超えました。PRを分割してください');
-  };
-  const excluded = paths.filter((path) => !isMaterialPath(path));
-  for (const path of paths.filter(isMaterialPath)) {
+  const patches = paths.filter(isMaterialPath).map((path) => {
     const patch = git(
       'diff',
       '--no-ext-diff',
@@ -100,57 +109,26 @@ export function collect(
       '--',
       path,
     );
-    reserve(patch);
     lines[path] = changedLines(patch);
-    patches.push({ path, patch });
-  }
-  const files = snapshotFiles(git, [pr.base.sha, pr.head.sha], reserve);
-  const metadata = {
+    return { path, patch };
+  });
+  const metadata: Material = {
     number: pr.number,
     head: pr.head.sha,
     base: pr.base.sha,
+    ancestor,
     lines,
     priorFindings,
-  };
-  const bundle = JSON.stringify({
-    ...metadata,
+    partitionVersion: 1,
     title: pr.title,
     body: pr.body,
-    ancestor,
-    excluded,
-    patches,
-    files,
-  });
-  if (Buffer.byteLength(bundle) > 400_000) throw new Error('JSON資料が400KBを超えました');
+  };
   if (Buffer.byteLength(JSON.stringify(metadata)) > 400_000)
-    throw new Error('変更行と指摘履歴の情報が400KBを超えました');
-  writeFileSync(join(directory, 'material.json'), bundle);
+    throw new ReviewFailure('BUDGET_EXCEEDED', '変更行と指摘履歴の情報が400KBを超えました');
+  const index = indexSources(git, [ancestor, pr.base.sha, pr.head.sha]);
+  index.excluded = [...new Set([...index.excluded, ...paths.filter((p) => !isMaterialPath(p))])];
+  const plan = planReview(metadata, index, patches);
+  writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
   return metadata;
-}
-
-export function snapshotFiles(
-  git: (...args: string[]) => string,
-  revisions: string[],
-  reserve: (text: string) => void,
-) {
-  const files = new Map<string, { revisions: string[]; path: string; content: string }>();
-  for (const revision of revisions) {
-    for (const entry of git('ls-tree', '-r', '-z', revision).split('\0').filter(Boolean)) {
-      const match = /^(100644|100755) blob ([a-f0-9]{40})\t([\s\S]+)$/.exec(entry);
-      if (!match || !isMaterialPath(match[3])) continue; // symlink、submoduleは追跡しない
-      const key = `${match[2]}:${match[3]}`;
-      const existing = files.get(key);
-      if (existing) {
-        existing.revisions.push(revision);
-        continue;
-      }
-      if (files.size >= 160) throw new Error('資料ファイル数が160件を超えました');
-      const content = git('cat-file', 'blob', match[2]);
-      if (content.includes('\0')) throw new Error('テキスト対象にバイナリが含まれています');
-      reserve(content);
-      files.set(key, { revisions: [revision], path: match[3], content });
-    }
-  }
-  return [...files.values()];
 }

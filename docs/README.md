@@ -19,6 +19,8 @@ AIレビューの指摘履歴と修正確認は[コメントと修正確認の�
 
 コードレビュー時の型と外部入力の判断は[コードレビュー基準](../CODING_STANDARDS.md)を参照してください。
 
+資料収集の容量問題への対応は[AIレビューの分割と横断確認の設計](spec/ai-review-partitioning.md)にまとめています。承認済みの設計に沿って実装・回帰テストを追加しています。PR #13の上限引き上げはマージしません。
+
 ## 設計判断の記録
 
 | ADR                                               | 判断                                                         |
@@ -27,6 +29,8 @@ AIレビューの指摘履歴と修正確認は[コメントと修正確認の�
 | [0002](adr/0002-queued-evaluation.md)             | 評価をQueuesとDLQで音声面接から分離する                      |
 | [0003](adr/0003-immutable-evaluation-evidence.md) | 評価の根拠を固定し、追記メモを分離する                       |
 | [0004](adr/0004-tanstack-start-with-void.md)      | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する |
+
+[ADR 0005](adr/0005-partitioned-ai-review.md)には分割レビューと横断確認を採用した理由を記録しています。
 
 ## 文書ごとの役割
 

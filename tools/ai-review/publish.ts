@@ -1,3 +1,5 @@
+import { verifyPartitionArtifact } from './artifact.ts';
+import type { GenerationOrigin } from './artifact.ts';
 import { reviewHistory, readInlineHistory, historyMarker } from './history.ts';
 import { REPOSITORY, safe, MARKER } from './policy.ts';
 import { readFileSync, statSync, appendFileSync } from 'node:fs';
@@ -7,6 +9,7 @@ import type { Api } from './github.ts';
 import { eligible, validReview, renderReview, revisionMarker } from './policy.ts';
 import type { PullRequest, ReviewInput, Finding } from './policy.ts';
 import type { Material } from './material.ts';
+import { writeStatusReport } from './status-report.ts';
 
 function findingKey(finding: Finding): string {
   return JSON.stringify([
@@ -19,11 +22,11 @@ function findingKey(finding: Finding): string {
   ]);
 }
 
-export async function publish(
+async function publishResult(
   api: Api,
   metadata: Material,
   value: ReviewInput | null,
-): Promise<boolean> {
+): Promise<'REVIEW_COMPLETE' | 'ALREADY_COMPLETE' | 'TARGET_CHANGED'> {
   if (
     !Number.isSafeInteger(metadata.number) ||
     metadata.number < 1 ||
@@ -32,9 +35,10 @@ export async function publish(
   )
     throw new Error('対象情報が不正です');
   const review = validReview(value, metadata.lines, metadata.priorFindings);
+  if (review.status !== 'complete') throw new Error('未完了の結果は投稿できません');
   const prior = (await comments(api, metadata.number)).filter(ownComment);
   if (prior.some((c) => c.body.includes(revisionMarker(metadata.head, metadata.base))))
-    return false;
+    return 'ALREADY_COMPLETE';
   const inline = await reviewComments(api, metadata.number);
   const history = reviewHistory(prior, inline, metadata.head, metadata.base);
   if (JSON.stringify(history) !== JSON.stringify(metadata.priorFindings ?? []))
@@ -48,7 +52,7 @@ export async function publish(
       pr.base.sha === metadata.base
     );
   };
-  if (!(await current())) return false;
+  if (!(await current())) return 'TARGET_CHANGED';
   const postedBatch = readInlineHistory(inline).filter(
     (f) => f.head === metadata.head && f.base === metadata.base,
   );
@@ -83,7 +87,7 @@ export async function publish(
         )
       : prior.some((c) => c.body.includes(marker));
     if (posted) continue;
-    if (!(await current())) return false;
+    if (!(await current())) return 'TARGET_CHANGED';
     const label = check.status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません';
     const reason =
       check.status === 'unverified'
@@ -111,7 +115,7 @@ export async function publish(
       { body },
     );
   }
-  if (!(await current())) return false;
+  if (!(await current())) return 'TARGET_CHANGED';
   const body = [
     renderReview({ ...review, findings: [], checks: [] }, metadata.head, metadata.base),
     '新規指摘は該当行のレビュースレッド、修正確認は元スレッドへの返信を参照してください。',
@@ -119,7 +123,28 @@ export async function publish(
   ].join('\n\n');
   if (body.length > 60000) throw new Error('コメントの上限を超えました');
   await api(`issues/${metadata.number}/comments`, 'POST', { body });
-  return true;
+  return 'REVIEW_COMPLETE';
+}
+export async function publish(
+  api: Api,
+  metadata: Material,
+  value: ReviewInput | null,
+): Promise<boolean> {
+  return (await publishResult(api, metadata, value)) === 'REVIEW_COMPLETE';
+}
+export async function publishAndReport(
+  api: Api,
+  metadata: Material,
+  value: ReviewInput | null,
+  env: Record<string, string | undefined>,
+): Promise<void> {
+  try {
+    const reason = await publishResult(api, metadata, value);
+    writeStatusReport(env, reason === 'TARGET_CHANGED' ? 'neutral' : 'success', 'publish', reason);
+  } catch (error) {
+    writeStatusReport(env, 'failure', 'publish', 'PUBLISH_FAILED');
+    throw error;
+  }
 }
 function readJson<T>(path: string, max: number): T {
   const stat = statSync(path);
@@ -129,8 +154,11 @@ function readJson<T>(path: string, max: number): T {
 export function readReviewArtifact(
   directory: string,
   expected: Pick<Material, 'number' | 'head' | 'base'>,
+  generation?: GenerationOrigin,
 ) {
+  if (generation) verifyPartitionArtifact(directory, generation);
   const metadata = readJson<Material>(join(directory, 'metadata.json'), 400_000);
+  if (metadata.partitionVersion && !generation) throw new Error('生成元の照合が必要です');
   // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
   if (
     metadata.number !== expected.number ||
@@ -139,7 +167,7 @@ export function readReviewArtifact(
   )
     throw new Error('成果物の対象が一致しません');
   const review = validReview(
-    readJson<ReviewInput>(join(directory, 'result.json'), 30_000),
+    readJson<ReviewInput>(join(directory, 'result.json'), generation ? 100_000 : 30_000),
     metadata.lines,
     metadata.priorFindings,
   );
@@ -147,24 +175,33 @@ export function readReviewArtifact(
 }
 
 if (import.meta.main) {
+  let validating = true;
   try {
-    const { metadata, review } = readReviewArtifact(process.env.REVIEW_DIRECTORY!, {
-      number: Number(process.env.PR_NUMBER),
-      head: process.env.PR_HEAD!,
-      base: process.env.PR_BASE!,
-    });
+    const { metadata, review } = readReviewArtifact(
+      process.env.REVIEW_DIRECTORY!,
+      {
+        number: Number(process.env.PR_NUMBER),
+        head: process.env.PR_HEAD!,
+        base: process.env.PR_BASE!,
+      },
+      {
+        run: process.env.GITHUB_RUN_ID!,
+        attempt: process.env.GENERATION_ATTEMPT!,
+        sha: process.env.GITHUB_SHA!,
+      },
+    );
     if (process.argv[2] === 'validate') {
       appendFileSync(
         process.env.GITHUB_STEP_SUMMARY!,
         `レビュー結果: ${review.status}、指摘${review.findings.length}件。対象SHA: ${metadata.head}\n`,
       );
     } else {
-      const posted = await publish(githubApi(process.env.GH_TOKEN ?? ''), metadata, review);
-      console.log(
-        posted ? 'レビューコメントを投稿しました' : '対象更新または投稿済みのため投稿しません',
-      );
+      validating = false;
+      await publishAndReport(githubApi(process.env.GH_TOKEN ?? ''), metadata, review, process.env);
+      console.log('投稿処理の結果を記録しました');
     }
   } catch {
+    if (validating) writeStatusReport(process.env, 'failure', 'artifact', 'ARTIFACT_INVALID');
     console.error('レビュー出力の検証または投稿に失敗しました。結果は成功として扱いません。');
     process.exitCode = 1;
   }

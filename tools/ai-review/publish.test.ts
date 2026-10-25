@@ -161,3 +161,19 @@ it('過去の指摘を保持して修正結果を新規投稿し、再実行は�
   expect(await publish(api, { ...metadata, priorFindings }, result)).toBe(false);
   expect(writes).toHaveLength(2);
 });
+
+it('未完了のレビューではGitHubの読み書きを始めない', async () => {
+  let calls = 0;
+  const api: Api = async <T>() => {
+    calls++;
+    return {} as T;
+  };
+  await expect(
+    publish(
+      api,
+      { number: 1, head: 'a'.repeat(40), base: 'b'.repeat(40), lines: {} },
+      { status: 'incomplete', summary: '資料不足', uncertainties: [], findings: [] },
+    ),
+  ).rejects.toThrow('未完了');
+  expect(calls).toBe(0);
+});

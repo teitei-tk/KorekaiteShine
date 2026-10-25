@@ -27,14 +27,19 @@ it('秘密値・生成物・ロック・エージェント設定を資料とし�
 });
 
 it('baseとheadで同じ内容の資料を二重送信しない', async () => {
-  const { snapshotFiles } = await import('./material.ts');
+  const { indexSources } = await import('./source-index.ts');
   const blob = 'a'.repeat(40);
-  const reserved: string[] = [];
-  const read = (...args: string[]) =>
-    args[0] === 'ls-tree' ? `100644 blob ${blob}\tapp.ts\0` : 'export const value = 1;';
-  const files = snapshotFiles(read, ['base', 'head'], (text) => reserved.push(text));
-  expect(files).toEqual([
-    { revisions: ['base', 'head'], path: 'app.ts', content: 'export const value = 1;' },
-  ]);
-  expect(reserved).toEqual(['export const value = 1;']);
+  let reads = 0;
+  const read = (...args: string[]) => {
+    if (args[0] === 'ls-tree') return `100644 blob ${blob}\tapp.ts\0`;
+    reads++;
+    return 'export const value = 1;';
+  };
+  const index = indexSources(read, ['base', 'head']);
+  expect(index.files[0].sources[0]).toMatchObject({
+    revisions: ['base', 'head'],
+    path: 'app.ts',
+    content: 'export const value = 1;',
+  });
+  expect(reads).toBe(1);
 });

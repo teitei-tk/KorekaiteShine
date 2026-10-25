@@ -96,3 +96,17 @@ describe('SDKレビュー', () => {
     ).rejects.toThrow(/^レビュー生成に失敗しました。$/);
   });
 });
+it('SDK応答検証で確定した安全な失敗コードを呼び出し元へ保持する', async () => {
+  const { requestStructuredReview } = await import('./review.ts');
+  const { ReviewFailure } = await import('./failure.ts');
+  await expect(
+    requestStructuredReview(
+      'fixture-token',
+      'data',
+      () => {
+        throw new ReviewFailure('MISSING_EVIDENCE', '根拠が不足しています');
+      },
+      async () => response(),
+    ),
+  ).rejects.toMatchObject({ reason: 'MISSING_EVIDENCE' });
+});

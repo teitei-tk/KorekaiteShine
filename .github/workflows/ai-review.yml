@@ -1,4 +1,5 @@
 name: AI review
+run-name: AI review / source run ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }} / ${{ vars.AI_REVIEW_MODE }}
 
 on:
   workflow_run:
@@ -20,6 +21,9 @@ jobs:
       (vars.AI_REVIEW_MODE == 'claims' || vars.AI_REVIEW_MODE == 'review')
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      AI_REVIEW_JOB: gate
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
     permissions:
       actions: read
       contents: read
@@ -43,20 +47,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: node tools/ai-review/prepare.ts gate
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-gate
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1
 
   generate:
     needs: gate
     if: needs.gate.outputs.allowed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 40
     outputs:
       ready: ${{ steps.validate.outcome == 'success' }}
+      artifact: ${{ steps.review.outputs.artifact }}
+      attempt: ${{ steps.review.outputs.attempt }}
     permissions:
       actions: read
       contents: read
       pull-requests: read
       id-token: write
     env:
+      AI_REVIEW_JOB: generate
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
       SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
       AI_REVIEW_MODE: ${{ vars.AI_REVIEW_MODE }}
     steps:
@@ -93,7 +109,7 @@ jobs:
         run: test "$EXPECTED_HEAD" = "$ACTUAL_HEAD" && test "$EXPECTED_BASE" = "$ACTUAL_BASE"
       - name: Diagnose claims or exchange a short-lived token
         id: wif
-        if: steps.material.outputs.allowed == 'true'
+        if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'claims'
         env:
           OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
           OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
@@ -102,18 +118,19 @@ jobs:
       - name: Review using GPT-6 Luna
         id: review
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
-        timeout-minutes: 3
+        timeout-minutes: 36
         env:
-          OPENAI_ACCESS_TOKEN: ${{ steps.wif.outputs.token }}
-          ACTIONS_ID_TOKEN_REQUEST_URL: ''
-          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ''
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
+          OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
           GH_TOKEN: ''
           GITHUB_TOKEN: ''
-        run: node tools/ai-review/review.ts
+        run: node tools/ai-review/orchestrate.ts
       - name: Validate output before handing it to the posting job
         id: validate
         if: steps.review.outcome == 'success'
         env:
+          GENERATION_ATTEMPT: ${{ steps.review.outputs.attempt }}
           PR_NUMBER: ${{ needs.gate.outputs.pr }}
           PR_HEAD: ${{ needs.gate.outputs.head }}
           PR_BASE: ${{ needs.gate.outputs.base }}
@@ -121,15 +138,25 @@ jobs:
       - uses: actions/upload-artifact@v7.0.2
         if: steps.review.outcome == 'success'
         with:
-          name: ai-review-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.review.outputs.artifact }}
           path: |
             ${{ runner.temp }}/ai-review-material/result.json
             ${{ runner.temp }}/ai-review-material/metadata.json
+            ${{ runner.temp }}/ai-review-material/plan.json
+            ${{ runner.temp }}/ai-review-material/execution.json
           if-no-files-found: error
           retention-days: 1
       - name: Record incomplete execution
         if: failure()
         run: echo 'AIレビューは未完了です。認証・資料上限・モデル・出力形式の各ステップを確認してください。自動再試行は行いません。' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-generate
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1
 
   publish:
     needs: [gate, generate]
@@ -140,6 +167,9 @@ jobs:
       contents: read
       pull-requests: write
     env:
+      AI_REVIEW_JOB: publish
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
+      GENERATION_ATTEMPT: ${{ needs.generate.outputs.attempt }}
       PR_NUMBER: ${{ needs.gate.outputs.pr }}
       PR_HEAD: ${{ needs.gate.outputs.head }}
       PR_BASE: ${{ needs.gate.outputs.base }}
@@ -153,10 +183,18 @@ jobs:
           node-version-file: .node-version
       - uses: actions/download-artifact@v8.0.2
         with:
-          name: ai-review-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ needs.generate.outputs.artifact }}
           path: ${{ runner.temp }}/ai-review-result
       - name: Recheck PR author and revision, then update the review comment
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEW_DIRECTORY: ${{ runner.temp }}/ai-review-result
         run: node tools/ai-review/publish.ts
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-publish
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1

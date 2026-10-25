@@ -1,3 +1,4 @@
+import type { PriorFinding } from './history.ts';
 export const REPOSITORY = 'teitei-tk/KorekaiteShine';
 export const REPOSITORY_ID = 1426899426;
 export const OWNER_ID = 1324680;
@@ -45,16 +46,44 @@ export interface Finding {
   impact: string;
   fix: string;
 }
+export interface FixCheck {
+  id: string;
+  status: 'fixed' | 'unfixed' | 'unverified';
+  evidence: string;
+}
 export interface Review {
   status: 'complete' | 'incomplete';
   summary: string;
   uncertainties: string[];
   findings: Finding[];
+  checks?: FixCheck[];
 }
 function shortText(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= max;
 }
-export function validReview(value: unknown, lines: Record<string, number[]>): Review {
+// 投稿済みの履歴にも使う形式検証。新規投稿の重複判定は含めない。
+export function validFindings(value: unknown): Finding[] {
+  if (!Array.isArray(value) || value.length > 3) throw new Error('指摘の形式が不正です');
+  for (const f of value) {
+    if (
+      !f ||
+      !['P1', 'P2'].includes(f.priority) ||
+      !shortText(f.path, 500) ||
+      !Number.isSafeInteger(f.line) ||
+      f.line < 1 ||
+      !shortText(f.condition, 1000) ||
+      !shortText(f.impact, 1000) ||
+      !shortText(f.fix, 1000)
+    )
+      throw new Error('指摘の形式が不正です');
+  }
+  return value;
+}
+export function validReview(
+  value: unknown,
+  lines: Record<string, number[]>,
+  prior: PriorFinding[] = [],
+): Review {
   const r = value as Review | null;
   if (
     !r ||
@@ -62,29 +91,40 @@ export function validReview(value: unknown, lines: Record<string, number[]>): Re
     !shortText(r.summary, 1500) ||
     !Array.isArray(r.uncertainties) ||
     r.uncertainties.length > 5 ||
-    !r.uncertainties.every((x) => shortText(x, 500)) ||
-    !Array.isArray(r.findings) ||
-    r.findings.length > 3
+    !r.uncertainties.every((x) => shortText(x, 500))
   )
     throw new Error('レビュー形式が不正です');
-  for (const f of r.findings) {
-    if (
-      !f ||
-      !['P1', 'P2'].includes(f.priority) ||
-      !shortText(f.path, 500) ||
-      !Object.hasOwn(lines, f.path) ||
-      !lines[f.path]?.includes(f.line) ||
-      !shortText(f.condition, 1000) ||
-      !shortText(f.impact, 1000) ||
-      !shortText(f.fix, 1000)
-    ) {
-      throw new Error('指摘の内容または変更行が不正です');
-    }
+  const findings = validFindings(r.findings);
+  for (const f of findings) {
+    if (!Object.hasOwn(lines, f.path) || !lines[f.path]?.includes(f.line))
+      throw new Error('指摘の変更行が不正です');
   }
+  if (
+    r.findings.some((f, index) =>
+      [...prior, ...r.findings.slice(0, index)].some(
+        (p) => p.path === f.path && p.condition.trim() === f.condition.trim(),
+      ),
+    )
+  )
+    throw new Error('既存または新規の指摘が重複しています');
+  const checks = r.checks ?? [];
+  if (
+    !Array.isArray(checks) ||
+    checks.length !== prior.length ||
+    new Set(checks.map((c) => c?.id)).size !== checks.length ||
+    checks.some(
+      (c) =>
+        !c ||
+        !prior.some((f) => f.id === c.id) ||
+        !['fixed', 'unfixed', 'unverified'].includes(c.status) ||
+        !shortText(c.evidence, 500),
+    )
+  )
+    throw new Error('修正確認の対象または根拠が不正です');
   return r;
 }
 // MarkdownをHTML化して挿入させず、@による通知も発生させない。
-function safe(value: string): string {
+export function safe(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

@@ -99,3 +99,61 @@ it('同じ対象への再投稿を抑止し、人間のコメントは更新し�
     expect(writes).toEqual(duplicate ? [] : ['POST issues/7/comments']);
   }
 });
+
+it('過去の指摘を保持して修正結果を新規投稿し、再実行は重複しない', async () => {
+  const { renderReview } = await import('./policy.ts');
+  const { readHistory } = await import('./history.ts');
+  const old = {
+    id: 10,
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+    body: renderReview(
+      {
+        ...review,
+        status: 'complete',
+        findings: [
+          {
+            priority: 'P1',
+            path: 'app.ts',
+            line: 1,
+            condition: '条件',
+            impact: '影響',
+            fix: '修正',
+          },
+        ],
+      },
+      'c'.repeat(40),
+      base,
+    ),
+  };
+  const priorFindings = readHistory([old]);
+  const stored = [old];
+  const writes: string[] = [];
+  const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+    if (method) {
+      writes.push(method);
+      stored.push({ id: 11, user: old.user, body: (body as { body: string }).body });
+      return {} as T;
+    }
+    if (path.startsWith('issues/')) return stored as T;
+    return {
+      number: 7,
+      user: { id: 1324680, type: 'User' },
+      state: 'open',
+      draft: false,
+      head: { sha: head, repo: { id: 1426899426 } },
+      base: { sha: base, ref: 'main', repo: { id: 1426899426 } },
+    } as T;
+  };
+  const result = {
+    ...review,
+    checks: [{ id: '10:1', status: 'fixed', evidence: 'app.tsの解放処理を確認' }],
+  };
+  expect(await publish(api, { ...metadata, priorFindings }, result)).toBe(true);
+  expect(stored[0]).toEqual(old);
+  expect(writes).toEqual(['POST']);
+  expect(stored[1].body).toContain('☑️: 修正を確認しました');
+  expect(stored[1].body).toContain('issuecomment-10');
+  expect(stored[1].body).toContain('app.tsの解放処理を確認');
+  expect(await publish(api, { ...metadata, priorFindings }, result)).toBe(false);
+  expect(writes).toHaveLength(1);
+});

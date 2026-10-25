@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "summary", "uncertainties", "findings"],
+  "required": ["status", "summary", "uncertainties", "findings", "checks"],
   "properties": {
     "status": {
       "type": "string",
@@ -40,6 +40,26 @@
             "type": "string"
           },
           "fix": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["fixed", "unfixed", "unverified"]
+          },
+          "evidence": {
             "type": "string"
           }
         }

@@ -1,3 +1,4 @@
+import type { PriorFinding } from './history.ts';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -36,8 +37,13 @@ export interface Material {
   head: string;
   base: string;
   lines: Record<string, number[]>;
+  priorFindings?: PriorFinding[];
 }
-export function collect(pr: PullRequest, directory: string): Material {
+export function collect(
+  pr: PullRequest,
+  directory: string,
+  priorFindings: PriorFinding[] = [],
+): Material {
   const bare = mkdtempSync(join(directory, 'git-'));
   const git = (...args: string[]) =>
     execFileSync(
@@ -99,7 +105,13 @@ export function collect(pr: PullRequest, directory: string): Material {
     patches.push({ path, patch });
   }
   const files = snapshotFiles(git, [pr.base.sha, pr.head.sha], reserve);
-  const metadata = { number: pr.number, head: pr.head.sha, base: pr.base.sha, lines };
+  const metadata = {
+    number: pr.number,
+    head: pr.head.sha,
+    base: pr.base.sha,
+    lines,
+    priorFindings,
+  };
   const bundle = JSON.stringify({
     ...metadata,
     title: pr.title,
@@ -110,8 +122,8 @@ export function collect(pr: PullRequest, directory: string): Material {
     files,
   });
   if (Buffer.byteLength(bundle) > 400_000) throw new Error('JSON資料が400KBを超えました');
-  if (Buffer.byteLength(JSON.stringify(metadata)) > 100_000)
-    throw new Error('変更行の情報が100KBを超えました');
+  if (Buffer.byteLength(JSON.stringify(metadata)) > 400_000)
+    throw new Error('変更行と指摘履歴の情報が400KBを超えました');
   writeFileSync(join(directory, 'material.json'), bundle);
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
   return metadata;

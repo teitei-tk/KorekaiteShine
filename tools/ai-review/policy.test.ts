@@ -77,3 +77,57 @@ it('期限切れや残存240秒未満を拒否する', () => {
     expect(() => remainingLifetime({ expires_at }, 1000)).toThrow();
   }
 });
+
+it('過去の全指摘に根拠付きの確認を要求し、未知・重複・欠落を拒否する', () => {
+  const prior = [
+    { ...result.findings[0], priority: 'P1' as const, id: '10:1', head: sha, base: 'b'.repeat(40) },
+  ];
+  const check = { id: '10:1', status: 'unverified', evidence: '資料不足で判断不能' };
+  expect(validReview({ ...result, findings: [], checks: [check] }, {}, prior).checks).toEqual([
+    check,
+  ]);
+  for (const checks of [
+    undefined,
+    [],
+    [check, check],
+    [{ ...check, id: '99:1' }],
+    [{ ...check, evidence: '' }],
+    [{ ...check, status: 'yes' }],
+  ]) {
+    expect(() => validReview({ ...result, findings: [], checks }, {}, prior)).toThrow();
+  }
+});
+
+it('行番号が移動した既存指摘を新規指摘として再投稿しない', () => {
+  const prior = [
+    { ...result.findings[0], priority: 'P1' as const, id: '10:1', head: sha, base: 'b'.repeat(40) },
+  ];
+  expect(() =>
+    validReview(
+      {
+        ...result,
+        findings: [{ ...result.findings[0], line: 3 }],
+        checks: [{ id: '10:1', status: 'unfixed', evidence: '問題が残存' }],
+      },
+      lines,
+      prior,
+    ),
+  ).toThrow();
+});
+
+it('影響を言い換えても同じ発生条件の指摘を再投稿しない', () => {
+  const prior = [
+    { ...result.findings[0], priority: 'P1' as const, id: '10:1', head: sha, base: 'b'.repeat(40) },
+  ];
+  expect(() =>
+    validReview(
+      {
+        ...result,
+        findings: [{ ...result.findings[0], impact: '処理が止まる' }],
+        checks: [{ id: '10:1', status: 'unfixed', evidence: '残存' }],
+      },
+      lines,
+      prior,
+    ),
+  ).toThrow();
+});

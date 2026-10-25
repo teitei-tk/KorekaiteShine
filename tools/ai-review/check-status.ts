@@ -76,7 +76,8 @@ async function existingCheck(
         c.name === 'AI review' &&
         c.head_sha === head &&
         c.app?.slug === 'github-actions' &&
-        c.details_url === url,
+        (c.details_url === url ||
+          c.details_url === `https://github.com/${REPOSITORY}/runs/${c.id}`),
     );
     if (check) {
       if (!positive(check.id) || !['queued', 'in_progress', 'completed'].includes(check.status))
@@ -217,8 +218,8 @@ export async function updateReviewCheck(
           : `AIレビュー: ${result.reason} (${result.target})`
         : 'AIレビュー実行中',
       summary: result
-        ? `対象: ${result.target}、理由: ${result.reason}。\n\n成功はレビュー処理と投稿の完了を表します。指摘の解決・Resolveは人間が判断します。`
-        : '資料収集・レビュー生成・コメント投稿の実行状態を確認しています。',
+        ? `対象: ${result.target}、理由: ${result.reason}。\n\n[AIレビューの実行ログ](${url})\n\n成功はレビュー処理と投稿の完了を表します。指摘の解決・Resolveは人間が判断します。`
+        : `資料収集・レビュー生成・コメント投稿の実行状態を確認しています。\n\n[AIレビューの実行ログ](${url})`,
     },
   };
   if (check) {

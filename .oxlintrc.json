@@ -2,5 +2,15 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "categories": {
     "correctness": "error"
+  },
+  "rules": {
+    "typescript/no-restricted-types": [
+      "error",
+      {
+        "types": {
+          "unknown": "入力の構造を表す具体的な型を使用し、実行時検証を維持してください。"
+        }
+      }
+    ]
   }
 }

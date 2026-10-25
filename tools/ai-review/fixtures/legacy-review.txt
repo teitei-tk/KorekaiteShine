@@ -1,0 +1,29 @@
+<!-- korekaite-ai-review -->
+
+<!-- revision:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -->
+
+### AIレビュー（完了）
+
+対象: `aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` / base: `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+
+モデル: gpt-6-luna。参考情報であり、マージ判定ではありません。
+
+接続失敗時の処理を確認しました。
+
+**P1 — src/a.ts:2**
+
+発生条件: 接続に失敗した場合
+
+影響: ソケットが解放されない
+
+修正方針: ソケットを解放する
+
+**P2 — src/a.ts:80**
+
+発生条件: 接続に失敗した場合
+
+影響: 再試行回数が初期化され無限再試行する
+
+修正方針: 再試行回数を保持する
+
+指摘がない場合も、不具合がないことを保証しません。

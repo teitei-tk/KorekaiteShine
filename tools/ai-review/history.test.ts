@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { readHistory, historyMarker } from './history.ts';
 import { renderReview } from './policy.ts';
@@ -76,4 +77,32 @@ it.each([
   expect(() =>
     readHistory([{ id: 12, user: bot, body: renderReview(review, head, base) + '\n' + marker }]),
   ).toThrow();
+});
+
+it('保存した旧形式コメントを現在の生成関数に依存せず読み取れる', () => {
+  const body = readFileSync(new URL('./fixtures/legacy-review.txt', import.meta.url), 'utf8');
+  expect(readHistory([{ id: 12, user: bot, body }])).toEqual([
+    {
+      id: '12:1',
+      head,
+      base,
+      priority: 'P1',
+      path: 'src/a.ts',
+      line: 2,
+      condition: '接続に失敗した場合',
+      impact: 'ソケットが解放されない',
+      fix: 'ソケットを解放する',
+    },
+    {
+      id: '12:2',
+      head,
+      base,
+      priority: 'P2',
+      path: 'src/a.ts',
+      line: 80,
+      condition: '接続に失敗した場合',
+      impact: '再試行回数が初期化され無限再試行する',
+      fix: '再試行回数を保持する',
+    },
+  ]);
 });

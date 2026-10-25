@@ -94,3 +94,9 @@ gh actions-lock --verify
 既存の参照先を更新する場合は`gh actions-lock --relock`を使い、変更されたSHAと更新理由を確認します。`--accept-moved`で自動的に受け入れる運用は行いません。`--verify-local`はネットワーク不要の対応関係の検査であり、取得元を確認する`--verify`の代わりにはしません。
 
 このツールは公開プレビューです。更新時はツールの版・ロック形式・CIの互換性を確認します。シェル内で導入するCLIやnpm依存はActionsロックの対象外であり、別途バージョン固定とpnpmの保護設定を維持します。
+
+## 型の禁止ルール
+
+`pnpm lint`はoxlintの`typescript/no-restricted-types`で、リポジトリ内の`unknown`型を拒否します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
+
+外部入力には具体的な入力型を付け、実行時の形式検証を維持してください。型アサーションだけではJSONやAPI応答を検証したことになりません。

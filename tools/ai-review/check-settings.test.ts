@@ -12,7 +12,8 @@ const variables = [
   { name: 'OPENAI_SERVICE_ACCOUNT_ID', value: 'user-fixture456' },
   { name: 'AI_REVIEW_MODE', value: 'claims' },
 ];
-const read = (value: unknown) => () => JSON.stringify(value);
+const read = (value: ({ name: string; value: string } | null)[] | Record<string, string>) => () =>
+  JSON.stringify(value);
 
 it('CLI経由でもghの標準出力・エラー出力を漏らさず、終了コードを返す', () => {
   const directory = mkdtempSync(join(tmpdir(), 'ai-settings-test-'));

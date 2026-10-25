@@ -31,16 +31,29 @@ const labels = new Map([
   ['Check formatting, links, and heading anchors', '文書検査'],
   ['Verify Actions lockfile', 'Actionsロック検証'],
 ]);
-function record(value: unknown): value is Record<string, unknown> {
+interface StepInput {
+  name?: string;
+  status: string | null;
+  conclusion: string | null;
+}
+interface JobInput extends StepInput {
+  steps: StepInput[];
+}
+interface RunInput {
+  status: string | null;
+  conclusion: string | null;
+  jobs: JobInput[];
+}
+function record(value: object | null | undefined): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function state(value: unknown): string {
+function state(value: string | null | undefined): string {
   if (value === '' || value === null) return '未確定';
   if (typeof value !== 'string' || !states.has(value)) throw new Error('Invalid state');
   return value;
 }
 export function runSnapshot(raw: string): { output: string; done: boolean; ok: boolean } {
-  const data: unknown = JSON.parse(raw);
+  const data: RunInput = JSON.parse(raw);
   if (!record(data) || !Array.isArray(data.jobs)) throw new Error('Invalid response');
   const status = state(data.status),
     conclusion = state(data.conclusion);

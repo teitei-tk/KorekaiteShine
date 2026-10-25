@@ -26,7 +26,7 @@ export function checkSettings(
   expected: Expected = {},
 ): { ok: boolean; output: string } {
   try {
-    const data: unknown = JSON.parse(read());
+    const data: { name: string; value: string }[] = JSON.parse(read());
     if (
       !Array.isArray(data) ||
       !data.every((row) => row && typeof row.name === 'string' && typeof row.value === 'string')

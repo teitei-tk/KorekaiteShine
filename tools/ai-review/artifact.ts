@@ -90,16 +90,15 @@ export function verifyPartitionArtifact(directory: string, expected: GenerationO
     plan.metadata.partitionVersion !== 1 ||
     !Array.isArray(record.completed) ||
     JSON.stringify(record.completed) !== JSON.stringify(plan.tasks.map((t) => t.id)) ||
-    !Number.isInteger(record.calls) ||
+    !Number.isSafeInteger(record.calls) ||
     record.calls < plan.tasks.length ||
-    record.calls > 12 ||
     !Number.isInteger(record.inputBytes) ||
     record.inputBytes < 1 ||
-    record.inputBytes > 3_000_000 ||
+    record.inputBytes > record.calls * 500_000 ||
     !record.usage ||
     !Number.isInteger(record.usage.output) ||
     record.usage.output < 0 ||
-    record.usage.output > 96000
+    record.usage.output > record.calls * 8000
   )
     throw new Error('成果物の完了範囲が不正です');
   const review = validReview(

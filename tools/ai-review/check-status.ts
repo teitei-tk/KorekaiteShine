@@ -1,3 +1,4 @@
+import type { Diagnostic } from './diagnostics.ts';
 import type { Api as GitHubApi } from './github.ts';
 import { readStatusReports } from './status-report.ts';
 import type { StatusReason } from './status-report.ts';
@@ -17,6 +18,8 @@ interface Outcome {
   conclusion: 'success' | 'failure' | 'neutral' | 'cancelled' | 'timed_out';
   target: string;
   reason: StatusReason;
+  diagnostic?: Diagnostic;
+  commentId?: number;
 }
 export async function completedOutcome(
   api: GitHubApi,
@@ -34,7 +37,13 @@ export async function completedOutcome(
     return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_INVALID' };
   }
   const failure = reports.find((r) => r.status === 'failure');
-  if (failure) return { conclusion: 'failure', target: failure.target, reason: failure.reason };
+  if (failure)
+    return {
+      conclusion: 'failure',
+      target: failure.target,
+      reason: failure.reason,
+      ...(failure.diagnostic ? { diagnostic: failure.diagnostic } : {}),
+    };
   if (run.conclusion !== 'success') {
     // 記録前の失敗（checkout、依存導入、Artifact取得など）にも安全な固定理由を付ける。
     let target = 'workflow';
@@ -57,9 +66,17 @@ export async function completedOutcome(
       reason: target === 'publish' ? 'PUBLISH_FAILED' : 'EXECUTION_FAILED',
     };
   }
-  const skipped = reports.find((r) => r.status === 'neutral');
+  const skipped = reports.find(
+    (r) => r.status === 'neutral' && r.reason !== 'COST_BUDGET_EXCEEDED',
+  );
   if (skipped) return { conclusion: 'neutral', target: skipped.target, reason: skipped.reason };
   const posted = reports.find((r) => r.status === 'success');
-  if (posted) return { conclusion: 'success', target: posted.target, reason: posted.reason };
+  if (posted)
+    return {
+      conclusion: 'success',
+      target: posted.target,
+      reason: posted.reason,
+      ...(posted.commentId ? { commentId: posted.commentId } : {}),
+    };
   return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_MISSING' };
 }

@@ -1,3 +1,5 @@
+import { validDiagnostic } from './diagnostics.ts';
+import type { Diagnostic } from './diagnostics.ts';
 import { writeFileSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { failureReasons } from './failure.ts';
@@ -5,6 +7,7 @@ import { failureReasons } from './failure.ts';
 const reasons = [
   ...failureReasons,
   'PUBLISH_FAILED',
+  'BUDGET_NOTIFIED',
   'EXECUTION_FAILED',
   'TARGET_CHANGED',
   'SKIPPED',
@@ -26,6 +29,8 @@ export interface StatusReport {
   status: 'success' | 'failure' | 'neutral';
   target: string;
   reason: StatusReason;
+  diagnostic?: Diagnostic;
+  commentId?: number;
 }
 export function validTarget(value: string): boolean {
   return (
@@ -39,6 +44,14 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
   return (
     !!value &&
     value.version === 1 &&
+    (value.reason === 'BUDGET_NOTIFIED'
+      ? Number.isSafeInteger(value.commentId) &&
+        value.commentId! > 0 &&
+        value.job === 'publish' &&
+        value.status === 'success'
+      : value.commentId === undefined) &&
+    (value.diagnostic === undefined ||
+      (value.status === 'failure' && validDiagnostic(value.diagnostic))) &&
     typeof value.run === 'string' &&
     /^[1-9]\d{0,17}$/.test(value.run) &&
     typeof value.attempt === 'string' &&
@@ -50,15 +63,22 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
     (value.status !== 'success' ||
       (value.job === 'publish' &&
         value.target === 'publish' &&
-        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE'].includes(value.reason ?? '')) ||
+        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason ?? '')) ||
       (['gate', 'generate'].includes(value.job ?? '') &&
         value.target === 'gate' &&
         value.reason === 'ALREADY_COMPLETE')) &&
-    (value.status !== 'neutral' || ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason ?? '')) &&
+    (value.status !== 'neutral' ||
+      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason ?? '') ||
+      (value.job === 'generate' && value.reason === 'COST_BUDGET_EXCEEDED')) &&
     (value.status !== 'failure' ||
-      !['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'TARGET_CHANGED', 'SKIPPED'].includes(
-        value.reason ?? '',
-      ))
+      ![
+        'REVIEW_COMPLETE',
+        'ALREADY_COMPLETE',
+        'BUDGET_NOTIFIED',
+        'TARGET_CHANGED',
+        'SKIPPED',
+        'COST_BUDGET_EXCEEDED',
+      ].includes(value.reason ?? ''))
   );
 }
 export function writeStatusReport(
@@ -66,6 +86,8 @@ export function writeStatusReport(
   status: StatusReport['status'],
   target: string,
   reason: StatusReason,
+  diagnostic?: Diagnostic,
+  commentId?: number,
 ): void {
   const path =
     env.AI_REVIEW_REPORT ??
@@ -79,9 +101,13 @@ export function writeStatusReport(
     status,
     target,
     reason,
+    ...(diagnostic ? { diagnostic } : {}),
+    ...(commentId !== undefined ? { commentId } : {}),
   };
   if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
-  writeFileSync(path, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  if (Buffer.byteLength(json) > 4096) throw new Error('実行結果が大きすぎます');
+  writeFileSync(path, json);
 }
 export function readStatusReports(
   directory: string | undefined,

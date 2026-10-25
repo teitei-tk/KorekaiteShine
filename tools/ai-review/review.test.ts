@@ -110,3 +110,29 @@ it('SDK応答検証で確定した安全な失敗コードを呼び出し元へ�
     ),
   ).rejects.toMatchObject({ reason: 'MISSING_EVIDENCE' });
 });
+it.each([
+  ['incomplete', 'max_output_tokens', 'TOKEN_LIMIT'],
+  ['incomplete', 'content_filter', 'CONTENT_FILTER'],
+  ['failed', 'SECRET', 'API_INCOMPLETE'],
+])('API中断を固定サブコードへ分類する: %s / %s', async (status, reason, subcode) => {
+  await expect(
+    generateReview('SECRET_TOKEN', 'SECRET_PROMPT', {}, async () =>
+      Response.json({
+        id: 'resp_test',
+        object: 'response',
+        status,
+        incomplete_details: { reason },
+        output: [],
+      }),
+    ),
+  ).rejects.toMatchObject({ reason: 'INCOMPLETE', detail: { subcode, missing: [] } });
+});
+it.each([
+  ['', 'EMPTY_OUTPUT'],
+  ['not-json SECRET', 'INVALID_JSON'],
+  ['x'.repeat(30001), 'OUTPUT_LIMIT'],
+])('出力不正の詳細に生出力を含めない: %s', async (text, subcode) => {
+  await expect(
+    generateReview('SECRET_TOKEN', 'SECRET_PROMPT', {}, async () => response('completed', text)),
+  ).rejects.toMatchObject({ detail: { subcode, missing: [] } });
+});

@@ -1,3 +1,5 @@
+import { renderDiagnostic } from './diagnostics.ts';
+import type { Diagnostic } from './diagnostics.ts';
 import { appendFileSync } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import { githubApi } from './github.ts';
@@ -164,12 +166,19 @@ export async function finishReview(
     return { conclusion: 'failure' as const, target: 'workflow', reason: 'SUPERSEDED' as const };
   return result;
 }
-function summary(target: string, reason: StatusReason, run?: number, attempt?: number): void {
-  const message = `対象: ${target}、理由: ${reason}。`;
+function summary(
+  target: string,
+  reason: StatusReason,
+  run?: number,
+  attempt?: number,
+  diagnostic?: Diagnostic,
+  commentId?: number,
+): void {
+  const message = `対象: ${target}、理由: ${reason}。${diagnostic ? '\n\n' + renderDiagnostic(diagnostic) : ''}`;
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `${message}\n\n${run ? `[AIレビューの実行ログ](https://github.com/${REPOSITORY}/actions/runs/${run}/attempts/${attempt})\n\n` : ''}成功はレビューと投稿の完了を表します。指摘のResolveは人間が行います。\n`,
+      `${message}\n\n${run ? `[AIレビューの実行ログ](https://github.com/${REPOSITORY}/actions/runs/${run}/attempts/${attempt})\n\n` : ''}${reason === 'BUDGET_NOTIFIED' ? `予算不足・レビュー未完了・[PR通知済み](https://github.com/${REPOSITORY}/issues/${process.env.REVIEW_PR}#issuecomment-${commentId})。CI成功は通知処理の完了です。` : '成功はレビューと投稿の完了を表します。'}指摘のResolveは人間が行います。\n`,
     );
   console.log(message);
 }
@@ -204,9 +213,11 @@ if (import.meta.main) {
           ? process.env.REVIEW_REPORT_DIRECTORY
           : undefined,
       );
-      summary(result.target, result.reason, id, attempt);
-      if (result.conclusion !== 'success') {
-        console.error(`::error::${result.reason} (${result.target})`);
+      summary(result.target, result.reason, id, attempt, result.diagnostic, result.commentId);
+      if (result.conclusion !== 'success' && result.conclusion !== 'neutral') {
+        console.error(
+          `::error::${result.reason}${result.diagnostic ? '/' + result.diagnostic.subcode : ''} (${result.target})`,
+        );
         process.exitCode = 1;
       }
     } else throw new Error('監視操作が不正です');

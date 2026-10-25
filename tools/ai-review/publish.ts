@@ -1,8 +1,9 @@
+import { readBudgetArtifact, publishBudget } from './budget-publish.ts';
 import { verifyPartitionArtifact } from './artifact.ts';
 import type { GenerationOrigin } from './artifact.ts';
 import { reviewHistory, readInlineHistory, historyMarker } from './history.ts';
 import { REPOSITORY, safe, MARKER } from './policy.ts';
-import { readFileSync, statSync, appendFileSync } from 'node:fs';
+import { readFileSync, statSync, appendFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { githubApi, comments, reviewComments, ownComment } from './github.ts';
 import type { Api } from './github.ts';
@@ -177,28 +178,45 @@ export function readReviewArtifact(
 if (import.meta.main) {
   let validating = true;
   try {
-    const { metadata, review } = readReviewArtifact(
-      process.env.REVIEW_DIRECTORY!,
-      {
-        number: Number(process.env.PR_NUMBER),
-        head: process.env.PR_HEAD!,
-        base: process.env.PR_BASE!,
-      },
-      {
-        run: process.env.GITHUB_RUN_ID!,
-        attempt: process.env.GENERATION_ATTEMPT!,
-        sha: process.env.GITHUB_SHA!,
-      },
-    );
-    if (process.argv[2] === 'validate') {
-      appendFileSync(
-        process.env.GITHUB_STEP_SUMMARY!,
-        `レビュー結果: ${review.status}、指摘${review.findings.length}件。対象SHA: ${metadata.head}\n`,
-      );
+    const directory = process.env.REVIEW_DIRECTORY!;
+    const expected = {
+      number: Number(process.env.PR_NUMBER),
+      head: process.env.PR_HEAD!,
+      base: process.env.PR_BASE!,
+    };
+    const origin = {
+      run: process.env.GITHUB_RUN_ID!,
+      attempt: process.env.GENERATION_ATTEMPT!,
+      sha: process.env.GITHUB_SHA!,
+    };
+    if (existsSync(join(directory, 'budget-result.json'))) {
+      if (
+        existsSync(join(directory, 'result.json')) ||
+        existsSync(join(directory, 'execution.json'))
+      )
+        throw new Error('成果物が競合しています');
+      const record = readBudgetArtifact(directory, expected, origin);
+      if (process.argv[2] !== 'validate') {
+        validating = false;
+        await publishBudget(githubApi(process.env.GH_TOKEN ?? ''), record, process.env);
+      }
     } else {
-      validating = false;
-      await publishAndReport(githubApi(process.env.GH_TOKEN ?? ''), metadata, review, process.env);
-      console.log('投稿処理の結果を記録しました');
+      const { metadata, review } = readReviewArtifact(directory, expected, origin);
+      if (process.argv[2] === 'validate') {
+        appendFileSync(
+          process.env.GITHUB_STEP_SUMMARY!,
+          `レビュー結果: ${review.status}、指摘${review.findings.length}件。対象SHA: ${metadata.head}\n`,
+        );
+      } else {
+        validating = false;
+        await publishAndReport(
+          githubApi(process.env.GH_TOKEN ?? ''),
+          metadata,
+          review,
+          process.env,
+        );
+        console.log('投稿処理の結果を記録しました');
+      }
     }
   } catch {
     if (validating) writeStatusReport(process.env, 'failure', 'artifact', 'ARTIFACT_INVALID');

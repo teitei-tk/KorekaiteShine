@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { renameSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { completedOutcome } from './check-status.ts';
@@ -76,5 +76,72 @@ it('元実行の時間切れとキャンセルを区別する', async () => {
   );
   expect((await completedOutcome(api, { ...run, conclusion: 'timed_out' })).reason).toBe(
     'TIMED_OUT',
+  );
+});
+it('検証したサブコードと不足分類をPRの表示結果へ引き継ぐ', () =>
+  report(
+    {
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'INCOMPLETE',
+      diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+    },
+    async (directory) => {
+      expect(
+        await completedOutcome(api, { ...run, conclusion: 'failure' }, directory),
+      ).toMatchObject({
+        conclusion: 'failure',
+        reason: 'INCOMPLETE',
+        diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+      });
+    },
+  ));
+it('診断へ自由文を追加したArtifactを拒否する', () =>
+  report(
+    {
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'INCOMPLETE',
+      diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'], text: 'SECRET' },
+    },
+    async (directory) => {
+      expect(await completedOutcome(api, { ...run, conclusion: 'failure' }, directory)).toEqual({
+        conclusion: 'failure',
+        target: 'artifact',
+        reason: 'REPORT_INVALID',
+      });
+    },
+  ));
+it('予算不足だけでは成功とせず、投稿済みだけを成功にする', async () => {
+  await report(
+    { job: 'generate', status: 'neutral', target: 'task-1', reason: 'COST_BUDGET_EXCEEDED' },
+    async (directory) => {
+      expect((await completedOutcome(api, run, directory)).conclusion).toBe('failure');
+      const generated = join(directory, 'ai-review-status-20-1-generate');
+      mkdirSync(generated);
+      renameSync(join(directory, 'status.json'), join(generated, 'status.json'));
+      const sub = join(directory, 'ai-review-status-20-1-publish');
+      mkdirSync(sub);
+      writeFileSync(
+        join(sub, 'status.json'),
+        JSON.stringify({
+          version: 1,
+          run: '20',
+          attempt: '1',
+          job: 'publish',
+          status: 'success',
+          target: 'publish',
+          reason: 'BUDGET_NOTIFIED',
+          commentId: 123,
+        }),
+      );
+      expect(await completedOutcome(api, run, directory)).toMatchObject({
+        conclusion: 'success',
+        reason: 'BUDGET_NOTIFIED',
+        commentId: 123,
+      });
+    },
   );
 });

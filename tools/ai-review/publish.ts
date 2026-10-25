@@ -5,10 +5,14 @@ import { join } from 'node:path';
 import { githubApi, comments, ownComment } from './github.ts';
 import type { Api } from './github.ts';
 import { eligible, validReview, renderReview, revisionMarker } from './policy.ts';
-import type { PullRequest } from './policy.ts';
+import type { PullRequest, ReviewInput } from './policy.ts';
 import type { Material } from './material.ts';
 
-export async function publish(api: Api, metadata: Material, value: unknown): Promise<boolean> {
+export async function publish(
+  api: Api,
+  metadata: Material,
+  value: ReviewInput | null,
+): Promise<boolean> {
   if (
     !Number.isSafeInteger(metadata.number) ||
     metadata.number < 1 ||
@@ -51,7 +55,7 @@ export async function publish(api: Api, metadata: Material, value: unknown): Pro
   await api(`issues/${metadata.number}/comments`, 'POST', { body });
   return true;
 }
-function readJson(path: string, max: number): unknown {
+function readJson<T>(path: string, max: number): T {
   const stat = statSync(path);
   if (!stat.isFile() || stat.size > max) throw new Error('成果物のサイズまたは形式が不正です');
   return JSON.parse(readFileSync(path, 'utf8'));
@@ -60,7 +64,7 @@ export function readReviewArtifact(
   directory: string,
   expected: Pick<Material, 'number' | 'head' | 'base'>,
 ) {
-  const metadata = readJson(join(directory, 'metadata.json'), 400_000) as Material;
+  const metadata = readJson<Material>(join(directory, 'metadata.json'), 400_000);
   // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
   if (
     metadata.number !== expected.number ||
@@ -69,7 +73,7 @@ export function readReviewArtifact(
   )
     throw new Error('成果物の対象が一致しません');
   const review = validReview(
-    readJson(join(directory, 'result.json'), 30_000),
+    readJson<ReviewInput>(join(directory, 'result.json'), 30_000),
     metadata.lines,
     metadata.priorFindings,
   );

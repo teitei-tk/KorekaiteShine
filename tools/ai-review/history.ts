@@ -1,7 +1,7 @@
 import { ownComment } from './github.ts';
 import type { Comment } from './github.ts';
 import { validFindings } from './policy.ts';
-import type { Finding } from './policy.ts';
+import type { Finding, FindingInput } from './policy.ts';
 
 export interface PriorFinding extends Finding {
   id: string;
@@ -26,10 +26,10 @@ export function readHistory(comments: Comment[]): PriorFinding[] {
     if (!revision || !Number.isSafeInteger(comment.id) || comment.id < 1)
       throw new Error('過去のレビュー対象が不正です');
     const marker = /^<!-- findings:v1:([A-Za-z0-9+/=]+) -->$/m.exec(comment.body);
-    let rawFindings: unknown;
+    let rawFindings: FindingInput[];
     if (comment.body.includes('<!-- findings:')) {
       if (!marker) throw new Error('指摘履歴が不正です');
-      const value: unknown = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
+      const value: FindingInput[] = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
       rawFindings = value;
     } else {
       // 旧集約コメントの固定レンダリング形式だけを移行する。

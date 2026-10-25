@@ -14,7 +14,7 @@ export interface PullRequest {
   title?: string;
   body?: string | null;
 }
-export function eligible(value: unknown): value is PullRequest {
+export function eligible(value: Partial<PullRequest> | null): value is PullRequest {
   const pr = value as PullRequest | null;
   return (
     !!pr &&
@@ -31,8 +31,11 @@ export function eligible(value: unknown): value is PullRequest {
     /^[a-f0-9]{40}$/.test(pr.base.sha)
   );
 }
-export function remainingLifetime(value: unknown, now = Math.floor(Date.now() / 1000)): number {
-  const expiry = (value as { expires_at?: unknown })?.expires_at;
+export function remainingLifetime(
+  value: { expires_at?: number | string } | null,
+  now = Math.floor(Date.now() / 1000),
+): number {
+  const expiry = value?.expires_at;
   if (typeof expiry !== 'number' || !Number.isSafeInteger(expiry) || expiry - now < 240) {
     throw new Error('WIFトークンの残存時間が240秒未満または不明です');
   }
@@ -58,11 +61,26 @@ export interface Review {
   findings: Finding[];
   checks?: FixCheck[];
 }
-function shortText(value: unknown, max: number): value is string {
+function shortText(value: string | null | undefined, max: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= max;
 }
+export interface FindingInput {
+  priority: string;
+  path: string;
+  line: number;
+  condition: string;
+  impact: string;
+  fix: string;
+}
+export interface ReviewInput {
+  status: string;
+  summary: string;
+  uncertainties: string[];
+  findings: FindingInput[];
+  checks?: { id: string; status: string; evidence: string }[];
+}
 // 投稿済みの履歴にも使う形式検証。新規投稿の重複判定は含めない。
-export function validFindings(value: unknown): Finding[] {
+export function validFindings(value: FindingInput[] | null | undefined): Finding[] {
   if (!Array.isArray(value) || value.length > 3) throw new Error('指摘の形式が不正です');
   for (const f of value) {
     if (
@@ -77,10 +95,10 @@ export function validFindings(value: unknown): Finding[] {
     )
       throw new Error('指摘の形式が不正です');
   }
-  return value;
+  return value as Finding[];
 }
 export function validReview(
-  value: unknown,
+  value: ReviewInput | null,
   lines: Record<string, number[]>,
   prior: PriorFinding[] = [],
 ): Review {

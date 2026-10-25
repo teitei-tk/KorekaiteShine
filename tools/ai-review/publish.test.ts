@@ -6,8 +6,8 @@ const head = 'a'.repeat(40),
 const metadata = { number: 7, head, base, lines: { 'app.ts': [1] } };
 const review = { status: 'complete', summary: '確認済み', uncertainties: [], findings: [] };
 it('投稿直前のhead変更では書き込みを行わない', async () => {
-  const writes: unknown[] = [];
-  const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+  const writes: ({ body: string } | undefined)[] = [];
+  const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
     if (method) writes.push(body);
     if (path.startsWith('issues/')) return [] as T;
     return {
@@ -41,8 +41,8 @@ it('不正な指摘位置はGitHubへ接続する前に拒否する', async () =
 
 it('本人の最新PRには投稿し、他人に変わっていれば投稿しない', async () => {
   for (const author of [1324680, 99]) {
-    const writes: { path: string; method: string; body: unknown }[] = [];
-    const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+    const writes: { path: string; method: string; body: { body: string } | undefined }[] = [];
+    const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
       if (method) {
         writes.push({ path, method, body });
         return {} as T;
@@ -128,7 +128,7 @@ it('過去の指摘を保持して修正結果を新規投稿し、再実行は�
   const priorFindings = readHistory([old]);
   const stored = [old];
   const writes: string[] = [];
-  const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+  const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
     if (method) {
       writes.push(method);
       stored.push({ id: 11, user: old.user, body: (body as { body: string }).body });

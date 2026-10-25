@@ -1,10 +1,10 @@
 import { REPOSITORY, MARKER, revisionMarker, eligible } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 
-export type Api = <T>(path: string, method?: string, body?: unknown) => Promise<T>;
+export type Api = <T>(path: string, method?: string, body?: { body: string }) => Promise<T>;
 export function githubApi(token: string): Api {
   if (!token) throw new Error('GitHub認証がありません');
-  return async <T>(path: string, method = 'GET', body?: unknown): Promise<T> => {
+  return async <T>(path: string, method = 'GET', body?: { body: string }): Promise<T> => {
     const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
       method,
       headers: {

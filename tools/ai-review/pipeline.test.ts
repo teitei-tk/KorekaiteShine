@@ -126,7 +126,7 @@ it.each(['success', 'incomplete', 'changed-head', 'wrong-artifact'])(
         return;
       }
       const artifact = readReviewArtifact(directory, metadata);
-      const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+      const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
         if (method) {
           writes.push(JSON.stringify(body));
           return {} as T;
@@ -229,7 +229,7 @@ it.each(['fixed', 'unfixed', 'unverified', 'missing', 'changed-history'])(
       await generate();
       const artifact = readReviewArtifact(directory, metadata);
       const writes: string[] = [];
-      const api: Api = async <T>(path: string, method?: string, body?: unknown) => {
+      const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
         if (method) {
           writes.push((body as { body: string }).body);
           return {} as T;

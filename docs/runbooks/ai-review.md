@@ -216,3 +216,9 @@ GitHub Actionsでは`Documentation checks`の`Repository lint, format and AI rev
 費用記録は親プロセスと一時JSONにあり、`ai-review-cost-<run>-<attempt>` Artifactとして1日保存する。入力・出力・キャッシュのトークン数、予約・実測金額、料金設定版を確認する。`actual: null`は未精算で、ゼロではない。強制終了でArtifactが残らない可能性があり、請求履歴の永続DBとして使わない。
 
 展開前に、固定SDK・WIFで計数APIが使えること、Schemaを含む計数と実測inputが一致すること、計数API自体の課金と請求区分を確認する。公表料金表だけで請求額の確定を主張しない。これらはローカルのモックテストでは検証できない。低予算の実PR検証を行う場合は信頼済みコードのテスト設定を使い、PR側の設定や環境変数から本番の$1上限を変えない。
+
+## 失敗通知の確認
+
+AIレビュー終了後のAI review failure notificationが、同じPRの現在のhead/baseへ固定理由と実行リンクを投稿する。レビュー失敗のチェックは失敗のまま残る。通常CIが失敗してAIレビューが開始されなかった場合や、対象外・更新済みPRは通知対象外。
+
+通知がない場合は、通知Workflowがmainに存在するか、元実行が完了したか、現在のhead/baseと試行が一致するかを確認する。状態Artifactが取得できなくても固定の代替理由で通知する。通知ジョブ自体にFAILURE_NOTIFICATION_FAILEDがあれば、GitHubの読み取り・PR書き込み権限と障害を確認する。通知Workflowだけの再実行はモデルを呼ばず、同じ実行・試行のコメントを重複投稿しない。

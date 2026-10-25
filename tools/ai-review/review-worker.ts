@@ -3,37 +3,46 @@ import { readFileSync } from 'node:fs';
 import { requestStructuredReview } from './review.ts';
 import { validateTaskResult } from './partition-review.ts';
 import type { TaskInvocation, TaskResult } from './partition-review.ts';
+import type { BillingHooks } from './budget.ts';
 import { validatePlan } from './partition.ts';
 import type { ReviewPlan } from './partition.ts';
 
+// IPCは信頼済み親子間のみ。モデル応答はusageと最終結果に分ける。
 if (import.meta.main) {
-  try {
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    for await (const chunk of process.stdin) {
-      bytes += chunk.length;
-      if (bytes > 8_000_000) throw new Error('入力上限');
-      chunks.push(chunk);
-    }
-    const { plan, input } = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-      plan: ReviewPlan;
-      input: TaskInvocation;
+  process.once('message', async ({ plan, input }: { plan: ReviewPlan; input: TaskInvocation }) => {
+    const notify = (message: object): Promise<void> =>
+      new Promise((resolve, reject) => {
+        process.once('message', (reply: { approved?: boolean }) => {
+          if (reply?.approved === true) resolve();
+          else reject(new Error('費用承認なし'));
+        });
+        process.send?.(message);
+      });
+    const billing: BillingHooks = {
+      reserve: (input, hash) => notify({ kind: 'reserve', input, hash }),
+      settle: (usage) => notify({ kind: 'settle', usage }),
     };
-    validatePlan(plan);
-    const schema = JSON.parse(
-      readFileSync(new URL('./partition-schema.json', import.meta.url), 'utf8'),
-    );
-    const result = await requestStructuredReview<TaskResult>(
-      process.env.OPENAI_ACCESS_TOKEN ?? '',
-      input.prompt,
-      (value) => validateTaskResult(value, plan, input.task),
-      fetch,
-      schema,
-    );
-    process.stdout.write(JSON.stringify(result));
-  } catch (error) {
-    process.stdout.write(
-      JSON.stringify(workerFailure(error instanceof ReviewFailure ? error : undefined)),
-    );
-  }
+    try {
+      validatePlan(plan);
+      const schema = JSON.parse(
+        readFileSync(new URL('./partition-schema.json', import.meta.url), 'utf8'),
+      );
+      const result = await requestStructuredReview<TaskResult>(
+        process.env.OPENAI_ACCESS_TOKEN ?? '',
+        input.prompt,
+        (value) => validateTaskResult(value, plan, input.task),
+        fetch,
+        schema,
+        billing,
+      );
+      process.send?.({ kind: 'result', result });
+    } catch (error) {
+      process.send?.({
+        kind: 'result',
+        result: workerFailure(error instanceof ReviewFailure ? error : undefined),
+      });
+    } finally {
+      process.disconnect?.();
+    }
+  });
 }

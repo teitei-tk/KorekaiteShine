@@ -250,7 +250,7 @@ it('既存指摘との対応を候補整理が覆したら停止する', async (
     }),
   ).rejects.toThrow(/既存指摘/);
 });
-it('入力総量が予算を超える計画ではモデルを一度も呼ばない', async () => {
+it('合計入力3MBを超えても1回の容量内なら分割レビューを実行できる', async () => {
   const base = 'b'.repeat(40),
     head = 'a'.repeat(40);
   const paths = Array.from({ length: 10 }, (_, i) => `f${i}.ts`);
@@ -258,7 +258,7 @@ it('入力総量が予算を超える計画ではモデルを一度も呼ばな�
     (...args) =>
       args[0] === 'ls-tree'
         ? paths.map((p, i) => `100644 blob ${i.toString(16).padStart(40, '0')}\t${p}\0`).join('')
-        : `export const value = '${'x'.repeat(220000)}';`,
+        : `export const value = '${'x'.repeat(298000)}';`,
     [base, head],
   );
   const plan = planReview(
@@ -267,13 +267,12 @@ it('入力総量が予算を超える計画ではモデルを一度も呼ばな�
     paths.map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
   );
   let calls = 0;
-  await expect(
-    runPartitionReview(plan, async (input) => {
-      calls++;
-      return { value: response(input), usage: { input: 1, output: 1, total: 2 } };
-    }),
-  ).rejects.toThrow(/予算/);
-  expect(calls).toBe(0);
+  const result = await runPartitionReview(plan, async (input) => {
+    calls++;
+    return { value: response(input), usage: { input: 1, output: 1, total: 2 } };
+  });
+  expect(result.inputBytes).toBeGreaterThan(3_000_000);
+  expect(calls).toBe(10);
 });
 it('指摘行を含まない別ファイルだけを根拠として返す応答を拒否する', () => {
   const base = 'b'.repeat(40),

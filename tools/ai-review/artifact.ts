@@ -95,7 +95,7 @@ export function verifyPartitionArtifact(directory: string, expected: GenerationO
     record.calls > 12 ||
     !Number.isInteger(record.inputBytes) ||
     record.inputBytes < 1 ||
-    record.inputBytes > 3_000_000 ||
+    record.inputBytes > record.calls * 500_000 ||
     !record.usage ||
     !Number.isInteger(record.usage.output) ||
     record.usage.output < 0 ||

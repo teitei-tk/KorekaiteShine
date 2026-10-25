@@ -47,3 +47,9 @@ it('Draft解除時にも通常CIと監視を同時に起動する', () => {
   for (const name of ['docs', 'ai-review-check'])
     expect(workflow(name)).toContain('types: [opened, synchronize, reopened, ready_for_review]');
 });
+it('予算結果を投稿ジョブへ渡し、失敗時にも費用記録を保存する', () => {
+  const backend = workflow('ai-review');
+  expect(backend).toContain('/ai-review-material/budget-result.json');
+  expect(backend).toMatch(/name: Preserve review cost record\n\s+if: always\(\)/);
+  expect(backend).toContain('name: ai-review-cost-${{ github.run_id }}-${{ github.run_attempt }}');
+});

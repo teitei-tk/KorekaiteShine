@@ -7,6 +7,7 @@ import { failureReasons } from './failure.ts';
 const reasons = [
   ...failureReasons,
   'PUBLISH_FAILED',
+  'BUDGET_NOTIFIED',
   'EXECUTION_FAILED',
   'TARGET_CHANGED',
   'SKIPPED',
@@ -29,6 +30,7 @@ export interface StatusReport {
   target: string;
   reason: StatusReason;
   diagnostic?: Diagnostic;
+  commentId?: number;
 }
 export function validTarget(value: string): boolean {
   return (
@@ -42,6 +44,12 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
   return (
     !!value &&
     value.version === 1 &&
+    (value.reason === 'BUDGET_NOTIFIED'
+      ? Number.isSafeInteger(value.commentId) &&
+        value.commentId! > 0 &&
+        value.job === 'publish' &&
+        value.status === 'success'
+      : value.commentId === undefined) &&
     (value.diagnostic === undefined ||
       (value.status === 'failure' && validDiagnostic(value.diagnostic))) &&
     typeof value.run === 'string' &&
@@ -55,15 +63,22 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
     (value.status !== 'success' ||
       (value.job === 'publish' &&
         value.target === 'publish' &&
-        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE'].includes(value.reason ?? '')) ||
+        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason ?? '')) ||
       (['gate', 'generate'].includes(value.job ?? '') &&
         value.target === 'gate' &&
         value.reason === 'ALREADY_COMPLETE')) &&
-    (value.status !== 'neutral' || ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason ?? '')) &&
+    (value.status !== 'neutral' ||
+      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason ?? '') ||
+      (value.job === 'generate' && value.reason === 'COST_BUDGET_EXCEEDED')) &&
     (value.status !== 'failure' ||
-      !['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'TARGET_CHANGED', 'SKIPPED'].includes(
-        value.reason ?? '',
-      ))
+      ![
+        'REVIEW_COMPLETE',
+        'ALREADY_COMPLETE',
+        'BUDGET_NOTIFIED',
+        'TARGET_CHANGED',
+        'SKIPPED',
+        'COST_BUDGET_EXCEEDED',
+      ].includes(value.reason ?? ''))
   );
 }
 export function writeStatusReport(
@@ -72,6 +87,7 @@ export function writeStatusReport(
   target: string,
   reason: StatusReason,
   diagnostic?: Diagnostic,
+  commentId?: number,
 ): void {
   const path =
     env.AI_REVIEW_REPORT ??
@@ -86,6 +102,7 @@ export function writeStatusReport(
     target,
     reason,
     ...(diagnostic ? { diagnostic } : {}),
+    ...(commentId !== undefined ? { commentId } : {}),
   };
   if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
   const json = JSON.stringify(value);

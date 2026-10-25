@@ -19,6 +19,7 @@ interface Outcome {
   target: string;
   reason: StatusReason;
   diagnostic?: Diagnostic;
+  commentId?: number;
 }
 export async function completedOutcome(
   api: GitHubApi,
@@ -65,9 +66,17 @@ export async function completedOutcome(
       reason: target === 'publish' ? 'PUBLISH_FAILED' : 'EXECUTION_FAILED',
     };
   }
-  const skipped = reports.find((r) => r.status === 'neutral');
+  const skipped = reports.find(
+    (r) => r.status === 'neutral' && r.reason !== 'COST_BUDGET_EXCEEDED',
+  );
   if (skipped) return { conclusion: 'neutral', target: skipped.target, reason: skipped.reason };
   const posted = reports.find((r) => r.status === 'success');
-  if (posted) return { conclusion: 'success', target: posted.target, reason: posted.reason };
+  if (posted)
+    return {
+      conclusion: 'success',
+      target: posted.target,
+      reason: posted.reason,
+      ...(posted.commentId ? { commentId: posted.commentId } : {}),
+    };
   return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_MISSING' };
 }

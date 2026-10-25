@@ -1,3 +1,4 @@
+import { maximumCost, LIMIT, cost } from './budget.ts';
 import { ReviewFailure, workerFailure } from './failure.ts';
 import { validateTaskResult } from './partition-review.ts';
 import { expect, it } from 'vitest';
@@ -25,6 +26,8 @@ const env = {
 };
 it.each([
   'success',
+  'budget',
+  'budget-late',
   'expired',
   'late-failure',
   'invalid-evidence',
@@ -85,10 +88,12 @@ it.each([
           AI_REVIEW_REPORT: join(directory, 'status.json'),
         },
         request,
-        async (input, token) => {
+        async (input, token, _plan, budget) => {
           calls++;
           expect(token).toBe('secret-' + calls);
+          budget.reserve(10, 'f'.repeat(64));
           if (scenario === 'late-failure' && calls === 2) throw new Error('SECRET');
+          budget.settle({ input: 10, cached: 0, written: 0, output: 10, total: 20 });
           const value = {
             status: 'complete' as const,
             summary: '確認',
@@ -149,7 +154,27 @@ it.each([
           return { value, usage: { input: 10, output: 10, total: 20 } };
         },
         () => {},
+        scenario === 'budget'
+          ? maximumCost(10) - 1
+          : scenario === 'budget-late'
+            ? maximumCost(10) +
+              cost({ input: 10, cached: 0, written: 0, output: 10, total: 20 }) -
+              1
+            : LIMIT,
       );
+    if (scenario === 'budget' || scenario === 'budget-late') {
+      await run();
+      expect(existsSync(join(directory, 'budget-result.json'))).toBe(true);
+      expect(existsSync(join(directory, 'result.json'))).toBe(false);
+      expect(existsSync(join(directory, 'execution.json'))).toBe(false);
+      expect(JSON.parse(readFileSync(join(directory, 'status.json'), 'utf8'))).toMatchObject({
+        status: 'neutral',
+        reason: 'COST_BUDGET_EXCEEDED',
+      });
+      expect(calls).toBe(scenario === 'budget' ? 1 : 2);
+      expect(readFileSync(join(directory, 'budget.json'), 'utf8')).not.toContain('secret-');
+      return;
+    }
     if (
       ['expired', 'late-failure', 'invalid-evidence', 'incomplete', 'worker-incomplete'].includes(
         scenario,
@@ -211,7 +236,7 @@ it('モデル子プロセスへOIDC・GitHub・Node設定を継承しない', ()
   const actual = workerEnvironment('short-token');
   expect(actual).toEqual({ OPENAI_ACCESS_TOKEN: 'short-token' });
 });
-it('課金前の予算超過も対象と理由を記録し外部エラーを表示しない', async () => {
+it('合計入力容量だけでは停止せず認証失敗の対象を記録する', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'partition-budget-summary-'));
   try {
     const paths = Array.from({ length: 10 }, (_, i) => `f${i}.ts`);
@@ -247,11 +272,11 @@ it('課金前の予算超過も対象と理由を記録し外部エラーを表�
       ),
     ).rejects.toThrow();
     const summary = readFileSync(join(directory, 'summary.md'), 'utf8');
-    expect(summary).toContain('BUDGET_EXCEEDED');
-    expect(summary).toContain('preflight');
+    expect(summary).toContain('AUTH_FAILED');
+    expect(summary).toContain('task-1');
     expect(summary).toContain('0/10');
     expect(summary).not.toContain('SECRET');
-    expect(calls).toBe(0);
+    expect(calls).toBe(1);
     expect(existsSync(join(directory, 'result.json'))).toBe(false);
   } finally {
     rmSync(directory, { recursive: true, force: true });

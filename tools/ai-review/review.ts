@@ -1,3 +1,7 @@
+import { MODEL, MAX_OUTPUT, validUsage } from './budget.ts';
+import type { BillingHooks } from './budget.ts';
+import { digest } from './source-index.ts';
+import type { ResponseCreateParamsNonStreaming } from 'openai/resources/responses/responses';
 import { ReviewFailure } from './failure.ts';
 import { detail } from './diagnostics.ts';
 import type { PriorFinding } from './history.ts';
@@ -36,6 +40,7 @@ export async function requestStructuredReview<T>(
   validate: (value: T) => T,
   fetcher: typeof fetch = fetch,
   outputSchema = schema,
+  billing?: BillingHooks,
 ): Promise<ReviewResult<T>> {
   try {
     if (!token || Buffer.byteLength(prompt) > 500_000) throw new Error('invalid input');
@@ -49,20 +54,58 @@ export async function requestStructuredReview<T>(
       logLevel: 'off',
       fetch: fetcher,
     });
-    const result = await client.responses.create(
-      {
-        model: 'gpt-6-luna',
-        input: prompt,
-        reasoning: { effort: 'medium' },
-        tools: [],
-        store: false,
-        max_output_tokens: 8000,
-        text: {
-          format: { type: 'json_schema', name: 'code_review', strict: true, schema: outputSchema },
-        },
+    const body = {
+      model: MODEL,
+      input: prompt,
+      reasoning: { effort: 'medium' },
+      tools: [],
+      store: false,
+      service_tier: 'default',
+      prompt_cache_options: { mode: 'implicit', ttl: '30m' },
+      max_output_tokens: MAX_OUTPUT,
+      text: {
+        format: { type: 'json_schema', name: 'code_review', strict: true, schema: outputSchema },
       },
-      { signal: AbortSignal.timeout(150_000) },
-    );
+    } satisfies ResponseCreateParamsNonStreaming;
+    if (billing) {
+      let input: number;
+      try {
+        const { model, input: promptInput, reasoning, tools, text } = body;
+        const counted = await client.responses.inputTokens.count(
+          { model, input: promptInput, reasoning, tools, text },
+          {
+            signal: AbortSignal.timeout(30000),
+          },
+        );
+        if (
+          counted.object !== 'response.input_tokens' ||
+          !Number.isSafeInteger(counted.input_tokens) ||
+          counted.input_tokens < 0
+        )
+          throw new Error('invalid count');
+        input = counted.input_tokens;
+      } catch {
+        throw new ReviewFailure('TOKEN_COUNT_FAILED', '入力計数に失敗しました');
+      }
+      await billing.reserve(input, digest(JSON.stringify(body)));
+    }
+    const result = await client.responses.create(body, { signal: AbortSignal.timeout(150_000) });
+    if (billing) {
+      const u = result.usage;
+      const usage = {
+        input: u?.input_tokens,
+        cached: u?.input_tokens_details?.cached_tokens,
+        written: u?.input_tokens_details?.cache_write_tokens,
+        output: u?.output_tokens,
+        total: u?.total_tokens,
+      };
+      if (!validUsage(usage)) throw new ReviewFailure('USAGE_INVALID', '使用量が不明です');
+      // 未知の料金区分では予約を保持し、誤った単価で精算しない。
+      if (result.model !== MODEL || result.service_tier !== 'default')
+        throw new ReviewFailure('USAGE_INVALID', '料金区分が一致しません');
+      // 課金usageはJSON解析・指摘の検証より先に保存する。
+      await billing.settle(usage);
+    }
     if (result.status !== 'completed') {
       const reason = result.incomplete_details?.reason;
       const subcode =

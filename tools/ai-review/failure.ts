@@ -3,6 +3,9 @@ import type { FailureDetail } from './diagnostics.ts';
 // 外部エラー本文をログへ渡さず、信頼済み処理が確定した理由だけを境界越しに伝える。
 export const failureReasons = [
   'INPUT_INVALID',
+  'COST_BUDGET_EXCEEDED',
+  'TOKEN_COUNT_FAILED',
+  'USAGE_INVALID',
   'TARGET_FAILED',
   'HISTORY_FAILED',
   'COLLECTION_FAILED',

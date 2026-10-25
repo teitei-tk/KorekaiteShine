@@ -172,12 +172,13 @@ function summary(
   run?: number,
   attempt?: number,
   diagnostic?: Diagnostic,
+  commentId?: number,
 ): void {
   const message = `対象: ${target}、理由: ${reason}。${diagnostic ? '\n\n' + renderDiagnostic(diagnostic) : ''}`;
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      `${message}\n\n${run ? `[AIレビューの実行ログ](https://github.com/${REPOSITORY}/actions/runs/${run}/attempts/${attempt})\n\n` : ''}成功はレビューと投稿の完了を表します。指摘のResolveは人間が行います。\n`,
+      `${message}\n\n${run ? `[AIレビューの実行ログ](https://github.com/${REPOSITORY}/actions/runs/${run}/attempts/${attempt})\n\n` : ''}${reason === 'BUDGET_NOTIFIED' ? `予算不足・レビュー未完了・[PR通知済み](https://github.com/${REPOSITORY}/issues/${process.env.REVIEW_PR}#issuecomment-${commentId})。CI成功は通知処理の完了です。` : '成功はレビューと投稿の完了を表します。'}指摘のResolveは人間が行います。\n`,
     );
   console.log(message);
 }
@@ -212,8 +213,8 @@ if (import.meta.main) {
           ? process.env.REVIEW_REPORT_DIRECTORY
           : undefined,
       );
-      summary(result.target, result.reason, id, attempt, result.diagnostic);
-      if (result.conclusion !== 'success') {
+      summary(result.target, result.reason, id, attempt, result.diagnostic, result.commentId);
+      if (result.conclusion !== 'success' && result.conclusion !== 'neutral') {
         console.error(
           `::error::${result.reason}${result.diagnostic ? '/' + result.diagnostic.subcode : ''} (${result.target})`,
         );

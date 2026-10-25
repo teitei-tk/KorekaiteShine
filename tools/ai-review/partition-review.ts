@@ -69,12 +69,8 @@ export function invocation(
 export function preflight(plan: ReviewPlan): TaskInvocation[] {
   validatePlan(plan);
   const inputs = plan.tasks.map((task) => invocation(plan, task));
-  // boundaryには先行候補の追加余地を予約。残り2回・1MBは候補整理専用。
-  const sizes = inputs.map(
-    (input) => Buffer.byteLength(input.prompt) + (input.task.kind === 'boundary' ? 150_000 : 0),
-  );
-  if (sizes.some((bytes) => bytes > 500_000) || sizes.reduce((sum, n) => sum + n, 0) > 2_000_000)
-    throw new ReviewFailure('BUDGET_EXCEEDED', '必須作業が入力予算を超えました');
+  if (inputs.some((input) => Buffer.byteLength(input.prompt) > 500_000))
+    throw new ReviewFailure('BUDGET_EXCEEDED', '1回の入力容量を超えました');
   return inputs;
 }
 const sameIds = (a: string[], b: string[]) =>
@@ -216,7 +212,8 @@ export async function runPartitionReview(
     inputBytes = 0;
   const execute = async (input: TaskInvocation) => {
     const bytes = Buffer.byteLength(input.prompt);
-    if (++calls > 12 || bytes > 500_000 || (inputBytes += bytes) > 3_000_000)
+    inputBytes += bytes;
+    if (++calls > 12 || bytes > 500_000)
       throw new ReviewFailure('BUDGET_EXCEEDED', '実行予算を超えました');
     const result = await invoke(input);
     let value: TaskResult;

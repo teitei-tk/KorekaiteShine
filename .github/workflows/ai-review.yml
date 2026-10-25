@@ -142,7 +142,16 @@ jobs:
             ${{ runner.temp }}/ai-review-material/metadata.json
             ${{ runner.temp }}/ai-review-material/plan.json
             ${{ runner.temp }}/ai-review-material/execution.json
+            ${{ runner.temp }}/ai-review-material/budget-result.json
           if-no-files-found: error
+          retention-days: 1
+      - name: Preserve review cost record
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-cost-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-review-material/budget.json
+          if-no-files-found: ignore
           retention-days: 1
       - name: Record incomplete execution
         if: failure()

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { renameSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { completedOutcome } from './check-status.ts';
@@ -114,3 +114,34 @@ it('診断へ自由文を追加したArtifactを拒否する', () =>
       });
     },
   ));
+it('予算不足だけでは成功とせず、投稿済みだけを成功にする', async () => {
+  await report(
+    { job: 'generate', status: 'neutral', target: 'task-1', reason: 'COST_BUDGET_EXCEEDED' },
+    async (directory) => {
+      expect((await completedOutcome(api, run, directory)).conclusion).toBe('failure');
+      const generated = join(directory, 'ai-review-status-20-1-generate');
+      mkdirSync(generated);
+      renameSync(join(directory, 'status.json'), join(generated, 'status.json'));
+      const sub = join(directory, 'ai-review-status-20-1-publish');
+      mkdirSync(sub);
+      writeFileSync(
+        join(sub, 'status.json'),
+        JSON.stringify({
+          version: 1,
+          run: '20',
+          attempt: '1',
+          job: 'publish',
+          status: 'success',
+          target: 'publish',
+          reason: 'BUDGET_NOTIFIED',
+          commentId: 123,
+        }),
+      );
+      expect(await completedOutcome(api, run, directory)).toMatchObject({
+        conclusion: 'success',
+        reason: 'BUDGET_NOTIFIED',
+        commentId: 123,
+      });
+    },
+  );
+});

@@ -131,6 +131,7 @@ it.each(['success', 'incomplete', 'changed-head', 'wrong-artifact'])(
           writes.push(JSON.stringify(body));
           return {} as T;
         }
+        if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
         if (path.startsWith('issues/')) return [] as T;
         return {
           ...pr,
@@ -138,7 +139,7 @@ it.each(['success', 'incomplete', 'changed-head', 'wrong-artifact'])(
         } as T;
       };
       expect(await publish(api, artifact.metadata, artifact.review)).toBe(scenario === 'success');
-      expect(writes).toHaveLength(scenario === 'success' ? 1 : 0);
+      expect(writes).toHaveLength(scenario === 'success' ? 2 : 0);
       if (writes.length) {
         expect(writes[0]).toContain(head);
         expect(writes[0]).toContain('app.ts:1');
@@ -234,6 +235,7 @@ it.each(['fixed', 'unfixed', 'unverified', 'missing', 'changed-history'])(
           writes.push((body as { body: string }).body);
           return {} as T;
         }
+        if (path.startsWith('pulls/') && path.includes('/comments?')) return [] as T;
         if (path.startsWith('issues/')) return (status === 'changed-history' ? [] : [old]) as T;
         return {
           number: 8,
@@ -250,7 +252,7 @@ it.each(['fixed', 'unfixed', 'unverified', 'missing', 'changed-history'])(
         return;
       }
       expect(await publish(api, artifact.metadata, artifact.review)).toBe(true);
-      expect(writes).toHaveLength(1);
+      expect(writes).toHaveLength(2);
       expect(writes[0]).toContain(
         status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません',
       );

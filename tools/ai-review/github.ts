@@ -1,10 +1,24 @@
 import { REPOSITORY, MARKER, revisionMarker, eligible } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 
-export type Api = <T>(path: string, method?: string, body?: { body: string }) => Promise<T>;
+export interface InlineCommentInput {
+  path: string;
+  line: number;
+  side: 'RIGHT';
+  body: string;
+}
+export type ApiBody =
+  | { body: string }
+  | {
+      body: string;
+      commit_id: string;
+      event: 'COMMENT';
+      comments: InlineCommentInput[];
+    };
+export type Api = <T>(path: string, method?: string, body?: ApiBody) => Promise<T>;
 export function githubApi(token: string): Api {
   if (!token) throw new Error('GitHub認証がありません');
-  return async <T>(path: string, method = 'GET', body?: { body: string }): Promise<T> => {
+  return async <T>(path: string, method = 'GET', body?: ApiBody): Promise<T> => {
     const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
       method,
       headers: {
@@ -35,14 +49,29 @@ export interface Comment {
   body: string;
   user: { login: string; type: string };
 }
-export async function comments(api: Api, number: number): Promise<Comment[]> {
-  const result: Comment[] = [];
+export interface ReviewComment extends Comment {
+  path: string;
+  line: number | null;
+  original_line: number | null;
+  commit_id: string;
+  original_commit_id: string;
+  in_reply_to_id?: number;
+}
+async function pages<T>(api: Api, path: string): Promise<T[]> {
+  const result: T[] = [];
   for (let page = 1; page <= 10; page++) {
-    const batch = await api<Comment[]>(`issues/${number}/comments?per_page=100&page=${page}`);
+    const batch = await api<T[]>(`${path}?per_page=100&page=${page}`);
+    if (!Array.isArray(batch)) throw new Error('コメント応答が不正です');
     result.push(...batch);
     if (batch.length < 100) return result;
   }
   throw new Error('コメント取得上限を超えました');
+}
+export function comments(api: Api, number: number): Promise<Comment[]> {
+  return pages(api, `issues/${number}/comments`);
+}
+export function reviewComments(api: Api, number: number): Promise<ReviewComment[]> {
+  return pages(api, `pulls/${number}/comments`);
 }
 export function ownComment(c: Comment): boolean {
   return (

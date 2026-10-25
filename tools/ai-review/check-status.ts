@@ -5,7 +5,7 @@ import type { PullRequest } from './policy.ts';
 import { readStatusReports } from './status-report.ts';
 import type { StatusReason } from './status-report.ts';
 
-interface ReviewRun {
+export interface ReviewRun {
   id: number;
   run_attempt: number;
   event: string;
@@ -88,7 +88,11 @@ async function existingCheck(
   }
   throw new Error('チェック取得上限を超えました');
 }
-async function completedOutcome(api: Api, run: ReviewRun, directory?: string): Promise<Outcome> {
+export async function completedOutcome(
+  api: Api,
+  run: ReviewRun,
+  directory?: string,
+): Promise<Outcome> {
   if (run.conclusion === 'cancelled')
     return { conclusion: 'cancelled', target: 'workflow', reason: 'CANCELLED' };
   if (run.conclusion === 'timed_out')

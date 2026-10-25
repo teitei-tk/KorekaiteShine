@@ -3,7 +3,7 @@ import { setTimeout } from 'node:timers/promises';
 import { githubApi } from './github.ts';
 import type { Api, Run } from './github.ts';
 import { completedOutcome } from './check-status.ts';
-import type { CheckRequest, ReviewRun } from './check-status.ts';
+import type { ReviewRun } from './check-status.ts';
 import { eligible, REPOSITORY, REPOSITORY_ID } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 import type { StatusReason } from './status-report.ts';
@@ -12,13 +12,15 @@ interface Revision {
   number: number;
   head: string;
   base: string;
+  since: string;
 }
 interface SourceRun extends Run {
+  created_at: string;
   id: number;
   run_attempt: number;
   status: string;
 }
-type ReadApi = Api<CheckRequest>;
+type ReadApi = Api;
 type Failure = { status: 'failure'; target: string; reason: StatusReason };
 type Inspection =
   | { status: 'pending'; target: string }
@@ -29,6 +31,7 @@ function positive(value: number): boolean {
 }
 function validRevision(revision: Revision): boolean {
   return (
+    Number.isFinite(Date.parse(revision.since)) &&
     positive(revision.number) &&
     /^[a-f0-9]{40}$/.test(revision.head) &&
     /^[a-f0-9]{40}$/.test(revision.base)
@@ -70,6 +73,7 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
     'docs.yml',
     'pull_request',
     (run) =>
+      Date.parse(run.created_at) >= Date.parse(revision.since) &&
       run.event === 'pull_request' &&
       run.path === '.github/workflows/docs.yml' &&
       run.repository?.id === REPOSITORY_ID &&
@@ -165,11 +169,12 @@ function summary(target: string, reason: StatusReason, run?: number, attempt?: n
 }
 if (import.meta.main) {
   try {
-    const api = githubApi<CheckRequest>(process.env.GH_TOKEN ?? '');
+    const api = githubApi(process.env.GH_TOKEN ?? '');
     const revision = {
       number: Number(process.env.REVIEW_PR),
       head: process.env.REVIEW_HEAD ?? '',
       base: process.env.REVIEW_BASE ?? '',
+      since: process.env.REVIEW_SINCE ?? '',
     };
     if (process.argv[2] === 'wait') {
       const result = await waitReview(api, revision);

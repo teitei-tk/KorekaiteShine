@@ -1,55 +1,63 @@
-name: AI review check
+name: AI review
 
 on:
-  workflow_run:
-    workflows: [AI review]
-    types: [in_progress, completed]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions: {}
 
-# 開始と完了を直列化する。元のAIレビューのキャンセルには巻き込まれない。
 concurrency:
-  group: ai-review-check-${{ github.event.workflow_run.id }}
-  cancel-in-progress: false
-  queue: max
+  group: ai-review-display-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  notify:
+  review:
+    name: Review result
     if: >-
-      github.event.workflow_run.event == 'workflow_run' &&
-      github.event.workflow_run.path == '.github/workflows/ai-review.yml' &&
-      github.event.workflow_run.head_repository.id == github.event.repository.id
+      vars.AI_REVIEW_MODE == 'review' &&
+      github.event.pull_request.user.id == 1324680 &&
+      github.event.pull_request.user.type == 'User' &&
+      github.event.pull_request.head.repo.id == github.event.repository.id &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 55
     permissions:
       actions: read
       contents: read
       pull-requests: read
-      checks: write
+    env:
+      REVIEW_SINCE: ${{ github.event.pull_request.updated_at }}
+      REVIEW_PR: ${{ github.event.pull_request.number }}
+      REVIEW_HEAD: ${{ github.event.pull_request.head.sha }}
+      REVIEW_BASE: ${{ github.event.pull_request.base.sha }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
+      - name: Wait for trusted AI review execution
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/ai-review/wait-review.ts wait
       - name: Download bounded status reports from this attempt
         id: reports
-        if: github.event.action == 'completed'
         continue-on-error: true
         uses: actions/download-artifact@v8.0.2
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-          pattern: ai-review-status-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-*
+          run-id: ${{ steps.wait.outputs.run }}
+          pattern: ai-review-status-${{ steps.wait.outputs.run }}-${{ steps.wait.outputs.attempt }}-*
           path: ${{ runner.temp }}/ai-review-status
-      - name: Update the check on the reviewed PR revision
+      - name: Show verified review result
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEW_RUN_ID: ${{ github.event.workflow_run.id }}
-          REVIEW_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-          REVIEW_RUN_PHASE: ${{ github.event.action }}
+          REVIEW_RUN_ID: ${{ steps.wait.outputs.run }}
+          REVIEW_RUN_ATTEMPT: ${{ steps.wait.outputs.attempt }}
           REVIEW_REPORT_DIRECTORY: ${{ runner.temp }}/ai-review-status
           REVIEW_REPORT_DOWNLOAD: ${{ steps.reports.outcome }}
-        run: node tools/ai-review/check-status.ts
+        run: node tools/ai-review/wait-review.ts finish

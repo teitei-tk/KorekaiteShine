@@ -1,13 +1,17 @@
 import { expect, it } from 'vitest';
 import { inspectReview, finishReview, waitReview } from './wait-review.ts';
 import type { Api } from './github.ts';
-import type { CheckRequest } from './check-status.ts';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 function fixture() {
-  const revision = { number: 7, head: 'a'.repeat(40), base: 'b'.repeat(40) };
+  const revision = {
+    number: 7,
+    head: 'a'.repeat(40),
+    base: 'b'.repeat(40),
+    since: '2026-10-25T06:00:00Z',
+  };
   const pr = {
     number: 7,
     user: { id: 1324680, type: 'User' },
@@ -17,6 +21,7 @@ function fixture() {
     base: { sha: revision.base, ref: 'main', repo: { id: 1426899426 } },
   };
   const source = {
+    created_at: '2026-10-25T06:00:01Z',
     id: 10,
     run_attempt: 2,
     event: 'pull_request',
@@ -42,7 +47,7 @@ function fixture() {
   const reviews = [review];
   const sources = [source];
   const calls: string[] = [];
-  const api: Api<CheckRequest> = async <T>(path: string, method = 'GET') => {
+  const api: Api = async <T>(path: string, method = 'GET') => {
     expect(method).toBe('GET');
     calls.push(path);
     if (path === 'pulls/7') return pr as T;
@@ -182,4 +187,26 @@ it('モデル側の失敗・キャンセルも終端結果として返す', asyn
   });
   f.review.conclusion = 'cancelled';
   expect((await finishReview(f.api, f.revision, 20, 1)).reason).toBe('CANCELLED');
+});
+
+it('同じrevisionの過去の失敗は今回のCIが現れるまで待つ', async () => {
+  const f = fixture();
+  f.source.created_at = '2026-10-25T05:59:59Z';
+  f.source.conclusion = 'failure';
+  expect(await inspectReview(f.api, f.revision)).toEqual({
+    status: 'pending',
+    target: 'source-ci',
+  });
+  f.sources.unshift({
+    ...f.source,
+    id: 11,
+    created_at: '2026-10-25T06:00:01Z',
+    status: 'in_progress',
+    conclusion: '',
+  });
+  expect((await inspectReview(f.api, f.revision)).status).toBe('pending');
+  f.sources[0].status = 'completed';
+  f.sources[0].conclusion = 'success';
+  f.review.display_title = 'AI review / source run 11 attempt 2 / review';
+  expect((await inspectReview(f.api, f.revision)).status).toBe('complete');
 });

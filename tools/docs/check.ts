@@ -108,6 +108,84 @@ export async function checkLinks(root: string, files: string[]) {
   return errors;
 }
 
+// 文書のコマンドは実行せず、明示的なpnpmスクリプト呼び出しだけを照合する。
+export async function checkCommands(root: string, files: string[]) {
+  root = await realpath(root);
+  const errors: string[] = [];
+  const builtins = new Set([
+    'run',
+    'install',
+    'exec',
+    'dlx',
+    'add',
+    'remove',
+    'update',
+    'list',
+    'why',
+    'help',
+  ]);
+  for (const file of files) {
+    const tokens = markdown.parse(await readFile(path.join(root, file), 'utf8'), {});
+    const commands: { text: string; line: number }[] = [];
+    let line = 1;
+    for (const token of tokens) {
+      if (token.map) line = token.map[0] + 1;
+      if (token.type === 'inline') {
+        for (const child of token.children ?? []) {
+          if (child.type === 'code_inline') commands.push({ text: child.content, line });
+        }
+      }
+      if (token.type === 'fence' && /^(sh|shell|bash|zsh)$/.test(token.info.trim())) {
+        token.content.split('\n').forEach((text, index) => {
+          commands.push({ text, line: line + index + 1 });
+        });
+      }
+    }
+    for (const { text, line } of commands) {
+      const words = text.trim().split(/\s+/);
+      if (words.shift() !== 'pnpm') continue;
+      let directory = '.';
+      if (words[0] === '--dir') {
+        words.shift();
+        const value = words.shift();
+        if (!value || !/^[\w./-]+$/.test(value) || value.startsWith('-')) continue;
+        directory = value;
+      }
+      const explicitRun = words[0] === 'run';
+      if (explicitRun) words.shift();
+      const script = words.shift();
+      // 未対応オプション・シェル構文・説明用プレースホルダーは照合しない。
+      if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/.test(script)) continue;
+      if (!explicitRun && builtins.has(script)) continue;
+      const manifest = path.resolve(root, directory, 'package.json');
+      try {
+        if (!within(root, manifest)) throw new Error('リポジトリ外のpackage.json');
+        const resolved = await realpath(manifest);
+        if (!within(root, resolved)) throw new Error('リポジトリ外のpackage.json');
+        const data = JSON.parse(await readFile(resolved, 'utf8'));
+        if (
+          !data?.scripts ||
+          !Object.hasOwn(data.scripts, script) ||
+          typeof data.scripts[script] !== 'string'
+        ) {
+          throw new Error(`スクリプトが存在しない: ${script} (${path.relative(root, manifest)})`);
+        }
+      } catch (error) {
+        const reason =
+          error instanceof Error && 'code' in error && error.code === 'ENOENT'
+            ? `package.jsonが存在しない: ${path.relative(root, manifest)}`
+            : error instanceof SyntaxError
+              ? `package.jsonのJSONが不正: ${path.relative(root, manifest)}`
+              : error instanceof Error
+                ? error.message
+                : 'package.jsonの検査に失敗';
+        errors.push(`${file}:${line}: ${reason}`);
+      }
+    }
+  }
+  return errors;
+}
+
 async function main() {
   // Git管理対象と未追跡ファイルを検査し、依存・生成物はGitの除外設定に従う。
   const files = [
@@ -140,11 +218,15 @@ async function main() {
     )
     .join('\n');
   const links = await checkLinks(repository, existing);
+  const commands = await checkCommands(repository, existing);
   if (formatting) console.error(formatting);
   if (links.length) console.error(links.join('\n'));
-  if (formatting || links.length) process.exitCode = 1;
+  if (commands.length) console.error(commands.join('\n'));
+  if (formatting || links.length || commands.length) process.exitCode = 1;
   else
-    console.log(`文書検査成功: Markdown ${existing.length}件（書式・相対リンク・見出しアンカー）`);
+    console.log(
+      `文書検査成功: Markdown ${existing.length}件（書式・相対リンク・見出しアンカー・pnpmスクリプト）`,
+    );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

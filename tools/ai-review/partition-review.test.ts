@@ -551,3 +551,68 @@ it('候補整理を3作業以上へ分割して全候補を確認する', async 
     }),
   ).not.toThrow();
 });
+
+it('担当外の履歴確認を返した応答は対象不一致の固定理由で拒否する', () => {
+  const plan = fixture(),
+    input = preflight(plan)[0];
+  const value = response(input);
+  value.checks = [{ id: '9:1', status: 'fixed', evidence: 'SECRET_MODEL_OUTPUT' }];
+  expect(() => validateTaskResult(value, plan, input.task)).toThrow(
+    expect.objectContaining({
+      reason: 'OUTPUT_INVALID',
+      detail: { subcode: 'CHECK_TARGET_MISMATCH', missing: [] },
+    }),
+  );
+});
+
+it('修正済み履歴はhistoryだけが判定し、単位作業と統合して全件返す', async () => {
+  const original = fixture();
+  const prior = {
+    id: '9:1',
+    head: original.metadata.base,
+    base: original.metadata.base,
+    priority: 'P2' as const,
+    path: 'app.ts',
+    line: 1,
+    condition: '比較が逆',
+    impact: '誤許可',
+    fix: '<=へ修正',
+  };
+  const index = indexSources(
+    (...args) =>
+      args[0] === 'ls-tree'
+        ? `100644 blob ${'c'.repeat(40)}\tapp.ts\0`
+        : 'export const allowed = spent + next <= limit;',
+    [original.metadata.base, original.metadata.head],
+  );
+  const plan = planReview({ ...original.metadata, priorFindings: [prior] }, index, [
+    { path: 'app.ts', patch: '@@ -1 +1 @@\n-old\n+new\n' },
+  ]);
+  const kinds: string[] = [];
+  const result = await runPartitionReview(plan, async (input) => {
+    kinds.push(input.task.kind);
+    expect(input.prompt).toContain('担当外の履歴は重複回避の参考情報');
+    const value = response(input);
+    value.checks = input.task.priorIds.map((id) => ({
+      id,
+      status: 'fixed' as const,
+      evidence: 'headの<=判定を確認',
+    }));
+    value.checkSources = input.task.priorIds.map((id) => ({ id, sources: input.task.sources }));
+    return { value, usage: { input: 1, output: 1, total: 2 } };
+  });
+  expect(kinds).toContain('unit');
+  expect(kinds).toContain('history');
+  expect(result.review.checks).toEqual([
+    { id: '9:1', status: 'fixed', evidence: 'headの<=判定を確認' },
+  ]);
+  const input = preflight(plan).find((input) => input.task.kind === 'history')!;
+  const value = response(input);
+  value.checks = [{ id: '9:1', status: 'fixed', evidence: '' }];
+  expect(() => validateTaskResult(value, plan, input.task)).toThrow(
+    expect.objectContaining({
+      reason: 'OUTPUT_INVALID',
+      detail: { subcode: 'CHECK_RESULT_INVALID', missing: [] },
+    }),
+  );
+});

@@ -1,4 +1,4 @@
-name: AI review
+name: AI review execution
 run-name: AI review / source run ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }} / ${{ vars.AI_REVIEW_MODE }}
 
 on:

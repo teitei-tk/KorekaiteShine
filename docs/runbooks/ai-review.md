@@ -134,19 +134,19 @@ IDは画面で確認した`idp_`、`user-`形式を検査します。形式OKだ
 
 ## PRのチェック一覧
 
-`ai-review.yml`と`ai-review-check.yml`をmainへ反映すると、対象PRのheadに`AI review`チェックを表示する。通知Workflowはデフォルトブランチに置く必要がある。現在の変更はローカルの回帰テストまで検証し、GitHub上の表示はmain反映後に確認する。PR #13の上限引き上げはマージしない。
+PRのチェック一覧には専用Workflowの`AI review / Review result`を表示する。`Documentation checks`の一部にはしない。main上の`AI review execution`がモデル実行と投稿を担当し、表示用Workflowは読み取りだけでその完了を待つ。PR #13の上限引き上げはマージしない。
 
-`AI review check`だけに`checks: write`を与える。モデルの実行や投稿をせず、信頼済みコードで元実行と起点CIを照合する。元のAIレビューの実行名は`AI review / source run <CI実行ID> attempt <CI試行番号> / review`として対応付けに使うため、形式を変更する際は通知側も更新する。
+表示側はbase SHAの信頼済みコードを使うため、監視コードを先にmainへ反映してからWorkflowを切り替える。`checks: write`は使わない。OIDCは生成ジョブ、PRコメントの書き込みは投稿ジョブだけに与える。AI実行名の`AI review / source run <CI実行ID> attempt <CI試行番号> / review`は照合に使うため、形式を変更する際は監視側も更新する。
 
-通知は実行ID単位で直列化し、`queue: max`で最大100件の待機を許可する。既定の単一待機枠では、再実行の開始通知が直前の完了通知を置き換えてしまうためである。待機上限や通知Workflow自体の障害で通知が失われた場合は、完了通知を再実行する。[GitHubの同時実行制御](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)を参照。
+開始時は実行中、投稿まで完了すると成功を表示する。失敗時は`対象: collect、理由: BUDGET_EXCEEDED`等をジョブ概要とエラー注釈で確認する。概要の「AIレビューの実行ログ」リンクから元の実行・試行を開ける。指摘がある場合も処理が完了すれば成功であり、スレッドのResolveは人間が行う。
 
-開始時は実行中、投稿まで完了すると成功を表示する。失敗時は`対象: collect、理由: BUDGET_EXCEEDED`等をチェックの概要で確認できる。GitHubが詳細URLを標準チェックURLへ書き換える場合があるため、概要内の「AIレビューの実行ログ」リンクから元の実行・試行を開く。指摘がある場合も処理が完了すれば成功であり、スレッドのResolveは人間が行う。
+通常CI・AI実行を15秒間隔で最大50分監視する。対象PR・head/base・今回のPRイベント以降に開始した起点CIとAIの最新試行を照合し、API一覧1,000件の上限やAPI接続障害でも成功にはしない。待機分のActions実行時間が必要になる。バックエンドのキャンセル・時間切れは表示ジョブの失敗とし、`CANCELLED`・`TIMED_OUT`で区別する。表示ジョブ自体のキャンセルはGitHubの`cancelled`になる。
 
 結果はジョブ別の`ai-review-status-<run>-<attempt>-<job>` Artifactに保存し、保持期間は1日とする。通知側はファイル上限4KB、実行ID・試行番号・ジョブ・対象ID・固定理由コードを検証する。単一Artifactは展開先直下の`status.json`、複数ArtifactはArtifact名のサブディレクトリから読む。両形式の混在は不正として拒否する。取得や形式検証に失敗した結果から成功を推測しない。実行が失敗し詳細記録がない場合は`EXECUTION_FAILED`または`PUBLISH_FAILED`、正常終了でも投稿記録がなければ`REPORT_MISSING`となる。
 
 準備段階で同じhead/baseの完了マーカーを本人PR上のBotコメントから確認した場合は、`ALREADY_COMPLETE`で成功を記録し、再収集・再生成・再投稿を省略する。対象外は`SKIPPED`として区別する。古いhead/baseのマーカーや人間のコメントだけでは投稿済みと判定しない。
 
-実行中のまま残る場合は`AI review check`の失敗を確認し、**完了イベントで起動した通知Workflow**を再実行する。開始通知だけを再実行しても終了処理には進まない。Artifactが失効していれば、記録を復元せず未完了として表示する。ただし、既に投稿確認済みの成功チェックは維持する。元のAIレビューを再実行した場合は試行ごとにチェックを区別し、古い通知は新しい結果を変更しない。main向けでないPRと`claims`モードは対象外である。
+表示が終了しない場合はActionsの`AI review`を確認する。元のAI実行を再試行した場合は、完了後に表示側のWorkflowも再実行する。表示側だけの再実行はモデルを呼ばず、最新試行と投稿記録を検証する。Artifactが1日の保持期間を過ぎていれば、記録を推測せず`REPORT_MISSING`で失敗する。必要ならAI実行も再試行し、投稿済み記録を作り直す。main向けでないPR・Draft・`claims`モードは表示ジョブをスキップする。
 
 ## 停止と障害時の扱い
 

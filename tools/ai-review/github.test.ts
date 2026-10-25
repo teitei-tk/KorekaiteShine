@@ -62,3 +62,23 @@ it('API取得失敗を許可として扱わない', async () => {
 
 it('CI後にbaseだけ進んだ場合も認証前に拒否する', async () =>
   expect(await target(setup('stale-base').api, 1)).toBeNull());
+
+it('コメント100件のページで打ち切らず、次ページの指摘も取得する', async () => {
+  const { comments } = await import('./github.ts');
+  const first = Array.from({ length: 100 }, (_, i) => ({
+    id: i + 1,
+    body: '履歴',
+    user: { login: 'someone', type: 'User' },
+  }));
+  const last = { id: 101, body: '過去の指摘', user: { login: 'github-actions[bot]', type: 'Bot' } };
+  const paths: string[] = [];
+  const api: Api = async <T>(path: string) => {
+    paths.push(path);
+    return (path.endsWith('page=1') ? first : [last]) as T;
+  };
+  expect(await comments(api, 11)).toEqual([...first, last]);
+  expect(paths).toEqual([
+    'issues/11/comments?per_page=100&page=1',
+    'issues/11/comments?per_page=100&page=2',
+  ]);
+});

@@ -40,7 +40,7 @@ export async function comments(api: Api, number: number): Promise<Comment[]> {
   for (let page = 1; page <= 10; page++) {
     const batch = await api<Comment[]>(`issues/${number}/comments?per_page=100&page=${page}`);
     result.push(...batch);
-    if (batch.length <= 100) return result;
+    if (batch.length < 100) return result;
   }
   throw new Error('コメント取得上限を超えました');
 }

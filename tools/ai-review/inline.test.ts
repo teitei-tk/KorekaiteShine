@@ -280,3 +280,53 @@ it('再生成で指摘の順番だけが変わった場合は投稿済みスレ�
   expect(f.writes.filter((w) => w.path === 'pulls/7/reviews')).toHaveLength(1);
   expect(f.issues).toHaveLength(1);
 });
+
+it.each(['fixed', 'unfixed', 'unverified'])(
+  'head/baseや根拠文が変わっても最新の%s判定と同じなら返信を増やさない',
+  async (status) => {
+    const f = fixture();
+    f.inline.push(root());
+    const label = status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません';
+    const reason = status === 'fixed' ? '修正済み' : status === 'unfixed' ? '未修正' : '確認不能';
+    f.inline.push({
+      ...root(),
+      id: 20,
+      in_reply_to_id: 10,
+      body: `${MARKER}\n<!-- followup:review:10:${oldHead}:${oldHead} -->\n### ${label}\n${reason}: 以前の根拠`,
+    });
+    const priorFindings = readInlineHistory(f.inline);
+    await publish(
+      f.api,
+      { ...metadata, priorFindings },
+      { ...review, findings: [], checks: [{ id: 'review:10', status, evidence: '新しい根拠文' }] },
+    );
+    expect(f.writes.filter((w) => w.path.endsWith('/replies'))).toHaveLength(0);
+    expect(f.writes.filter((w) => w.path === 'issues/7/comments')).toHaveLength(1);
+  },
+);
+it('修正確認のあとに再発が通知されていれば、再修正を返信する', async () => {
+  const f = fixture();
+  f.inline.push(root());
+  for (const [id, label, reason] of [
+    [20, '☑️: 修正を確認しました', '修正済み'],
+    [30, '修正が確認できません', '未修正'],
+  ] as const)
+    f.inline.push({
+      ...root(),
+      id,
+      in_reply_to_id: 10,
+      body: `${MARKER}\n<!-- followup:review:10:${oldHead}:${base} -->\n### ${label}\n${reason}: 根拠`,
+    });
+  f.inline.reverse();
+  const priorFindings = readInlineHistory(f.inline);
+  await publish(
+    f.api,
+    { ...metadata, priorFindings },
+    {
+      ...review,
+      findings: [],
+      checks: [{ id: 'review:10', status: 'fixed', evidence: '再修正の根拠' }],
+    },
+  );
+  expect(f.writes.filter((w) => w.path.endsWith('/replies'))).toHaveLength(1);
+});

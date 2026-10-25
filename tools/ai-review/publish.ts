@@ -1,3 +1,4 @@
+import { latestFollowupStatus } from './followup.ts';
 import { readBudgetArtifact, publishBudget } from './budget-publish.ts';
 import { verifyPartitionArtifact } from './artifact.ts';
 import type { GenerationOrigin } from './artifact.ts';
@@ -87,7 +88,7 @@ async function publishResult(
           (c) => ownComment(c) && c.in_reply_to_id === original.replyTo && c.body.includes(marker),
         )
       : prior.some((c) => c.body.includes(marker));
-    if (posted) continue;
+    if (posted || latestFollowupStatus(original, prior, inline) === check.status) continue;
     if (!(await current())) return 'TARGET_CHANGED';
     const label = check.status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません';
     const reason =
@@ -102,6 +103,7 @@ async function publishResult(
     const body = [
       MARKER,
       marker,
+      `<!-- followup-state:v1:${check.status} -->`,
       // 旧形式の確認投稿も履歴として読み取れるが、完了マーカーは最後の概要だけに付ける。
       `対象: ${metadata.head} / base: ${metadata.base}`,
       `### ${label}`,

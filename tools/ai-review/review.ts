@@ -1,4 +1,5 @@
 import { ReviewFailure } from './failure.ts';
+import { detail } from './diagnostics.ts';
 import type { PriorFinding } from './history.ts';
 import OpenAI from 'openai';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
@@ -62,18 +63,40 @@ export async function requestStructuredReview<T>(
       },
       { signal: AbortSignal.timeout(150_000) },
     );
-    if (
-      result.status !== 'completed' ||
-      !result.output_text ||
-      Buffer.byteLength(result.output_text) > 30_000
-    )
-      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。');
+    if (result.status !== 'completed') {
+      const reason = result.incomplete_details?.reason;
+      const subcode =
+        reason === 'max_output_tokens'
+          ? 'TOKEN_LIMIT'
+          : reason === 'content_filter'
+            ? 'CONTENT_FILTER'
+            : 'API_INCOMPLETE';
+      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail(subcode));
+    }
+    if (!result.output_text)
+      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('EMPTY_OUTPUT'));
+    if (Buffer.byteLength(result.output_text) > 30_000)
+      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('OUTPUT_LIMIT'));
+    let parsed: T;
+    try {
+      parsed = JSON.parse(result.output_text) as T;
+    } catch {
+      throw new ReviewFailure(
+        'OUTPUT_INVALID',
+        'レビュー生成に失敗しました。',
+        detail('INVALID_JSON'),
+      );
+    }
     let value: T;
     try {
-      value = validate(JSON.parse(result.output_text));
+      value = validate(parsed);
     } catch (error) {
       if (error instanceof ReviewFailure) throw error;
-      throw new ReviewFailure('OUTPUT_INVALID', 'レビュー生成に失敗しました。');
+      throw new ReviewFailure(
+        'OUTPUT_INVALID',
+        'レビュー生成に失敗しました。',
+        detail('INVALID_RESULT'),
+      );
     }
     const count = (n: number | undefined) =>
       typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n : null;

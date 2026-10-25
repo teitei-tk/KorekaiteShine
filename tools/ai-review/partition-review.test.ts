@@ -429,3 +429,40 @@ it.each([1000, 175000])('重複棄却は双方の原文と引用を必要とす�
   if (size === 175000) await expect(run()).rejects.toThrow(/重複先.*原文/);
   else expect((await run()).review.findings.map((f) => f.path)).toEqual(['two.ts']);
 });
+it('モデル申告の不足情報を固定分類だけで引き継ぐ', () => {
+  const plan = fixture(),
+    input = preflight(plan)[0];
+  expect(() =>
+    validateTaskResult(
+      {
+        ...response(input),
+        status: 'incomplete',
+        summary: 'SECRET_SUMMARY',
+        uncertainties: ['SECRET_TEXT'],
+        incomplete: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+      },
+      plan,
+      input.task,
+    ),
+  ).toThrow(
+    expect.objectContaining({
+      reason: 'INCOMPLETE',
+      detail: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+    }),
+  );
+});
+it('モデル診断の未知コードや自由文を記録しない', () => {
+  const plan = fixture(),
+    input = preflight(plan)[0];
+  const invalid = {
+    ...response(input),
+    status: 'incomplete' as const,
+    incomplete: { subcode: 'MISSING_CONTEXT' as const, missing: [], text: 'SECRET' },
+  };
+  expect(() => validateTaskResult(invalid, plan, input.task)).toThrow(
+    expect.objectContaining({
+      reason: 'OUTPUT_INVALID',
+      detail: { subcode: 'INVALID_DIAGNOSTIC', missing: [] },
+    }),
+  );
+});

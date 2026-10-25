@@ -62,3 +62,13 @@ PR更新後、通常CIの成功を受けて再レビューするときに、過�
 全必須作業と候補整理が完了した場合だけ投稿する。部分失敗時は成功した部分の指摘・修正確認を投稿しない。十分な資料を読んでも判断がつかない結果と、必須資料の欠落・モデル失敗を区別する。前者は確認不能の理由を返信し、後者はActionsに未完了を記録する。
 
 重複はモデルに既存指摘との意味上の対応付けを指示し、根拠付きの候補整理で確認する。同じファイル・発生条件の指摘は投稿前の検証でも拒否する。成果物の生成元、固定入力・結果のハッシュ、全作業の完了を投稿前に照合する。
+
+## 未完了の安全な診断
+
+既存の理由コード（`INCOMPLETE`・`OUTPUT_INVALID`等）に固定サブコードを追加する。API生成中断は`TOKEN_LIMIT`・`CONTENT_FILTER`・`API_INCOMPLETE`、空・過大出力は`EMPTY_OUTPUT`・`OUTPUT_LIMIT`、形式や根拠の不正は`INVALID_JSON`・`INVALID_RESULT`・`COVERAGE_MISMATCH`・`EVIDENCE_MISMATCH`等で区別する。
+
+モデルは未完了時に`MISSING_CONTEXT`・`NO_REVIEWABLE_LINE`・`UNRESOLVED_CONFLICT`・`MODEL_UNSPECIFIED`のいずれかを申告する。不足情報は`IMPLEMENTATION`・`CALLER`・`CONTRACT`・`SPECIFICATION`・`PRIOR_EVIDENCE`・`REVIEWABLE_LINE`から選ぶ。モデルの申告は原因の確定とは区別し、診断だけを根拠に自動再試行や資料の追加取得は行わない。旧形式など分類できない失敗は`UNCLASSIFIED`を使う。
+
+親プロセスが検証済み台帳から作業種別、資料ID・行範囲・base/head/ancestorの別、確認対象IDと全件数を記録する。各一覧は最大8件とし、表示件数と全件数を併記する。台帳検証前の失敗では範囲を推測して記録しない。ファイルパス、本文、認証値、外部エラー本文、モデルのsummary・uncertaintiesなどの自由文は診断へ含めない。
+
+診断は生成ジョブのActions概要と、既存の4KB状態Artifactに保存する。独立したPRチェックは検証した診断だけを概要へ表示し、エラー注釈には対象・理由・サブコードを表示する。未知の分類・余分な項目・不正なIDや範囲を拒否する。診断を持たない旧形式の状態Artifactも読み取り可能とし、未完了を成功や部分投稿へ変換しない。

@@ -1,4 +1,6 @@
 import { ReviewFailure } from './failure.ts';
+import { detail, validDetail, modelSubcodes } from './diagnostics.ts';
+import type { FailureDetail } from './diagnostics.ts';
 import { readFileSync } from 'node:fs';
 import { validReview } from './policy.ts';
 import type { Finding, FixCheck, Review } from './policy.ts';
@@ -21,6 +23,7 @@ export interface Decision {
   sources: string[];
 }
 export interface TaskResult extends Review {
+  incomplete?: FailureDetail | null;
   coverage: string[];
   evidence: { finding: number; sources: string[]; priorId: string | null }[];
   checkSources: { id: string; sources: string[] }[];
@@ -45,7 +48,7 @@ export interface PartitionResult {
   candidateCount: number;
 }
 const instruction = readFileSync(new URL('./prompt.md', import.meta.url), 'utf8');
-const taskInstruction = `\n担当taskのobligationsを全件確認し、そのIDをcoverageへ列挙してください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。\n`;
+const taskInstruction = `\n担当taskのobligationsを全件確認し、そのIDをcoverageへ列挙してください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。completeではincompleteフィールドをnullにします。incompleteではincompleteフィールドに固定分類を返します。subcodeはMISSING_CONTEXT（資料不足）、NO_REVIEWABLE_LINE（投稿可能行なし）、UNRESOLVED_CONFLICT（根拠の矛盾）、MODEL_UNSPECIFIED（分類不能）のいずれかです。missingには不足しているIMPLEMENTATION、CALLER、CONTRACT、SPECIFICATION、PRIOR_EVIDENCE、REVIEWABLE_LINEだけを列挙し、自由文は入れません。資料不足なら少なくとも1分類を申告してください。\n`;
 export function invocation(
   plan: ReviewPlan,
   task: ReviewTask,
@@ -113,9 +116,28 @@ export function validateTaskResult(
     ]),
   );
   validReview(value, lines, prior);
-  if (value.status !== 'complete') throw new ReviewFailure('INCOMPLETE', '担当範囲が未完了です');
+  if (
+    value.incomplete != null &&
+    (!validDetail(value.incomplete) ||
+      !modelSubcodes.some((code) => code === value.incomplete?.subcode) ||
+      (value.incomplete.subcode === 'MISSING_CONTEXT' && !value.incomplete.missing.length) ||
+      value.status === 'complete')
+  )
+    throw new ReviewFailure('OUTPUT_INVALID', '診断分類が不正です', detail('INVALID_DIAGNOSTIC'));
+  if (value.status !== 'complete')
+    throw new ReviewFailure(
+      'INCOMPLETE',
+      '担当範囲が未完了です',
+      value.incomplete
+        ? detail(value.incomplete.subcode, value.incomplete.missing)
+        : detail('MODEL_UNSPECIFIED'),
+    );
   if (!sameIds(value.coverage, task.obligations))
-    throw new ReviewFailure('OUTPUT_INVALID', '担当範囲のIDが不正です');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '担当範囲のIDが不正です',
+      detail('COVERAGE_MISMATCH'),
+    );
   if (
     !Array.isArray(value.evidence) ||
     value.evidence.length !== value.findings.length ||
@@ -141,7 +163,7 @@ export function validateTaskResult(
           !(plan.metadata.priorFindings ?? []).some((p) => p.id === e.priorId)),
     )
   )
-    throw new ReviewFailure('OUTPUT_INVALID', '指摘の根拠が不正です');
+    throw new ReviewFailure('OUTPUT_INVALID', '指摘の根拠が不正です', detail('EVIDENCE_MISMATCH'));
   if (
     !Array.isArray(value.checkSources) ||
     !sameIds(
@@ -159,13 +181,21 @@ export function validateTaskResult(
         ),
     )
   )
-    throw new ReviewFailure('OUTPUT_INVALID', '修正確認の根拠が不正です');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '修正確認の根拠が不正です',
+      detail('CHECK_EVIDENCE_MISMATCH'),
+    );
   if (
     !Array.isArray(value.decisions) ||
     (task.kind !== 'reconcile' && value.decisions.length) ||
     (['history', 'reconcile'].includes(task.kind) && value.findings.length)
   )
-    throw new ReviewFailure('OUTPUT_INVALID', '作業種別と結果が一致しません');
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '作業種別と結果が一致しません',
+      detail('TASK_KIND_MISMATCH'),
+    );
   return value;
 }
 
@@ -194,7 +224,11 @@ export async function runPartitionReview(
       value = validateTaskResult(result.value, plan, input.task);
     } catch (error) {
       if (error instanceof ReviewFailure) throw error;
-      throw new ReviewFailure('OUTPUT_INVALID', 'モデル出力の形式が不正です');
+      throw new ReviewFailure(
+        'OUTPUT_INVALID',
+        'モデル出力の形式が不正です',
+        detail('INVALID_RESULT'),
+      );
     }
     for (const key of ['input', 'output', 'total'] as const) {
       const count = result.usage[key];

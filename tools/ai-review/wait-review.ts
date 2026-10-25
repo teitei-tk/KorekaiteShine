@@ -1,3 +1,5 @@
+import { renderDiagnostic } from './diagnostics.ts';
+import type { Diagnostic } from './diagnostics.ts';
 import { appendFileSync } from 'node:fs';
 import { setTimeout } from 'node:timers/promises';
 import { githubApi } from './github.ts';
@@ -164,8 +166,14 @@ export async function finishReview(
     return { conclusion: 'failure' as const, target: 'workflow', reason: 'SUPERSEDED' as const };
   return result;
 }
-function summary(target: string, reason: StatusReason, run?: number, attempt?: number): void {
-  const message = `対象: ${target}、理由: ${reason}。`;
+function summary(
+  target: string,
+  reason: StatusReason,
+  run?: number,
+  attempt?: number,
+  diagnostic?: Diagnostic,
+): void {
+  const message = `対象: ${target}、理由: ${reason}。${diagnostic ? '\n\n' + renderDiagnostic(diagnostic) : ''}`;
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
@@ -204,9 +212,11 @@ if (import.meta.main) {
           ? process.env.REVIEW_REPORT_DIRECTORY
           : undefined,
       );
-      summary(result.target, result.reason, id, attempt);
+      summary(result.target, result.reason, id, attempt, result.diagnostic);
       if (result.conclusion !== 'success') {
-        console.error(`::error::${result.reason} (${result.target})`);
+        console.error(
+          `::error::${result.reason}${result.diagnostic ? '/' + result.diagnostic.subcode : ''} (${result.target})`,
+        );
         process.exitCode = 1;
       }
     } else throw new Error('監視操作が不正です');

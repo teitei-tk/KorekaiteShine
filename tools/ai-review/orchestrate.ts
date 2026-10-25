@@ -1,5 +1,7 @@
-import { ReviewFailure, validFailureReason } from './failure.ts';
+import { ReviewFailure, validFailureReason, workerFailure } from './failure.ts';
 import type { FailureReason } from './failure.ts';
+import { detail, validDetail, taskScope, renderDiagnostic } from './diagnostics.ts';
+import type { DetailInput, Diagnostic, TaskScope } from './diagnostics.ts';
 import { execFile } from 'node:child_process';
 import { appendFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -31,18 +33,45 @@ async function callWorker(
           return;
         }
         try {
-          const result = JSON.parse(stdout) as ReviewResult<TaskResult> & { failure?: string };
-          if (validFailureReason(result.failure))
-            reject(new ReviewFailure(result.failure, 'モデル子プロセスが未完了です'));
-          else resolve(result);
-        } catch {
-          reject(new Error('モデル出力が不正です'));
+          resolve(decodeWorkerResult(stdout));
+        } catch (failure) {
+          reject(
+            failure instanceof ReviewFailure
+              ? failure
+              : new ReviewFailure(
+                  'OUTPUT_INVALID',
+                  'モデル出力が不正です',
+                  detail('INVALID_RESULT'),
+                ),
+          );
         }
       },
     );
     child.stdin?.on('error', () => {});
     child.stdin?.end(JSON.stringify({ input, plan }));
   });
+}
+export function decodeWorkerResult(stdout: string): ReviewResult<TaskResult> {
+  let result: ReviewResult<TaskResult> & { failure?: string; detail?: DetailInput };
+  try {
+    result = JSON.parse(stdout) as typeof result;
+  } catch {
+    throw new ReviewFailure('OUTPUT_INVALID', 'モデル出力が不正です', detail('INVALID_JSON'));
+  }
+  if (!result || typeof result !== 'object')
+    throw new ReviewFailure('OUTPUT_INVALID', 'モデル出力が不正です', detail('INVALID_RESULT'));
+  if (result.failure !== undefined) {
+    if (!validFailureReason(result.failure))
+      throw new ReviewFailure('OUTPUT_INVALID', '失敗コードが不正です', detail('INVALID_RESULT'));
+    if (result.detail !== undefined && !validDetail(result.detail))
+      throw new ReviewFailure('OUTPUT_INVALID', '診断分類が不正です', detail('INVALID_DIAGNOSTIC'));
+    throw new ReviewFailure(
+      result.failure,
+      'モデル子プロセスが未完了です',
+      result.detail ? detail(result.detail.subcode, result.detail.missing) : undefined,
+    );
+  }
+  return result;
 }
 export async function generatePartitionArtifact(
   directory: string,
@@ -58,6 +87,7 @@ export async function generatePartitionArtifact(
   // 前回の部分生成物を完了成果物として使わない。
   for (const path of ['result.json', 'execution.json'])
     rmSync(join(directory, path), { force: true });
+  let scope: TaskScope | undefined;
   let completed = 0;
   let total = 0;
   let target = 'preflight';
@@ -84,10 +114,12 @@ export async function generatePartitionArtifact(
       },
       (task) => {
         target = /^(task|reconcile)-[1-9]\d*$/.test(task.id) ? task.id : 'invalid-task-id';
+        scope = taskScope(plan, task);
         fallback = 'OUTPUT_INVALID';
       },
     );
     target = 'artifact';
+    scope = undefined;
     fallback = 'ARTIFACT_INVALID';
     writePartitionArtifact(directory, plan, result, {
       run: env.GITHUB_RUN_ID ?? '',
@@ -106,13 +138,17 @@ export async function generatePartitionArtifact(
       );
   } catch (error) {
     const reason = error instanceof ReviewFailure ? error.reason : fallback;
-    writeStatusReport(env, 'failure', target, reason);
+    const safeDetail =
+      workerFailure(error instanceof ReviewFailure ? error : undefined).detail ??
+      detail('UNCLASSIFIED');
+    const diagnostic: Diagnostic = { ...safeDetail, ...(scope ? { scope } : {}) };
+    writeStatusReport(env, 'failure', target, reason, diagnostic);
     for (const path of ['result.json', 'execution.json'])
       rmSync(join(directory, path), { force: true });
     if (env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
-        `分割レビュー未完了: ${completed}/${total}作業完了。対象: ${target}、理由: ${reason}。残る必須作業・候補整理は未完了です。部分結果は投稿しません。\n`,
+        `分割レビュー未完了: ${completed}/${total}作業完了。対象: ${target}、理由: ${reason}。残る必須作業・候補整理は未完了です。部分結果は投稿しません。\n\n${renderDiagnostic(diagnostic)}\n`,
       );
     throw new Error('分割レビューが未完了です');
   }

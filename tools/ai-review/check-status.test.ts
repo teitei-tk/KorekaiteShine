@@ -78,3 +78,39 @@ it('元実行の時間切れとキャンセルを区別する', async () => {
     'TIMED_OUT',
   );
 });
+it('検証したサブコードと不足分類をPRの表示結果へ引き継ぐ', () =>
+  report(
+    {
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'INCOMPLETE',
+      diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+    },
+    async (directory) => {
+      expect(
+        await completedOutcome(api, { ...run, conclusion: 'failure' }, directory),
+      ).toMatchObject({
+        conclusion: 'failure',
+        reason: 'INCOMPLETE',
+        diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'] },
+      });
+    },
+  ));
+it('診断へ自由文を追加したArtifactを拒否する', () =>
+  report(
+    {
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'INCOMPLETE',
+      diagnostic: { subcode: 'MISSING_CONTEXT', missing: ['CONTRACT'], text: 'SECRET' },
+    },
+    async (directory) => {
+      expect(await completedOutcome(api, { ...run, conclusion: 'failure' }, directory)).toEqual({
+        conclusion: 'failure',
+        target: 'artifact',
+        reason: 'REPORT_INVALID',
+      });
+    },
+  ));

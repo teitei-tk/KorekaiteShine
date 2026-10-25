@@ -1,4 +1,4 @@
-import { ReviewFailure } from './failure.ts';
+import { ReviewFailure, workerFailure } from './failure.ts';
 import { readFileSync } from 'node:fs';
 import { requestStructuredReview } from './review.ts';
 import { validateTaskResult } from './partition-review.ts';
@@ -33,7 +33,7 @@ if (import.meta.main) {
     process.stdout.write(JSON.stringify(result));
   } catch (error) {
     process.stdout.write(
-      JSON.stringify({ failure: error instanceof ReviewFailure ? error.reason : 'MODEL_FAILED' }),
+      JSON.stringify(workerFailure(error instanceof ReviewFailure ? error : undefined)),
     );
   }
 }

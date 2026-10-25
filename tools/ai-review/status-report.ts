@@ -1,3 +1,5 @@
+import { validDiagnostic } from './diagnostics.ts';
+import type { Diagnostic } from './diagnostics.ts';
 import { writeFileSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { failureReasons } from './failure.ts';
@@ -26,6 +28,7 @@ export interface StatusReport {
   status: 'success' | 'failure' | 'neutral';
   target: string;
   reason: StatusReason;
+  diagnostic?: Diagnostic;
 }
 export function validTarget(value: string): boolean {
   return (
@@ -39,6 +42,8 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
   return (
     !!value &&
     value.version === 1 &&
+    (value.diagnostic === undefined ||
+      (value.status === 'failure' && validDiagnostic(value.diagnostic))) &&
     typeof value.run === 'string' &&
     /^[1-9]\d{0,17}$/.test(value.run) &&
     typeof value.attempt === 'string' &&
@@ -66,6 +71,7 @@ export function writeStatusReport(
   status: StatusReport['status'],
   target: string,
   reason: StatusReason,
+  diagnostic?: Diagnostic,
 ): void {
   const path =
     env.AI_REVIEW_REPORT ??
@@ -79,9 +85,12 @@ export function writeStatusReport(
     status,
     target,
     reason,
+    ...(diagnostic ? { diagnostic } : {}),
   };
   if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
-  writeFileSync(path, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  if (Buffer.byteLength(json) > 4096) throw new Error('実行結果が大きすぎます');
+  writeFileSync(path, json);
 }
 export function readStatusReports(
   directory: string | undefined,

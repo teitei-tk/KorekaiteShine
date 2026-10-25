@@ -1,3 +1,4 @@
+import { runVersion } from './run-version.ts';
 import { execFileSync } from 'node:child_process';
 import { setTimeout } from 'node:timers/promises';
 import { REPOSITORY } from './policy.ts';
@@ -118,10 +119,43 @@ export async function checkRun(
     return 2;
   }
 }
-if (import.meta.main) {
-  const [id, option, extra] = process.argv.slice(2);
-  if (!id || extra || (option !== undefined && option !== '--watch')) {
-    console.error('使い方: pnpm check:ai-run <実行ID> [--watch]');
-    process.exitCode = 2;
-  } else process.exitCode = await checkRun(id, option === '--watch');
+export function parseRunArgs(args: string[]): { id: string; watch: boolean; expected?: string } {
+  const [id, ...options] = args;
+  if (!id || !/^[1-9][0-9]{0,17}$/.test(id)) throw new Error('Invalid arguments');
+  let watch = false;
+  let expected: string | undefined;
+  for (let i = 0; i < options.length; i++) {
+    if (options[i] === '--watch' && !watch) watch = true;
+    else if (options[i] === '--expect-commit' && expected === undefined) {
+      expected = options[++i];
+      if (!expected || !/^[a-f0-9]{40}$/.test(expected)) throw new Error('Invalid arguments');
+    } else throw new Error('Invalid arguments');
+  }
+  return { id, watch, expected };
 }
+export async function checkRunCommand(
+  args: string[],
+  version = runVersion,
+  check = checkRun,
+  emit: (text: string) => void = console.log,
+): Promise<number> {
+  let options: ReturnType<typeof parseRunArgs>;
+  try {
+    options = parseRunArgs(args);
+  } catch {
+    emit('使い方: pnpm check:ai-run <実行ID> [--watch] [--expect-commit <40桁SHA>]');
+    return 2;
+  }
+  try {
+    const result = version(options.id, options.expected);
+    emit(result.output);
+    if (!result.eligible) return 3;
+  } catch {
+    emit(
+      '実行状態を取得・解析できませんでした。実行版・期待コミット・権限・接続を確認してください。',
+    );
+    return 2;
+  }
+  return check(options.id, options.watch, undefined, emit);
+}
+if (import.meta.main) process.exitCode = await checkRunCommand(process.argv.slice(2));

@@ -210,3 +210,38 @@ it('同じrevisionの過去の失敗は今回のCIが現れるまで待つ', asy
   f.review.display_title = 'AI review / source run 11 attempt 2 / review';
   expect((await inspectReview(f.api, f.revision)).status).toBe('complete');
 });
+it('完了結果の取得中に再試行が始まった場合も旧成功を返さない', async () => {
+  const f = fixture();
+  const api: Api = async <T>(path: string) => {
+    const value = await f.api<T>(path);
+    if (path === 'actions/runs/20/attempts/1') {
+      const frozen = { ...f.review };
+      f.review.run_attempt = 2;
+      f.review.status = 'in_progress';
+      return frozen as T;
+    }
+    return value;
+  };
+  const directory = mkdtempSync(join(tmpdir(), 'ai-monitor-rerun-'));
+  try {
+    writeFileSync(
+      join(directory, 'status.json'),
+      JSON.stringify({
+        version: 1,
+        run: '20',
+        attempt: '1',
+        job: 'publish',
+        status: 'success',
+        target: 'publish',
+        reason: 'REVIEW_COMPLETE',
+      }),
+    );
+    expect(await finishReview(api, f.revision, 20, 1, directory)).toEqual({
+      conclusion: 'failure',
+      target: 'workflow',
+      reason: 'SUPERSEDED',
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

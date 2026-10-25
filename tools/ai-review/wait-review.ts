@@ -156,7 +156,13 @@ export async function finishReview(
     run.head_repository?.id !== REPOSITORY_ID
   )
     throw new Error('監視結果が不一致です');
-  return completedOutcome(api, run, directory);
+  const result = await completedOutcome(api, run, directory);
+  const after = await inspectReview(api, revision);
+  if (after.status === 'failure')
+    return { conclusion: 'failure' as const, target: after.target, reason: after.reason };
+  if (after.status !== 'complete' || after.run !== id || after.attempt !== attempt)
+    return { conclusion: 'failure' as const, target: 'workflow', reason: 'SUPERSEDED' as const };
+  return result;
 }
 function summary(target: string, reason: StatusReason, run?: number, attempt?: number): void {
   const message = `対象: ${target}、理由: ${reason}。`;

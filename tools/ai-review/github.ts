@@ -15,10 +15,10 @@ export type ApiBody =
       event: 'COMMENT';
       comments: InlineCommentInput[];
     };
-export type Api = <T>(path: string, method?: string, body?: ApiBody) => Promise<T>;
-export function githubApi(token: string): Api {
+export type Api<Body = ApiBody> = <T>(path: string, method?: string, body?: Body) => Promise<T>;
+export function githubApi<Body extends object = ApiBody>(token: string): Api<Body> {
   if (!token) throw new Error('GitHub認証がありません');
-  return async <T>(path: string, method = 'GET', body?: ApiBody): Promise<T> => {
+  return async <T>(path: string, method = 'GET', body?: Body): Promise<T> => {
     const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
       method,
       headers: {
@@ -78,7 +78,11 @@ export function ownComment(c: Comment): boolean {
     c.user?.login === 'github-actions[bot]' && c.user.type === 'Bot' && c.body.startsWith(MARKER)
   );
 }
-export async function target(api: Api, runId: number): Promise<PullRequest | null> {
+export type TargetResult =
+  | { status: 'ready'; pr: PullRequest }
+  | { status: 'already-complete'; pr: PullRequest }
+  | { status: 'excluded' };
+export async function target(api: Api, runId: number): Promise<TargetResult> {
   if (!Number.isSafeInteger(runId) || runId < 1) throw new Error('実行IDが不正です');
   const run = await api<Run>(`actions/runs/${runId}`);
   if (
@@ -89,15 +93,16 @@ export async function target(api: Api, runId: number): Promise<PullRequest | nul
     run.head_repository?.id !== 1426899426 ||
     run.pull_requests?.length !== 1
   )
-    return null;
+    return { status: 'excluded' };
   const number = run.pull_requests[0].number;
-  if (!Number.isSafeInteger(number) || number < 1) return null;
+  if (!Number.isSafeInteger(number) || number < 1) return { status: 'excluded' };
   const pr = await api<PullRequest>(`pulls/${number}`);
-  if (!eligible(pr) || pr.number !== number) return null;
+  if (!eligible(pr) || pr.number !== number) return { status: 'excluded' };
   const tested = run.pull_requests[0];
-  if (tested.head?.sha !== pr.head.sha || tested.base?.sha !== pr.base.sha) return null;
+  if (tested.head?.sha !== pr.head.sha || tested.base?.sha !== pr.base.sha)
+    return { status: 'excluded' };
   if (run.head_sha !== pr.head.sha) {
-    if (!/^[a-f0-9]{40}$/.test(run.head_sha)) return null;
+    if (!/^[a-f0-9]{40}$/.test(run.head_sha)) return { status: 'excluded' };
     const commit = await api<{ parents: { sha: string }[] }>(`git/commits/${run.head_sha}`);
     // PRの仮想mergeコミットを検査したCIにも対応する。
     if (
@@ -105,10 +110,10 @@ export async function target(api: Api, runId: number): Promise<PullRequest | nul
       commit.parents[0].sha !== pr.base.sha ||
       commit.parents[1].sha !== pr.head.sha
     )
-      return null;
+      return { status: 'excluded' };
   }
   const prior = await comments(api, pr.number);
   if (prior.some((c) => ownComment(c) && c.body.includes(revisionMarker(pr.head.sha, pr.base.sha))))
-    return null;
-  return pr;
+    return { status: 'already-complete', pr };
+  return { status: 'ready', pr };
 }

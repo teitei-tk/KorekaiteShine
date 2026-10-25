@@ -70,7 +70,12 @@ it.each(['success', 'expired', 'late-failure', 'invalid-evidence', 'incomplete',
       const run = () =>
         generatePartitionArtifact(
           directory,
-          { ...env, GITHUB_STEP_SUMMARY: join(directory, 'summary.md') },
+          {
+            ...env,
+            GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
+            AI_REVIEW_JOB: 'generate',
+            AI_REVIEW_REPORT: join(directory, 'status.json'),
+          },
           request,
           async (input, token) => {
             calls++;
@@ -135,6 +140,14 @@ it.each(['success', 'expired', 'late-failure', 'invalid-evidence', 'incomplete',
                 ? 'INCOMPLETE'
                 : 'OUTPUT_INVALID';
         expect(summary).toContain(expected);
+        expect(JSON.parse(readFileSync(join(directory, 'status.json'), 'utf8'))).toMatchObject({
+          run: '10',
+          attempt: '1',
+          job: 'generate',
+          status: 'failure',
+          reason: expected,
+          target: scenario === 'expired' ? 'task-1' : 'reconcile-1',
+        });
         expect(summary).toContain(scenario === 'expired' ? 'task-1' : 'reconcile-1');
         expect(summary).not.toContain('SECRET');
         expect(summary).not.toContain('secret-');

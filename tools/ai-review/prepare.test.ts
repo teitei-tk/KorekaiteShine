@@ -47,6 +47,10 @@ it.each([
       REVIEW_DIRECTORY: directory,
       GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
       GITHUB_OUTPUT: join(directory, 'outputs'),
+      GITHUB_RUN_ID: '20',
+      GITHUB_RUN_ATTEMPT: '1',
+      AI_REVIEW_JOB: 'generate',
+      AI_REVIEW_REPORT: join(directory, 'status.json'),
     };
     const files =
       scenario === 'preflight-budget'
@@ -112,6 +116,19 @@ it.each([
       );
       expect(summary).not.toContain('SECRET');
       expect(summary).not.toContain('token');
+      expect(JSON.parse(readFileSync(env.AI_REVIEW_REPORT, 'utf8'))).toMatchObject({
+        run: '20',
+        attempt: '1',
+        job: 'generate',
+        status: 'failure',
+        target: scenario === 'preflight-budget' ? 'preflight' : 'collect',
+        reason:
+          scenario === 'unresolved'
+            ? 'UNRESOLVED_REFERENCE'
+            : scenario === 'external-error'
+              ? 'COLLECTION_FAILED'
+              : 'BUDGET_EXCEEDED',
+      });
       expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain('allowed=false');
       expect(existsSync(join(directory, 'result.json'))).toBe(false);
     }
@@ -148,3 +165,48 @@ it('CLI失敗は非ゼロ終了し、生成器に到達しなくても概要を�
     rmSync(directory, { recursive: true, force: true });
   }
 });
+it.each(['same', 'old-head', 'old-base', 'human', 'ineligible'])(
+  '準備段階の投稿済み判定は対象と投稿者を照合する: %s',
+  async (scenario) => {
+    const directory = mkdtempSync(join(tmpdir(), 'prepare-completed-'));
+    try {
+      const env = {
+        SOURCE_RUN_ID: '1',
+        GITHUB_RUN_ID: '20',
+        GITHUB_RUN_ATTEMPT: '2',
+        AI_REVIEW_JOB: 'gate',
+        AI_REVIEW_REPORT: join(directory, 'status.json'),
+        GITHUB_OUTPUT: join(directory, 'output'),
+      };
+      const client: Api = async <T>(path: string) => {
+        if (path === 'pulls/7' && scenario === 'ineligible')
+          return { ...pr, base: { ...pr.base, ref: 'other' } } as T;
+        if (path.startsWith('issues/7/comments?'))
+          return [
+            {
+              id: 1,
+              user: {
+                login: scenario === 'human' ? 'owner' : 'github-actions[bot]',
+                type: scenario === 'human' ? 'User' : 'Bot',
+              },
+              body: `<!-- korekaite-ai-review -->\n<!-- revision:${scenario === 'old-head' ? 'c'.repeat(40) : head}:${scenario === 'old-base' ? 'c'.repeat(40) : base} -->`,
+            },
+          ] as T;
+        return api<T>(path);
+      };
+      await prepareReview('gate', env, client);
+      if (scenario === 'same' || scenario === 'ineligible') {
+        expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toBe('allowed=false\n');
+        expect(JSON.parse(readFileSync(env.AI_REVIEW_REPORT, 'utf8'))).toMatchObject({
+          status: scenario === 'same' ? 'success' : 'neutral',
+          reason: scenario === 'same' ? 'ALREADY_COMPLETE' : 'SKIPPED',
+        });
+      } else {
+        expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain('allowed=true');
+        expect(existsSync(env.AI_REVIEW_REPORT)).toBe(false);
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

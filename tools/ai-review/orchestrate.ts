@@ -10,6 +10,7 @@ import type { TaskInvocation, TaskResult } from './partition-review.ts';
 import type { ReviewResult } from './review.ts';
 import { readBounded, writePartitionArtifact } from './artifact.ts';
 import type { ReviewPlan } from './partition.ts';
+import { writeStatusReport } from './status-report.ts';
 
 export function workerEnvironment(token: string): Record<string, string> {
   return { OPENAI_ACCESS_TOKEN: token };
@@ -105,6 +106,7 @@ export async function generatePartitionArtifact(
       );
   } catch (error) {
     const reason = error instanceof ReviewFailure ? error.reason : fallback;
+    writeStatusReport(env, 'failure', target, reason);
     for (const path of ['result.json', 'execution.json'])
       rmSync(join(directory, path), { force: true });
     if (env.GITHUB_STEP_SUMMARY)

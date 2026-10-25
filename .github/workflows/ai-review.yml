@@ -1,4 +1,5 @@
 name: AI review
+run-name: AI review / source run ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }} / ${{ vars.AI_REVIEW_MODE }}
 
 on:
   workflow_run:
@@ -20,6 +21,9 @@ jobs:
       (vars.AI_REVIEW_MODE == 'claims' || vars.AI_REVIEW_MODE == 'review')
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    env:
+      AI_REVIEW_JOB: gate
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
     permissions:
       actions: read
       contents: read
@@ -43,6 +47,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
         run: node tools/ai-review/prepare.ts gate
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-gate
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1
 
   generate:
     needs: gate
@@ -59,6 +71,8 @@ jobs:
       pull-requests: read
       id-token: write
     env:
+      AI_REVIEW_JOB: generate
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
       SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
       AI_REVIEW_MODE: ${{ vars.AI_REVIEW_MODE }}
     steps:
@@ -135,6 +149,14 @@ jobs:
       - name: Record incomplete execution
         if: failure()
         run: echo 'AIレビューは未完了です。認証・資料上限・モデル・出力形式の各ステップを確認してください。自動再試行は行いません。' >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-generate
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1
 
   publish:
     needs: [gate, generate]
@@ -145,6 +167,8 @@ jobs:
       contents: read
       pull-requests: write
     env:
+      AI_REVIEW_JOB: publish
+      AI_REVIEW_REPORT: ${{ runner.temp }}/status.json
       GENERATION_ATTEMPT: ${{ needs.generate.outputs.attempt }}
       PR_NUMBER: ${{ needs.gate.outputs.pr }}
       PR_HEAD: ${{ needs.gate.outputs.head }}
@@ -166,3 +190,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REVIEW_DIRECTORY: ${{ runner.temp }}/ai-review-result
         run: node tools/ai-review/publish.ts
+      - name: Preserve check status
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-publish
+          path: ${{ runner.temp }}/status.json
+          if-no-files-found: ignore
+          retention-days: 1

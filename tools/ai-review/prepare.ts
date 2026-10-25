@@ -7,6 +7,7 @@ import { preflight } from './partition-review.ts';
 import { collect } from './material.ts';
 import { ReviewFailure } from './failure.ts';
 import type { FailureReason } from './failure.ts';
+import { writeStatusReport } from './status-report.ts';
 
 export async function prepareReview(
   mode: string,
@@ -19,11 +20,18 @@ export async function prepareReview(
   try {
     if (!api && !env.GH_TOKEN) throw new ReviewFailure('AUTH_FAILED', 'GitHub認証がありません');
     const client = api ?? githubApi(env.GH_TOKEN!);
-    const pr = await target(client, Number(env.SOURCE_RUN_ID));
-    if (!pr) {
+    const result = await target(client, Number(env.SOURCE_RUN_ID));
+    if (result.status !== 'ready') {
+      writeStatusReport(
+        env,
+        result.status === 'already-complete' ? 'success' : 'neutral',
+        'gate',
+        result.status === 'already-complete' ? 'ALREADY_COMPLETE' : 'SKIPPED',
+      );
       appendFileSync(env.GITHUB_OUTPUT!, 'allowed=false\n');
       return;
     }
+    const pr = result.pr;
     if (mode === 'collect' && env.AI_REVIEW_MODE === 'review') {
       targetId = 'collect';
       fallback = 'INPUT_INVALID';
@@ -51,6 +59,7 @@ export async function prepareReview(
   } catch (error) {
     // 外部API・gitのメッセージでは分類せず、信頼済み処理の固定コードだけを表示する。
     const reason = error instanceof ReviewFailure ? error.reason : fallback;
+    writeStatusReport(env, 'failure', targetId, reason);
     if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, 'allowed=false\n');
     if (env.GITHUB_STEP_SUMMARY)
       appendFileSync(

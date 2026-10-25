@@ -42,17 +42,18 @@ function setup(kind = 'owner') {
 }
 it('他人のPRは再実行者に関係なく除外し資料取得へ進まない', async () => {
   const { api, requests } = setup('other');
-  expect(await target(api, 1)).toBeNull();
+  expect(await target(api, 1)).toEqual({ status: 'excluded' });
   expect(requests).toEqual(['actions/runs/1', 'pulls/7']);
 });
 it('forkはPR取得前に拒否する', async () => {
   const { api, requests } = setup('fork');
-  expect(await target(api, 1)).toBeNull();
+  expect(await target(api, 1)).toEqual({ status: 'excluded' });
   expect(requests).toEqual(['actions/runs/1']);
 });
 it('CI後にheadが変わっていたら実行しない', async () =>
-  expect(await target(setup('stale').api, 1)).toBeNull());
-it('本人の最新headを返す', async () => expect((await target(setup().api, 1))?.number).toBe(7));
+  expect(await target(setup('stale').api, 1)).toEqual({ status: 'excluded' }));
+it('本人の最新headを返す', async () =>
+  expect(await target(setup().api, 1)).toMatchObject({ status: 'ready', pr: { number: 7 } }));
 it('API取得失敗を許可として扱わない', async () => {
   const api: Api = async () => {
     throw new Error('API failed');
@@ -61,7 +62,7 @@ it('API取得失敗を許可として扱わない', async () => {
 });
 
 it('CI後にbaseだけ進んだ場合も認証前に拒否する', async () =>
-  expect(await target(setup('stale-base').api, 1)).toBeNull());
+  expect(await target(setup('stale-base').api, 1)).toEqual({ status: 'excluded' }));
 
 it('レビューコメントも100件を超えたら次ページまで取得する', async () => {
   const { reviewComments } = await import('./github.ts');

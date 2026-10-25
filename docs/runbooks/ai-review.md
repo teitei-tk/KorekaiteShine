@@ -132,6 +132,22 @@ IDは画面で確認した`idp_`、`user-`形式を検査します。形式OKだ
 
 本人以外のPR、fork、bot、Draft、古いCI、投稿前にhead/baseが変わった場合を確認します。他人のPRを本人が再実行しても対象外です。通常CIの実行は制限しません。投稿前の照合とGitHubのコメント更新は原子的ではないため、直後のpushとの競合は完全には防げません。コメントに対象SHAを残して区別します。
 
+## PRのチェック一覧
+
+`ai-review.yml`と`ai-review-check.yml`をmainへ反映すると、対象PRのheadに`AI review`チェックを表示する。通知Workflowはデフォルトブランチに置く必要がある。現在の変更はローカルの回帰テストまで検証し、GitHub上の表示はmain反映後に確認する。PR #13の上限引き上げはマージしない。
+
+`AI review check`だけに`checks: write`を与える。モデルの実行や投稿をせず、信頼済みコードで元実行と起点CIを照合する。元のAIレビューの実行名は`AI review / source run <CI実行ID> attempt <CI試行番号> / review`として対応付けに使うため、形式を変更する際は通知側も更新する。
+
+通知は実行ID単位で直列化し、`queue: max`で最大100件の待機を許可する。既定の単一待機枠では、再実行の開始通知が直前の完了通知を置き換えてしまうためである。待機上限や通知Workflow自体の障害で通知が失われた場合は、完了通知を再実行する。[GitHubの同時実行制御](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)を参照。
+
+開始時は実行中、投稿まで完了すると成功を表示する。失敗時は`対象: collect、理由: BUDGET_EXCEEDED`等をチェックの概要で確認できる。`Details`から元の実行・試行のログを開く。指摘がある場合も処理が完了すれば成功であり、スレッドのResolveは人間が行う。
+
+結果はジョブ別の`ai-review-status-<run>-<attempt>-<job>` Artifactに保存し、保持期間は1日とする。通知側はファイル上限4KB、実行ID・試行番号・ジョブ・対象ID・固定理由コードを検証する。単一Artifactは展開先直下の`status.json`、複数ArtifactはArtifact名のサブディレクトリから読む。両形式の混在は不正として拒否する。取得や形式検証に失敗した結果から成功を推測しない。実行が失敗し詳細記録がない場合は`EXECUTION_FAILED`または`PUBLISH_FAILED`、正常終了でも投稿記録がなければ`REPORT_MISSING`となる。
+
+準備段階で同じhead/baseの完了マーカーを本人PR上のBotコメントから確認した場合は、`ALREADY_COMPLETE`で成功を記録し、再収集・再生成・再投稿を省略する。対象外は`SKIPPED`として区別する。古いhead/baseのマーカーや人間のコメントだけでは投稿済みと判定しない。
+
+実行中のまま残る場合は`AI review check`の失敗を確認し、**完了イベントで起動した通知Workflow**を再実行する。開始通知だけを再実行しても終了処理には進まない。Artifactが失効していれば、記録を復元せず未完了として表示する。ただし、既に投稿確認済みの成功チェックは維持する。元のAIレビューを再実行した場合は試行ごとにチェックを区別し、古い通知は新しい結果を変更しない。main向けでないPRと`claims`モードは対象外である。
+
 ## 停止と障害時の扱い
 
 `AI_REVIEW_MODE`を削除するか`off`に変更すると、次の実行から認証・生成を停止します。進行中の実行はActions画面でキャンセルしてください。

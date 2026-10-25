@@ -75,6 +75,8 @@ GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取�
 
 `Documentation checks`内で、文書検査・Actionsロック検証・`Repository lint, format and AI review checks`を独立したジョブとして実行します。同ジョブでリポジトリ全体のLint・整形確認と、`tools/ai-review`のTypeScript・Vitestを個別ステップで実行します。CIでは整形を書き換えず、OpenAIへの通信も行いません。ローカルの`pnpm check`はこれらのコード・文書検査をまとめて実行する入口として維持します。
 
+文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・AIレビューツール検査は毎回実行します。
+
 有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。
 
 ### Actionsのロック

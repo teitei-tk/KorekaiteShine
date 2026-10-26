@@ -638,3 +638,32 @@ it('39件のcoverageで欠落・重複・担当外IDを拒否し、順序だけ�
       .coverage,
   ).toHaveLength(39);
 });
+it('各作業の担当範囲と補助資料の役割を明示し、未確認事項の委譲を前提にしない', () => {
+  const inputs = preflight(fixture());
+  const unit = inputs.find((i) => i.task.kind === 'unit')!;
+  expect(unit.prompt).toContain(
+    'PR全体の影響評価や全呼び出し経路の網羅はこの作業の責務ではありません',
+  );
+  expect(unit.prompt).toContain('後続へ未確認事項を引き継ぐ仕組みはありません');
+  expect(unit.prompt).toContain('担当範囲内の判断に不可欠な資料が不足する場合はincomplete');
+});
+it('CALLER不足の未完了は後続へ進めず、完了に補正しない', async () => {
+  const calls: string[] = [];
+  await expect(
+    runPartitionReview(fixture(), async (input) => {
+      calls.push(input.task.id);
+      return {
+        value: {
+          ...response(input),
+          status: 'incomplete',
+          incomplete: { subcode: 'MISSING_CONTEXT', missing: ['CALLER'] },
+        },
+        usage: { input: 1, output: 1, total: 2 },
+      };
+    }),
+  ).rejects.toMatchObject({
+    reason: 'INCOMPLETE',
+    detail: { subcode: 'MISSING_CONTEXT', missing: ['CALLER'] },
+  });
+  expect(calls).toEqual(['task-1']);
+});

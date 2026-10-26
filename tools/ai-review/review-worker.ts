@@ -1,8 +1,8 @@
 import { ReviewFailure, workerFailure } from './failure.ts';
 import { taskSchema } from './task-schema.ts';
 import { requestStructuredReview } from './review.ts';
-import { validateTaskResult } from './partition-review.ts';
-import type { TaskInvocation, TaskResult } from './partition-review.ts';
+import { validateTaskResponse } from './partition-review.ts';
+import type { TaskInvocation, TaskResult, TaskResponse } from './partition-review.ts';
 import type { BillingHooks } from './budget.ts';
 import { validatePlan } from './partition.ts';
 import type { ReviewPlan } from './partition.ts';
@@ -25,10 +25,10 @@ if (import.meta.main) {
     try {
       validatePlan(plan);
       const schema = taskSchema(input.task);
-      const result = await requestStructuredReview<TaskResult>(
+      const result = await requestStructuredReview<TaskResponse, TaskResult>(
         process.env.OPENAI_ACCESS_TOKEN ?? '',
         input.prompt,
-        (value) => validateTaskResult(value, plan, input.task),
+        (value) => validateTaskResponse(value, plan, input.task),
         fetch,
         schema,
         billing,

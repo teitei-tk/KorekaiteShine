@@ -1,3 +1,5 @@
+import { validCoverage, renderCoverage } from './coverage-diagnostic.ts';
+import type { CoverageDiagnostic } from './coverage-diagnostic.ts';
 import type { ReviewPlan, ReviewTask } from './partition.ts';
 
 export const modelSubcodes = [
@@ -40,10 +42,12 @@ export type MissingKind = (typeof missingKinds)[number];
 export interface FailureDetail {
   subcode: Subcode;
   missing: MissingKind[];
+  coverage?: CoverageDiagnostic;
 }
 export interface DetailInput {
   subcode?: string;
   missing?: string[];
+  coverage?: Partial<CoverageDiagnostic>;
 }
 interface SourceRange {
   id: string;
@@ -78,6 +82,8 @@ const id = (value: string | undefined): value is string =>
   typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 function classification(value: DetailInput): boolean {
   return (
+    (value.coverage === undefined ||
+      (value.subcode === 'COVERAGE_MISMATCH' && validCoverage(value.coverage))) &&
     subcodes.some((code) => code === value.subcode) &&
     Array.isArray(value.missing) &&
     value.missing.length <= missingKinds.length &&
@@ -89,12 +95,16 @@ export function validDetail(value: DetailInput | null | undefined): value is Fai
   return (
     !!value &&
     typeof value === 'object' &&
-    only(value, ['subcode', 'missing']) &&
+    only(value, ['subcode', 'missing', 'coverage']) &&
     classification(value)
   );
 }
-export function detail(subcode: Subcode, missing: MissingKind[] = []): FailureDetail {
-  const value = { subcode, missing: [...missing] };
+export function detail(
+  subcode: Subcode,
+  missing: MissingKind[] = [],
+  coverage?: CoverageDiagnostic,
+): FailureDetail {
+  const value = { subcode, missing: [...missing], ...(coverage ? { coverage } : {}) };
   if (!validDetail(value)) throw new Error('診断分類が不正です');
   return value;
 }
@@ -102,7 +112,7 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
   if (
     !value ||
     typeof value !== 'object' ||
-    !only(value, ['subcode', 'missing', 'scope']) ||
+    !only(value, ['subcode', 'missing', 'scope', 'coverage']) ||
     !classification(value)
   )
     return false;
@@ -170,6 +180,7 @@ export function renderDiagnostic(value: DiagnosticInput): string {
   const lines = [
     `サブコード: ${value.subcode}。不足情報: ${value.missing.join(', ') || '申告なし'}。`,
   ];
+  if (value.coverage) lines.push(renderCoverage(value.coverage));
   if (value.scope) {
     const s = value.scope;
     lines.push(

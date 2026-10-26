@@ -108,7 +108,9 @@ export function decodeWorkerResult(stdout: string): ReviewResult<TaskResult> {
     throw new ReviewFailure(
       result.failure,
       'モデル子プロセスが未完了です',
-      result.detail ? detail(result.detail.subcode, result.detail.missing) : undefined,
+      result.detail
+        ? detail(result.detail.subcode, result.detail.missing, result.detail.coverage)
+        : undefined,
     );
   }
   return result;

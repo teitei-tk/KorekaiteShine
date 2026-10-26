@@ -1,3 +1,9 @@
+import {
+  HISTORY_SUMMARY_CHARS,
+  HISTORY_UNCERTAINTIES,
+  HISTORY_UNCERTAINTY_CHARS,
+} from './output-size.ts';
+import { coverageDiagnostic } from './coverage-diagnostic.ts';
 import { ReviewFailure } from './failure.ts';
 import { detail, validDetail, modelSubcodes } from './diagnostics.ts';
 import type { FailureDetail } from './diagnostics.ts';
@@ -29,6 +35,32 @@ export interface TaskResult extends Review {
   checkSources: { id: string; sources: string[] }[];
   decisions: Decision[];
 }
+export interface TaskResponse extends Omit<TaskResult, 'coverage'> {
+  coverage: Record<string, boolean>;
+}
+export function validateTaskResponse(
+  value: TaskResponse,
+  plan: ReviewPlan,
+  task: ReviewTask,
+): TaskResult {
+  const coverage = value?.coverage;
+  if (
+    !coverage ||
+    typeof coverage !== 'object' ||
+    Array.isArray(coverage) ||
+    Object.values(coverage).some((v) => v !== true)
+  )
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '確認済み一覧の形式が不正です',
+      detail(
+        'COVERAGE_MISMATCH',
+        [],
+        coverageDiagnostic(task.obligations, Array.isArray(coverage) ? coverage : []),
+      ),
+    );
+  return validateTaskResult({ ...value, coverage: Object.keys(coverage) }, plan, task);
+}
 export interface PriorAssessment {
   check: FixCheck;
   sources: string[];
@@ -48,7 +80,7 @@ export interface PartitionResult {
   candidateCount: number;
 }
 const instruction = readFileSync(new URL('./prompt.md', import.meta.url), 'utf8');
-const taskInstruction = `\n担当taskのobligationsを全件確認し、task.obligationsのIDを省略・重複・改変せずcoverageへ列挙してください。sourcesのIDやtaskのIDをcoverageへ入れないでください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。completeではincompleteフィールドをnullにします。incompleteではincompleteフィールドに固定分類を返します。subcodeはMISSING_CONTEXT（資料不足）、NO_REVIEWABLE_LINE（投稿可能行なし）、UNRESOLVED_CONFLICT（根拠の矛盾）、MODEL_UNSPECIFIED（分類不能）のいずれかです。missingには不足しているIMPLEMENTATION、CALLER、CONTRACT、SPECIFICATION、PRIOR_EVIDENCE、REVIEWABLE_LINEだけを列挙し、自由文は入れません。資料不足なら少なくとも1分類を申告してください。\n`;
+const taskInstruction = `\n担当taskのobligationsを全件確認し、coverageはオブジェクトです。task.obligationsの各IDをキー、確認済みをtrueとして、省略・改変せず全件返してください。sourcesのIDやtaskのIDをcoverageへ入れないでください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。completeではincompleteフィールドをnullにします。incompleteではincompleteフィールドに固定分類を返します。subcodeはMISSING_CONTEXT（資料不足）、NO_REVIEWABLE_LINE（投稿可能行なし）、UNRESOLVED_CONFLICT（根拠の矛盾）、MODEL_UNSPECIFIED（分類不能）のいずれかです。missingには不足しているIMPLEMENTATION、CALLER、CONTRACT、SPECIFICATION、PRIOR_EVIDENCE、REVIEWABLE_LINEだけを列挙し、自由文は入れません。資料不足なら少なくとも1分類を申告してください。\n`;
 const scopeInstructions: Record<ReviewTask['kind'], string> = {
   unit: '担当はobligationsのpatchとsourcesに含まれる変更箇所・周辺宣言です。contextは直接の呼び出し元・依存先・規約・仕様を判断する補助資料であり、その全体を新しい確認対象にしません。PR全体の影響評価や全呼び出し経路の網羅はこの作業の責務ではありません。',
   boundary:
@@ -125,6 +157,17 @@ export function validateTaskResult(
   );
   validReview(value, lines, prior);
   if (
+    task.kind === 'history' &&
+    (value.summary.length > HISTORY_SUMMARY_CHARS ||
+      value.uncertainties.length > HISTORY_UNCERTAINTIES ||
+      value.uncertainties.some((s) => s.length > HISTORY_UNCERTAINTY_CHARS))
+  )
+    throw new ReviewFailure(
+      'OUTPUT_INVALID',
+      '履歴作業の応答が上限を超えました',
+      detail('REVIEW_FORMAT_INVALID'),
+    );
+  if (
     value.incomplete != null &&
     (!validDetail(value.incomplete) ||
       !modelSubcodes.some((code) => code === value.incomplete?.subcode) ||
@@ -144,7 +187,7 @@ export function validateTaskResult(
     throw new ReviewFailure(
       'OUTPUT_INVALID',
       '担当範囲のIDが不正です',
-      detail('COVERAGE_MISMATCH'),
+      detail('COVERAGE_MISMATCH', [], coverageDiagnostic(task.obligations, value.coverage)),
     );
   if (
     !Array.isArray(value.evidence) ||

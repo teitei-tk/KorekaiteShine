@@ -43,5 +43,8 @@ export function workerFailure(error?: ReviewFailure): {
   if (error.detail === undefined) return { failure: error.reason };
   if (!validDetail(error.detail))
     return { failure: 'OUTPUT_INVALID', detail: detail('INVALID_DIAGNOSTIC') };
-  return { failure: error.reason, detail: detail(error.detail.subcode, error.detail.missing) };
+  return {
+    failure: error.reason,
+    detail: detail(error.detail.subcode, error.detail.missing, error.detail.coverage),
+  };
 }

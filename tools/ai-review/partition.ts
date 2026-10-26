@@ -1,3 +1,4 @@
+import { historyOutputBytes, HISTORY_RESULT_BYTES } from './output-size.ts';
 import { ReviewFailure } from './failure.ts';
 import { builtinModules } from 'node:module';
 import { posix } from 'node:path';
@@ -44,6 +45,7 @@ export function taskData(plan: ReviewPlan, task: ReviewTask) {
   };
 }
 export function taskFits(plan: ReviewPlan, task: ReviewTask): boolean {
+  if (task.kind === 'history' && historyOutputBytes(task) > HISTORY_RESULT_BYTES) return false;
   const data = taskData(plan, task);
   const raw =
     data.sources.reduce((sum, s) => sum + Buffer.byteLength(s.content), 0) +

@@ -13,7 +13,7 @@ import { authenticate } from './wif.ts';
 import { preflight, runPartitionReview } from './partition-review.ts';
 import type { TaskInvocation, TaskResult } from './partition-review.ts';
 import type { ReviewResult } from './review.ts';
-import { readBounded, writePartitionArtifact } from './artifact.ts';
+import { readArtifactText, writePartitionArtifact } from './artifact.ts';
 import type { ReviewPlan } from './partition.ts';
 import { writeStatusReport } from './status-report.ts';
 
@@ -62,8 +62,7 @@ export async function callWorker(
       }) => {
         if (done) return;
         try {
-          if (!message || Buffer.byteLength(JSON.stringify(message)) > 150000)
-            throw new Error('IPC形式不正');
+          if (!message) throw new Error('IPC形式不正');
           if (message.kind === 'reserve' && !reserved) {
             budget.reserve(message.input!, message.hash!);
             reserved = true;
@@ -140,8 +139,8 @@ export async function generatePartitionArtifact(
   let target = 'preflight';
   let fallback: FailureReason = 'INPUT_INVALID';
   try {
-    const plan = JSON.parse(readBounded(join(directory, 'plan.json'), 6_000_000)) as ReviewPlan;
-    if (JSON.stringify(plan.metadata) !== readBounded(join(directory, 'metadata.json'), 400_000))
+    const plan = JSON.parse(readArtifactText(join(directory, 'plan.json'))) as ReviewPlan;
+    if (JSON.stringify(plan.metadata) !== readArtifactText(join(directory, 'metadata.json')))
       throw new Error('入力の対象情報が一致しません');
     total = Array.isArray(plan?.tasks) ? plan.tasks.length : 0;
     const result = await withReviewDeadline(async (signal, checkTime) => {

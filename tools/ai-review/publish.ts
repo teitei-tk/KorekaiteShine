@@ -149,9 +149,9 @@ export async function publishAndReport(
     throw error;
   }
 }
-function readJson<T>(path: string, max: number): T {
+function readJson<T>(path: string): T {
   const stat = statSync(path);
-  if (!stat.isFile() || stat.size > max) throw new Error('成果物のサイズまたは形式が不正です');
+  if (!stat.isFile()) throw new Error('成果物のサイズまたは形式が不正です');
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 export function readReviewArtifact(
@@ -160,7 +160,7 @@ export function readReviewArtifact(
   generation?: GenerationOrigin,
 ) {
   if (generation) verifyPartitionArtifact(directory, generation);
-  const metadata = readJson<Material>(join(directory, 'metadata.json'), 400_000);
+  const metadata = readJson<Material>(join(directory, 'metadata.json'));
   if (metadata.partitionVersion && !generation) throw new Error('生成元の照合が必要です');
   // artifact内の対象と、準備ジョブで確定した対象の両方を照合する。
   if (
@@ -170,7 +170,7 @@ export function readReviewArtifact(
   )
     throw new Error('成果物の対象が一致しません');
   const review = validReview(
-    readJson<ReviewInput>(join(directory, 'result.json'), generation ? 100_000 : 30_000),
+    readJson<ReviewInput>(join(directory, 'result.json')),
     metadata.lines,
     metadata.priorFindings,
   );

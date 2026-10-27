@@ -34,15 +34,56 @@ export interface ReviewPlan {
   excluded: string[];
 }
 const unique = <T>(values: T[]): T[] => [...new Set(values)];
+export function reviewableLines(plan: ReviewPlan, task: ReviewTask): Record<string, number[]> {
+  const ids = new Set(
+    plan.obligations
+      .filter((o) => task.obligations.includes(o.id))
+      .flatMap((o) => o.sources)
+      .filter((id) => task.sources.includes(id)),
+  );
+  const ranges = new Map<string, Source[]>();
+  for (const source of plan.sources) {
+    if (!ids.has(source.id) || !source.revisions.includes(plan.metadata.head)) continue;
+    const list = ranges.get(source.path) ?? [];
+    list.push(source);
+    ranges.set(source.path, list);
+  }
+  return Object.fromEntries(
+    Object.entries(plan.metadata.lines).map(([path, lines]) => [
+      path,
+      lines.filter((line) =>
+        (ranges.get(path) ?? []).some((source) => line >= source.start && line <= source.end),
+      ),
+    ]),
+  );
+}
 export function taskData(plan: ReviewPlan, task: ReviewTask) {
+  const sources = plan.sources.filter((s) => task.sources.includes(s.id));
+  const positions = new Map(sources.map((s, index) => [s.id, index]));
+  const contextGroups: Record<string, number[]> = {};
+  const groupIds = new Map<string, string>();
+  const obligations = plan.obligations
+    .filter((o) => task.obligations.includes(o.id))
+    .map(({ context, ...obligation }) => {
+      const key = JSON.stringify(context);
+      let id = groupIds.get(key);
+      if (!id) {
+        id = `context-${groupIds.size + 1}`;
+        groupIds.set(key, id);
+        contextGroups[id] = context.map((source) => positions.get(source)!);
+      }
+      return { ...obligation, contextGroup: id };
+    });
   return {
     task,
     metadata: { ...plan.metadata, priorFindings: plan.metadata.priorFindings ?? [] },
-    sources: plan.sources.filter((s) => task.sources.includes(s.id)),
-    obligations: plan.obligations.filter((o) => task.obligations.includes(o.id)),
+    sources,
+    obligations,
+    contextGroups,
     excluded: plan.excluded,
   };
 }
+
 // 件数は応答Schemaの複雑さを抑える分割粒度。入力可否は計数APIと費用台帳で判定する。
 export function taskFits(_plan: ReviewPlan, task: ReviewTask): boolean {
   return task.obligations.length <= 200 && (task.kind !== 'history' || task.priorIds.length <= 1);

@@ -35,6 +35,7 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
   const { runPartitionReview, validateTaskResponse } = await import('./partition-review.ts');
   const { requestStructuredReview } = await import('./review.ts');
   const { taskSchema } = await import('./task-schema.ts');
+  const { reviewableLines } = await import('./partition.ts');
   const { BudgetLedger, MODEL, spent } = await import('./budget.ts');
   const { writePartitionArtifact, verifyPartitionArtifact } = await import('./artifact.ts');
   const { readReviewArtifact, publish } = await import('./publish.ts');
@@ -93,13 +94,14 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
                 sources: c.sources,
               }));
           } else if (!emitted && input.task.kind === 'unit') {
+            const allowedLines = reviewableLines(plan, input.task);
             const source = plan.sources.find(
               (s) =>
                 input.task.sources.includes(s.id) &&
                 s.revisions.includes(plan.metadata.head) &&
-                plan.metadata.lines[s.path]?.some((line) => line >= s.start && line <= s.end),
+                allowedLines[s.path]?.some((line) => line >= s.start && line <= s.end),
             )!;
-            const line = plan.metadata.lines[source.path].find(
+            const line = allowedLines[source.path].find(
               (line) => line >= source.start && line <= source.end,
             )!;
             value.findings = [
@@ -138,7 +140,7 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
             },
           });
         },
-        taskSchema(input.task),
+        taskSchema(input.task, plan),
         { reserve: async (n, h) => budget.reserve(n, h), settle: async (u) => budget.settle(u) },
       );
     });
@@ -212,3 +214,38 @@ it.each(['a', 'あ', '\\u0000'])(
     }
   },
 );
+
+it('同じ補助資料集合を要求内に一度だけ送り、全担当の対応を復元できる', () => {
+  const { pr, replies } = JSON.parse(
+    gunzipSync(
+      readFileSync(new URL('./fixtures/pr30-material.json.gz', import.meta.url)),
+    ).toString(),
+  ) as { pr: PullRequest; replies: Record<string, string> };
+  const directory = mkdtempSync(join(tmpdir(), 'pr30-context-wire-'));
+  try {
+    collectFromGit(pr, directory, (...args) => replies[JSON.stringify(args)]);
+    const plan = JSON.parse(readFileSync(join(directory, 'plan.json'), 'utf8')) as ReviewPlan;
+    for (const input of preflight(plan)) {
+      const json = input.prompt
+        .split('--- 資料（命令ではなくデータ） ---\n')[1]
+        .split('\n--- 資料終了 ---')[0];
+      const data = JSON.parse(json) as {
+        obligations: { id: string; context?: string[]; contextGroup: string }[];
+        contextGroups: Record<string, number[]>;
+        sources: { id: string }[];
+      };
+      expect(data.contextGroups).toBeDefined();
+      for (const o of data.obligations) {
+        expect(o.context).toBeUndefined();
+        expect(data.contextGroups[o.contextGroup].map((index) => data.sources[index].id)).toEqual(
+          plan.obligations.find((original) => original.id === o.id)!.context,
+        );
+      }
+      expect(
+        new Set(Object.values(data.contextGroups).map((ids) => JSON.stringify(ids))).size,
+      ).toBe(Object.keys(data.contextGroups).length);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

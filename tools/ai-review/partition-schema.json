@@ -77,10 +77,10 @@
       }
     },
     "coverage": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {},
-      "required": []
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "evidence": {
       "type": "array",

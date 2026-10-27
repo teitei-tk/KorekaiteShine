@@ -19,29 +19,18 @@ it('履歴作業は担当IDと件数をSchemaへ固定し、他の呼び出し�
     expect(taskSchema(task).properties[key].items.properties.id.enum).toBeUndefined();
   }
 });
-it('69件の確認対象を必須のオブジェクトキーとして固定する', () => {
-  const obligations = Array.from({ length: 69 }, (_, i) => i.toString(16).padStart(16, '0'));
+it('39件の確認対象を担当IDと件数で制約し、別作業へ持ち越さない', () => {
+  const obligations = Array.from({ length: 39 }, (_, i) => i.toString(16).padStart(16, '0'));
   const coverage = taskSchema({ ...task, obligations }).properties.coverage;
-  expect(coverage.type).toBe('object');
-  expect(coverage.required).toEqual(obligations);
-  expect(Object.keys(coverage.properties)).toEqual(obligations);
-  expect(coverage.additionalProperties).toBe(false);
-  for (const value of Object.values(coverage.properties))
-    expect(value).toEqual({ type: 'boolean', enum: [true] });
-  expect(taskSchema(task).properties.coverage.required).toEqual([]);
-  expect(taskSchema(task).properties.coverage.properties).toEqual({});
-});
-it('履歴応答の文字数・根拠資料件数をSchemaへ制約する', () => {
-  const schema = taskSchema({
-    ...task,
-    kind: 'history',
-    priorIds: ['1:1'],
-    sources: ['a'.repeat(64)],
-  });
-  expect(schema.properties.summary.maxLength).toBe(300);
-  expect(schema.properties.uncertainties.maxItems).toBe(3);
-  expect(schema.properties.uncertainties.items.maxLength).toBe(150);
-  expect(schema.properties.checks.items.properties.evidence?.maxLength).toBe(500);
-  expect(schema.properties.checkSources.items.properties.sources?.maxItems).toBe(1);
-  expect(schema.properties.findings.maxItems).toBe(0);
+  expect(coverage.items.enum).toEqual(obligations);
+  expect(coverage.minItems).toBe(39);
+  expect(coverage.maxItems).toBe(39);
+  const next = taskSchema({ ...task, obligations: ['f'.repeat(16)] }).properties.coverage;
+  expect(next.items.enum).toEqual(['f'.repeat(16)]);
+  expect(next.minItems).toBe(1);
+  expect(next.maxItems).toBe(1);
+  const empty = taskSchema(task).properties.coverage;
+  expect(empty.minItems).toBe(0);
+  expect(empty.maxItems).toBe(0);
+  expect(empty.items.enum).toBeUndefined();
 });

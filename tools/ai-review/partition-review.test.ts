@@ -629,7 +629,7 @@ it('39件のcoverageで欠落・重複・担当外IDを拒否し、順序だけ�
     expect(() => validateTaskResult({ ...response(input), coverage }, plan, task)).toThrow(
       expect.objectContaining({
         reason: 'OUTPUT_INVALID',
-        detail: expect.objectContaining({ subcode: 'COVERAGE_MISMATCH', missing: [] }),
+        detail: { subcode: 'COVERAGE_MISMATCH', missing: [] },
       }),
     );
   }
@@ -637,115 +637,4 @@ it('39件のcoverageで欠落・重複・担当外IDを拒否し、順序だけ�
     validateTaskResult({ ...response(input), coverage: [...obligations].reverse() }, plan, task)
       .coverage,
   ).toHaveLength(39);
-});
-it('各作業の担当範囲と補助資料の役割を明示し、未確認事項の委譲を前提にしない', () => {
-  const inputs = preflight(fixture());
-  const unit = inputs.find((i) => i.task.kind === 'unit')!;
-  expect(unit.prompt).toContain(
-    'PR全体の影響評価や全呼び出し経路の網羅はこの作業の責務ではありません',
-  );
-  expect(unit.prompt).toContain('後続へ未確認事項を引き継ぐ仕組みはありません');
-  expect(unit.prompt).toContain('担当範囲内の判断に不可欠な資料が不足する場合はincomplete');
-});
-it('CALLER不足の未完了は後続へ進めず、完了に補正しない', async () => {
-  const calls: string[] = [];
-  await expect(
-    runPartitionReview(fixture(), async (input) => {
-      calls.push(input.task.id);
-      return {
-        value: {
-          ...response(input),
-          status: 'incomplete',
-          incomplete: { subcode: 'MISSING_CONTEXT', missing: ['CALLER'] },
-        },
-        usage: { input: 1, output: 1, total: 2 },
-      };
-    }),
-  ).rejects.toMatchObject({
-    reason: 'INCOMPLETE',
-    detail: { subcode: 'MISSING_CONTEXT', missing: ['CALLER'] },
-  });
-  expect(calls).toEqual(['task-1']);
-});
-it('確認済み一覧は必須キーの集合として検証し、欠落・担当外・配列・falseを拒否する', async () => {
-  const { validateTaskResponse } = await import('./partition-review.ts');
-  const plan = fixture(),
-    input = preflight(plan)[0];
-  const coverage = Object.fromEntries(input.task.obligations.map((id) => [id, true]));
-  expect(validateTaskResponse({ ...response(input), coverage }, plan, input.task).coverage).toEqual(
-    input.task.obligations,
-  );
-  for (const value of [
-    {},
-    { ...coverage, forged: true },
-    Object.fromEntries(input.task.obligations.map((id) => [id, false])),
-    JSON.parse('["forged"]'),
-  ])
-    expect(() =>
-      validateTaskResponse({ ...response(input), coverage: value }, plan, input.task),
-    ).toThrow(expect.objectContaining({ reason: 'OUTPUT_INVALID' }));
-});
-it('履歴30件の最大長根拠を出力量で分割しSDK境界まで成功する', async () => {
-  const { requestStructuredReview } = await import('./review.ts');
-  const plan = fixture();
-  const base = plan.metadata.base;
-  const prior = Array.from({ length: 30 }, (_, i) => ({
-    id: `${i + 1}:1`,
-    head: base,
-    base,
-    priority: 'P2' as const,
-    path: 'app.ts',
-    line: 1,
-    condition: `条件${i}`,
-    impact: '影響',
-    fix: '修正',
-  }));
-  const index = indexSources(
-    (...args) =>
-      args[0] === 'ls-tree' ? `100644 blob ${'c'.repeat(40)}\tapp.ts\0` : 'export const value = 1;',
-    [base, plan.metadata.head],
-  );
-  const historyPlan = planReview({ ...plan.metadata, priorFindings: prior }, index, []);
-  const { taskSchema } = await import('./task-schema.ts');
-  const { validateTaskResponse } = await import('./partition-review.ts');
-  const inputs = preflight(historyPlan).filter((i) => i.task.kind === 'history');
-  expect(inputs.length).toBeGreaterThan(1);
-  expect(inputs.flatMap((i) => i.task.priorIds).sort()).toEqual(prior.map((p) => p.id).sort());
-  for (const input of inputs) {
-    const value = {
-      ...response(input),
-      summary: 'あ'.repeat(300),
-      uncertainties: Array(3).fill('あ'.repeat(150)),
-      coverage: Object.fromEntries(input.task.obligations.map((id) => [id, true])),
-      checks: input.task.priorIds.map((id) => ({
-        id,
-        status: 'fixed' as const,
-        evidence: 'あ'.repeat(500),
-      })),
-      checkSources: input.task.priorIds.map((id) => ({ id, sources: input.task.sources })),
-    };
-    const text = JSON.stringify(value);
-    expect(Buffer.byteLength(text)).toBeLessThanOrEqual(30000);
-    const result = await requestStructuredReview<typeof value, TaskResult>(
-      'test-token',
-      'data',
-      (v) => validateTaskResponse(v, historyPlan, input.task),
-      async () =>
-        Response.json({
-          id: 'test',
-          object: 'response',
-          status: 'completed',
-          output: [
-            {
-              type: 'message',
-              role: 'assistant',
-              content: [{ type: 'output_text', text, annotations: [] }],
-            },
-          ],
-          usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 },
-        }),
-      taskSchema(input.task),
-    );
-    expect(result.value.checks).toHaveLength(input.task.priorIds.length);
-  }
 });

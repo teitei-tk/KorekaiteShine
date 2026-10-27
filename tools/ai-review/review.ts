@@ -1,4 +1,3 @@
-import { RESULT_BYTES } from './output-size.ts';
 import { MODEL, MAX_OUTPUT, validUsage } from './budget.ts';
 import type { BillingHooks } from './budget.ts';
 import { digest } from './source-index.ts';
@@ -10,7 +9,7 @@ import OpenAI from 'openai';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { validReview } from './policy.ts';
-import type { Review, ReviewInput } from './policy.ts';
+import type { Review } from './policy.ts';
 import type { Material } from './material.ts';
 
 const schema = JSON.parse(readFileSync(new URL('./schema.json', import.meta.url), 'utf8'));
@@ -27,7 +26,7 @@ export async function generateReview(
   fetcher: typeof fetch = fetch,
   prior: PriorFinding[] = [],
 ): Promise<ReviewResult> {
-  return requestStructuredReview<ReviewInput | null, Review>(
+  return requestStructuredReview(
     token,
     prompt,
     (value) => validReview(value, lines, prior),
@@ -35,14 +34,14 @@ export async function generateReview(
   );
 }
 
-export async function requestStructuredReview<T, R = T>(
+export async function requestStructuredReview<T>(
   token: string,
   prompt: string,
-  validate: (value: T) => R,
+  validate: (value: T) => T,
   fetcher: typeof fetch = fetch,
   outputSchema = schema,
   billing?: BillingHooks,
-): Promise<ReviewResult<R>> {
+): Promise<ReviewResult<T>> {
   try {
     if (!token || Buffer.byteLength(prompt) > 500_000) throw new Error('invalid input');
     const client = new OpenAI({
@@ -119,7 +118,7 @@ export async function requestStructuredReview<T, R = T>(
     }
     if (!result.output_text)
       throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('EMPTY_OUTPUT'));
-    if (Buffer.byteLength(result.output_text) > RESULT_BYTES)
+    if (Buffer.byteLength(result.output_text) > 30_000)
       throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('OUTPUT_LIMIT'));
     let parsed: T;
     try {
@@ -131,7 +130,7 @@ export async function requestStructuredReview<T, R = T>(
         detail('INVALID_JSON'),
       );
     }
-    let value: R;
+    let value: T;
     try {
       value = validate(parsed);
     } catch (error) {

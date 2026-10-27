@@ -1,3 +1,4 @@
+import { reviewableLines } from './partition.ts';
 import {
   HISTORY_SUMMARY_CHARS,
   HISTORY_UNCERTAINTIES,
@@ -80,7 +81,7 @@ export interface PartitionResult {
   candidateCount: number;
 }
 const instruction = readFileSync(new URL('./prompt.md', import.meta.url), 'utf8');
-const taskInstruction = `\n担当taskのobligationsを全件確認し、coverageはオブジェクトです。task.obligationsの各IDをキー、確認済みをtrueとして、省略・改変せず全件返してください。sourcesのIDやtaskのIDをcoverageへ入れないでください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。completeではincompleteフィールドをnullにします。incompleteではincompleteフィールドに固定分類を返します。subcodeはMISSING_CONTEXT（資料不足）、NO_REVIEWABLE_LINE（投稿可能行なし）、UNRESOLVED_CONFLICT（根拠の矛盾）、MODEL_UNSPECIFIED（分類不能）のいずれかです。missingには不足しているIMPLEMENTATION、CALLER、CONTRACT、SPECIFICATION、PRIOR_EVIDENCE、REVIEWABLE_LINEだけを列挙し、自由文は入れません。資料不足なら少なくとも1分類を申告してください。\n`;
+const taskInstruction = `\n担当taskのobligationsを全件確認し、coverageはオブジェクトです。task.obligationsの各IDをキー、確認済みをtrueとして、省略・改変せず全件返してください。sourcesのIDやtaskのIDをcoverageへ入れないでください。obligation.contextGroupはcontextGroupsのキーで、対応する配列はsources配列の0始まりの位置番号です。その位置の資料を補助資料として参照し、回答のevidence等には位置番号ではなく資料のidを使用してください。sourcesのpath,start,end,revisionsに従って原文を読んでください。metadata.priorFindingsは重複回避の全履歴ですが、checksはtask.priorIdsだけを確認します。history作業とreconcile作業では新規findingsを返しません。各findingにはevidenceを1件ずつ付け、sourcesに根拠資料ID、priorIdに同じ問題の既存指摘ID（なければnull）を記載します。checkSourcesに各checksの根拠資料IDを記載します。boundary作業は両側の原文と候補を照合します。reconcile作業はtask.candidateIdsの候補全件をdecisionsでkeep/reject/duplicateに分類し、duplicateOfには保持候補か過去指摘のIDを入れます。候補を黙って省略せず、判断できなければincompleteにしてください。priorChecksは履歴確認の判定と根拠です。同じ問題が残る候補とfixedが矛盾する場合、原文で候補が誤りと確定したときだけrejectにし、矛盾が解けなければincompleteにしてください。通常作業のdecisionsは空配列です。資料不足や重要な問題の投稿可能行がなければincompleteにします。completeではincompleteフィールドをnullにします。incompleteではincompleteフィールドに固定分類を返します。subcodeはMISSING_CONTEXT（資料不足）、NO_REVIEWABLE_LINE（投稿可能行なし）、UNRESOLVED_CONFLICT（根拠の矛盾）、MODEL_UNSPECIFIED（分類不能）のいずれかです。missingには不足しているIMPLEMENTATION、CALLER、CONTRACT、SPECIFICATION、PRIOR_EVIDENCE、REVIEWABLE_LINEだけを列挙し、自由文は入れません。資料不足なら少なくとも1分類を申告してください。\n`;
 const scopeInstructions: Record<ReviewTask['kind'], string> = {
   unit: '担当はobligationsのpatchとsourcesに含まれる変更箇所・周辺宣言です。contextは直接の呼び出し元・依存先・規約・仕様を判断する補助資料であり、その全体を新しい確認対象にしません。PR全体の影響評価や全呼び出し経路の網羅はこの作業の責務ではありません。',
   boundary:
@@ -136,21 +137,7 @@ export function validateTaskResult(
   task: ReviewTask,
 ): TaskResult {
   const prior = (plan.metadata.priorFindings ?? []).filter((p) => task.priorIds.includes(p.id));
-  const lines = Object.fromEntries(
-    Object.entries(plan.metadata.lines).map(([path, numbers]) => [
-      path,
-      numbers.filter((line) =>
-        plan.sources.some(
-          (s) =>
-            task.sources.includes(s.id) &&
-            s.path === path &&
-            s.revisions.includes(plan.metadata.head) &&
-            line >= s.start &&
-            line <= s.end,
-        ),
-      ),
-    ]),
-  );
+  const lines = reviewableLines(plan, task);
   validReview(value, lines, prior);
   if (
     task.kind === 'history' &&

@@ -24,7 +24,7 @@ if (import.meta.main) {
     };
     try {
       validatePlan(plan);
-      const schema = taskSchema(input.task);
+      const schema = taskSchema(input.task, plan);
       const result = await requestStructuredReview<TaskResponse, TaskResult>(
         process.env.OPENAI_ACCESS_TOKEN ?? '',
         input.prompt,

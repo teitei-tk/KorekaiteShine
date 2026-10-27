@@ -73,3 +73,39 @@ it.each(['invalid-json', 'exit', 'budget', 'timeout'])(
       expect(ledger.snapshot().entries[0].actual).toBeNull();
   },
 );
+
+it.each([false, true])(
+  '出力不足の回復を許すのは親がusageを精算した場合だけ: %s',
+  async (settled) => {
+    const ledger = new BudgetLedger(
+      join(mkdtempSync(join(tmpdir(), 'recovery-ipc-')), 'budget.json'),
+      { run: '1', attempt: '1', sha: 'c'.repeat(40) },
+      target,
+    );
+    const child = new ChildProcess();
+    vi.spyOn(child, 'kill').mockReturnValue(true);
+    child.send = () => true;
+    vi.mocked(fork).mockReturnValue(child);
+    const result = callWorker({ ...input, outputLimit: 32000 }, 'TOKEN', plan, ledger);
+    const rejected = expect(result).rejects.toMatchObject({
+      reason: settled ? 'INCOMPLETE' : 'USAGE_INVALID',
+    });
+    child.emit('message', {
+      kind: 'reserve',
+      input: 100,
+      hash: 'd'.repeat(64),
+      outputLimit: 32000,
+    });
+    if (settled)
+      child.emit('message', {
+        kind: 'settle',
+        usage: { input: 100, cached: 0, written: 0, output: 32000, total: 32100, reasoning: 31000 },
+      });
+    child.emit('message', {
+      kind: 'result',
+      result: { failure: 'INCOMPLETE', detail: { subcode: 'TOKEN_LIMIT', missing: [] } },
+    });
+    await rejected;
+    expect(ledger.snapshot().entries[0].actual === null).toBe(!settled);
+  },
+);

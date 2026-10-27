@@ -1,4 +1,6 @@
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { validBudget } from './budget.ts';
+import type { BudgetRecord } from './budget.ts';
+import { readFileSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { digest } from './source-index.ts';
 import { validatePlan } from './partition.ts';
@@ -13,7 +15,9 @@ export interface GenerationOrigin {
   sha: string;
 }
 interface ExecutionRecord {
-  version: 1;
+  version: 1 | 2;
+  budget?: BudgetRecord;
+  budgetHash?: string;
   origin: GenerationOrigin;
   planHash: string;
   metadataHash: string;
@@ -48,8 +52,13 @@ export function writePartitionArtifact(
   if (JSON.stringify(plan) !== planText || JSON.stringify(plan.metadata) !== metadataText)
     throw new Error('生成中に入力が変わりました');
   const resultText = JSON.stringify(result.review);
+  const budgetPath = join(directory, 'budget.json');
+  const budget: BudgetRecord | undefined = existsSync(budgetPath)
+    ? JSON.parse(readArtifactText(budgetPath))
+    : undefined;
   const record: ExecutionRecord = {
-    version: 1,
+    version: budget ? 2 : 1,
+    ...(budget ? { budget, budgetHash: digest(JSON.stringify(budget)) } : {}),
     origin,
     planHash: digest(planText),
     metadataHash: digest(metadataText),
@@ -57,7 +66,7 @@ export function writePartitionArtifact(
     completed: result.completed,
     calls: result.calls,
     inputBytes: result.inputBytes,
-    usage: result.usage,
+    usage: budget ? budgetUsage(budget) : result.usage,
   };
   writeFileSync(join(directory, 'result.json'), resultText);
   writeFileSync(join(directory, 'execution.json'), JSON.stringify(record));
@@ -70,7 +79,7 @@ export function verifyPartitionArtifact(directory: string, expected: GenerationO
   const resultText = readArtifactText(join(directory, 'result.json'));
   if (
     !record ||
-    record.version !== 1 ||
+    ![1, 2].includes(record.version) ||
     !validOrigin(expected) ||
     !validOrigin(record.origin) ||
     record.origin.run !== expected.run ||
@@ -94,13 +103,44 @@ export function verifyPartitionArtifact(directory: string, expected: GenerationO
     !record.usage ||
     !Number.isInteger(record.usage.output) ||
     record.usage.output < 0 ||
-    record.usage.output > record.calls * 8000
+    (record.version === 1 && record.usage.output > record.calls * 8000)
   )
     throw new Error('成果物の完了範囲が不正です');
+  if (record.version === 2) {
+    const budget = record.budget;
+    if (
+      !budget ||
+      !validBudget(budget) ||
+      budget.denied ||
+      budget.entries.some((e) => e.actual === null) ||
+      digest(JSON.stringify(budget)) !== record.budgetHash ||
+      JSON.stringify(budget.origin) !== JSON.stringify(record.origin) ||
+      budget.target.number !== plan.metadata.number ||
+      budget.target.head !== plan.metadata.head ||
+      budget.target.base !== plan.metadata.base ||
+      JSON.stringify(budgetUsage(budget)) !== JSON.stringify(record.usage) ||
+      budget.entries.length < plan.tasks.length ||
+      budget.entries.length > record.calls
+    )
+      throw new Error('成果物の課金記録が一致しません');
+  }
   const review = validReview(
     JSON.parse(resultText) as ReviewInput,
     plan.metadata.lines,
     plan.metadata.priorFindings,
   );
   if (review.status !== 'complete') throw new Error('未完了の結果は投稿できません');
+}
+
+export function budgetUsage(record: BudgetRecord): PartitionResult['usage'] {
+  if (!validBudget(record) || record.entries.some((e) => !e.usage))
+    throw new Error('未精算の課金記録です');
+  return record.entries.reduce(
+    (sum, e) => ({
+      input: sum.input + e.usage!.input,
+      output: sum.output + e.usage!.output,
+      total: sum.total + e.usage!.total,
+    }),
+    { input: 0, output: 0, total: 0 },
+  );
 }

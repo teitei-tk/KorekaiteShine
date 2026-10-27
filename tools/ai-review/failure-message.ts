@@ -92,6 +92,8 @@ const messages: Partial<Record<StatusReason, readonly [string, string]>> = {
   ],
 };
 export function failureMessage(reason: StatusReason, subcode?: Subcode): string {
+  if (reason === 'INCOMPLETE' && subcode === 'TOKEN_LIMIT')
+    return 'AIの推論・回答が生成できるトークン数の上限に達し、レビューを完了できませんでした。\n\nこれは料金の上限超過ではありません。実行記録で出力枠と担当範囲を確認してください。';
   if (reason === 'OUTPUT_INVALID' && subcode === 'COVERAGE_MISMATCH')
     return '指定した確認対象とAIが回答した確認済み一覧が一致せず、レビューを停止しました。\n\n欠落・重複・担当外の件数とIDを確認してください。期待する対象を全件確認した結果になるまで、レビュー完了とは扱いません。';
   if (reason === 'INCOMPLETE' && subcode === 'MISSING_CONTEXT')

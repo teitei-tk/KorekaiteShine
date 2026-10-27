@@ -41,6 +41,8 @@ export async function requestStructuredReview<T, R = T>(
   fetcher: typeof fetch = fetch,
   outputSchema = schema,
   billing?: BillingHooks,
+  outputLimit = MAX_OUTPUT,
+  signal?: AbortSignal,
 ): Promise<ReviewResult<R>> {
   try {
     if (!token) throw new Error('invalid input');
@@ -50,7 +52,7 @@ export async function requestStructuredReview<T, R = T>(
       organization: null,
       project: null,
       maxRetries: 0,
-      timeout: 150_000,
+      timeout: signal ? 30 * 60_000 : 150_000,
       logLevel: 'off',
       fetch: fetcher,
     });
@@ -62,7 +64,7 @@ export async function requestStructuredReview<T, R = T>(
       store: false,
       service_tier: 'default',
       prompt_cache_options: { mode: 'implicit', ttl: '30m' },
-      max_output_tokens: MAX_OUTPUT,
+      max_output_tokens: outputLimit,
       text: {
         format: { type: 'json_schema', name: 'code_review', strict: true, schema: outputSchema },
       },
@@ -74,7 +76,9 @@ export async function requestStructuredReview<T, R = T>(
         const counted = await client.responses.inputTokens.count(
           { model, input: promptInput, reasoning, tools, text },
           {
-            signal: AbortSignal.timeout(30000),
+            signal: signal
+              ? AbortSignal.any([signal, AbortSignal.timeout(30000)])
+              : AbortSignal.timeout(30000),
           },
         );
         if (
@@ -87,9 +91,11 @@ export async function requestStructuredReview<T, R = T>(
       } catch {
         throw new ReviewFailure('TOKEN_COUNT_FAILED', '入力計数に失敗しました');
       }
-      await billing.reserve(input, digest(JSON.stringify(body)));
+      await billing.reserve(input, digest(JSON.stringify(body)), outputLimit);
     }
-    const result = await client.responses.create(body, { signal: AbortSignal.timeout(150_000) });
+    const result = await client.responses.create(body, {
+      signal: signal ?? AbortSignal.timeout(150_000),
+    });
     if (billing) {
       const u = result.usage;
       const usage = {
@@ -98,6 +104,9 @@ export async function requestStructuredReview<T, R = T>(
         written: u?.input_tokens_details?.cache_write_tokens,
         output: u?.output_tokens,
         total: u?.total_tokens,
+        ...(u?.output_tokens_details?.reasoning_tokens !== undefined
+          ? { reasoning: u.output_tokens_details.reasoning_tokens }
+          : {}),
       };
       if (!validUsage(usage)) throw new ReviewFailure('USAGE_INVALID', '使用量が不明です');
       // 未知の料金区分では予約を保持し、誤った単価で精算しない。

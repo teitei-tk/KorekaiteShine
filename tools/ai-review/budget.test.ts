@@ -79,3 +79,45 @@ it('12回を超えても費用内なら予約と精算を継続する', () => {
   expect(validBudget(ledger.snapshot())).toBe(true);
   expect(ledger.snapshot().entries).toHaveLength(30);
 });
+
+it('要求ごとの出力枠を予約し8,000を超える使用量も精算する', () => {
+  const ledger = create(maximumCost(100, 32000));
+  ledger.reserve(100, hash, 32000);
+  ledger.settle({ input: 100, cached: 0, written: 0, output: 16000, total: 16100 });
+  expect(ledger.snapshot()).toMatchObject({ version: 2, entries: [{ outputLimit: 32000 }] });
+  expect(validBudget(ledger.snapshot())).toBe(true);
+  const changed = ledger.snapshot();
+  changed.entries[0].outputLimit = 8000;
+  expect(validBudget(changed)).toBe(false);
+});
+it('小さい予約枠を超えたusageは精算前に拒否し予約を保持する', () => {
+  const ledger = create();
+  ledger.reserve(100, hash, 1000);
+  expect(() =>
+    ledger.settle({ input: 100, cached: 0, written: 0, output: 1001, total: 1101 }),
+  ).toThrow();
+  expect(ledger.snapshot().entries[0].actual).toBeNull();
+});
+it('繰り返す出力不足も同じ1ドル台帳へ精算し次の生成を拒否する', () => {
+  const ledger = create();
+  let calls = 0;
+  for (let i = 0; i < 9; i++) {
+    ledger.reserve(390911, hash, 8000);
+    calls++;
+    ledger.settle({ input: 390911, cached: 0, written: 390908, output: 8000, total: 398911 });
+  }
+  expect(() => ledger.reserve(390911, hash, 8000)).toThrow('予算');
+  expect(calls).toBe(9);
+  expect(ledger.snapshot().entries.reduce((n, e) => n + e.actual!, 0)).toBe(933548400);
+});
+it('旧v1台帳は8000枠として読み取り、新v2の枠欠落を拒否する', () => {
+  const ledger = create();
+  ledger.reserve(100, hash);
+  ledger.settle(usage);
+  const old = ledger.snapshot();
+  old.version = 1;
+  delete old.entries[0].outputLimit;
+  expect(validBudget(old)).toBe(true);
+  old.version = 2;
+  expect(validBudget(old)).toBe(false);
+});

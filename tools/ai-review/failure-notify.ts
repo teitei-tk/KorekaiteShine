@@ -1,3 +1,4 @@
+import { renderCoverage } from './coverage-diagnostic.ts';
 import { failureMessage } from './failure-message.ts';
 import { appendFileSync } from 'node:fs';
 import { completedOutcome } from './check-status.ts';
@@ -69,6 +70,7 @@ export async function notifyFailure(
     marker,
     '### AIレビューを完了できませんでした',
     failureMessage(outcome.reason, outcome.diagnostic?.subcode),
+    ...(outcome.diagnostic?.coverage ? [renderCoverage(outcome.diagnostic.coverage)] : []),
     '**レビュー全体は未完了です。** 既に投稿された指摘・返信はそのまま残ります。',
     `[実行記録を確認](https://github.com/${REPOSITORY}/actions/runs/${id}/attempts/${attempt})`,
     '<details>\n<summary>調査用の詳細</summary>\n',

@@ -206,6 +206,17 @@ it.each([
       expect(summary).not.toContain('secret-');
       const report = readFileSync(join(directory, 'status.json'), 'utf8');
       expect(report).not.toMatch(/SECRET|secret-|oidc-secret/);
+      if (scenario === 'invalid-evidence') {
+        expect(JSON.parse(report).diagnostic.coverage).toMatchObject({
+          expected: 0,
+          received: 1,
+          foreign: 1,
+          duplicates: 0,
+          missing: 0,
+        });
+        expect(summary).toContain('担当外1件');
+        expect(summary).not.toContain('forged');
+      }
       if (['incomplete', 'worker-incomplete'].includes(scenario)) {
         expect(summary).toContain('MISSING_CONTEXT');
         expect(summary).toContain('CONTRACT');

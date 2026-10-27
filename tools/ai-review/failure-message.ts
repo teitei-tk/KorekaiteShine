@@ -88,6 +88,8 @@ const messages: Partial<Record<StatusReason, readonly [string, string]>> = {
   ],
 };
 export function failureMessage(reason: StatusReason, subcode?: Subcode): string {
+  if (reason === 'OUTPUT_INVALID' && subcode === 'COVERAGE_MISMATCH')
+    return '指定した確認対象とAIが回答した確認済み一覧が一致せず、レビューを停止しました。\n\n欠落・重複・担当外の件数とIDを確認してください。期待する対象を全件確認した結果になるまで、レビュー完了とは扱いません。';
   if (reason === 'INCOMPLETE' && subcode === 'MISSING_CONTEXT')
     return 'AIが「判断に必要な資料が足りない」と報告したため、レビューを中断しました。\n\n関連する実装・呼び出し元・仕様がレビュー資料に含まれているか確認してください。';
   const text = messages[reason] ?? [

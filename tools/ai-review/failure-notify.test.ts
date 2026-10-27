@@ -220,3 +220,30 @@ it('処理上限の通知は容量に断定せず、件数・時間も含めて�
   expect(body).not.toContain('PRを関連する変更ごとに分割してください');
   expect(body).toContain('https://github.com/teitei-tk/KorekaiteShine/actions/runs/20/attempts/1');
 });
+it('確認対象の不一致の内訳をArtifactからPRへ日本語で表示する', async () => {
+  const { coverageDiagnostic } = await import('./coverage-diagnostic.ts');
+  const f = fixture();
+  const coverage = coverageDiagnostic(
+    ['a'.repeat(16), 'b'.repeat(16)],
+    ['a'.repeat(16), 'a'.repeat(16), 'SECRET'],
+  );
+  writeFileSync(
+    join(f.directory, 'status.json'),
+    JSON.stringify({
+      version: 1,
+      run: '20',
+      attempt: '1',
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'OUTPUT_INVALID',
+      diagnostic: { subcode: 'COVERAGE_MISMATCH', missing: [], coverage },
+    }),
+  );
+  await notifyFailure(f.api, 20, 1, f.directory);
+  expect(f.posted[0]).toContain('期待2件、回答3件');
+  expect(f.posted[0]).toContain('欠落1件、重複1件');
+  expect(f.posted[0]).toContain('担当外1件');
+  expect(f.posted[0]).toContain('b'.repeat(16));
+  expect(f.posted[0]).not.toContain('SECRET');
+});

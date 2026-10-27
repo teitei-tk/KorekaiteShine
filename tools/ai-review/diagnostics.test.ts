@@ -1,3 +1,4 @@
+import { coverageDiagnostic } from './coverage-diagnostic.ts';
 import { expect, it } from 'vitest';
 import {
   detail,
@@ -90,7 +91,15 @@ it('資料が多くても件数を保ち、4KBの状態Artifactへ収める', as
   );
   expect(scope.sourceCount).toBe(12);
   expect(scope.sources).toHaveLength(8);
-  const diagnostic = { ...detail('MISSING_CONTEXT', ['CONTRACT']), scope };
+  const expected = Array.from({ length: 69 }, (_, i) => i.toString(16).padStart(16, '0'));
+  const coverage = coverageDiagnostic(expected, [
+    expected[0],
+    expected[0],
+    expected[1],
+    expected[1],
+    ...Array.from({ length: 8 }, (_, i) => 'SECRET' + i),
+  ]);
+  const diagnostic = { ...detail('COVERAGE_MISMATCH', [], coverage), scope };
   const directory = mkdtempSync(join(tmpdir(), 'diagnostic-bound-'));
   try {
     writeStatusReport(

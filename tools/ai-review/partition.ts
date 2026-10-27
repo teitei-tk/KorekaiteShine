@@ -1,3 +1,4 @@
+import { historyOutputBytes, HISTORY_RESULT_BYTES } from './output-size.ts';
 import { ReviewFailure } from './failure.ts';
 import { builtinModules } from 'node:module';
 import { posix } from 'node:path';
@@ -13,6 +14,7 @@ export interface Obligation {
   id: string;
   kind: 'unit' | 'boundary' | 'history';
   sources: string[];
+  context: string[];
   patch?: Patch;
   priorId?: string;
 }
@@ -43,6 +45,7 @@ export function taskData(plan: ReviewPlan, task: ReviewTask) {
   };
 }
 export function taskFits(plan: ReviewPlan, task: ReviewTask): boolean {
+  if (task.kind === 'history' && historyOutputBytes(task) > HISTORY_RESULT_BYTES) return false;
   const data = taskData(plan, task);
   const raw =
     data.sources.reduce((sum, s) => sum + Buffer.byteLength(s.content), 0) +
@@ -137,11 +140,12 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
     extra: Pick<Obligation, 'patch' | 'priorId'> = {},
   ) => {
     sources = unique(sources).sort();
-    const id = digest(JSON.stringify({ kind, sources, ...extra })).slice(0, 16);
+    const context = contextFor(sources);
+    const id = digest(JSON.stringify({ kind, sources, context, ...extra })).slice(0, 16);
     if (plan.obligations.length >= 5000)
       throw new ReviewFailure('BUDGET_EXCEEDED', '確認対象の索引上限を超えました');
     if (!plan.obligations.some((o) => o.id === id))
-      plan.obligations.push({ id, kind, sources, ...extra });
+      plan.obligations.push({ id, kind, sources, context, ...extra });
   };
   const roots = unique([
     ...patches.map((p) => p.path),
@@ -236,6 +240,23 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
     if (!sourcesFor(path).length && index.excluded.includes(path))
       throw new ReviewFailure('MISSING_EVIDENCE', '必須資料が除外されています');
   }
+  // 補助資料は確認対象と区別する。直接の関係だけを辿り、補助資料から再帰展開しない。
+  const contextFor = (sources: string[]): string[] => {
+    const paths = new Set(
+      sources.map((id) => allSources.get(id)!.path).filter((path) => roots.includes(path)),
+    );
+    const related = new Set(contracts);
+    for (const edge of allEdges) {
+      if (paths.has(edge.from)) related.add(edge.to);
+      if (paths.has(edge.to)) related.add(edge.from);
+    }
+    for (const path of related)
+      if (unresolved.has(path))
+        throw new ReviewFailure('UNRESOLVED_REFERENCE', '補助資料に未解決の参照があります');
+    return unique([...related].flatMap(sourcesFor))
+      .filter((id) => !sources.includes(id))
+      .sort();
+  };
   for (const patch of [...patches].sort((a, b) => a.path.localeCompare(b.path))) {
     const sources = sourcesFor(patch.path);
     const hunks = patch.patch.split(/(?=^@@ )/m).filter((p) => p.startsWith('@@'));
@@ -270,10 +291,12 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
     if (!ids.length) throw new ReviewFailure('MISSING_EVIDENCE', '過去指摘の必須資料がありません');
     add('history', ids, { priorId: prior.id });
   }
+  if (!plan.obligations.length) add('unit', []); // 除外変更も担当を持つ。
   plan.sources = [...allSources.values()]
-    .filter((s) => plan.obligations.some((o) => o.sources.includes(s.id)))
+    .filter((s) =>
+      plan.obligations.some((o) => o.sources.includes(s.id) || o.context.includes(s.id)),
+    )
     .sort((a, b) => a.id.localeCompare(b.id));
-  if (!plan.obligations.length) add('unit', []); // 除外変更だけでも確認範囲をモデルへ伝える。
   for (const kind of ['unit', 'boundary', 'history'] as const) {
     const pending = plan.obligations.filter((o) => o.kind === kind);
     while (pending.length) {
@@ -294,7 +317,7 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
         const next = pending[0];
         const candidate = {
           ...task,
-          sources: unique([...task.sources, ...next.sources]),
+          sources: unique([...task.sources, ...next.sources, ...next.context]),
           obligations: [...task.obligations, next.id],
           priorIds: unique([...task.priorIds, ...(next.priorId ? [next.priorId] : [])]),
         };
@@ -368,12 +391,16 @@ export function validatePlan(plan: ReviewPlan): ReviewPlan {
       !o ||
       !['unit', 'boundary', 'history'].includes(o.kind) ||
       !Array.isArray(o.sources) ||
+      !Array.isArray(o.context) ||
+      new Set(o.context).size !== o.context.length ||
+      o.context.some((id) => !ids.has(id) || o.sources.includes(id)) ||
       o.sources.some((id) => !ids.has(id)) ||
       o.id !==
         digest(
           JSON.stringify({
             kind: o.kind,
             sources: o.sources,
+            context: o.context,
             ...(o.patch ? { patch: o.patch } : {}),
             ...(o.priorId ? { priorId: o.priorId } : {}),
           }),
@@ -395,7 +422,10 @@ export function validatePlan(plan: ReviewPlan): ReviewPlan {
     const obligations = task.obligations.map((id) => plan.obligations.find((o) => o.id === id));
     if (
       obligations.some(
-        (o) => !o || o.kind !== task.kind || o.sources.some((id) => !task.sources.includes(id)),
+        (o) =>
+          !o ||
+          o.kind !== task.kind ||
+          [...o.sources, ...o.context].some((id) => !task.sources.includes(id)),
       ) ||
       JSON.stringify(unique(obligations.flatMap((o) => (o?.priorId ? [o.priorId] : []))).sort()) !==
         JSON.stringify([...task.priorIds].sort())

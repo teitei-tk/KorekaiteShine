@@ -19,7 +19,7 @@ if (import.meta.main) {
         process.send?.(message);
       });
     const billing: BillingHooks = {
-      reserve: (input, hash) => notify({ kind: 'reserve', input, hash }),
+      reserve: (input, hash, outputLimit) => notify({ kind: 'reserve', input, hash, outputLimit }),
       settle: (usage) => notify({ kind: 'settle', usage }),
     };
     try {
@@ -32,6 +32,8 @@ if (import.meta.main) {
         fetch,
         schema,
         billing,
+        input.outputLimit,
+        AbortSignal.timeout(30 * 60_000),
       );
       process.send?.({ kind: 'result', result });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -71,6 +71,22 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
             return Response.json({ object: 'response.input_tokens', input_tokens: 1000 });
           }
           generations++;
+          if (generations === 1)
+            return Response.json({
+              id: 'resp_incomplete',
+              object: 'response',
+              status: 'incomplete',
+              incomplete_details: { reason: 'max_output_tokens' },
+              model: MODEL,
+              service_tier: 'default',
+              output: [],
+              usage: {
+                input_tokens: 1000,
+                output_tokens: input.outputLimit!,
+                total_tokens: 1000 + input.outputLimit!,
+                input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+              },
+            });
           const value: import('./partition-review.ts').TaskResponse = {
             status: 'complete',
             summary: '確認済み',
@@ -141,17 +157,28 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
           });
         },
         taskSchema(input.task, plan),
-        { reserve: async (n, h) => budget.reserve(n, h), settle: async (u) => budget.settle(u) },
+        {
+          reserve: async (n, h, o) => budget.reserve(n, h, o),
+          settle: async (u) => budget.settle(u),
+        },
+        input.outputLimit,
       );
     });
     expect(maxBytes).toBeGreaterThan(500_000);
-    expect(counts).toBe(plan.tasks.length + 1);
+    expect(counts).toBe(plan.tasks.length + 2);
     expect(generations).toBe(counts);
     expect(spent(budget.snapshot())).toBeGreaterThan(0);
     expect(budget.snapshot().entries.every((e) => e.actual !== null)).toBe(true);
     writePartitionArtifact(directory, plan, result, origin);
     verifyPartitionArtifact(directory, origin);
     const artifact = readReviewArtifact(directory, plan.metadata, origin);
+    const execution = JSON.parse(readFileSync(join(directory, 'execution.json'), 'utf8'));
+    expect(execution.version).toBe(2);
+    expect(execution.usage.output).toBe(
+      budget.snapshot().entries.reduce((sum, entry) => sum + entry.usage!.output, 0),
+    );
+    expect(execution.usage.output).toBeGreaterThan(result.usage.output);
+    expect(spent(budget.snapshot())).toBeLessThanOrEqual(1_000_000_000);
     const writes: string[] = [];
     const api: import('./github.ts').Api = async <T>(path: string, method?: string) => {
       if (method) {
@@ -170,6 +197,26 @@ it('PR30の実資料を計数・費用精算し、成果物を保存・再検証
     };
     expect(await publish(api, artifact.metadata, artifact.review)).toBe(true);
     expect(writes).toEqual(['pulls/30/reviews', 'issues/30/comments']);
+    const recordPath = join(directory, 'execution.json');
+    const original = readFileSync(recordPath, 'utf8');
+    const { digest } = await import('./source-index.ts');
+    const empty = JSON.parse(original);
+    empty.budget.entries = [];
+    empty.budgetHash = digest(JSON.stringify(empty.budget));
+    empty.usage = { input: 0, output: 0, total: 0 };
+    writeFileSync(recordPath, JSON.stringify(empty));
+    expect(() => readReviewArtifact(directory, plan.metadata, origin)).toThrow();
+    writeFileSync(recordPath, original);
+
+    execution.budget.entries[0].outputLimit = 8000;
+    writeFileSync(recordPath, JSON.stringify(execution));
+    expect(() => readReviewArtifact(directory, plan.metadata, origin)).toThrow();
+    writeFileSync(recordPath, original);
+    execution.budget.entries[0].outputLimit = JSON.parse(original).budget.entries[0].outputLimit;
+    execution.usage.output--;
+    writeFileSync(recordPath, JSON.stringify(execution));
+    expect(() => readReviewArtifact(directory, plan.metadata, origin)).toThrow();
+    writeFileSync(recordPath, original);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

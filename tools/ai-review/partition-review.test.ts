@@ -188,7 +188,14 @@ it('過去指摘30件を新規候補とは別枠で全件確認する', async ()
     index,
     [{ path: 'app.ts', patch: '@@ -1 +1 @@\n-old\n+new\n' }],
   );
+  const { ReviewFailure } = await import('./failure.ts');
+  const { detail } = await import('./diagnostics.ts');
+  const recovered = new Set<string>();
   const result = await runPartitionReview(plan, async (input) => {
+    if (input.task.kind === 'history' && !recovered.has(input.task.id)) {
+      recovered.add(input.task.id);
+      throw new ReviewFailure('INCOMPLETE', '不足', detail('TOKEN_LIMIT'));
+    }
     const value = response(input);
     value.checks = input.task.priorIds.map((id) => ({
       id,
@@ -416,17 +423,16 @@ it.each([1000, 175000])('重複棄却は双方の原文と引用を必要とす�
       if (input.task.kind === 'reconcile') {
         value.decisions = input.task.candidateIds!.map((id) => {
           const candidate = input.candidates.find((c) => c.id === id)!;
-          const other = input.candidates.find((c) => c.finding.path === 'two.ts')!;
+          const other = input.candidates.find((c) => c.id !== candidate.id);
           return {
             id,
-            disposition:
-              candidate.finding.path === 'one.ts' ? ('duplicate' as const) : ('keep' as const),
-            duplicateOf: candidate.finding.path === 'one.ts' ? other.id : null,
+            disposition: other ? ('duplicate' as const) : ('keep' as const),
+            duplicateOf: other?.id ?? null,
             reason: '同一問題',
             sources: [
               ...new Set([
                 ...candidate.sources,
-                ...other.sources.filter((id) => input.task.sources.includes(id)),
+                ...(other?.sources ?? []).filter((id) => input.task.sources.includes(id)),
               ]),
             ],
           };
@@ -445,7 +451,7 @@ it.each([1000, 175000])('重複棄却は双方の原文と引用を必要とす�
       }
       return { value, usage: { input: 1, output: 1, total: 2 } };
     });
-  expect((await run()).review.findings.map((f) => f.path)).toEqual(['two.ts']);
+  expect((await run()).review.findings).toHaveLength(1);
 });
 it('モデル申告の不足情報を固定分類だけで引き継ぐ', () => {
   const plan = fixture(),
@@ -540,7 +546,7 @@ it('候補整理は原文が旧容量上限を超えても全候補を確認す�
     return { value, usage: { input: 1, output: 1, total: 2 } };
   });
   expect(result.review.findings).toHaveLength(3);
-  expect(calls).toBe(plan.tasks.length + 1);
+  expect(calls).toBe(plan.tasks.length + result.candidateCount);
   const directory = mkdtempSync(join(tmpdir(), 'review-many-'));
   writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
@@ -799,8 +805,7 @@ it('単一対象の必須文脈がトークン上限を超えても資料を落�
   ).rejects.toMatchObject({ reason: 'INPUT_TOKEN_LIMIT' });
 });
 
-it('再分割した候補整理では別の子作業にしか渡していない原文を引用できない', async () => {
-  const { ReviewFailure } = await import('./failure.ts');
+it('候補整理で提示していない別候補の原文を引用したら固定理由で拒否する', async () => {
   const base = 'b'.repeat(40),
     head = 'a'.repeat(40);
   const index = indexSources(
@@ -833,31 +838,22 @@ it('再分割した候補整理では別の子作業にしか渡していない�
           priorId: null,
         }));
       } else {
-        if (input.task.candidateIds!.length > 1)
-          throw new ReviewFailure('INPUT_TOKEN_LIMIT', '分割');
-        const [a, b] = input.candidates;
-        const first = input.task.candidateIds![0] === a.id;
+        const current = input.candidates.find((c) => c.id === input.task.candidateIds![0])!;
+        const absent = plan.sources.find((source) => !input.task.sources.includes(source.id))!;
+        expect(absent).toBeDefined();
         value.decisions = [
-          first
-            ? {
-                id: a.id,
-                disposition: 'duplicate',
-                duplicateOf: b.id,
-                reason: '同一',
-                sources: [...a.sources, ...b.sources],
-              }
-            : {
-                id: b.id,
-                disposition: 'keep',
-                duplicateOf: null,
-                reason: '確認',
-                sources: b.sources,
-              },
+          {
+            id: current.id,
+            disposition: 'keep',
+            duplicateOf: null,
+            reason: '担当外の原文を混入',
+            sources: [...current.sources, absent.id],
+          },
         ];
       }
       return { value, usage: { input: 1, output: 1, total: 2 } };
     }),
-  ).rejects.toThrow();
+  ).rejects.toMatchObject({ reason: 'OUTPUT_INVALID', message: '候補整理の根拠が不正です' });
 });
 
 it('独立した宣言を保持し、合計だけトークン上限を超える場合に分割完了する', async () => {
@@ -879,3 +875,138 @@ it('独立した宣言を保持し、合計だけトークン上限を超える�
   });
   expect(result.completed).toEqual(plan.tasks.map((t) => t.id));
 });
+
+it('出力不足では同一枠を再送せず拡大し、単一担当でも回復する', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  const { detail } = await import('./diagnostics.ts');
+  const limits: number[] = [];
+  const result = await runPartitionReview(fixture(), async (input) => {
+    limits.push(input.outputLimit!);
+    if (limits.length === 1)
+      throw new ReviewFailure('INCOMPLETE', '出力不足', detail('TOKEN_LIMIT'));
+    return { value: response(input), usage: { input: 10, output: 9000, total: 9010 } };
+  });
+  expect(limits).toHaveLength(2);
+  expect(limits[1]).toBe(limits[0] * 2);
+  expect(result.completed).toEqual(['task-1']);
+});
+it('単一担当が最大枠でも不足した場合は有限で終了する', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  const { detail } = await import('./diagnostics.ts');
+  const limits: number[] = [];
+  await expect(
+    runPartitionReview(fixture(), async (input) => {
+      limits.push(input.outputLimit!);
+      throw new ReviewFailure('INCOMPLETE', '出力不足', detail('TOKEN_LIMIT'));
+    }),
+  ).rejects.toMatchObject({ reason: 'INCOMPLETE' });
+  expect(limits.at(-1)).toBe(128000);
+  expect(new Set(limits).size).toBe(limits.length);
+});
+
+it('候補を順次確認し、保持候補との重複を双方の原文で確認できる', async () => {
+  const base = 'b'.repeat(40),
+    head = 'a'.repeat(40);
+  const index = indexSources(
+    (...args) =>
+      args[0] === 'ls-tree'
+        ? ['a.ts', 'b.ts'].map((p, i) => `100644 blob ${String(i).repeat(40)}\t${p}\0`).join('')
+        : 'export const v = 1;',
+    [base, head],
+  );
+  const plan = planReview(
+    { number: 1, base, head, lines: { 'a.ts': [1], 'b.ts': [1] } },
+    index,
+    ['a.ts', 'b.ts'].map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
+  );
+  let comparisons = 0;
+  const result = await runPartitionReview(plan, async (input) => {
+    const value = response(input);
+    if (input.task.kind === 'unit') {
+      value.findings = plan.sources.map((s) => ({
+        priority: 'P2',
+        path: s.path,
+        line: 1,
+        condition: s.path,
+        impact: '影響',
+        fix: '修正',
+      }));
+      value.evidence = plan.sources.map((s, finding) => ({
+        finding,
+        sources: [s.id],
+        priorId: null,
+      }));
+    } else {
+      comparisons++;
+      expect(input.task.candidateIds).toHaveLength(1);
+      const current = input.candidates.find((c) => input.task.candidateIds!.includes(c.id))!;
+      const other = input.candidates.find((c) => c.id !== current.id);
+      const sources = [...current.sources, ...(other?.sources ?? [])];
+      expect(sources.every((id) => input.task.sources.includes(id))).toBe(true);
+      value.decisions = [
+        {
+          id: current.id,
+          disposition: other ? 'duplicate' : 'keep',
+          duplicateOf: other?.id ?? null,
+          reason: '原文を比較',
+          sources,
+        },
+      ];
+    }
+    return { value, usage: { input: 10, output: 20, total: 30 } };
+  });
+  expect(comparisons).toBe(2);
+  expect(result.review.findings).toHaveLength(1);
+});
+
+it.each([false, true])(
+  '最大出力でも不足する複数担当は分割し、最後の子が失敗したら結果を返さない: %s',
+  async (failLast) => {
+    const { ReviewFailure } = await import('./failure.ts');
+    const { detail } = await import('./diagnostics.ts');
+    const base = 'b'.repeat(40),
+      head = 'a'.repeat(40);
+    const index = indexSources(
+      (...args) =>
+        args[0] === 'ls-tree'
+          ? `100644 blob ${'c'.repeat(40)}\ta.ts\0`
+          : 'export function a() { return 1; }\nexport function b() { return 2; }\n',
+      [base, head],
+    );
+    const plan = planReview({ number: 1, base, head, lines: { 'a.ts': [1, 2] } }, index, [
+      { path: 'a.ts', patch: '@@ -1,2 +1,2 @@\n-old1\n-old2\n+new1\n+new2\n' },
+    ]);
+    const covered: string[] = [];
+    let parents = 0;
+    const run = runPartitionReview(plan, async (input) => {
+      if (input.task.obligations.length > 1) {
+        parents++;
+        throw new ReviewFailure('INCOMPLETE', '不足', detail('TOKEN_LIMIT'));
+      }
+      if (failLast && covered.length) throw new ReviewFailure('MODEL_FAILED', '最後の子が失敗');
+      covered.push(...input.task.obligations);
+      return { value: response(input), usage: { input: 1, output: 1, total: 2 } };
+    });
+    if (failLast) await expect(run).rejects.toMatchObject({ reason: 'MODEL_FAILED' });
+    else {
+      expect((await run).completed).toEqual(plan.tasks.map((t) => t.id));
+      expect(covered.sort()).toEqual(plan.obligations.map((o) => o.id).sort());
+    }
+    expect(parents).toBeGreaterThan(1);
+  },
+);
+it.each(['CONTENT_FILTER', 'API_INCOMPLETE'] as const)(
+  '出力不足以外の中断は再生成しない: %s',
+  async (subcode) => {
+    const { ReviewFailure } = await import('./failure.ts');
+    const { detail } = await import('./diagnostics.ts');
+    let calls = 0;
+    await expect(
+      runPartitionReview(fixture(), async () => {
+        calls++;
+        throw new ReviewFailure('INCOMPLETE', '中断', detail(subcode));
+      }),
+    ).rejects.toMatchObject({ reason: 'INCOMPLETE' });
+    expect(calls).toBe(1);
+  },
+);

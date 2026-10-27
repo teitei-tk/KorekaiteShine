@@ -26,6 +26,7 @@ const env = {
 };
 it.each([
   'success',
+  'output-recovery',
   'budget',
   'budget-late',
   'expired',
@@ -94,6 +95,8 @@ it.each([
           budget.reserve(10, 'f'.repeat(64));
           if (scenario === 'late-failure' && calls === 2) throw new Error('SECRET');
           budget.settle({ input: 10, cached: 0, written: 0, output: 10, total: 20 });
+          if (scenario === 'output-recovery' && calls === 1)
+            throw new ReviewFailure('INCOMPLETE', '不足', { subcode: 'TOKEN_LIMIT', missing: [] });
           const value = {
             status: 'complete' as const,
             summary: '確認',
@@ -229,11 +232,13 @@ it.each([
       return;
     }
     await run();
-    expect(exchanges).toBe(2);
-    expect(calls).toBe(2);
+    expect(exchanges).toBe(scenario === 'output-recovery' ? 3 : 2);
+    expect(calls).toBe(scenario === 'output-recovery' ? 3 : 2);
     verifyPartitionArtifact(directory, origin);
     for (const path of ['execution.json', 'result.json', 'plan.json'])
       expect(readFileSync(join(directory, path), 'utf8')).not.toContain('secret-');
+    if (scenario === 'output-recovery')
+      expect(readFileSync(join(directory, 'summary.md'), 'utf8')).toContain('input=30 / output=30');
     if (scenario === 'tampered') {
       writeFileSync(join(directory, 'result.json'), '{}');
       expect(() => verifyPartitionArtifact(directory, origin)).toThrow();

@@ -6,7 +6,8 @@ import { ReviewFailure } from './failure.ts';
 export const LIMIT = 1_000_000_000;
 export const MODEL = 'gpt-6-luna';
 export const PRICE_VERSION = 'gpt-6-luna-standard-30m-2026-10-25';
-export const MAX_OUTPUT = 8000;
+export const MAX_OUTPUT = 8000; // 旧呼び出し・旧台帳の既定
+export const MODEL_MAX_OUTPUT = 128_000;
 export const MAX_INPUT = 922_000;
 export interface BillingUsage {
   input: number;
@@ -14,9 +15,10 @@ export interface BillingUsage {
   written: number;
   output: number;
   total: number;
+  reasoning?: number;
 }
 export interface BillingHooks {
-  reserve(input: number, hash: string): Promise<void>;
+  reserve(input: number, hash: string, outputLimit?: number): Promise<void>;
   settle(usage: BillingUsage): Promise<void>;
 }
 export interface BudgetTarget {
@@ -25,6 +27,7 @@ export interface BudgetTarget {
   base: string;
 }
 interface Entry {
+  outputLimit?: number;
   input: number;
   hash: string;
   maximum: number;
@@ -32,13 +35,13 @@ interface Entry {
   usage?: BillingUsage;
 }
 export interface BudgetRecord {
-  version: 1;
+  version: 1 | 2;
   pricing: string;
   origin: GenerationOrigin;
   target: BudgetTarget;
   limit: number;
   entries: Entry[];
-  denied?: { input: number; hash: string; maximum: number };
+  denied?: { input: number; hash: string; maximum: number; outputLimit?: number };
 }
 const integer = (n: number | undefined, max = Number.MAX_SAFE_INTEGER): n is number =>
   typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= max;
@@ -51,15 +54,15 @@ function rates(input: number) {
 export function validUsage(u: Partial<BillingUsage> | null | undefined): u is BillingUsage {
   return (
     !!u &&
-    keys(u, ['input', 'cached', 'written', 'output', 'total']) &&
+    keys(u, ['input', 'cached', 'written', 'output', 'total', 'reasoning']) &&
     integer(u.input, 2_000_000) &&
     integer(u.cached, 2_000_000) &&
     integer(u.written, 2_000_000) &&
-    integer(u.output, MAX_OUTPUT) &&
+    integer(u.output, MODEL_MAX_OUTPUT) &&
     integer(u.total, 2_000_000) &&
     u.cached + u.written <= u.input &&
     u.input + u.output === u.total &&
-    u.output <= MAX_OUTPUT
+    (u.reasoning === undefined || integer(u.reasoning, u.output))
   );
 }
 export function cost(u: BillingUsage): number {
@@ -72,12 +75,14 @@ export function cost(u: BillingUsage): number {
     u.output * r.output
   );
 }
-export function maximumCost(input: number): number {
+export function maximumCost(input: number, outputLimit = MAX_OUTPUT): number {
   if (!integer(input)) throw new ReviewFailure('TOKEN_COUNT_FAILED', '入力計数が不正です');
   if (input > MAX_INPUT)
     throw new ReviewFailure('INPUT_TOKEN_LIMIT', '入力トークン上限を超えました');
+  if (!integer(outputLimit, MODEL_MAX_OUTPUT) || outputLimit < 1)
+    throw new ReviewFailure('USAGE_INVALID', '出力枠が不正です');
   const r = rates(input);
-  return input * r.written + MAX_OUTPUT * r.output;
+  return input * r.written + outputLimit * r.output;
 }
 export function spent(record: BudgetRecord): number {
   return record.entries.reduce((sum, e) => sum + (e.actual ?? e.maximum), 0);
@@ -87,7 +92,7 @@ export function validBudget(r: BudgetRecord): boolean {
     if (
       !r ||
       !keys(r, ['version', 'pricing', 'origin', 'target', 'limit', 'entries', 'denied']) ||
-      r.version !== 1 ||
+      ![1, 2].includes(r.version) ||
       r.pricing !== PRICE_VERSION ||
       !integer(r.limit, LIMIT) ||
       r.limit < 1 ||
@@ -109,23 +114,35 @@ export function validBudget(r: BudgetRecord): boolean {
     for (const [i, e] of r.entries.entries()) {
       if (
         !e ||
-        !keys(e, ['input', 'hash', 'maximum', 'actual', 'usage']) ||
+        !keys(e, ['input', 'hash', 'maximum', 'actual', 'usage', 'outputLimit']) ||
         !/^[a-f0-9]{64}$/.test(e.hash) ||
-        maximumCost(e.input) !== e.maximum ||
+        (r.version === 2
+          ? !integer(e.outputLimit, MODEL_MAX_OUTPUT) || e.outputLimit! < 1
+          : e.outputLimit !== undefined) ||
+        maximumCost(e.input, e.outputLimit) !== e.maximum ||
         total + e.maximum > r.limit
       )
         return false;
       if (e.actual === null) {
         if (e.usage !== undefined || i !== r.entries.length - 1 || r.denied) return false;
-      } else if (!e.usage || cost(e.usage) !== e.actual) return false;
+      } else if (
+        !e.usage ||
+        cost(e.usage) !== e.actual ||
+        e.usage.output > (e.outputLimit ?? MAX_OUTPUT) ||
+        e.usage.input !== e.input
+      )
+        return false;
       total += e.actual ?? e.maximum;
     }
     if (r.denied) {
       const d = r.denied;
       if (
-        !keys(d, ['input', 'hash', 'maximum']) ||
+        !keys(d, ['input', 'hash', 'maximum', 'outputLimit']) ||
         !/^[a-f0-9]{64}$/.test(d.hash) ||
-        maximumCost(d.input) !== d.maximum ||
+        (r.version === 2
+          ? !integer(d.outputLimit, MODEL_MAX_OUTPUT) || d.outputLimit! < 1
+          : d.outputLimit !== undefined) ||
+        maximumCost(d.input, d.outputLimit) !== d.maximum ||
         total + d.maximum <= r.limit
       )
         return false;
@@ -140,7 +157,7 @@ export class BudgetLedger {
   readonly path: string;
   constructor(path: string, origin: GenerationOrigin, target: BudgetTarget, limit = LIMIT) {
     this.path = path;
-    this.record = { version: 1, pricing: PRICE_VERSION, origin, target, limit, entries: [] };
+    this.record = { version: 2, pricing: PRICE_VERSION, origin, target, limit, entries: [] };
     this.save();
   }
   snapshot(): BudgetRecord {
@@ -152,10 +169,10 @@ export class BudgetLedger {
     writeFileSync(this.path + '.tmp', json, { mode: 0o600 });
     renameSync(this.path + '.tmp', this.path);
   }
-  reserve(input: number, hash: string): void {
+  reserve(input: number, hash: string, outputLimit = MAX_OUTPUT): void {
     if (this.record.denied || this.record.entries.some((e) => e.actual === null))
       throw new ReviewFailure('USAGE_INVALID', '未精算の要求があります');
-    const next = { input, hash, maximum: maximumCost(input) };
+    const next = { input, hash, outputLimit, maximum: maximumCost(input, outputLimit) };
     if (spent(this.record) + next.maximum > this.record.limit) {
       this.record.denied = next;
       this.save();
@@ -168,6 +185,12 @@ export class BudgetLedger {
     const entry = this.record.entries.at(-1);
     if (!entry || entry.actual !== null)
       throw new ReviewFailure('USAGE_INVALID', '予約がありません');
+    if (
+      !validUsage(usage) ||
+      usage.input !== entry.input ||
+      usage.output > (entry.outputLimit ?? MAX_OUTPUT)
+    )
+      throw new ReviewFailure('USAGE_INVALID', '予約と使用量が一致しません');
     const actual = cost(usage);
     entry.actual = actual;
     entry.usage = { ...usage };

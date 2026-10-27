@@ -13,7 +13,7 @@ import { authenticate } from './wif.ts';
 import { preflight, runPartitionReview } from './partition-review.ts';
 import type { TaskInvocation, TaskResult } from './partition-review.ts';
 import type { ReviewResult } from './review.ts';
-import { readArtifactText, writePartitionArtifact } from './artifact.ts';
+import { readArtifactText, writePartitionArtifact, budgetUsage } from './artifact.ts';
 import type { ReviewPlan } from './partition.ts';
 import { writeStatusReport } from './status-report.ts';
 
@@ -46,7 +46,10 @@ export async function callWorker(
       if (error) reject(error);
       else resolve(result!);
     };
-    const timer = setTimeout(() => finish(new Error('モデル子プロセスが時間切れです')), 200000);
+    const timer = setTimeout(
+      () => finish(new Error('モデル子プロセスが時間切れです')),
+      signal ? REVIEW_TIME_MS : 200000,
+    );
     const abort = () => finish(timeFailure());
     signal?.addEventListener('abort', abort, { once: true });
     child.on('error', () => finish(new Error('モデル子プロセスが失敗しました')));
@@ -57,6 +60,7 @@ export async function callWorker(
         kind?: string;
         input?: number;
         hash?: string;
+        outputLimit?: number;
         usage?: BillingUsage;
         result?: ReviewResult<TaskResult>;
       }) => {
@@ -64,7 +68,7 @@ export async function callWorker(
         try {
           if (!message) throw new Error('IPC形式不正');
           if (message.kind === 'reserve' && !reserved) {
-            budget.reserve(message.input!, message.hash!);
+            budget.reserve(message.input!, message.hash!, message.outputLimit);
             reserved = true;
             child.send({ approved: true });
           } else if (message.kind === 'settle' && reserved && !settled) {
@@ -72,7 +76,19 @@ export async function callWorker(
             settled = true;
             child.send({ approved: true });
           } else if (message.kind === 'result') {
-            const result = decodeWorkerResult(JSON.stringify(message.result));
+            let result: ReviewResult<TaskResult>;
+            try {
+              result = decodeWorkerResult(JSON.stringify(message.result));
+            } catch (error) {
+              if (
+                error instanceof ReviewFailure &&
+                error.reason === 'INCOMPLETE' &&
+                error.detail?.subcode === 'TOKEN_LIMIT' &&
+                !settled
+              )
+                throw new ReviewFailure('USAGE_INVALID', '未精算の出力不足です');
+              throw error;
+            }
             if (!settled) throw new ReviewFailure('USAGE_INVALID', '費用が未精算です');
             finish(undefined, result);
           } else throw new Error('IPC順序不正');
@@ -194,10 +210,11 @@ export async function generatePartitionArtifact(
       attempt: env.GITHUB_RUN_ATTEMPT ?? '',
       sha: env.GITHUB_SHA ?? '',
     });
+    const chargedUsage = budgetUsage(budget!.snapshot());
     if (env.GITHUB_STEP_SUMMARY)
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
-        `分割レビュー完了: ${completed}/${plan.tasks.length}作業、${result.calls}回、input=${result.usage.input} / output=${result.usage.output} tokens。\n`,
+        `分割レビュー完了: ${completed}/${plan.tasks.length}作業、${result.calls}回、input=${chargedUsage.input} / output=${chargedUsage.output} tokens。\n`,
       );
     if (env.GITHUB_OUTPUT)
       appendFileSync(

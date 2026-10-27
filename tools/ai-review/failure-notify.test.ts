@@ -247,3 +247,24 @@ it('確認対象の不一致の内訳をArtifactからPRへ日本語で表示す
   expect(f.posted[0]).toContain('b'.repeat(16));
   expect(f.posted[0]).not.toContain('SECRET');
 });
+
+it('出力不足は料金超過と区別してPRに日本語で通知する', async () => {
+  const f = fixture('INCOMPLETE');
+  writeFileSync(
+    join(f.directory, 'status.json'),
+    JSON.stringify({
+      version: 1,
+      run: '20',
+      attempt: '1',
+      job: 'generate',
+      status: 'failure',
+      target: 'task-1',
+      reason: 'INCOMPLETE',
+      diagnostic: { subcode: 'TOKEN_LIMIT', missing: [] },
+    }),
+  );
+  await notifyFailure(f.api, 20, 1, f.directory);
+  expect(f.posted[0]).toContain('AIの推論・回答');
+  expect(f.posted[0]).toContain('料金の上限超過ではありません');
+  expect(f.posted[0]).toContain('actions/runs/20/attempts/1');
+});

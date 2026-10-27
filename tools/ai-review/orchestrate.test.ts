@@ -285,7 +285,7 @@ it('合計入力容量だけでは停止せず認証失敗の対象を記録す�
     const summary = readFileSync(join(directory, 'summary.md'), 'utf8');
     expect(summary).toContain('AUTH_FAILED');
     expect(summary).toContain('task-1');
-    expect(summary).toContain('0/10');
+    expect(summary).toContain(`0/${plan.tasks.length}`);
     expect(summary).not.toContain('SECRET');
     expect(calls).toBe(1);
     expect(existsSync(join(directory, 'result.json'))).toBe(false);

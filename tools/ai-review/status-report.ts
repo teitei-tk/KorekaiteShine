@@ -106,7 +106,6 @@ export function writeStatusReport(
   };
   if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
   const json = JSON.stringify(value);
-  if (Buffer.byteLength(json) > 4096) throw new Error('実行結果が大きすぎます');
   writeFileSync(path, json);
 }
 export function readStatusReports(
@@ -118,7 +117,7 @@ export function readStatusReports(
   const reports: StatusReport[] = [];
   const readReport = (path: string, job?: ReportJob): StatusReport => {
     const stat = statSync(path);
-    if (!stat.isFile() || stat.size > 4096) throw new Error('実行結果が大きすぎます');
+    if (!stat.isFile()) throw new Error('実行結果が大きすぎます');
     const value = JSON.parse(readFileSync(path, 'utf8')) as Partial<StatusReport> | null;
     if (
       !validReport(value) ||

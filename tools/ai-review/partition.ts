@@ -1,4 +1,3 @@
-import { historyOutputBytes, HISTORY_RESULT_BYTES } from './output-size.ts';
 import { ReviewFailure } from './failure.ts';
 import { builtinModules } from 'node:module';
 import { posix } from 'node:path';
@@ -44,13 +43,9 @@ export function taskData(plan: ReviewPlan, task: ReviewTask) {
     excluded: plan.excluded,
   };
 }
-export function taskFits(plan: ReviewPlan, task: ReviewTask): boolean {
-  if (task.kind === 'history' && historyOutputBytes(task) > HISTORY_RESULT_BYTES) return false;
-  const data = taskData(plan, task);
-  const raw =
-    data.sources.reduce((sum, s) => sum + Buffer.byteLength(s.content), 0) +
-    data.obligations.reduce((sum, o) => sum + Buffer.byteLength(o.patch?.patch ?? ''), 0);
-  return raw <= 300_000 && Buffer.byteLength(JSON.stringify(data)) <= 400_000;
+// 件数は応答Schemaの複雑さを抑える分割粒度。入力可否は計数APIと費用台帳で判定する。
+export function taskFits(_plan: ReviewPlan, task: ReviewTask): boolean {
+  return task.obligations.length <= 200 && (task.kind !== 'history' || task.priorIds.length <= 1);
 }
 
 function splitHunk(
@@ -276,10 +271,9 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
   for (const edge of edges) {
     const from = sourcesFor(edge.from),
       to = sourcesFor(edge.to);
-    // 宣言間の関係を切り捨てない。巨大な関係数は課金前の予算検証で止める。
-    if (from.length * to.length > 2000)
-      throw new ReviewFailure('BUDGET_EXCEEDED', '境界の容量上限を超えました');
-    for (const left of from) for (const right of to) add('boundary', [left, right]);
+    // 参照関係はファイル対の契約。宣言の直積で同じ契約を重複登録しない。
+    // 両側の原文はすべて保持し、実計数で入力上限を検証する。
+    add('boundary', unique([...from, ...to]));
   }
   for (const prior of metadata.priorFindings ?? []) {
     const ids = unique([
@@ -321,12 +315,7 @@ export function planReview(metadata: Material, index: SourceIndex, patches: Patc
           obligations: [...task.obligations, next.id],
           priorIds: unique([...task.priorIds, ...(next.priorId ? [next.priorId] : [])]),
         };
-        if (
-          candidate.obligations.length > 200 ||
-          !taskFits(plan, candidate) ||
-          (kind === 'boundary' &&
-            Buffer.byteLength(JSON.stringify(taskData(plan, candidate))) > 250_000)
-        ) {
+        if (candidate.obligations.length > 200 || !taskFits(plan, candidate)) {
           if (!task.obligations.length)
             throw new ReviewFailure(
               'BUDGET_EXCEEDED',

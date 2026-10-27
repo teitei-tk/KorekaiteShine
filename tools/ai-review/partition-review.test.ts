@@ -254,7 +254,7 @@ it('既存指摘との対応を候補整理が覆したら停止する', async (
     }),
   ).rejects.toThrow(/既存指摘/);
 });
-it('13作業・合計3MB超でも1回の容量内なら分割レビューを完了できる', async () => {
+it('合計3MB超でもバイト数だけで分割レビューを拒否しない', async () => {
   const base = 'b'.repeat(40),
     head = 'a'.repeat(40);
   const paths = Array.from({ length: 13 }, (_, i) => `f${i}.ts`);
@@ -282,7 +282,7 @@ it('13作業・合計3MB超でも1回の容量内なら分割レビューを完�
     return { value: response(input), usage: { input: 1, output: 8000, total: 8001 } };
   });
   expect(result.inputBytes).toBeGreaterThan(3_000_000);
-  expect(calls).toBe(13);
+  expect(calls).toBe(plan.tasks.length);
   const directory = mkdtempSync(join(tmpdir(), 'review-many-'));
   writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
@@ -445,8 +445,7 @@ it.each([1000, 175000])('重複棄却は双方の原文と引用を必要とす�
       }
       return { value, usage: { input: 1, output: 1, total: 2 } };
     });
-  if (size === 175000) await expect(run()).rejects.toThrow(/重複先.*原文/);
-  else expect((await run()).review.findings.map((f) => f.path)).toEqual(['two.ts']);
+  expect((await run()).review.findings.map((f) => f.path)).toEqual(['two.ts']);
 });
 it('モデル申告の不足情報を固定分類だけで引き継ぐ', () => {
   const plan = fixture(),
@@ -486,7 +485,7 @@ it('モデル診断の未知コードや自由文を記録しない', () => {
   );
 });
 
-it('候補整理を3作業以上へ分割して全候補を確認する', async () => {
+it('候補整理は原文が旧容量上限を超えても全候補を確認する', async () => {
   const base = 'b'.repeat(40),
     head = 'a'.repeat(40);
   const paths = Array.from({ length: 3 }, (_, i) => `f${i}.ts`);
@@ -523,23 +522,25 @@ it('候補整理を3作業以上へ分割して全候補を確認する', async 
           sources: c.sources,
         }));
     } else {
-      const source = plan.sources.find((source) => input.task.sources.includes(source.id))!;
-      value.findings = [
-        {
-          priority: 'P2',
-          path: source.path,
-          line: 1,
-          condition: '条件',
-          impact: '影響',
-          fix: '修正',
-        },
-      ];
-      value.evidence = [{ finding: 0, sources: [source.id], priorId: null }];
+      const sources = plan.sources.filter((source) => input.task.sources.includes(source.id));
+      value.findings = sources.map((source) => ({
+        priority: 'P2',
+        path: source.path,
+        line: 1,
+        condition: '条件',
+        impact: '影響',
+        fix: '修正',
+      }));
+      value.evidence = sources.map((source, finding) => ({
+        finding,
+        sources: [source.id],
+        priorId: null,
+      }));
     }
     return { value, usage: { input: 1, output: 1, total: 2 } };
   });
   expect(result.review.findings).toHaveLength(3);
-  expect(calls).toBe(6);
+  expect(calls).toBe(plan.tasks.length + 1);
   const directory = mkdtempSync(join(tmpdir(), 'review-many-'));
   writeFileSync(join(directory, 'plan.json'), JSON.stringify(plan));
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(plan.metadata));
@@ -748,4 +749,133 @@ it('履歴30件の最大長根拠を出力量で分割しSDK境界まで成功�
     );
     expect(result.value.checks).toHaveLength(input.task.priorIds.length);
   }
+});
+
+it('実計数による入力トークン超過だけ担当IDを二分し、全対象を一度ずつ完了する', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  const base = 'b'.repeat(40),
+    head = 'a'.repeat(40);
+  const sources = indexSources(
+    (...args) =>
+      args[0] === 'ls-tree'
+        ? ['one.ts', 'two.ts'].map((p, i) => `100644 blob ${String(i).repeat(40)}\t${p}\0`).join('')
+        : 'export const v = 1;',
+    [base, head],
+  );
+  const plan = planReview(
+    { number: 1, base, head, lines: { 'one.ts': [1], 'two.ts': [1] } },
+    sources,
+    ['one.ts', 'two.ts'].map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
+  );
+  const covered: string[] = [];
+  let attempts = 0;
+  const result = await runPartitionReview(plan, async (input) => {
+    attempts++;
+    if (input.task.obligations.length > 1)
+      throw new ReviewFailure('INPUT_TOKEN_LIMIT', '計数結果が超過');
+    covered.push(...input.task.obligations);
+    return { value: response(input), usage: { input: 100, output: 10, total: 110 } };
+  });
+  expect(attempts).toBeGreaterThan(plan.tasks.length);
+  expect(covered.sort()).toEqual(plan.obligations.map((o) => o.id).sort());
+  expect(new Set(covered).size).toBe(covered.length);
+  expect(result.completed).toEqual(plan.tasks.map((t) => t.id));
+  let calls = 0;
+  await expect(
+    runPartitionReview(plan, async () => {
+      calls++;
+      throw new ReviewFailure('COST_BUDGET_EXCEEDED', '費用不足');
+    }),
+  ).rejects.toMatchObject({ reason: 'COST_BUDGET_EXCEEDED' });
+  expect(calls).toBe(1);
+});
+
+it('単一対象の必須文脈がトークン上限を超えても資料を落として成功させない', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  await expect(
+    runPartitionReview(fixture(), async () => {
+      throw new ReviewFailure('INPUT_TOKEN_LIMIT', '入力超過');
+    }),
+  ).rejects.toMatchObject({ reason: 'INPUT_TOKEN_LIMIT' });
+});
+
+it('再分割した候補整理では別の子作業にしか渡していない原文を引用できない', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  const base = 'b'.repeat(40),
+    head = 'a'.repeat(40);
+  const index = indexSources(
+    (...args) =>
+      args[0] === 'ls-tree'
+        ? ['a.ts', 'b.ts'].map((p, i) => `100644 blob ${String(i).repeat(40)}\t${p}\0`).join('')
+        : 'export const v = 1;',
+    [base, head],
+  );
+  const plan = planReview(
+    { number: 1, base, head, lines: { 'a.ts': [1], 'b.ts': [1] } },
+    index,
+    ['a.ts', 'b.ts'].map((path) => ({ path, patch: '@@ -1 +1 @@\n-old\n+new\n' })),
+  );
+  await expect(
+    runPartitionReview(plan, async (input) => {
+      const value = response(input);
+      if (input.task.kind === 'unit') {
+        value.findings = plan.sources.map((s) => ({
+          priority: 'P2',
+          path: s.path,
+          line: 1,
+          condition: s.path,
+          impact: '影響',
+          fix: '修正',
+        }));
+        value.evidence = plan.sources.map((s, finding) => ({
+          finding,
+          sources: [s.id],
+          priorId: null,
+        }));
+      } else {
+        if (input.task.candidateIds!.length > 1)
+          throw new ReviewFailure('INPUT_TOKEN_LIMIT', '分割');
+        const [a, b] = input.candidates;
+        const first = input.task.candidateIds![0] === a.id;
+        value.decisions = [
+          first
+            ? {
+                id: a.id,
+                disposition: 'duplicate',
+                duplicateOf: b.id,
+                reason: '同一',
+                sources: [...a.sources, ...b.sources],
+              }
+            : {
+                id: b.id,
+                disposition: 'keep',
+                duplicateOf: null,
+                reason: '確認',
+                sources: b.sources,
+              },
+        ];
+      }
+      return { value, usage: { input: 1, output: 1, total: 2 } };
+    }),
+  ).rejects.toThrow();
+});
+
+it('独立した宣言を保持し、合計だけトークン上限を超える場合に分割完了する', async () => {
+  const { ReviewFailure } = await import('./failure.ts');
+  const base = 'b'.repeat(40),
+    head = 'a'.repeat(40);
+  const content = 'export function first() { return 1; }\nexport function second() { return 2; }\n';
+  const index = indexSources(
+    (...args) => (args[0] === 'ls-tree' ? `100644 blob ${'c'.repeat(40)}\ta.ts\0` : content),
+    [base, head],
+  );
+  expect(index.files[0].sources).toHaveLength(2);
+  const plan = planReview({ number: 1, base, head, lines: { 'a.ts': [1, 2] } }, index, [
+    { path: 'a.ts', patch: '@@ -1,2 +1,2 @@\n-old1\n-old2\n+new1\n+new2\n' },
+  ]);
+  const result = await runPartitionReview(plan, async (input) => {
+    if (input.task.sources.length > 1) throw new ReviewFailure('INPUT_TOKEN_LIMIT', '分割');
+    return { value: response(input), usage: { input: 1, output: 1, total: 2 } };
+  });
+  expect(result.completed).toEqual(plan.tasks.map((t) => t.id));
 });

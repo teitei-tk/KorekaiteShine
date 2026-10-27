@@ -97,8 +97,6 @@ export function invocation(
   priorChecks: PriorAssessment[] = [],
 ): TaskInvocation {
   const data = JSON.stringify({ ...taskData(plan, task), candidates, priorChecks });
-  if (Buffer.byteLength(data) > 400_000)
-    throw new ReviewFailure('BUDGET_EXCEEDED', 'JSON資料が容量上限を超えました');
   const prompt =
     instruction +
     taskInstruction +
@@ -113,8 +111,6 @@ export function invocation(
 export function preflight(plan: ReviewPlan): TaskInvocation[] {
   validatePlan(plan);
   const inputs = plan.tasks.map((task) => invocation(plan, task));
-  if (inputs.some((input) => Buffer.byteLength(input.prompt) > 500_000))
-    throw new ReviewFailure('BUDGET_EXCEEDED', '1回の入力容量を超えました');
   return inputs;
 }
 const sameIds = (a: string[], b: string[]) =>
@@ -266,12 +262,11 @@ export async function runPartitionReview(
   const usage = { input: 0, output: 0, total: 0 };
   let calls = 0,
     inputBytes = 0;
-  const execute = async (input: TaskInvocation) => {
+  const executeOne = async (input: TaskInvocation) => {
     checkTime();
     const bytes = Buffer.byteLength(input.prompt);
     inputBytes += bytes;
     calls++;
-    if (bytes > 500_000) throw new ReviewFailure('BUDGET_EXCEEDED', '実行予算を超えました');
     const result = await invoke(input);
     checkTime();
     let value: TaskResult;
@@ -295,6 +290,49 @@ export async function runPartitionReview(
       throw new ReviewFailure('BUDGET_EXCEEDED', '出力予算を超えました');
     return value;
   };
+  // 実計数がモデル入力上限を超えた場合だけ、担当IDを二分して再計数する。
+  // 単一対象の必須文脈は切り捨てない。料金不足・生成後の失敗は再試行しない。
+  const execute = async (
+    input: TaskInvocation,
+  ): Promise<{ input: TaskInvocation; value: TaskResult }[]> => {
+    try {
+      return [{ input, value: await executeOne(input) }];
+    } catch (error) {
+      if (!(error instanceof ReviewFailure) || error.reason !== 'INPUT_TOKEN_LIMIT') throw error;
+      const ids =
+        input.task.kind === 'reconcile' ? (input.task.candidateIds ?? []) : input.task.obligations;
+      if (ids.length < 2) throw error;
+      const midpoint = Math.ceil(ids.length / 2);
+      const results: { input: TaskInvocation; value: TaskResult }[] = [];
+      for (const group of [ids.slice(0, midpoint), ids.slice(midpoint)]) {
+        checkTime();
+        const obligations = plan.obligations.filter((o) => group.includes(o.id));
+        const selected = input.candidates.filter((c) => group.includes(c.id));
+        const sources = [
+          ...new Set(
+            input.task.kind === 'reconcile'
+              ? [
+                  ...selected.flatMap((c) => c.sources),
+                  ...input.priorChecks.flatMap((c) => c.sources),
+                ]
+              : obligations.flatMap((o) => [...o.sources, ...o.context]),
+          ),
+        ];
+        const task: ReviewTask = {
+          ...input.task,
+          sources,
+          obligations: input.task.kind === 'reconcile' ? [] : group,
+          priorIds: obligations.flatMap((o) => (o.priorId ? [o.priorId] : [])),
+          ...(input.task.kind === 'reconcile' ? { candidateIds: group } : {}),
+        };
+        onTask(task);
+        results.push(
+          ...(await execute(invocation(plan, task, input.candidates, input.priorChecks))),
+        );
+      }
+      return results;
+    }
+  };
   for (const prepared of inputs) {
     const task = prepared.task;
     const related =
@@ -302,26 +340,28 @@ export async function runPartitionReview(
         ? candidates.filter((c) => c.sources.some((id) => task.sources.includes(id)))
         : [];
     onTask(task);
-    const value = await execute(invocation(plan, task, related));
+    const results = await execute(invocation(plan, task, related));
     completed.push(task.id);
-    for (const [index, finding] of value.findings.entries()) {
-      const evidence = value.evidence.find((e) => e.finding === index)!;
-      const candidate: Candidate = {
-        id: digest(`${task.id}:${index}:${JSON.stringify(finding)}`),
-        finding,
-        sources: evidence.sources,
-        priorId: evidence.priorId,
-      };
-      candidates.push(candidate);
+    for (const { value } of results) {
+      for (const [index, finding] of value.findings.entries()) {
+        const evidence = value.evidence.find((e) => e.finding === index)!;
+        const candidate: Candidate = {
+          id: digest(`${task.id}:${candidates.length}:${JSON.stringify(finding)}`),
+          finding,
+          sources: evidence.sources,
+          priorId: evidence.priorId,
+        };
+        candidates.push(candidate);
+      }
+      checks.push(...(value.checks ?? []));
+      assessments.push(
+        ...(value.checks ?? []).map((check) => ({
+          check,
+          sources: value.checkSources.find((c) => c.id === check.id)!.sources,
+        })),
+      );
+      uncertainties.push(...value.uncertainties);
     }
-    checks.push(...(value.checks ?? []));
-    assessments.push(
-      ...(value.checks ?? []).map((check) => ({
-        check,
-        sources: value.checkSources.find((c) => c.id === check.id)!.sources,
-      })),
-    );
-    uncertainties.push(...value.uncertainties);
     progress(completed.length, inputs.length);
   }
   // 候補の原文が1回に収まらなければ容量内の作業へ分割する。異なるパスの意味上の重複も照合できるよう全候補の本文を渡す。
@@ -373,7 +413,17 @@ export async function runPartitionReview(
     onTask(task);
     if (!taskFits(plan, task))
       throw new ReviewFailure('BUDGET_EXCEEDED', '候補整理の資料容量を超えました');
-    const result = await execute(invocation(plan, task, candidates, relatedChecks(batch)));
+    const responses = await execute(invocation(plan, task, candidates, relatedChecks(batch)));
+    for (const response of responses) {
+      if (
+        !sameIds(
+          response.value.decisions.map((d) => d.id),
+          response.input.task.candidateIds ?? [],
+        )
+      )
+        throw new ReviewFailure('OUTPUT_INVALID', '子作業の候補整理の対象が不正です');
+    }
+    const result = { decisions: responses.flatMap((r) => r.value.decisions) };
     if (
       !sameIds(
         result.decisions.map((d) => d?.id),
@@ -382,13 +432,14 @@ export async function runPartitionReview(
     )
       throw new ReviewFailure('OUTPUT_INVALID', '候補整理の対象が不正です');
     for (const decision of result.decisions) {
+      const decisionTask = responses.find((r) => r.value.decisions.includes(decision))!.input.task;
       if (
         !decision ||
         !['keep', 'reject', 'duplicate'].includes(decision.disposition) ||
         typeof decision.reason !== 'string' ||
         !decision.reason.trim() ||
         decision.reason.length > 500 ||
-        !validSources(decision.sources, plan, task) ||
+        !validSources(decision.sources, plan, decisionTask) ||
         (decision.disposition === 'duplicate'
           ? typeof decision.duplicateOf !== 'string' || decision.duplicateOf === decision.id
           : decision.duplicateOf !== null)
@@ -412,7 +463,7 @@ export async function runPartitionReview(
           assessments.find((a) => a.check.id === decision.duplicateOf)?.sources;
         if (
           !targetSources?.length ||
-          !targetSources.every((id) => task.sources.includes(id)) ||
+          !targetSources.every((id) => decisionTask.sources.includes(id)) ||
           !decision.sources.some((id) => targetSources.includes(id))
         )
           throw new ReviewFailure('MISSING_EVIDENCE', '重複先の原文と根拠を同じ確認へ渡せません');

@@ -126,13 +126,12 @@ function parse(
 export function indexSources(
   git: (...args: string[]) => string,
   revisions: string[],
-  limits = { files: 5000, bytes: 20_000_000 },
+  limits = { files: 5000 },
 ): SourceIndex {
   const started = Date.now();
   const blobs = new Map<string, SourceFile>();
   const excluded = new Set<string>();
-  let bytes = 0,
-    count = 0;
+  let count = 0;
   for (const revision of new Set(revisions)) {
     const entries = git('ls-tree', '-r', '-z', revision).split('\0').filter(Boolean);
     if (entries.length > limits.files)
@@ -155,9 +154,6 @@ export function indexSources(
       const content = git('cat-file', 'blob', blob);
       if (Date.now() - started > 120_000)
         throw new ReviewFailure('BUDGET_EXCEEDED', '索引の時間上限を超えました');
-      bytes += Buffer.byteLength(content);
-      if (bytes > limits.bytes)
-        throw new ReviewFailure('BUDGET_EXCEEDED', '索引のバイト上限を超えました');
       if (content.includes('\0')) {
         excluded.add(path);
         continue;
@@ -190,19 +186,6 @@ export function indexSources(
         start += lines;
         offset = boundary;
       }
-      const compact: Source[] = [];
-      for (const source of file.sources) {
-        const previous = compact.at(-1);
-        if (
-          previous &&
-          Buffer.byteLength(previous.content) + Buffer.byteLength(source.content) <= 80_000
-        ) {
-          previous.content += source.content;
-          previous.end = source.end;
-          previous.id = digest(`${path}:${previous.start}:${previous.content}`);
-        } else compact.push({ ...source });
-      }
-      file.sources = compact;
       blobs.set(key, file);
     }
   }

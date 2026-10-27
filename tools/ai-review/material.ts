@@ -3,7 +3,7 @@ import { indexSources } from './source-index.ts';
 import { planReview } from './partition.ts';
 import type { PriorFinding } from './history.ts';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, openSync, closeSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPOSITORY } from './policy.ts';
 import type { PullRequest } from './policy.ts';
@@ -52,25 +52,33 @@ export function collect(
   priorFindings: PriorFinding[] = [],
 ): Material {
   const bare = mkdtempSync(join(directory, 'git-'));
-  const git = (...args: string[]) =>
-    execFileSync(
-      'git',
-      ['-c', 'core.hooksPath=/dev/null', '-c', 'diff.external=', '-C', bare, ...args],
-      {
-        encoding: 'utf8',
-        maxBuffer: 2_000_000,
-        timeout: 60_000,
-        env: {
-          PATH: process.env.PATH,
-          HOME: bare,
-          GIT_CONFIG_NOSYSTEM: '1',
-          GIT_CONFIG_GLOBAL: '/dev/null',
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_LFS_SKIP_SMUDGE: '1',
+  const git = (...args: string[]) => {
+    const output = join(bare, 'command-output');
+    const fd = openSync(output, 'w');
+    try {
+      execFileSync(
+        'git',
+        ['-c', 'core.hooksPath=/dev/null', '-c', 'diff.external=', '-C', bare, ...args],
+        {
+          encoding: 'utf8',
+          timeout: 60_000,
+          env: {
+            PATH: process.env.PATH,
+            HOME: bare,
+            GIT_CONFIG_NOSYSTEM: '1',
+            GIT_CONFIG_GLOBAL: '/dev/null',
+            GIT_TERMINAL_PROMPT: '0',
+            GIT_LFS_SKIP_SMUDGE: '1',
+          },
+          stdio: ['ignore', fd, 'ignore'],
         },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      },
-    );
+      );
+      return readFileSync(output, 'utf8');
+    } finally {
+      closeSync(fd);
+      rmSync(output, { force: true });
+    }
+  };
   git('init', '--bare');
   // 公開リポジトリだけを認証情報なしで取得。checkoutやPR内のコード実行はしない。
   git(
@@ -123,14 +131,10 @@ export function collectFromGit(
     title: pr.title,
     body: pr.body,
   };
-  if (Buffer.byteLength(JSON.stringify(metadata)) > 400_000)
-    throw new ReviewFailure('BUDGET_EXCEEDED', '変更行と指摘履歴の情報が400KBを超えました');
   const index = indexSources(git, [ancestor, pr.base.sha, pr.head.sha]);
   index.excluded = [...new Set([...index.excluded, ...paths.filter((p) => !isMaterialPath(p))])];
   const plan = planReview(metadata, index, patches);
   const serializedPlan = JSON.stringify(plan);
-  if (Buffer.byteLength(serializedPlan) > 6_000_000)
-    throw new ReviewFailure('BUDGET_EXCEEDED', '分割計画の容量を超えました');
   writeFileSync(join(directory, 'plan.json'), serializedPlan);
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
   return metadata;

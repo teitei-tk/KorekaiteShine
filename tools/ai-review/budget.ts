@@ -3,11 +3,11 @@ import type { GenerationOrigin } from './artifact.ts';
 import { ReviewFailure } from './failure.ts';
 
 // 1 USD = 10^9 units。公表単価と確認日を版に固定。Standard / 30mのみ。
-export const BUDGET_RECORD_BYTES = 6_000_000;
 export const LIMIT = 1_000_000_000;
 export const MODEL = 'gpt-6-luna';
 export const PRICE_VERSION = 'gpt-6-luna-standard-30m-2026-10-25';
 export const MAX_OUTPUT = 8000;
+export const MAX_INPUT = 922_000;
 export interface BillingUsage {
   input: number;
   cached: number;
@@ -73,7 +73,9 @@ export function cost(u: BillingUsage): number {
   );
 }
 export function maximumCost(input: number): number {
-  if (!integer(input, 922_000)) throw new ReviewFailure('TOKEN_COUNT_FAILED', '入力計数が不正です');
+  if (!integer(input)) throw new ReviewFailure('TOKEN_COUNT_FAILED', '入力計数が不正です');
+  if (input > MAX_INPUT)
+    throw new ReviewFailure('INPUT_TOKEN_LIMIT', '入力トークン上限を超えました');
   const r = rates(input);
   return input * r.written + MAX_OUTPUT * r.output;
 }
@@ -147,8 +149,6 @@ export class BudgetLedger {
   private save(): void {
     if (!validBudget(this.record)) throw new ReviewFailure('USAGE_INVALID', '費用記録が不正です');
     const json = JSON.stringify(this.record);
-    if (Buffer.byteLength(json) > BUDGET_RECORD_BYTES)
-      throw new ReviewFailure('BUDGET_EXCEEDED', '費用記録の容量を超えました');
     writeFileSync(this.path + '.tmp', json, { mode: 0o600 });
     renameSync(this.path + '.tmp', this.path);
   }

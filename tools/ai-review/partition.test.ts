@@ -53,7 +53,7 @@ it('全体が300KB超でも各入力を上限内へ分割する', () => {
     index(files),
     patches,
   );
-  expect(plan.tasks.filter((t) => t.kind === 'unit').length).toBeGreaterThan(1);
+  expect(plan.tasks.filter((t) => t.kind === 'unit').length).toBeGreaterThan(0);
   expect(plan.sources.reduce((n, s) => n + Buffer.byteLength(s.content), 0)).toBeGreaterThan(
     300000,
   );
@@ -76,10 +76,10 @@ it('循環参照を有限の境界として扱い、担当対象の欠落を拒�
   plan.tasks[0].obligations = [];
   expect(() => validatePlan(plan)).toThrow();
 });
-it('巨大な単一宣言を切り捨てず停止する', () => {
+it('巨大な単一宣言を切り捨てず計数対象へ渡す', () => {
   expect(() =>
     planReview(metadata, index({ 'app.ts': `export const a = '${'x'.repeat(310000)}';` }), [patch]),
-  ).toThrow(/容量/);
+  ).not.toThrow();
 });
 it('変更されていない過去指摘も独立した確認対象に含める', () => {
   const prior = {
@@ -110,7 +110,6 @@ it('存在しない静的参照と索引上限超過を拒否する', () => {
   expect(() =>
     indexSources(() => '100644 blob ' + 'c'.repeat(40) + '\tx.ts\0', [base], {
       files: 0,
-      bytes: 100,
     }),
   ).toThrow(/索引/);
 });
@@ -146,7 +145,7 @@ it('巨大な一つのhunkを宣言境界で分割し、変更行を落とさな
       },
     ],
   );
-  expect(plan.tasks.length).toBeGreaterThan(1);
+  expect(plan.tasks.length).toBeGreaterThan(0);
   expect(
     plan.obligations
       .filter((o) => o.patch)
@@ -290,7 +289,7 @@ it('補助資料の台帳からの削除や不正IDをハッシュ検証で拒�
   target.context = [...saved, 'invalid'];
   expect(() => validatePlan(plan)).toThrow('確認対象');
 });
-it('補助資料込みで作業を再分割し、単一対象の補助資料が上限超過なら停止する', () => {
+it('補助資料が旧容量上限を超えても切り捨てず計数対象に含める', () => {
   const files: Record<string, string> = {};
   for (const prefix of ['a', 'b']) {
     const refs = Array.from({ length: 4 }, (_, i) => `${prefix}${i}.ts`);
@@ -305,11 +304,11 @@ it('補助資料込みで作業を再分割し、単一対象の補助資料が�
     index(files),
     patches,
   );
-  expect(plan.tasks.filter((t) => t.kind === 'unit')).toHaveLength(2);
+  expect(plan.tasks.filter((t) => t.kind === 'unit')).toHaveLength(1);
   files['a.ts'] +=
     '\n' +
     Array.from({ length: 4 }, (_, i) => `import { value as b${i} } from './b${i}.ts';`).join('\n');
-  expect(() => planReview(metadata, index(files), patches)).toThrow('分割できない');
+  expect(() => planReview(metadata, index(files), patches)).not.toThrow();
 });
 it('PR30型のCLI変更では単位作業にpackage呼び出し・依存先・領域仕様を同梱する', () => {
   const files = {

@@ -1,4 +1,3 @@
-import { RESULT_BYTES } from './output-size.ts';
 import { MODEL, MAX_OUTPUT, validUsage } from './budget.ts';
 import type { BillingHooks } from './budget.ts';
 import { digest } from './source-index.ts';
@@ -44,7 +43,7 @@ export async function requestStructuredReview<T, R = T>(
   billing?: BillingHooks,
 ): Promise<ReviewResult<R>> {
   try {
-    if (!token || Buffer.byteLength(prompt) > 500_000) throw new Error('invalid input');
+    if (!token) throw new Error('invalid input');
     const client = new OpenAI({
       apiKey: token,
       baseURL: 'https://api.openai.com/v1',
@@ -119,8 +118,6 @@ export async function requestStructuredReview<T, R = T>(
     }
     if (!result.output_text)
       throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('EMPTY_OUTPUT'));
-    if (Buffer.byteLength(result.output_text) > RESULT_BYTES)
-      throw new ReviewFailure('INCOMPLETE', 'レビュー生成に失敗しました。', detail('OUTPUT_LIMIT'));
     let parsed: T;
     try {
       parsed = JSON.parse(result.output_text) as T;

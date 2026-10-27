@@ -136,7 +136,7 @@ it.each([
 it.each([
   ['', 'EMPTY_OUTPUT'],
   ['not-json SECRET', 'INVALID_JSON'],
-  ['x'.repeat(30001), 'OUTPUT_LIMIT'],
+  ['x'.repeat(30001), 'INVALID_JSON'],
 ])('出力不正の詳細に生出力を含めない: %s', async (text, subcode) => {
   await expect(
     generateReview('SECRET_TOKEN', 'SECRET_PROMPT', {}, async () => response('completed', text)),

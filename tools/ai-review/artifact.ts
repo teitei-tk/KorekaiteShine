@@ -23,9 +23,9 @@ interface ExecutionRecord {
   inputBytes: number;
   usage: PartitionResult['usage'];
 }
-export function readBounded(path: string, max: number): string {
+export function readArtifactText(path: string): string {
   const stat = statSync(path);
-  if (!stat.isFile() || stat.size > max) throw new Error('成果物の容量が不正です');
+  if (!stat.isFile()) throw new Error('成果物の容量が不正です');
   return readFileSync(path, 'utf8');
 }
 function validOrigin(origin: GenerationOrigin): boolean {
@@ -43,12 +43,11 @@ export function writePartitionArtifact(
   origin: GenerationOrigin,
 ): void {
   if (!validOrigin(origin)) throw new Error('生成元が不正です');
-  const planText = readBounded(join(directory, 'plan.json'), 6_000_000);
-  const metadataText = readBounded(join(directory, 'metadata.json'), 400_000);
+  const planText = readArtifactText(join(directory, 'plan.json'));
+  const metadataText = readArtifactText(join(directory, 'metadata.json'));
   if (JSON.stringify(plan) !== planText || JSON.stringify(plan.metadata) !== metadataText)
     throw new Error('生成中に入力が変わりました');
   const resultText = JSON.stringify(result.review);
-  if (Buffer.byteLength(resultText) > 100_000) throw new Error('最終結果の容量を超えました');
   const record: ExecutionRecord = {
     version: 1,
     origin,
@@ -65,12 +64,10 @@ export function writePartitionArtifact(
   verifyPartitionArtifact(directory, origin);
 }
 export function verifyPartitionArtifact(directory: string, expected: GenerationOrigin): void {
-  const record = JSON.parse(
-    readBounded(join(directory, 'execution.json'), 30_000),
-  ) as ExecutionRecord;
-  const planText = readBounded(join(directory, 'plan.json'), 6_000_000);
-  const metadataText = readBounded(join(directory, 'metadata.json'), 400_000);
-  const resultText = readBounded(join(directory, 'result.json'), 100_000);
+  const record = JSON.parse(readArtifactText(join(directory, 'execution.json'))) as ExecutionRecord;
+  const planText = readArtifactText(join(directory, 'plan.json'));
+  const metadataText = readArtifactText(join(directory, 'metadata.json'));
+  const resultText = readArtifactText(join(directory, 'result.json'));
   if (
     !record ||
     record.version !== 1 ||
@@ -94,7 +91,6 @@ export function verifyPartitionArtifact(directory: string, expected: GenerationO
     record.calls < plan.tasks.length ||
     !Number.isInteger(record.inputBytes) ||
     record.inputBytes < 1 ||
-    record.inputBytes > record.calls * 500_000 ||
     !record.usage ||
     !Number.isInteger(record.usage.output) ||
     record.usage.output < 0 ||

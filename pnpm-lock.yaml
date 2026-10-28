@@ -182,8 +182,8 @@ importers:
         specifier: 15.0.3
         version: 15.0.3
       openai:
-        specifier: 7.43.0
-        version: 7.43.0
+        specifier: 7.45.0
+        version: 7.45.0
       typescript-parser:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
@@ -1084,8 +1084,8 @@ packages:
     resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
     engines: {node: '>=12.20.0'}
 
-  openai@7.43.0:
-    resolution: {integrity: sha512-fBjKaDFG8AVfkGYoIo/E+xNRlNk7nx2nQ9GoQtXfePzPjg4QcT6nejkhXayJnEwSpFGfthOrAPI2KXj5yAqg9A==}
+  openai@7.45.0:
+    resolution: {integrity: sha512-krAWw8RRzV5OGGjD9JR3QKDEB+DU5k4YIOyHfdJaNAU9qkV2W1OvGszk9+bxQo9kZ8+//1gEDflgXVFpMH7Lrg==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
@@ -1961,7 +1961,7 @@ snapshots:
 
   obug@3.0.0: {}
 
-  openai@7.43.0: {}
+  openai@7.45.0: {}
 
   oxfmt@0.74.0:
     dependencies:

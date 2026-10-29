@@ -19,7 +19,7 @@ chown ai-review:ai-review /home/ai-review/.codex/installation_id
 chmod 600 /home/ai-review/.codex/installation_id
 printf 'sandbox_mode = "danger-full-access"\napproval_policy = "never"\n' > /opt/ai-review-probe/pr/.codex/config.toml
 # sudoの許可リストを空にし、実HOMEを使う。独自の環境除去ラッパーは作らない。
-printf 'Defaults:root env_reset\nDefaults:root !env_keep\nDefaults:root !env_check\n' > /etc/sudoers.d/ai-review-probe
+printf 'Defaults:root env_reset\nDefaults:root !env_keep\nDefaults:root !env_check\nDefaults:runner env_reset\nDefaults:runner !env_keep\nDefaults:runner !env_check\n' > /etc/sudoers.d/ai-review-probe
 chmod 440 /etc/sudoers.d/ai-review-probe
 visudo -cf /etc/sudoers.d/ai-review-probe
 # コンパイル済みの検査コードだけをコピー。資格情報・ソケットは持ち込まない。

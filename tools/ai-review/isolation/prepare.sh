@@ -3,7 +3,7 @@
 set -euo pipefail
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts isolation/wif.ts \
+  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts isolation/wif.ts isolation/model.ts \
   --rewriteRelativeImportExtensions --module NodeNext --target ES2022 --skipLibCheck --outDir "$RUNNER_TEMP/isolation-compiled"
 curl --fail --location --proto '=https' --tlsv1.2 \
   https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-x86_64-unknown-linux-musl.tar.gz \

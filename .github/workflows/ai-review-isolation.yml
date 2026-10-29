@@ -8,7 +8,11 @@ permissions:
 
 jobs:
   isolation:
-    name: Verify official isolation with dummy credentials
+    name: Verify official isolation (${{ matrix.result }})
+    strategy:
+      fail-fast: false
+      matrix:
+        result: [complete, reject]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -33,7 +37,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-            isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts \
+            isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts \
             --module NodeNext --target ES2022 --skipLibCheck --outDir "$RUNNER_TEMP/isolation-compiled"
       - name: Install pinned official CLI and OS tools
         shell: bash
@@ -45,6 +49,12 @@ jobs:
           echo "90dd0b03b28afcb7fa733a4f73b413db2916a47347efd43fb669cc1c774ee8e4  $RUNNER_TEMP/codex.tar.gz" | sha256sum --check --status
           tar -xzf "$RUNNER_TEMP/codex.tar.gz" -C "$RUNNER_TEMP"
           sudo install -m 755 "$RUNNER_TEMP/codex-x86_64-unknown-linux-musl" /usr/local/bin/codex
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-responses-api-proxy-x86_64-unknown-linux-musl.tar.gz \
+            -o "$RUNNER_TEMP/proxy.tar.gz"
+          echo "688d0d2b2944f47be81e9b9133786950e765d22ff6c709ba7627820eaae330c1  $RUNNER_TEMP/proxy.tar.gz" | sha256sum --check --status
+          tar -xzf "$RUNNER_TEMP/proxy.tar.gz" -C "$RUNNER_TEMP"
+          sudo install -m 755 "$RUNNER_TEMP/codex-responses-api-proxy-x86_64-unknown-linux-musl" /usr/local/bin/codex-responses-api-proxy
           sudo ln -sf "$(command -v node)" /usr/local/bin/node
           sudo apt-get update -qq
           sudo apt-get install -y bubblewrap
@@ -65,3 +75,39 @@ jobs:
           # モデルの代わりに400を返すローカル受信器だけを使う。外部通信経路を作らない。
           sudo unshare --net bash -c 'ip link set lo up; exec /usr/local/bin/node /opt/ai-review-probe/startup.js "$1"' \
             bash "$GITHUB_WORKSPACE/.official-codex-action/dist/main.js"
+      - name: Prepare isolated official proxy with dummy credential
+        id: prepare
+        env:
+          FIXTURE_MODE: ${{ matrix.result }}
+        run: |
+          # npm等の準備はrunner UIDで実行する。専用UIDと模擬資格情報を持つrootは外へ通信できない。
+          for uid in 0 2001; do
+            sudo iptables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT
+            sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT
+          done
+          sudo /usr/local/bin/node /opt/ai-review-probe/lifecycle.js prepare "$FIXTURE_MODE" "$GITHUB_RUN_ID"
+      - name: Run complete official Action against local fixture
+        id: full
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: ./.official-codex-action
+        with:
+          codex-version: 0.164.0
+          openai-api-key: ''
+          allow-users: ${{ github.actor }}
+          prompt: Return the fixed offline fixture response.
+          working-directory: /opt/ai-review-probe/pr
+          codex-home: /home/ai-review/.codex
+          safety-strategy: unprivileged-user
+          codex-user: ai-review
+          sandbox: read-only
+          codex-args: '["--ephemeral"]'
+      - name: Verify result and stop official proxy
+        if: ${{ always() && steps.prepare.outcome == 'success' }}
+        env:
+          FIXTURE_MODE: ${{ matrix.result }}
+          FIXTURE_OUTCOME: ${{ steps.full.outcome }}
+          FIXTURE_OUTPUT: ${{ steps.full.outputs.final-message }}
+        run: |
+          sudo --preserve-env=FIXTURE_OUTPUT /usr/local/bin/node /opt/ai-review-probe/lifecycle.js \
+            finish "$FIXTURE_MODE" "$FIXTURE_OUTCOME"

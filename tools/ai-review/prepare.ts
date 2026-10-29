@@ -1,9 +1,8 @@
-import { reviewHistory } from './history.ts';
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
-import { githubApi, target, comments, reviewComments } from './github.ts';
+import { readInlineHistory } from './history.ts';
+import { loadSnapshot } from './snapshot.ts';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { githubApi, target, ownComment } from './github.ts';
 import type { Api } from './github.ts';
-import { join } from 'node:path';
-import { preflight } from './partition-review.ts';
 import { collect } from './material.ts';
 import { ReviewFailure } from './failure.ts';
 import type { FailureReason } from './failure.ts';
@@ -40,17 +39,22 @@ export async function prepareReview(
       mkdirSync(directory, { recursive: true });
       targetId = 'history';
       fallback = 'HISTORY_FAILED';
-      const [legacy, inline] = await Promise.all([
-        comments(client, pr.number),
-        reviewComments(client, pr.number),
-      ]);
-      const history = reviewHistory(legacy, inline, pr.head.sha, pr.base.sha);
+      const history = await loadSnapshot(client, pr.number);
+      if (
+        readInlineHistory(history.inline).some(
+          (f) => f.head === pr.head.sha && f.base === pr.base.sha,
+        ) ||
+        [...history.issues, ...history.inline].some(
+          (c) =>
+            ownComment(c) &&
+            /<!-- generation:v2:\d+:\d+:/.test(c.body) &&
+            c.body.includes(`:${pr.head.sha}:${pr.base.sha} -->`),
+        )
+      )
+        throw new Error('途中投稿があります。同じArtifactで投稿を再開してください');
       targetId = 'collect';
       fallback = 'COLLECTION_FAILED';
-      collectMaterial(pr, directory, history);
-      targetId = 'preflight';
-      fallback = 'INPUT_INVALID';
-      preflight(JSON.parse(readFileSync(join(directory, 'plan.json'), 'utf8')));
+      collectMaterial(pr, directory, history, env.SOURCE_RUN_ID!);
     }
     appendFileSync(
       env.GITHUB_OUTPUT!,

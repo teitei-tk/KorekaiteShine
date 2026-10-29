@@ -58,6 +58,14 @@ export async function notifyFailure(
 ): Promise<NotificationResult> {
   const accepted = await failureTarget(api, id, attempt);
   if (!accepted || accepted.run.conclusion === 'success') return { status: 'skipped' };
+  // 投稿の失敗通知も履歴改訂になる。同じArtifactからの再開を壊さないため、
+  // 投稿へ進んだ実行はチェック・Actionsだけで通知する（timeout/cancelも含む）。
+  const jobs = await api<{ jobs: { name: string; conclusion: string | null }[] }>(
+    `actions/runs/${id}/attempts/${attempt}/jobs?per_page=100`,
+  );
+  if (!Array.isArray(jobs.jobs) || jobs.jobs.length >= 100) throw new Error('ジョブ一覧が不正です');
+  if (jobs.jobs.some((j) => j.name === 'publish' && j.conclusion !== 'skipped'))
+    return { status: 'skipped' };
   const outcome = await completedOutcome(api, accepted.run, directory);
   if (outcome.conclusion === 'success' || outcome.conclusion === 'neutral')
     return { status: 'skipped' };

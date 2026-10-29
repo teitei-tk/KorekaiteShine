@@ -3,7 +3,6 @@ import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareReview } from './prepare.ts';
-import { collectFromGit } from './material.ts';
 import type { Api } from './github.ts';
 
 const head = 'a'.repeat(40),
@@ -27,105 +26,20 @@ const run = {
 };
 const api: Api = async <T>(path: string) => {
   if (path === 'actions/runs/1') return run as T;
+  if (path === 'graphql')
+    return {
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+          },
+        },
+      },
+    } as T;
   if (path === 'pulls/7') return pr as T;
   if (path.includes('/comments?')) return [] as T;
   throw new Error('Unexpected fixture path');
 };
-it.each(['collection-limit', 'unresolved', 'large-input', 'external-error', 'success', 'skip'])(
-  '準備処理のActions概要と許可判定: %s',
-  async (scenario) => {
-    const directory = mkdtempSync(join(tmpdir(), 'prepare-review-'));
-    try {
-      const env = {
-        AI_REVIEW_MODE: 'review',
-        SOURCE_RUN_ID: '1',
-        REVIEW_DIRECTORY: directory,
-        GITHUB_STEP_SUMMARY: join(directory, 'summary.md'),
-        GITHUB_OUTPUT: join(directory, 'outputs'),
-        GITHUB_RUN_ID: '20',
-        GITHUB_RUN_ATTEMPT: '1',
-        AI_REVIEW_JOB: 'generate',
-        AI_REVIEW_REPORT: join(directory, 'status.json'),
-      };
-      const files =
-        scenario === 'large-input' ? Array.from({ length: 10 }, (_, i) => `f${i}.ts`) : ['app.ts'];
-      let collections = 0;
-      const collect: typeof collectFromGit = (target, dir, _git, prior) =>
-        collectFromGit(
-          target,
-          dir,
-          (...args) => {
-            if (scenario === 'external-error') throw new Error('SECRET PR本文 予算 token');
-            if (args[0] === 'merge-base') return base;
-            if (args[0] === 'diff' && args.includes('--name-only'))
-              return (
-                scenario === 'collection-limit'
-                  ? Array.from({ length: 5001 }, (_, i) => `f${i}.ts`)
-                  : files
-              ).join('\0');
-            if (args[0] === 'diff') return '@@ -1 +1 @@\n-old\n+new\n';
-            if (args[0] === 'ls-tree')
-              return files
-                .map((p, i) => `100644 blob ${i.toString(16).padStart(40, '0')}\t${p}\0`)
-                .join('');
-            if (args[0] === 'cat-file')
-              return scenario === 'unresolved'
-                ? 'import "./missing.ts";'
-                : `export const a = '${'x'.repeat(scenario === 'large-input' ? 220000 : 1)}';`;
-            throw new Error('Unexpected fixture git command');
-          },
-          prior,
-        );
-      const execute = () =>
-        prepareReview(
-          'collect',
-          env,
-          scenario === 'skip' ? async <T>() => ({ ...run, conclusion: 'failure' }) as T : api,
-          (p, d, history) => {
-            collections++;
-            return collect(p, d, () => '', history);
-          },
-        );
-      if (scenario === 'success' || scenario === 'skip' || scenario === 'large-input') {
-        await execute();
-        expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain(`allowed=${scenario !== 'skip'}`);
-        expect(existsSync(env.GITHUB_STEP_SUMMARY)).toBe(false);
-        expect(collections).toBe(scenario === 'skip' ? 0 : 1);
-      } else {
-        await expect(execute()).rejects.toThrow();
-        const summary = readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
-        expect(summary).toContain('完了0件');
-        expect(summary).toContain(`対象: ${scenario === 'large-input' ? 'preflight' : 'collect'}`);
-        expect(summary).toContain(
-          scenario === 'unresolved'
-            ? 'UNRESOLVED_REFERENCE'
-            : scenario === 'external-error'
-              ? 'COLLECTION_FAILED'
-              : 'BUDGET_EXCEEDED',
-        );
-        expect(summary).not.toContain('SECRET');
-        expect(summary).not.toContain('token');
-        expect(JSON.parse(readFileSync(env.AI_REVIEW_REPORT, 'utf8'))).toMatchObject({
-          run: '20',
-          attempt: '1',
-          job: 'generate',
-          status: 'failure',
-          target: scenario === 'large-input' ? 'preflight' : 'collect',
-          reason:
-            scenario === 'unresolved'
-              ? 'UNRESOLVED_REFERENCE'
-              : scenario === 'external-error'
-                ? 'COLLECTION_FAILED'
-                : 'BUDGET_EXCEEDED',
-        });
-        expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain('allowed=false');
-        expect(existsSync(join(directory, 'result.json'))).toBe(false);
-      }
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  },
-);
 it('CLI失敗は非ゼロ終了し、生成器に到達しなくても概要を記録する', async () => {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');

@@ -1,22 +1,10 @@
-import { ReviewFailure } from './failure.ts';
-import { indexSources } from './source-index.ts';
-import { planReview } from './partition.ts';
-import type { PriorFinding } from './history.ts';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, openSync, closeSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, openSync, closeSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { REPOSITORY } from './policy.ts';
-import type { PullRequest } from './policy.ts';
-
-export function isMaterialPath(path: string): boolean {
-  if (
-    /(^|\/)(\.env[^/]*|\.codex|\.agents|node_modules|dist|build|coverage|\.git)(\/|$)/i.test(path)
-  )
-    return false;
-  if (/(^|\/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|actions\.lock)$/.test(path))
-    return false;
-  return /\.(md|ts|tsx|js|jsx|mjs|cjs|json|yml|yaml|toml|css|html|sql)$/.test(path);
-}
+import { REPOSITORY, type PullRequest } from './policy.ts';
+import { reviewHistory } from './history.ts';
+import { validateMetadata, type Metadata } from './artifact.ts';
+import { type Snapshot } from './snapshot.ts';
 export function changedLines(patch: string): number[] {
   let line = 0;
   const result: number[] = [];
@@ -35,36 +23,28 @@ export function changedLines(patch: string): number[] {
   }
   return result;
 }
-export interface Material {
-  number: number;
-  head: string;
-  base: string;
-  lines: Record<string, number[]>;
-  priorFindings?: PriorFinding[];
-  ancestor?: string;
-  partitionVersion?: 1;
-  title?: string;
-  body?: string | null;
-}
+
+export type Material = Metadata;
 export function collect(
   pr: PullRequest,
   directory: string,
-  priorFindings: PriorFinding[] = [],
-): Material {
-  const bare = mkdtempSync(join(directory, 'git-'));
+  history: Snapshot,
+  sourceRun: string,
+): Metadata {
+  const repository = join(directory, 'repository');
+  mkdirSync(repository, { recursive: true });
   const git = (...args: string[]) => {
-    const output = join(bare, 'command-output');
+    const output = join(directory, 'git-output');
     const fd = openSync(output, 'w');
     try {
       execFileSync(
         'git',
-        ['-c', 'core.hooksPath=/dev/null', '-c', 'diff.external=', '-C', bare, ...args],
+        ['-c', 'core.hooksPath=/dev/null', '-c', 'diff.external=', '-C', repository, ...args],
         {
-          encoding: 'utf8',
-          timeout: 60_000,
+          timeout: 120000,
           env: {
             PATH: process.env.PATH,
-            HOME: bare,
+            HOME: directory,
             GIT_CONFIG_NOSYSTEM: '1',
             GIT_CONFIG_GLOBAL: '/dev/null',
             GIT_TERMINAL_PROMPT: '0',
@@ -79,63 +59,63 @@ export function collect(
       rmSync(output, { force: true });
     }
   };
-  git('init', '--bare');
-  // 公開リポジトリだけを認証情報なしで取得。checkoutやPR内のコード実行はしない。
-  git(
-    'fetch',
-    '--no-tags',
-    '--depth=200',
-    `https://github.com/${REPOSITORY}.git`,
-    pr.base.sha,
-    pr.head.sha,
-  );
-  return collectFromGit(pr, directory, git, priorFindings);
+  git('init');
+  git('fetch', '--no-tags', `https://github.com/${REPOSITORY}.git`, pr.base.sha, pr.head.sha);
+  git('checkout', '--detach', '--force', pr.head.sha);
+  return collectFromGit(pr, directory, git, history, sourceRun);
 }
-
 export function collectFromGit(
   pr: PullRequest,
   directory: string,
   git: (...args: string[]) => string,
-  priorFindings: PriorFinding[] = [],
-): Material {
+  history: Snapshot,
+  sourceRun: string,
+): Metadata {
   const ancestor = git('merge-base', pr.base.sha, pr.head.sha).trim();
   if (!/^[a-f0-9]{40}$/.test(ancestor)) throw new Error('比較元を確定できません');
   const paths = git('diff', '--name-only', '-z', '--no-renames', ancestor, pr.head.sha)
     .split('\0')
     .filter(Boolean);
-  if (paths.length > 5000) throw new ReviewFailure('BUDGET_EXCEEDED', '変更一覧の上限を超えました');
   const lines: Record<string, number[]> = Object.create(null);
-  const patches = paths.filter(isMaterialPath).map((path) => {
-    const patch = git(
-      'diff',
-      '--no-ext-diff',
-      '--no-textconv',
-      '--no-renames',
-      '--unified=3',
-      ancestor,
-      pr.head.sha,
-      '--',
-      path,
+  for (const path of paths)
+    lines[path] = changedLines(
+      git(
+        'diff',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--no-renames',
+        '--unified=3',
+        ancestor,
+        pr.head.sha,
+        '--',
+        path,
+      ),
     );
-    lines[path] = changedLines(patch);
-    return { path, patch };
-  });
-  const metadata: Material = {
+  const metadata = validateMetadata({
+    version: 2,
+    repository: REPOSITORY,
     number: pr.number,
     head: pr.head.sha,
     base: pr.base.sha,
-    ancestor,
+    sourceRun,
     lines,
-    priorFindings,
-    partitionVersion: 1,
-    title: pr.title,
-    body: pr.body,
-  };
-  const index = indexSources(git, [ancestor, pr.base.sha, pr.head.sha]);
-  index.excluded = [...new Set([...index.excluded, ...paths.filter((p) => !isMaterialPath(p))])];
-  const plan = planReview(metadata, index, patches);
-  const serializedPlan = JSON.stringify(plan);
-  writeFileSync(join(directory, 'plan.json'), serializedPlan);
+    history,
+  });
   writeFileSync(join(directory, 'metadata.json'), JSON.stringify(metadata));
+  writeFileSync(join(directory, 'history.json'), JSON.stringify(history));
+  writeFileSync(
+    join(directory, 'request.json'),
+    JSON.stringify({
+      number: pr.number,
+      title: pr.title ?? '',
+      body: pr.body ?? '',
+      head: pr.head.sha,
+      base: pr.base.sha,
+      ancestor,
+      changedLines: lines,
+      priorFindings: reviewHistory(history.issues, history.inline, pr.head.sha, pr.base.sha),
+      historyFile: '/opt/ai-review/context/history.json',
+    }),
+  );
   return metadata;
 }

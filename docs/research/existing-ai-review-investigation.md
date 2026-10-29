@@ -46,7 +46,7 @@
 
 ## 現行方式との重要な差分
 
-現行KorekaiteShineは、渡した静的資料だけで作業を完了させ、不可欠な資料が不足すれば未完了にする。追加取得や後続への引き継ぎはなく、必須作業の一つでも未完了なら部分結果を投稿しない。ユーザーの既存実装はCodexにリポジトリの調査を任せるため、この資料取得と終了条件が異なる。ただし、この違いだけで過去の停止原因を特定できるわけではない。[現行のモデル指示](../../tools/ai-review/partition-review.ts)、[現行の失敗処理](../../tools/ai-review/orchestrate.ts)、[ADR 0005](../adr/0005-partitioned-ai-review.md)
+現行KorekaiteShineは、渡した静的資料だけで作業を完了させ、不可欠な資料が不足すれば未完了にする。追加取得や後続への引き継ぎはなく、必須作業の一つでも未完了なら部分結果を投稿しない。ユーザーの既存実装はCodexにリポジトリの調査を任せるため、この資料取得と終了条件が異なる。ただし、この違いだけで過去の停止原因を特定できるわけではない。[現行のモデル指示](https://github.com/teitei-tk/KorekaiteShine/blob/bee23229456ef3315c5493987ab5876da616a56e/tools/ai-review/partition-review.ts)、[現行の失敗処理](https://github.com/teitei-tk/KorekaiteShine/blob/bee23229456ef3315c5493987ab5876da616a56e/tools/ai-review/orchestrate.ts)、[ADR 0005](../adr/0005-partitioned-ai-review.md)
 
 認証も移植の前提になる。現行の[運用記録](../runbooks/ai-review.md)には、2026年10月24日にOpenAI WIFの交換には成功したが、Codex Action内プロキシの認証文字列1,024バイト制限で停止し、OpenAI SDKへ変更したとある。ユーザーの既存実装は長期の`OPENAI_API_KEY`を渡す構成である。WIFを維持したままActionへ戻す互換性は、今回の調査では確認していない。
 

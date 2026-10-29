@@ -50,15 +50,20 @@ function fixture(reason = 'OUTPUT_INVALID') {
   let failPost = false,
     changeOnComments = false,
     commentReads = 0;
-  const api: Api = async <T>(path: string, method?: string, body?: { body: string }) => {
+  const api: Api = async <T>(
+    path: string,
+    method?: string,
+    body?: import('./github.ts').ApiBody,
+  ) => {
     if (method) {
       expect(path).toBe('issues/7/comments');
       expect(method).toBe('POST');
       if (failPost) throw new Error('SECRET_EXTERNAL_ERROR');
-      posted.push(body!.body);
+      if (!body || !('body' in body)) throw new Error('missing body');
+      posted.push(body.body);
       const comment = {
         id: 100,
-        body: body!.body,
+        body: body.body,
         user: { id: 41898282, login: 'github-actions[bot]', type: 'Bot' },
       };
       prior.push(comment);
@@ -268,3 +273,26 @@ it('出力不足は料金超過と区別してPRに日本語で通知する', as
   expect(f.posted[0]).toContain('料金の上限超過ではありません');
   expect(f.posted[0]).toContain('actions/runs/20/attempts/1');
 });
+it.each(['failure', 'cancelled', 'timed_out'])(
+  '投稿開始後の%sは履歴を変えず既存チェックに残す',
+  async (conclusion) => {
+    const f = fixture('PUBLISH_FAILED');
+    f.run.conclusion = conclusion;
+    const api: Api = async <T>(
+      path: string,
+      method?: string,
+      body?: import('./github.ts').ApiBody,
+    ) => {
+      if (path.startsWith('actions/runs/20/attempts/1/jobs'))
+        return {
+          jobs: [
+            { name: 'generate', conclusion: 'success' },
+            { name: 'publish', conclusion },
+          ],
+        } as T;
+      return f.api<T>(path, method, body);
+    };
+    expect(await notifyFailure(api, 20, 1, f.directory)).toEqual({ status: 'skipped' });
+    expect(f.posted).toHaveLength(0);
+  },
+);

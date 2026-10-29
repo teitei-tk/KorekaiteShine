@@ -1,45 +1,34 @@
 import { expect, it } from 'vitest';
-import { changedLines, isMaterialPath } from './material.ts';
-it('hunkの新しい側の行を取り出し、削除行を新側の指摘位置にしない', () => {
-  expect(changedLines('@@ -1,3 +1,3 @@\n same\n-old\n+new\n same\n')).toEqual([2]);
-  expect(changedLines('@@ -1 +0,0 @@\n-old\n')).toEqual([]);
-});
-it('秘密値・生成物・ロック・エージェント設定を資料としても除外する', () => {
-  for (const path of [
-    '.env',
-    '.env.production',
-    'x/key.pem',
-    '.codex/config.toml',
-    'node_modules/a.ts',
-    'pnpm-lock.yaml',
-    'dist/app.js',
-  ]) {
-    expect(isMaterialPath(path)).toBe(false);
-  }
-  for (const path of [
-    'src/app.tsx',
-    'docs/spec/mvp.md',
-    'AGENTS.md',
-    '.github/workflows/docs.yml',
-  ]) {
-    expect(isMaterialPath(path)).toBe(true);
-  }
-});
-
-it('baseとheadで同じ内容の資料を二重送信しない', async () => {
-  const { indexSources } = await import('./source-index.ts');
-  const blob = 'a'.repeat(40);
-  let reads = 0;
-  const read = (...args: string[]) => {
-    if (args[0] === 'ls-tree') return `100644 blob ${blob}\tapp.ts\0`;
-    reads++;
-    return 'export const value = 1;';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { collectFromGit, changedLines } from './material.ts';
+it('追加行だけを投稿候補にする', () =>
+  expect(changedLines('@@ -1,2 +1,3 @@\n same\n+new\n-old\n+newer')).toEqual([2, 3]));
+it('原文への参照と全差分行を準備し独自分割を作らない', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'codex-material-'));
+  const pr = {
+    number: 1,
+    user: { id: 1324680, type: 'User' },
+    state: 'open',
+    draft: false,
+    head: { sha: 'a'.repeat(40), repo: { id: 1426899426 } },
+    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1426899426 } },
   };
-  const index = indexSources(read, ['base', 'head']);
-  expect(index.files[0].sources[0]).toMatchObject({
-    revisions: ['base', 'head'],
-    path: 'app.ts',
-    content: 'export const value = 1;',
-  });
-  expect(reads).toBe(1);
+  const git = (...args: string[]) =>
+    args[0] === 'merge-base'
+      ? 'c'.repeat(40)
+      : args.includes('--name-only')
+        ? 'a.rs\0'
+        : args[0] === 'diff'
+          ? '@@ -0,0 +1 @@\n+bug\n'
+          : '';
+  try {
+    const result = collectFromGit(pr, dir, git, { issues: [], inline: [], threads: [] }, '4');
+    expect(result.version).toBe(2);
+    expect(result.lines['a.rs']).toEqual([1]);
+    expect(JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8')).head).toBe(pr.head.sha);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

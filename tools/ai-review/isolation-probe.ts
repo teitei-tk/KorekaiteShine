@@ -9,8 +9,11 @@ export type IsolationInput = {
   expectedUid: number;
   protectedFiles: string[];
   readOnlyDirectories: string[];
+  readOnlyFiles?: string[];
   parentPid: number;
   parentPidNamespace?: string;
+  protectedProcesses?: number[];
+  protectedSockets?: string[];
   port: number;
   env: NodeJS.ProcessEnv;
 };
@@ -66,6 +69,22 @@ async function networkDenied(port: number): Promise<boolean> {
   });
 }
 
+async function socketDenied(path: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ path });
+    const finish = (passed: boolean) => {
+      socket.destroy();
+      resolve(passed);
+    };
+    socket.once('connect', () => finish(false));
+    // 消滅・listener停止・タイムアウトをアクセス拒否と混同しない。
+    socket.once('error', (error: NodeJS.ErrnoException) =>
+      finish(['EACCES', 'EPERM'].includes(error.code ?? '')),
+    );
+    socket.setTimeout(2000, () => finish(false));
+  });
+}
+
 export async function probeIsolation(input: IsolationInput): Promise<IsolationReport> {
   let pidNamespace: string | undefined;
   try {
@@ -76,6 +95,12 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   }
   const checks: IsolationReport['checks'] = [
     { name: 'uid', passed: input.expectedUid > 0 && process.getuid?.() === input.expectedUid },
+    {
+      name: 'groups',
+      passed:
+        (process.getgid?.() ?? 0) > 0 &&
+        (process.getgroups?.() ?? []).every((group) => group === process.getgid?.()),
+    },
     {
       name: 'credential-environment',
       passed: ![
@@ -104,20 +129,36 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
       }),
     });
   }
-  for (const name of ['environ', 'mem']) {
-    let observation = 'readable';
-    let passed = false;
-    try {
-      closeSync(openSync(`/proc/${input.parentPid}/${name}`, 'r'));
-    } catch (error) {
-      const code = error instanceof Error && 'code' in error ? String(error.code) : '';
-      observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(code)
-        ? code
-        : 'other-error';
-      passed = parentAccessIsolated(code, input.parentPidNamespace, pidNamespace);
-    }
-    checks.push({ name: `parent-${name}`, passed, observation });
+  for (const [index, file] of (input.readOnlyFiles ?? []).entries()) {
+    checks.push({
+      name: `read-only-file-${index}`,
+      passed: denied(() => closeSync(openSync(file, 'r+'))),
+    });
   }
+  const processes = [
+    { pid: input.parentPid, label: 'parent' },
+    ...(input.protectedProcesses ?? []).map((pid, index) => ({
+      pid,
+      label: `runner-process-${index}`,
+    })),
+  ];
+  for (const { pid, label } of processes)
+    for (const name of ['environ', 'mem']) {
+      let observation = 'readable';
+      let passed = false;
+      try {
+        closeSync(openSync(`/proc/${pid}/${name}`, 'r'));
+      } catch (error) {
+        const code = error instanceof Error && 'code' in error ? String(error.code) : '';
+        observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(code)
+          ? code
+          : 'other-error';
+        passed = parentAccessIsolated(code, input.parentPidNamespace, pidNamespace);
+      }
+      checks.push({ name: `${label}-${name}`, passed, observation });
+    }
+  for (const [index, path] of (input.protectedSockets ?? []).entries())
+    checks.push({ name: `protected-socket-${index}`, passed: await socketDenied(path) });
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
   checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
   checks.push({ name: 'network', passed: await networkDenied(input.port) });

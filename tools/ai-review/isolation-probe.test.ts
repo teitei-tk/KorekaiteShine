@@ -38,6 +38,7 @@ it('隔離されていない環境の資格情報・読取・書込を成功扱�
   const report = await probeIsolation({
     expectedUid: (process.getuid?.() ?? 0) + 1,
     protectedFiles: [protectedFile],
+    readOnlyFiles: [protectedFile],
     readOnlyDirectories: [directory],
     parentPid: process.pid,
     port: 0,
@@ -49,6 +50,7 @@ it('隔離されていない環境の資格情報・読取・書込を成功扱�
       { name: 'uid', passed: false },
       { name: 'credential-environment', passed: false },
       { name: 'protected-file-0', passed: false },
+      { name: 'read-only-file-0', passed: false },
       { name: 'read-only-directory-0', passed: false },
     ]),
   );
@@ -84,6 +86,36 @@ it('通信先へ到達できる場合にネットワーク隔離成功と表示�
     });
     expect(report.checks).toContainEqual({ name: 'network', passed: false });
     expect(report.passed).toBe(false);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+it('接続できるUnixソケットを隔離済みにせず、存在しないソケットも拒否の証拠にしない', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'socket-probe-'));
+  directories.push(directory);
+  const path = join(directory, 'service.sock');
+  const server = createServer((socket) => socket.end());
+  await new Promise<void>((resolve) => server.listen(path, resolve));
+  try {
+    const report = await probeIsolation({
+      expectedUid: process.getuid?.() ?? 0,
+      protectedFiles: [],
+      readOnlyDirectories: [],
+      parentPid: process.pid,
+      port: 0,
+      env: {},
+      protectedSockets: [path, join(directory, 'missing.sock')],
+      protectedProcesses: [process.pid, 2147483647],
+    });
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        { name: 'protected-socket-0', passed: false },
+        { name: 'protected-socket-1', passed: false },
+        expect.objectContaining({ name: 'runner-process-1-environ', passed: false }),
+        expect.objectContaining({ name: 'runner-process-1-mem', passed: false }),
+      ]),
+    );
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

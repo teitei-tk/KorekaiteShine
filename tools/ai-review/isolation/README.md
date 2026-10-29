@@ -12,6 +12,8 @@
 - 調査対象、信頼する設定、`/tmp`、CLI用一時領域へ書き込めないこと。
 - 稼働中のloopback listenerへ接続できないこと。検査前後に外側から接続できることも確認する。
 - PR側の`danger-full-access`設定で、明示した読み取り専用プロファイルを上書きできないこと。
+- 実runnerのWorker・Listenerプロセス、存在する認証ファイル候補、Docker・containerdソケットへ専用UIDからアクセスできず、補助グループ経由でも権限を持たないこと。
+- 公式Actionから起動した実CLIが、PR側のMCP・TOML/JSONフック・接続先設定を採用しないこと。モデルへの要求はオフラインの受信器で拒否する。
 
 無制限環境で同じ検査が違反を検出することを先に確認します。終了コード0だけでは合格とせず、全項目の成功結果が必要です。単なるファイルの不存在、検査の欠落、タイムアウトは合格にしません。親procの不可視化は、次節の条件をすべて満たす場合だけ隔離の証拠にします。sandbox内の結果出力は`writeSync`を使います。ローカル検証では、Nodeの非同期ログがsocket由来の標準出力へ現れないケースを確認しました。終了コードだけで通過させない検査を追加しています。
 
@@ -26,7 +28,23 @@
 
 判定の補正は検証fixtureだけに置きます。公式CLIのPID名前空間を無効化したり、ホストの`/proc`をsandboxへ追加公開したりしません。名前空間IDとエラー種別だけを記録し、環境・メモリの内容は読み出しません。
 
-設定ディレクトリと`config.toml`はroot所有で保護し、公式CLIがPATH aliasを作る`.codex/tmp`だけ専用UIDに所有させます。sandbox内ではこの一時領域も書込み不可です。sudoの`env_reset`を有効にし、`env_keep`・`env_check`は空にします。検証fixtureには引数検証等が含まれますが、これを本番の資格情報除去機構に転用しません。
+設定ディレクトリと`config.toml`はroot所有で保護します。公式CLIがPATH aliasを作る`.codex/tmp`と、起動時に読書き用に開く`installation_id`だけ専用UIDに所有させます。sandbox内では一時領域への書込みと、既存の設定・状態ファイルを書込み用に開く操作を拒否することも検査します。sudoの`env_reset`を有効にし、`env_keep`・`env_check`は空にします。検証fixtureには引数検証等が含まれますが、これを本番の資格情報除去機構に転用しません。
+
+### 実runnerの検査対象
+
+Worker・Listenerは`/proc`のプロセス名から特定し、同じPID名前空間と開始時刻を検査前後で照合します。認証ファイル候補はrunnerの実行ファイルから求めた配置先の`.credentials`・`.credentials_rsaparams`と、runner HOMEのGit・GitHub CLI・Codex・Dockerの既知の認証ファイルです。内容は読み出さず、専用UIDでのopenの成否だけを確認します。対象のパスや認証値をログへ出さず、対象件数と番号付き結果を記録します。
+
+Unixソケットは接続だけを試し、要求を送りません。既知のDocker・containerdソケットに加え、rootだけが接続できる無害なlistenerを用意します。このlistenerはrootで接続できる負の対照も確認します。`ENOENT`・`ECONNREFUSED`・タイムアウトをUnixソケットのアクセス拒否として扱いません。存在しない認証ファイルやソケットは検証済みとは数えません。将来追加されるサービスや別構成のrunnerまで網羅した保証ではありません。
+
+### PR起動設定のオフライン検査
+
+公式の`projects.<調査ディレクトリ>.trust_level = "untrusted"`をroot所有の設定に置きます。[固定版の設定ローダー](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/config/src/loader/mod.rs)がプロジェクト層を無効化する境界を使い、独自の設定除去ラッパーは作りません。
+
+`startup.ts`は外部インターフェイスのないnetwork namespace内だけで実行します。モデルもWIFも使わず、ローカルHTTP受信器がすべての要求へ400を返します。実`codex exec`がその受信器まで到達したことを必須にし、起動前に失敗しただけのケースを合格にしません。終了コードの非ゼロは、モデル要求を拒否するこの検査でだけ期待する動作です。
+
+PR側にはMCP、TOMLのSessionStartフック、`.codex/hooks.json`のSessionStartフックを置き、それぞれ無害なマーカーを作らせます。資格情報なしの負の対照ではPRをtrustedとしてCLIを直接起動し、フックの信頼検査もその対照に限り迂回して、3つとも起動することを確認します。通常検証は公式Actionの`unprivileged-user`から実CLIを起動し、untrusted設定で3つとも起動しないことと、接続先が準備側のローカル受信器から変わらないことを確認します。公式Actionは保護モードでフックの信頼検査を迂回する引数を拒否するため、その制限も維持します。
+
+この検査が扱うのはCLIの起動段階です。モデル応答・モデルによるツール選択・実プロキシ接続の成功は検証しません。調査コマンドの書込み・通信制限は、先行する実CLI sandbox検査で別に確認します。
 
 ## GitHub-hosted runnerでの実行
 
@@ -40,6 +58,8 @@
 
 同日の[修正版の実行](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40814310020)は成功しました。実行コードは`3c33c24b223b55f28d589dcb6759397b852e6d2c`です。負の対照、Action境界の5項目、sandbox内の11項目を通過し、親procは外側で`EACCES`、別名前空間の内側で`ENOENT`を確認しました。UID・環境・ファイル・書込み・sudo・通信の隔離条件と公式CLIの起動設定は維持しています。
 
+[追加の事前検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40819244385)も同日に成功しました。実行コードは`7e03c7ac2e3e4a9bc180a67470d6216a8b51de53`です。実runnerプロセス2件、認証ファイル候補2件、実サービスソケット2件を検出し、模擬対象を含むアクセス拒否・書込み拒否を確認しました。オフライン起動では負の対照の3マーカーを検出し、公式Action経由のuntrusted起動では3つとも作られず、準備側のローカル受信器への到達を確認しました。実資格情報の投入・WIF交換・モデルAPI・投稿は行っていません。
+
 ## ローカルLinuxでの再現
 
 2026年10月28日、macOS上のDocker Linux/aarch64で、Node 26.12.1・公式Actionの固定コミット・Codex 0.164.0を用いて成功しました。Dockerの既定seccompではuser namespaceを作れなかったため、資格情報・ホストソケットを持たない一時コンテナに限り`--security-opt seccomp=unconfined`を指定しました。これはGitHub-hosted runnerでの実証ではありません。
@@ -48,7 +68,7 @@
 
 ```sh
 pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts \
+  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts \
   --module NodeNext --target ES2022 --skipLibCheck --outDir /tmp/ai-review-isolation-compiled
 ```
 
@@ -64,6 +84,6 @@ bash /fixture/setup.sh /official-action/dist/main.js /compiled
 
 ## 次の段階へ進む条件
 
-現状は初期fixtureをローカルLinuxとGitHub-hosted runnerで検証した段階です。対象は検査器の親プロセス、模擬資格情報、固定ディレクトリ、検査用listenerです。実runnerのその他のプロセス・ファイル・サービスソケット、MCP・フック等のPR設定全体、公式Action全体からの実`codex exec`、実プロキシのメモリ、既存WIF交換・更新、実モデル・実投稿は未検証です。このfixtureの成功を、それらの安全性や新レビュー方式の実装完了として扱いません。
+対象は検査器の親プロセス、模擬資格情報、固定ディレクトリ、実runnerの上記対象と、公式Actionの実行ヘルパーから実CLIを起動する際のPR設定です。公式Actionのsetup/postを含む全体、実プロキシのメモリ・server-infoの具体的な配置、既存WIF交換・更新、実モデル・実投稿は未検証です。このfixtureの成功を、それらの安全性や新レビュー方式の実装完了として扱いません。
 
 設計の受け入れ順に従い、実runnerでの境界検証を完了してからWIF接続へ進みます。後段の履歴・投稿の置換は、その接続検証が成立してから実装します。

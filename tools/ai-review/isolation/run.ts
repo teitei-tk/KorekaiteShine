@@ -37,6 +37,9 @@ try {
       throw new Error('negative control failed');
   }
   console.log('negative control: expected violations detected');
+  console.log(
+    JSON.stringify({ stage: 'parent', pid: process.pid, pidNamespace: control.pidNamespace }),
+  );
   const status = await new Promise<number | null>((resolve, reject) => {
     const child = spawn(
       '/usr/local/bin/node',

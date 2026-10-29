@@ -22,6 +22,13 @@ const outside = await probeIsolation(input);
 const boundaryChecks = outside.checks.filter((check) =>
   ['uid', 'credential-environment', 'sudo', 'parent-environ', 'parent-mem'].includes(check.name),
 );
+console.log(
+  JSON.stringify({
+    stage: 'action-boundary',
+    pidNamespace: outside.pidNamespace,
+    checks: boundaryChecks,
+  }),
+);
 if (boundaryChecks.some((check) => !check.passed)) {
   console.log(JSON.stringify({ stage: 'action-boundary', passed: false, checks: boundaryChecks }));
   process.exit(1);

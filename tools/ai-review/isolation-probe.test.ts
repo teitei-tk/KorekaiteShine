@@ -118,3 +118,24 @@ it('終了コード0でも検査結果の欠落・一部だけの成功を合格
     ),
   ).not.toThrow();
 });
+
+it('存在しない親PIDは合格にせず、秘密を含まない原因を報告する', async () => {
+  const report = await probeIsolation({
+    expectedUid: process.getuid?.() ?? 0,
+    protectedFiles: [],
+    readOnlyDirectories: [],
+    parentPid: 2147483647,
+    port: 0,
+    env: {},
+  });
+  expect(report.checks).toContainEqual({
+    name: 'parent-environ',
+    passed: false,
+    observation: 'ENOENT',
+  });
+  expect(report.checks).toContainEqual({
+    name: 'parent-mem',
+    passed: false,
+    observation: 'ENOENT',
+  });
+});

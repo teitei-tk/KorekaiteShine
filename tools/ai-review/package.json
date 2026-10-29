@@ -6,11 +6,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "markdown-it": "15.0.3",
-    "openai": "7.43.0",
-    "typescript-parser": "npm:typescript@5.9.3"
-  },
   "devDependencies": {
     "@types/node": "26.6.5",
     "typescript": "7.0.2",

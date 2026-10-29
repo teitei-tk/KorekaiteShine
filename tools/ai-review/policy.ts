@@ -33,16 +33,6 @@ export function eligible(value: Partial<PullRequest> | null): value is PullReque
     /^[a-f0-9]{40}$/.test(pr.base.sha)
   );
 }
-export function remainingLifetime(
-  value: { expires_at?: number | string } | null,
-  now = Math.floor(Date.now() / 1000),
-): number {
-  const expiry = value?.expires_at;
-  if (typeof expiry !== 'number' || !Number.isSafeInteger(expiry) || expiry - now < 240) {
-    throw new Error('WIFトークンの残存時間が240秒未満または不明です');
-  }
-  return expiry - now;
-}
 export interface Finding {
   priority: 'P1' | 'P2';
   path: string;

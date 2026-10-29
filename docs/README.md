@@ -13,7 +13,7 @@
 
 AIレビューの正式な動作は[コメントと修正確認の要件](spec/ai-review.md)、初期設定・再開は[運用手順](runbooks/ai-review.md)を参照してください。旧SDKの静的分割方式から、公式Codex Action・公式WIFプロキシへ移行しています。履歴・対象検査・投稿・状態表示は既存TypeScript基盤を再利用します。
 
-[承認済み移行設計](superpowers/specs/2026-10-27-existing-review-wif-design.md)と[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に経緯・受け入れ条件があります。実runnerの資格情報隔離、実WIF初期交換、61分後の更新失敗・復旧、モデル権限とSchema出力、公式終了APIは検証済みです。[隔離検証](../tools/ai-review/isolation/README.md)と[接続検証](runbooks/ai-review.md#期限更新モデル権限schema出力の限定検証)に証拠を記録しています。通常レビューの移行と実PR検証は進行中です。
+[承認済み移行設計](superpowers/specs/2026-10-27-existing-review-wif-design.md)と[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に経緯・受け入れ条件があります。実runnerの資格情報隔離、実WIF初期交換、61分後の更新失敗・復旧、モデル権限とSchema出力、公式終了APIは検証済みです。[隔離検証](../tools/ai-review/isolation/README.md)と[接続検証](runbooks/ai-review.md#期限更新モデル権限schema出力の限定検証)に証拠を記録しています。通常レビューを有効化し、実PRの行コメント投稿が成功しています。修正返信と生成なし・重複なしの投稿再試行も成功し、大規模差分の検証を続けています。
 
 エージェントの認証確認・PR整理は[作業手順](runbooks/agent-workflow.md)、コードレビューは[基準](../CODING_STANDARDS.md)を参照してください。
 

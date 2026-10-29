@@ -182,8 +182,8 @@ importers:
         specifier: 15.0.3
         version: 15.0.3
       openai:
-        specifier: 7.43.0
-        version: 7.43.0
+        specifier: 7.45.1
+        version: 7.45.1
       typescript-parser:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
@@ -1084,14 +1084,14 @@ packages:
     resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
     engines: {node: '>=12.20.0'}
 
-  openai@7.43.0:
-    resolution: {integrity: sha512-fBjKaDFG8AVfkGYoIo/E+xNRlNk7nx2nQ9GoQtXfePzPjg4QcT6nejkhXayJnEwSpFGfthOrAPI2KXj5yAqg9A==}
+  openai@7.45.1:
+    resolution: {integrity: sha512-mutrJXwhJIMZ24Lab2COFtNp44OcpZSnV4O2O7q38wAHUa2m2fQqUO5pj1XS3PqLfOTeODBUS9YoadqDnnGk5A==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
-      google-auth-library: '>=9.15.1 <11'
+      google-auth-library: '>=9.15.1 <12'
       undici: '>=5 <9'
       ws: ^8.21.0
       zod: ^3.25 || ^4.0
@@ -1961,7 +1961,7 @@ snapshots:
 
   obug@3.0.0: {}
 
-  openai@7.43.0: {}
+  openai@7.45.1: {}
 
   oxfmt@0.74.0:
     dependencies:

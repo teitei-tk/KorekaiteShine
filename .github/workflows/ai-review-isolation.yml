@@ -59,4 +59,4 @@ jobs:
         run: |
           sudo bash tools/ai-review/isolation/setup.sh \
             "$GITHUB_WORKSPACE/.official-codex-action/dist/main.js" \
-            "$RUNNER_TEMP/isolation-compiled"
+            "$RUNNER_TEMP/isolation-compiled" github

@@ -21,8 +21,11 @@ const outside = await probeIsolation(input);
 if (!input.parentPidNamespace || outside.pidNamespace !== input.parentPidNamespace)
   throw new Error('Action boundary must share the live parent PID namespace');
 // 外側では読取り・ネットワークはOS権限に従う。資格情報・UID・昇格だけをAction境界で検査。
-const boundaryChecks = outside.checks.filter((check) =>
-  ['uid', 'credential-environment', 'sudo', 'parent-environ', 'parent-mem'].includes(check.name),
+const boundaryChecks = outside.checks.filter(
+  (check) =>
+    ['uid', 'groups', 'credential-environment', 'sudo', 'parent-environ', 'parent-mem'].includes(
+      check.name,
+    ) || /^(runner-process-|protected-file-|protected-socket-)/.test(check.name),
 );
 console.log(
   JSON.stringify({

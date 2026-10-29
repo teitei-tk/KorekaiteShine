@@ -26,4 +26,4 @@ cp /opt/ai-review-probe/probe-child.js /opt/ai-review-probe/pr/probe-child.js
 printf '{"type":"module"}\n' > /opt/package.json
 ln -s /opt/ai-review-probe/action-probe.js /opt/ai-review-probe/bin/codex
 chmod 755 /opt/ai-review-probe/action-probe.js
-exec /usr/local/bin/node /opt/ai-review-probe/run.js "$1"
+exec /usr/local/bin/node /opt/ai-review-probe/run.js "$1" "${3:-local}"

@@ -76,6 +76,10 @@ Actionの入れ子の`setup-node`もActionsロックへ含めます。実行時�
 
 [追加の事前検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40819244385)も同日に成功しました。実行コードは`7e03c7ac2e3e4a9bc180a67470d6216a8b51de53`です。実runnerプロセス2件、認証ファイル候補2件、実サービスソケット2件を検出し、模擬対象を含むアクセス拒否・書込み拒否を確認しました。オフライン起動では負の対照の3マーカーを検出し、公式Action経由のuntrusted起動では3つとも作られず、準備側のローカル受信器への到達を確認しました。実資格情報の投入・WIF交換・モデルAPI・投稿は行っていません。
 
+PR #42のマージ後、[mainでの再実行](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40820000247)も成功しました。対象は`166533bca098e330a5611287cd3a007b59861d05`です。
+
+[公式Action全体と実プロキシの検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40822090945)は、`051d0b61680add79a817d3c937b84c4ac1b065fd`で2ケースとも成功しました。`complete`では固定メッセージで正常終了し、`reject`ではActionの失敗を観測したうえで検証全体が成功しています。どちらも実プロキシのメモリ・配置の隔離、設定の不変、公式終了APIによる停止を確認しました。`reject`のログにあるActionの終了コード1は、この負のケースの観測結果であり、検証ジョブ全体は成功です。実WIF・有料モデル・投稿は使用していません。
+
 ## ローカルLinuxでの再現
 
 2026年10月28日、macOS上のDocker Linux/aarch64で、Node 26.12.1・公式Actionの固定コミット・Codex 0.164.0を用いて成功しました。Dockerの既定seccompではuser namespaceを作れなかったため、資格情報・ホストソケットを持たない一時コンテナに限り`--security-opt seccomp=unconfined`を指定しました。これはGitHub-hosted runnerでの実証ではありません。

@@ -8,7 +8,9 @@ export interface InlineCommentInput {
   body: string;
 }
 export type ApiBody =
+  | { query: string; variables: { number: number; cursor: string | null } }
   | { body: string }
+  | { body: string; commit_id: string; path: string; line: number; side: 'RIGHT' }
   | {
       body: string;
       commit_id: string;
@@ -19,18 +21,23 @@ export type Api<Body = ApiBody> = <T>(path: string, method?: string, body?: Body
 export function githubApi<Body extends object = ApiBody>(token: string): Api<Body> {
   if (!token) throw new Error('GitHub認証がありません');
   return async <T>(path: string, method = 'GET', body?: Body): Promise<T> => {
-    const response = await fetch(`https://api.github.com/repos/${REPOSITORY}/${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      path === 'graphql'
+        ? 'https://api.github.com/graphql'
+        : `https://api.github.com/repos/${REPOSITORY}/${path}`,
+      {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(30_000),
-      redirect: 'error',
-    });
+    );
     if (!response.ok) throw new Error(`GitHub API HTTP ${response.status}`);
     return (await response.json()) as T;
   };
@@ -47,6 +54,7 @@ export interface Run {
 export interface Comment {
   id: number;
   body: string;
+  updated_at?: string;
   user: { id?: number; login: string; type: string };
 }
 export interface ReviewComment extends Comment {
@@ -59,13 +67,12 @@ export interface ReviewComment extends Comment {
 }
 async function pages<T>(api: Api, path: string): Promise<T[]> {
   const result: T[] = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; ; page++) {
     const batch = await api<T[]>(`${path}?per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error('コメント応答が不正です');
     result.push(...batch);
     if (batch.length < 100) return result;
   }
-  throw new Error('コメント取得上限を超えました');
 }
 export function comments(api: Api, number: number): Promise<Comment[]> {
   return pages(api, `issues/${number}/comments`);

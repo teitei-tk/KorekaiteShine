@@ -1,6 +1,5 @@
 import { validCoverage, renderCoverage } from './coverage-diagnostic.ts';
 import type { CoverageDiagnostic } from './coverage-diagnostic.ts';
-import type { ReviewPlan, ReviewTask } from './partition.ts';
 
 export const modelSubcodes = [
   'MODEL_UNSPECIFIED',
@@ -56,7 +55,7 @@ interface SourceRange {
   revisions: ('head' | 'base' | 'ancestor')[];
 }
 export interface TaskScope {
-  kind: ReviewTask['kind'];
+  kind: 'unit' | 'boundary' | 'history' | 'reconcile';
   sourceCount: number;
   obligationCount: number;
   sources: SourceRange[];
@@ -152,28 +151,6 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
       new Set(s.revisions).size === s.revisions.length &&
       s.revisions.every((r) => ['head', 'base', 'ancestor'].includes(r)),
   );
-}
-export function taskScope(plan: ReviewPlan, task: ReviewTask): TaskScope {
-  const scope: TaskScope = {
-    kind: task.kind,
-    sourceCount: task.sources.length,
-    obligationCount: task.obligations.length,
-    sources: task.sources.slice(0, 8).map((sourceId) => {
-      const source = plan.sources.find((s) => s.id === sourceId);
-      if (!source) throw new Error('診断資料が台帳にありません');
-      return {
-        id: source.id,
-        start: source.start,
-        end: source.end,
-        revisions: (['head', 'base', 'ancestor'] as const).filter((key) =>
-          source.revisions.includes(plan.metadata[key] ?? ''),
-        ),
-      };
-    }),
-    obligations: task.obligations.slice(0, 8),
-  };
-  if (!validDiagnostic({ ...detail('UNCLASSIFIED'), scope })) throw new Error('診断範囲が不正です');
-  return scope;
 }
 export function renderDiagnostic(value: DiagnosticInput): string {
   if (!validDiagnostic(value)) throw new Error('診断の形式が不正です');

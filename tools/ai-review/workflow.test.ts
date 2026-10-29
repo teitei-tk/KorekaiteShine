@@ -47,11 +47,17 @@ it('Draft解除時にも通常CIと監視を同時に起動する', () => {
   for (const name of ['docs', 'ai-review-check'])
     expect(workflow(name)).toContain('types: [opened, synchronize, reopened, ready_for_review]');
 });
-it('予算結果を投稿ジョブへ渡し、失敗時にも費用記録を保存する', () => {
+it('通常生成も公式Actionと隔離境界を使い、同じ成果物を投稿再開する', () => {
   const backend = workflow('ai-review');
-  expect(backend).toContain('/ai-review-material/budget-result.json');
-  expect(backend).toMatch(/name: Preserve review cost record\n\s+if: always\(\)/);
-  expect(backend).toContain('name: ai-review-cost-${{ github.run_id }}-${{ github.run_attempt }}');
+  const generate = backend.split('\n  generate:')[1].split('\n  publish:')[0];
+  expect(generate).toContain('uses: openai/codex-action@v1.13');
+  expect(generate).toContain('safety-strategy: unprivileged-user');
+  expect(generate).toContain('sandbox: read-only');
+  expect(generate).toContain('output-schema-file: /opt/ai-review/context/schema.json');
+  expect(generate).toContain('output-file: /home/ai-review/.codex/tmp/review.json');
+  expect(generate).toContain('/ai-review-material/review-v2.json');
+  expect(generate).not.toMatch(/orchestrate.ts|budget-result.json|tools\/ai-review-retired/);
+  expect(backend).toContain('cancel-in-progress: false');
 });
 
 it('失敗通知は終了イベントから信頼済みコードだけで実行し、OIDC権限を持たない', () => {

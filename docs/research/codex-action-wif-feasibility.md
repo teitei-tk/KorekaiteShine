@@ -46,7 +46,7 @@ APIキーを空にする場合、通常の起動時にActionが行うserver-info
 
 資格情報はプロキシ内に保持する。CodexやPR由来のコードを起動する前に、OIDC要求用トークンと要求URLを子プロセスの環境から除去する。プロキシは親のrunner環境を変更しない。Actionに`id-token: write`を付けただけでは、この分離が自動的に成立するとはいえない。Bearerを引数・設定・`GITHUB_OUTPUT`・`GITHUB_ENV`へ残さないことも公式の呼び出し側要件である。[公式プロキシの呼び出し側要件][proxy-readme]
 
-期限更新は公式プロキシに任せられる。現行は各生成処理前に交換し、残存240秒以上を検査する。プロキシは期限前に新しいGitHub JWTを取得して再交換し、更新失敗時は期限切れトークンを使わず502で停止する。401の場合も同じResponses POSTを自動再送せず、その資格情報を破棄する。ただしCodex側の再試行まで含めた動作は未検証である。[現行の実行制御](../../tools/ai-review/orchestrate.ts)、[現行の期限検査](../../tools/ai-review/policy.ts)、[プロキシの期限制御][proxy-auth]
+期限更新は公式プロキシに任せられる。現行は各生成処理前に交換し、残存240秒以上を検査する。プロキシは期限前に新しいGitHub JWTを取得して再交換し、更新失敗時は期限切れトークンを使わず502で停止する。401の場合も同じResponses POSTを自動再送せず、その資格情報を破棄する。ただしCodex側の再試行まで含めた動作は未検証である。[現行の実行制御](https://github.com/teitei-tk/KorekaiteShine/blob/bee23229456ef3315c5493987ab5876da616a56e/tools/ai-review/orchestrate.ts)、[現行の期限検査](../../tools/ai-review/policy.ts)、[プロキシの期限制御][proxy-auth]
 
 ## 根拠の版と未検証事項
 

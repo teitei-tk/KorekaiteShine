@@ -1,8 +1,6 @@
 import { expect, it } from 'vitest';
 import { coverageDiagnostic, validCoverage, renderCoverage } from './coverage-diagnostic.ts';
 import { detail } from './diagnostics.ts';
-import { workerFailure, ReviewFailure } from './failure.ts';
-import { decodeWorkerResult } from './orchestrate.ts';
 it('欠落・重複・担当外を区別し、モデルの原文を保存しない', () => {
   const ids = ['a'.repeat(16), 'b'.repeat(16)];
   const value = coverageDiagnostic(ids, [ids[0], ids[0], 'SECRET', 'SECRET']);
@@ -19,16 +17,6 @@ it('欠落・重複・担当外を区別し、モデルの原文を保存しな�
   expect(validCoverage(value)).toBe(true);
   expect(JSON.stringify(value)).not.toContain('SECRET');
   expect(renderCoverage(value)).toContain('欠落1件');
-});
-it('診断を子プロセス境界で失わない', () => {
-  const coverage = coverageDiagnostic(['a'.repeat(16)], []);
-  const payload = workerFailure(
-    new ReviewFailure('OUTPUT_INVALID', 'SECRET', detail('COVERAGE_MISMATCH', [], coverage)),
-  );
-  expect(payload.detail).toMatchObject({ coverage });
-  expect(() => decodeWorkerResult(JSON.stringify(payload))).toThrow(
-    expect.objectContaining({ detail: expect.objectContaining({ coverage }) }),
-  );
 });
 it('診断の不正な件数・任意文字列・余分なフィールドを拒否する', () => {
   const valid = coverageDiagnostic(['a'.repeat(16)], []);

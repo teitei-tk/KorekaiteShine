@@ -11,27 +11,11 @@
 3. 関係するADR：現在の選択に至った理由と引き受ける負担。
 4. [技術調査記録](research/platform-integration.md)：公式資料の根拠と、実動作で確認すべき事項。
 
-AIコードレビューは[導入設計](research/ai-code-review.md)と[初期設定・確認手順](runbooks/ai-review.md)を参照してください。Workflowは実装済みですが、実アカウントのWIF交換は成功しています。SDK版のモデル呼び出し・投稿はmain反映後に検証します。
+AIレビューの正式な動作は[コメントと修正確認の要件](spec/ai-review.md)、初期設定・再開は[運用手順](runbooks/ai-review.md)を参照してください。旧SDKの静的分割方式から、公式Codex Action・公式WIFプロキシへ移行しています。履歴・対象検査・投稿・状態表示は既存TypeScript基盤を再利用します。
 
-エージェントによる認証設定の確認・調査結果の扱い・レビュー委譲は[エージェント作業手順](runbooks/agent-workflow.md)を参照してください。
+[承認済み移行設計](superpowers/specs/2026-10-27-existing-review-wif-design.md)と[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に経緯・受け入れ条件があります。実runnerの資格情報隔離、実WIF初期交換、61分後の更新失敗・復旧、モデル権限とSchema出力、公式終了APIは検証済みです。[隔離検証](../tools/ai-review/isolation/README.md)と[接続検証](runbooks/ai-review.md#期限更新モデル権限schema出力の限定検証)に証拠を記録しています。通常レビューの移行と実PR検証は進行中です。
 
-AIレビューの指摘履歴と修正確認は[コメントと修正確認の要件](spec/ai-review.md)を参照してください。集約コメント方式は実PRで検証済みです。該当行のレビュースレッドへの投稿と返信も実装し、実PRでの確認はmain反映後に行います。
-
-コードレビュー時の型と外部入力の判断は[コードレビュー基準](../CODING_STANDARDS.md)を参照してください。
-
-資料収集の容量問題への対応は[AIレビューの分割と横断確認の設計](spec/ai-review-partitioning.md)にまとめています。承認済みの設計に沿って実装・回帰テストを追加しています。PR #13の上限引き上げはマージしません。
-
-既存実装の再利用候補と現方式との違いは[ユーザーの既存AIレビュー実装の調査](research/existing-ai-review-investigation.md)にまとめています。採用や移植は未実施です。
-
-ユーザーの既存実装を使う方式で現行WIFを維持する可否は[WIF導入調査](research/codex-action-wif-feasibility.md)を参照してください。公式プロキシの対応を確認していますが、接続の実装・実API検証は未実施です。
-
-移行案は[ユーザーの既存実装と公式WIFプロキシを使うAIレビューの設計](superpowers/specs/2026-10-27-existing-review-wif-design.md)にまとめています。利用者が選択した公式Action方式、周辺処理のTypeScript実装、$1厳密上限の撤廃を反映した設計レビュー用の文書です。実装・Workflow・認証設定は変更していません。 [敵対的検証](research/existing-review-wif-adversarial-validation.md)の2件は設計へ反映済みです。利用者は公式`unprivileged-user`による[資格情報の隔離](research/codex-wif-credential-isolation.md)と、読み取り専用環境内でのPRコード実行を選択しました。[厳密な実行禁止](research/codex-pr-execution-restrictions.md)を理由とする保留条件は解除し、隔離・接続の実検証を受け入れ条件として残しています。
-
-TypeScript変更後の[敵対的検証](research/typescript-review-adversarial-validation.md)では、再利用元のページ数上限に関するP2を1件確認しました。このP2は設計へ反映済みです。履歴検証と投稿の再利用範囲を明確にし、共通スナップショットと一つの投稿処理へ集約する方針を記載しています。実装による解消は未検証です。
-
-履歴の改訂検知と投稿再開の[再検証](research/review-resume-adversarial-validation.md)では、通常の再開手順は整合すると判断しました。応答喪失後に削除された返信を検知できない限界について、P2を1件記録し、設計へ反映しました。投稿済みコメントの保持・読取可能性を再開保証の前提とし、手動削除後は同じArtifactを再試行しない運用を明記しています。実装は未変更です。
-
-2026年10月28日に利用者が移行の実装開始を承認しました。[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に従い、[資格情報を使わない隔離検査](../tools/ai-review/isolation/README.md)を先行実装しています。10月29日、GitHub-hosted runnerで初期fixtureに加え、runnerの認証ファイル候補・プロセス・既知の特権ソケットと、PR設定・MCP・フックのオフライン起動検査が成功しました。模擬キーによる公式Action全体と実プロキシの配置・終了検査も成功しています。実WIF交換・期限更新、実モデル接続、新レビュー本体の移行は未完了です。現行の有料レビューWorkflowは変更していません。
+エージェントの認証確認・PR整理は[作業手順](runbooks/agent-workflow.md)、コードレビューは[基準](../CODING_STANDARDS.md)を参照してください。
 
 ## 設計判断の記録
 

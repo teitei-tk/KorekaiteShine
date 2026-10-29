@@ -10,7 +10,7 @@ permissions: {}
 
 concurrency:
   group: ai-review-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # 指定されたmainのCIだけを検証する。通常レビューはoffのまま。
@@ -149,12 +149,12 @@ jobs:
   generate:
     needs: gate
     if: needs.gate.outputs.allowed == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     outputs:
-      ready: ${{ steps.validate.outcome == 'success' }}
-      artifact: ${{ steps.review.outputs.artifact }}
-      attempt: ${{ steps.review.outputs.attempt }}
+      ready: ${{ steps.finish.outcome == 'success' }}
+      artifact: ${{ steps.finish.outputs.artifact }}
+      attempt: ${{ steps.finish.outputs.attempt }}
     permissions:
       actions: read
       contents: read
@@ -169,21 +169,27 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - uses: actions/checkout@v7.0.1
+        if: vars.AI_REVIEW_MODE == 'review'
+        with:
+          repository: openai/codex-action
+          ref: bdf19a4a223ec2549a3e2274a0cf61556bc07675
+          path: .official-codex-action
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-      - uses: pnpm/action-setup@v6.1.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Prepare and verify trusted isolation before collecting PR code
         if: vars.AI_REVIEW_MODE == 'review'
-        with:
-          package_json_file: package.json
-      - name: Install trusted review dependencies before authentication
-        if: vars.AI_REVIEW_MODE == 'review'
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Keep the repository Node version for validation
-        run: |
-          echo "REVIEW_NODE=$(command -v node)" >> "$GITHUB_ENV"
-          echo "REVIEW_DIRECTORY=$RUNNER_TEMP/ai-review-material" >> "$GITHUB_ENV"
-      - name: Recheck target and collect inert text without executing PR code
+        run: bash tools/ai-review/isolation/prepare.sh
+      - name: Select material directory
+        run: echo "REVIEW_DIRECTORY=$RUNNER_TEMP/ai-review-material" >> "$GITHUB_ENV"
+      - name: Recheck target and collect full history and PR checkout
         id: material
         env:
           GH_TOKEN: ${{ github.token }}
@@ -196,57 +202,64 @@ jobs:
           ACTUAL_HEAD: ${{ steps.material.outputs.head }}
           ACTUAL_BASE: ${{ steps.material.outputs.base }}
         run: test "$EXPECTED_HEAD" = "$ACTUAL_HEAD" && test "$EXPECTED_BASE" = "$ACTUAL_BASE"
-      - name: Diagnose claims or exchange a short-lived token
-        id: wif
+      - name: Diagnose claims without model requests
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'claims'
         env:
           OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
           OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
           OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
         run: node tools/ai-review/wif.ts
-      - name: Review using GPT-6 Luna
-        id: review
+      - name: Protect actual PR and context
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
-        timeout-minutes: 36
+        run: sudo /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" setup "$REVIEW_DIRECTORY" "$GITHUB_WORKSPACE"
+      - name: Start official WIF proxy and verify actual PR isolation
+        id: proxy
+        if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
         env:
           OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
           OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
           OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
-          GH_TOKEN: ''
-          GITHUB_TOKEN: ''
-        run: node tools/ai-review/orchestrate.ts
-      - name: Validate output before handing it to the posting job
-        id: validate
-        if: steps.review.outcome == 'success'
+        run: |
+          sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_SHA \
+            /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" start
+      - name: Review with official Action
+        id: review
+        if: steps.proxy.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 15
+        uses: openai/codex-action@v1.13
+        with:
+          codex-version: 0.164.0
+          openai-api-key: ''
+          allow-users: ${{ github.actor }}
+          prompt-file: /opt/ai-review/context/prompt.md
+          output-schema-file: /opt/ai-review/context/schema.json
+          output-file: /home/ai-review/.codex/tmp/review.json
+          model: gpt-6-luna
+          effort: medium
+          working-directory: /opt/ai-review/pr
+          codex-home: /home/ai-review/.codex
+          safety-strategy: unprivileged-user
+          codex-user: ai-review
+          sandbox: read-only
+          codex-args: '["--ephemeral", "--json"]'
+      - name: Validate artifact and stop official proxy
+        id: finish
+        if: ${{ always() && steps.proxy.outcome == 'success' }}
         env:
-          GENERATION_ATTEMPT: ${{ steps.review.outputs.attempt }}
-          PR_NUMBER: ${{ needs.gate.outputs.pr }}
-          PR_HEAD: ${{ needs.gate.outputs.head }}
-          PR_BASE: ${{ needs.gate.outputs.base }}
-        run: '"$REVIEW_NODE" tools/ai-review/publish.ts validate'
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: sudo --preserve-env=GITHUB_OUTPUT /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" finish "$REVIEW_DIRECTORY" "$REVIEW_OUTCOME"
       - uses: actions/upload-artifact@v7.0.2
-        if: steps.review.outcome == 'success'
+        if: steps.finish.outcome == 'success'
         with:
-          name: ${{ steps.review.outputs.artifact }}
-          path: |
-            ${{ runner.temp }}/ai-review-material/result.json
-            ${{ runner.temp }}/ai-review-material/metadata.json
-            ${{ runner.temp }}/ai-review-material/plan.json
-            ${{ runner.temp }}/ai-review-material/execution.json
-            ${{ runner.temp }}/ai-review-material/budget-result.json
+          name: ${{ steps.finish.outputs.artifact }}
+          path: ${{ runner.temp }}/ai-review-material/review-v2.json
           if-no-files-found: error
-          retention-days: 1
-      - name: Preserve review cost record
-        if: always()
-        uses: actions/upload-artifact@v7.0.2
-        with:
-          name: ai-review-cost-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ai-review-material/budget.json
-          if-no-files-found: ignore
-          retention-days: 1
+          retention-days: 7
       - name: Record incomplete execution
         if: failure()
-        run: echo 'AIレビューは未完了です。認証・資料上限・モデル・出力形式の各ステップを確認してください。自動再試行は行いません。' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          node --input-type=module -e "import {writeStatusReport} from './tools/ai-review/status-report.ts'; writeStatusReport(process.env, 'failure', 'generate', 'EXECUTION_FAILED');"
       - name: Preserve check status
         if: always()
         uses: actions/upload-artifact@v7.0.2
@@ -254,13 +267,16 @@ jobs:
           name: ai-review-status-${{ github.run_id }}-${{ github.run_attempt }}-generate
           path: ${{ runner.temp }}/status.json
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: 7
 
   publish:
     needs: [gate, generate]
     if: vars.AI_REVIEW_MODE == 'review' && needs.generate.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
+    concurrency:
+      group: ai-review-publish-${{ needs.gate.outputs.pr }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
@@ -282,7 +298,7 @@ jobs:
         with:
           name: ${{ needs.generate.outputs.artifact }}
           path: ${{ runner.temp }}/ai-review-result
-      - name: Recheck PR author and revision, then update the review comment
+      - name: Recheck revision and history before each resumable operation
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEW_DIRECTORY: ${{ runner.temp }}/ai-review-result

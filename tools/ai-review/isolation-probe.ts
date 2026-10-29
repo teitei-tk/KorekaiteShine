@@ -10,6 +10,7 @@ export type IsolationInput = {
   protectedFiles: string[];
   readOnlyDirectories: string[];
   parentPid: number;
+  parentPidNamespace?: string;
   port: number;
   env: NodeJS.ProcessEnv;
 };
@@ -18,6 +19,21 @@ export type IsolationReport = {
   checks: { name: string; passed: boolean; observation?: string }[];
   pidNamespace?: string;
 };
+
+export function parentAccessIsolated(
+  observation: string,
+  parentNamespace?: string,
+  currentNamespace?: string,
+): boolean {
+  // ENOENT単独では成功にしない。親の生存と外側の拒否はrun/action-probeで検証する。
+  return (
+    ['EACCES', 'EPERM', 'EROFS'].includes(observation) ||
+    (observation === 'ENOENT' &&
+      /^pid:\[\d+\]$/.test(parentNamespace ?? '') &&
+      /^pid:\[\d+\]$/.test(currentNamespace ?? '') &&
+      parentNamespace !== currentNamespace)
+  );
+}
 
 function denied(action: () => void): boolean {
   try {
@@ -51,6 +67,13 @@ async function networkDenied(port: number): Promise<boolean> {
 }
 
 export async function probeIsolation(input: IsolationInput): Promise<IsolationReport> {
+  let pidNamespace: string | undefined;
+  try {
+    const value = readlinkSync('/proc/self/ns/pid');
+    if (/^pid:\[\d+\]$/.test(value)) pidNamespace = value;
+  } catch {
+    /* 非Linuxや不可視の場合も、隔離成功の根拠にはしない。 */
+  }
   const checks: IsolationReport['checks'] = [
     { name: 'uid', passed: input.expectedUid > 0 && process.getuid?.() === input.expectedUid },
     {
@@ -91,20 +114,13 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
       observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(code)
         ? code
         : 'other-error';
-      passed = ['EACCES', 'EPERM', 'EROFS'].includes(code);
+      passed = parentAccessIsolated(code, input.parentPidNamespace, pidNamespace);
     }
     checks.push({ name: `parent-${name}`, passed, observation });
   }
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
   checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
   checks.push({ name: 'network', passed: await networkDenied(input.port) });
-  let pidNamespace: string | undefined;
-  try {
-    const value = readlinkSync('/proc/self/ns/pid');
-    if (/^pid:\[\d+\]$/.test(value)) pidNamespace = value;
-  } catch {
-    /* 非Linuxや不可視の場合も、隔離成功の根拠にはしない。 */
-  }
   return { passed: checks.every((check) => check.passed), checks, pidNamespace };
 }
 

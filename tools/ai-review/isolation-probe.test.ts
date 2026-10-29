@@ -3,9 +3,28 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { afterEach, expect, it } from 'vitest';
-import { probeIsolation, requireIsolationReport } from './isolation-probe.ts';
+import { parentAccessIsolated, probeIsolation, requireIsolationReport } from './isolation-probe.ts';
 
 const directories: string[] = [];
+
+it.each([
+  ['ENOENT', 'pid:[100]', 'pid:[200]', true],
+  ['ENOENT', 'pid:[100]', 'pid:[100]', false],
+  ['ENOENT', undefined, 'pid:[200]', false],
+  ['ENOENT', 'pid:[100]', undefined, false],
+  ['ENOENT', '', 'pid:[200]', false],
+  ['ENOENT', 'pid:[100]', 'invalid', false],
+  ['readable', 'pid:[100]', 'pid:[200]', false],
+  ['ESRCH', 'pid:[100]', 'pid:[200]', false],
+  ['other-error', 'pid:[100]', 'pid:[200]', false],
+  ['EACCES', 'pid:[100]', 'pid:[100]', true],
+  ['EPERM', 'pid:[100]', 'pid:[100]', true],
+] as const)(
+  '親procの%sは名前空間%s→%sの証拠に応じて判定する',
+  (code, parent, current, expected) => {
+    expect(parentAccessIsolated(code, parent, current)).toBe(expected);
+  },
+);
 afterEach(() => {
   for (const directory of directories.splice(0))
     rmSync(directory, { recursive: true, force: true });

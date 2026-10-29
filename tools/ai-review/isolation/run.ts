@@ -2,7 +2,7 @@
 import { createServer, createConnection } from 'node:net';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { probeIsolation } from '../isolation-probe.js';
+import { probeIsolation, type IsolationInput } from '../isolation-probe.js';
 
 if (process.platform !== 'linux' || process.getuid?.() !== 0)
   throw new Error('requires disposable Linux root environment');
@@ -16,7 +16,7 @@ await new Promise<void>((resolve, reject) => {
 try {
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('listener not ready');
-  const input = {
+  const input: IsolationInput = {
     expectedUid: 2001,
     protectedFiles: ['/opt/ai-review-probe/private/dummy-token'],
     readOnlyDirectories: [
@@ -29,13 +29,22 @@ try {
     port: address.port,
     env: {},
   };
-  writeFileSync('/opt/ai-review-probe/input.json', JSON.stringify(input), { mode: 0o444 });
   // 無制限実行で実際に検査が失敗することを先に証明する。
   const control = await probeIsolation(input);
-  for (const name of ['uid', 'protected-file-0', 'read-only-directory-0', 'network']) {
+  for (const name of [
+    'uid',
+    'protected-file-0',
+    'read-only-directory-0',
+    'network',
+    'parent-environ',
+    'parent-mem',
+  ]) {
     if (control.checks.find((check) => check.name === name)?.passed !== false)
       throw new Error('negative control failed');
   }
+  if (!control.pidNamespace) throw new Error('parent PID namespace unavailable');
+  input.parentPidNamespace = control.pidNamespace;
+  writeFileSync('/opt/ai-review-probe/input.json', JSON.stringify(input), { mode: 0o444 });
   console.log('negative control: expected violations detected');
   console.log(
     JSON.stringify({ stage: 'parent', pid: process.pid, pidNamespace: control.pidNamespace }),
@@ -101,6 +110,7 @@ try {
     });
     socket.once('error', reject);
   });
+  // この親自身が子の完了を待って判定するため、親終了後のENOENTでは合格できない。
   if (status !== 0) throw new Error('isolation acceptance failed');
   console.log('official Action boundary + official CLI sandbox: passed');
 } finally {

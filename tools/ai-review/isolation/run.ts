@@ -45,6 +45,13 @@ try {
     });
   if (process.argv[3] === 'github' && runnerProcesses.length === 0)
     throw new Error('real runner processes not found');
+  const startTime = (pid: number) => {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const value = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+    if (!/^\d+$/.test(value ?? '')) throw new Error('process identity unavailable');
+    return value;
+  };
+  const processIdentities = runnerProcesses.map((pid) => ({ pid, start: startTime(pid) }));
   const candidateFiles = [
     '/home/runner/.git-credentials',
     '/home/runner/.config/gh/hosts.yml',
@@ -71,6 +78,11 @@ try {
       '/tmp',
       '/home/ai-review/.codex/tmp',
     ],
+    readOnlyFiles: [
+      '/home/ai-review/.codex/config.toml',
+      '/home/ai-review/.codex/installation_id',
+      '/opt/ai-review-probe/pr/.codex/config.toml',
+    ],
     parentPid: process.pid,
     port: address.port,
     env: {},
@@ -86,6 +98,9 @@ try {
     'parent-mem',
     'groups',
     'protected-socket-0',
+    'read-only-file-0',
+    'read-only-file-1',
+    'read-only-file-2',
   ]) {
     if (control.checks.find((check) => check.name === name)?.passed !== false)
       throw new Error('negative control failed');
@@ -170,7 +185,8 @@ try {
     socket.once('error', reject);
   });
   // この親自身が子の完了を待って判定するため、親終了後のENOENTでは合格できない。
-  for (const pid of runnerProcesses) process.kill(pid, 0);
+  for (const { pid, start } of processIdentities)
+    if (startTime(pid) !== start) throw new Error('runner process changed during probe');
   if (status !== 0) throw new Error('isolation acceptance failed');
   console.log('official Action boundary + official CLI sandbox: passed');
 } finally {

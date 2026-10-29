@@ -38,6 +38,7 @@ it('隔離されていない環境の資格情報・読取・書込を成功扱�
   const report = await probeIsolation({
     expectedUid: (process.getuid?.() ?? 0) + 1,
     protectedFiles: [protectedFile],
+    readOnlyFiles: [protectedFile],
     readOnlyDirectories: [directory],
     parentPid: process.pid,
     port: 0,
@@ -49,6 +50,7 @@ it('隔離されていない環境の資格情報・読取・書込を成功扱�
       { name: 'uid', passed: false },
       { name: 'credential-environment', passed: false },
       { name: 'protected-file-0', passed: false },
+      { name: 'read-only-file-0', passed: false },
       { name: 'read-only-directory-0', passed: false },
     ]),
   );

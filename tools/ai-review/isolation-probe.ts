@@ -9,6 +9,7 @@ export type IsolationInput = {
   expectedUid: number;
   protectedFiles: string[];
   readOnlyDirectories: string[];
+  readOnlyFiles?: string[];
   parentPid: number;
   parentPidNamespace?: string;
   protectedProcesses?: number[];
@@ -126,6 +127,12 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
         writeFileSync(file, 'harmless isolation fixture', { flag: 'wx' });
         unlinkSync(file);
       }),
+    });
+  }
+  for (const [index, file] of (input.readOnlyFiles ?? []).entries()) {
+    checks.push({
+      name: `read-only-file-${index}`,
+      passed: denied(() => closeSync(openSync(file, 'r+'))),
     });
   }
   const processes = [

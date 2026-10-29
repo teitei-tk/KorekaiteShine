@@ -33,7 +33,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-            isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts \
+            isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts \
             --module NodeNext --target ES2022 --skipLibCheck --outDir "$RUNNER_TEMP/isolation-compiled"
       - name: Install pinned official CLI and OS tools
         shell: bash
@@ -60,3 +60,8 @@ jobs:
           sudo bash tools/ai-review/isolation/setup.sh \
             "$GITHUB_WORKSPACE/.official-codex-action/dist/main.js" \
             "$RUNNER_TEMP/isolation-compiled" github
+      - name: Verify untrusted PR startup without external network
+        run: |
+          # モデルの代わりに400を返すローカル受信器だけを使う。外部通信経路を作らない。
+          sudo unshare --net bash -c 'ip link set lo up; exec /usr/local/bin/node /opt/ai-review-probe/startup.js "$1"' \
+            bash "$GITHUB_WORKSPACE/.official-codex-action/dist/main.js"

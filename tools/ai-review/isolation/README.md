@@ -46,6 +46,22 @@ PR側にはMCP、TOMLのSessionStartフック、`.codex/hooks.json`のSessionSta
 
 この検査が扱うのはCLIの起動段階です。モデル応答・モデルによるツール選択・実プロキシ接続の成功は検証しません。調査コマンドの書込み・通信制限は、先行する実CLI sandbox検査で別に確認します。
 
+### 公式Action全体と実プロキシの配置
+
+`lifecycle.ts`は、固定版の公式プロキシへ模擬文字列だけを標準入力のパイプで渡します。プロキシはrootとして最小環境で起動し、別のrootプロセスが返すローカルの固定応答へ接続します。独自プロキシ・認証処理・モデル推論は実装しません。`--github-oidc`は使用せず、模擬キーを使うAPI-keyモードの配置検証に限定します。
+
+専用UIDから実プロキシの環境・メモリを開けず、設定・server-infoを書込み用に開けないことを、sandboxの外側と内側で確認します。server-infoはroot所有の専用HOME内で0444に固定し、内容はポートとPIDだけです。プロキシとローカル受信器のPID・開始時刻を記録し、終了処理で別プロセスへ取り違えないようにします。設定の内容・所有者・権限がAction実行後も維持されることも必須です。
+
+検証Workflowは`openai/codex-action`本体を改変せず呼びます。`openai-api-key`入力を空にし、事前起動プロキシと保護済みの設定・server-infoを使う経路です。CLI・プロキシのnpm導入、HOME解決、server-info読込み、ユーザー切替、実CLI実行までを含みます。APIキー入力からAction自身がプロキシを起動する別経路は、採用予定のWIF構成では使わないため対象外です。
+
+この段階の外部通信遮断は、専用UIDとrootに対するIPv4/IPv6のOUTPUT規則で行います。loopback以外を拒否し、runner UIDによる公式配布物の準備は維持します。PRコマンドの公式sandbox制限も維持します。GitHubの読み取り専用トークンは通常の取得・準備に限られ、プロキシ・ローカル受信器の環境へ渡しません。実OIDC要求資格情報やOpenAI資格情報は投入しません。
+
+検証は`complete`と`reject`の2ケースです。前者は固定SSE応答で公式Actionが正常終了し、固定の最終メッセージを返すことを確認します。後者はローカル受信器が400を返し、要求到達後にActionが失敗した場合の後始末を確認します。CLIが400をどのエラー種別として処理したかまでは保証しません。どちらもプロキシからの要求と模擬Authorizationの一致が必須で、起動前の失敗は合格にしません。プロキシ準備から150秒以上かかった場合も不合格とし、Actionの3分timeoutを期待した失敗と混同しません。固定応答のusageは模擬値であり、実利用量や料金として扱いません。
+
+固定版Actionはcompositeで、プロキシ終了用の独自post処理を持ちません。[公式プロキシの終了API](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/responses-api-proxy/README.md)に従い、呼出し側の`always()`ステップが`/shutdown`を呼び、実プロセスの停止とserver-infoの削除を確認します。HTTPエラーでActionが失敗した場合も同じ処理を行います。これは成功・失敗後の通常の後始末検査であり、runnerの強制停止やジョブ強制キャンセル後の実行保証ではありません。
+
+Actionの入れ子の`setup-node`もActionsロックへ含めます。実行時にcheckoutしたローカルActionとして参照すると、ローカル検査からその依存を辿れずrunnerで停止したため、公式Actionを直接参照し、同じコミットをロックで固定しています。公式Actionのソースは変更していません。
+
 ## GitHub-hosted runnerでの実行
 
 [手動Workflow](../../../.github/workflows/ai-review-isolation.yml)を使います。`workflow_dispatch`のみで、`contents: read`だけを持ちます。OIDC・投稿権限・Secrets入力はありません。現行AIレビューWorkflowの起動条件とWIF設定は変更しません。
@@ -68,7 +84,7 @@ PR側にはMCP、TOMLのSessionStartフック、`.codex/hooks.json`のSessionSta
 
 ```sh
 pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts \
+  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts \
   --module NodeNext --target ES2022 --skipLibCheck --outDir /tmp/ai-review-isolation-compiled
 ```
 
@@ -84,6 +100,6 @@ bash /fixture/setup.sh /official-action/dist/main.js /compiled
 
 ## 次の段階へ進む条件
 
-対象は検査器の親プロセス、模擬資格情報、固定ディレクトリ、実runnerの上記対象と、公式Actionの実行ヘルパーから実CLIを起動する際のPR設定です。公式Actionのsetup/postを含む全体、実プロキシのメモリ・server-infoの具体的な配置、既存WIF交換・更新、実モデル・実投稿は未検証です。このfixtureの成功を、それらの安全性や新レビュー方式の実装完了として扱いません。
+対象は検査器の親プロセス、模擬資格情報、固定ディレクトリ、実runnerの上記対象、PR設定、公式ActionのAPI-key入力を空にする経路と実プロキシの配置・通常の後始末です。既存WIF交換・期限更新と更新失敗、実モデル・Schema出力・実利用量、実投稿は未検証です。このfixtureの成功を、それらの安全性や新レビュー方式の実装完了として扱いません。
 
 設計の受け入れ順に従い、実runnerでの境界検証を完了してからWIF接続へ進みます。後段の履歴・投稿の置換は、その接続検証が成立してから実装します。

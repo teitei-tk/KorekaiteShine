@@ -25,15 +25,26 @@ const reportFile = `${privateDir}/upstream-report.json`;
 type Report = { count: number; authOk: boolean };
 type Info = { port: number; pid: number };
 type Identity = { pid: number; start: string };
-type State = { proxy: Identity; backend: Identity; infoPath: string; configHash: string };
+type State = {
+  proxy: Identity;
+  backend: Identity;
+  infoPath: string;
+  configHash: string;
+  startedAt: string;
+};
 
 export function lifecyclePassed(
   mode: string,
   outcome: string,
   report: Report,
   output: string,
+  elapsedMs: number,
 ): boolean {
   return (
+    // Actionの3分timeoutより短い検証期限。時間切れを期待した拒否と取り違えない。
+    Number.isFinite(elapsedMs) &&
+    elapsedMs >= 0 &&
+    elapsedMs < 150000 &&
     Number.isInteger(report.count) &&
     report.count > 0 &&
     report.authOk === true &&
@@ -209,6 +220,7 @@ trust_level = "untrusted"
       backend: identity(backendPid),
       infoPath,
       configHash: configHash(),
+      startedAt: process.hrtime.bigint().toString(),
     };
     writeFileSync(`${privateDir}/lifecycle.json`, JSON.stringify(state), { mode: 0o600 });
     const input: IsolationInput = {
@@ -294,7 +306,13 @@ async function finish(mode: string, outcome: string): Promise<void> {
       info.pid === state.proxy.pid &&
       protectedConfig &&
       configHash() === state.configHash &&
-      lifecyclePassed(mode, outcome, report, process.env.FIXTURE_OUTPUT ?? '');
+      lifecyclePassed(
+        mode,
+        outcome,
+        report,
+        process.env.FIXTURE_OUTPUT ?? '',
+        Number(process.hrtime.bigint() - BigInt(state.startedAt)) / 1e6,
+      );
     const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
       signal: AbortSignal.timeout(3000),
     });

@@ -13,6 +13,15 @@ it.each([
 ] as const)(
   'モデルなしの%s検証は起動・転送・結果が揃った時だけ合格する',
   (mode, outcome, count, authOk, output, expected) => {
-    expect(lifecyclePassed(mode, outcome, { count, authOk }, output)).toBe(expected);
+    expect(lifecyclePassed(mode, outcome, { count, authOk }, output, 1000)).toBe(expected);
+  },
+);
+
+it.each([180000, Number.NaN, -1])(
+  'Actionの時間切れや不正な経過時間を拒否成功としない: %s',
+  (elapsed) => {
+    expect(lifecyclePassed('reject', 'failure', { count: 1, authOk: true }, '', elapsed)).toBe(
+      false,
+    );
   },
 );

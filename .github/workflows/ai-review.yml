@@ -87,7 +87,7 @@ jobs:
           openai-api-key: ''
           allow-users: ${{ github.actor }}
           prompt: 'Return exactly {"status":"ok"} for this connection test. Do not use tools or read files.'
-          output-schema: '{"type":"object","properties":{"status":{"type":"string","enum":["ok"]}},"required":["status"],"additionalProperties":false}'
+          output-schema-file: /opt/ai-review-probe/pr/schema.json
           model: gpt-6-luna
           effort: medium
           working-directory: /opt/ai-review-probe/pr

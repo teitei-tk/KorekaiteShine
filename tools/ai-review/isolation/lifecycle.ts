@@ -196,6 +196,7 @@ export function verifyProxyIsolation(
   proxy: Info,
   infoPath: string,
   protectedProcesses: number[] = [],
+  additionalReadOnlyFiles: string[] = [],
 ): void {
   const input: IsolationInput = {
     expectedUid: 2001,
@@ -204,7 +205,12 @@ export function verifyProxyIsolation(
     parentPidNamespace: readlinkSync('/proc/self/ns/pid'),
     protectedFiles: [`${privateDir}/dummy-token`],
     readOnlyDirectories: ['/opt/ai-review-probe/pr', home, '/tmp', `${home}/tmp`],
-    readOnlyFiles: [`${home}/config.toml`, infoPath, `${home}/installation_id`],
+    readOnlyFiles: [
+      `${home}/config.toml`,
+      infoPath,
+      `${home}/installation_id`,
+      ...additionalReadOnlyFiles,
+    ],
     port: proxy.port,
     env: {},
   };

@@ -243,7 +243,7 @@ AIレビュー終了後のAI review failure notificationが、同じPRの現在�
 
 利用者はこの検証に必要な最小限の有料呼び出しを承認しました。通常レビューは`AI_REVIEW_MODE=off`のままにします。前節と同じmain・Workflow・ソースCI・SHA条件を使い、`AI_REVIEW_WIF_MODEL_RUN`へ指定したCI実行IDを設定します。認証専用の`AI_REVIEW_WIF_PROBE_RUN`は削除しておきます。CIを再実行すると`wif-validation`がモデル検証経路へ進みます。成否を確認したら`AI_REVIEW_WIF_MODEL_RUN`も削除します。
 
-固定版公式プロキシの[最大TTLは3600秒](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/responses-api-proxy/src/auth.rs)です。初期交換後、同じプロセスを単調時計で61分維持します。OS時計・トークン期限・公式バイナリの変更は行いません。待機後にrootの外向き通信を一時拒否し、空のローカル要求に対する502と、上流応答が存在しないことを確認します。規則を除去して公式backoffを待った後、公式Actionの`unprivileged-user`・読み取り専用環境から`gpt-6-luna`へ小さなSchemaを指定します。
+固定版公式プロキシの[最大TTLは3600秒](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/responses-api-proxy/src/auth.rs)です。初期交換後、同じプロセスを単調時計で61分維持します。OS時計・トークン期限・公式バイナリの変更は行いません。待機後にrootの外向き通信を一時拒否し、空のローカル要求に対する502と、上流応答が存在しないことを確認します。規則を除去して公式backoffを待った後、公式Actionの`unprivileged-user`・読み取り専用環境から`gpt-6-luna`へ小さなSchemaを指定します。Schemaはroot所有・読取専用ファイルとして配置し、公式`output-schema-file`へ渡します。固定版Actionのinline入力は、runnerが別UID所有の一時ディレクトリへ書き込もうとして失敗するため使いません。
 
 期待する有料要求は1回です。プロバイダーの要求・ストリーム再試行を0にし、Actionを3分で打ち切ります。公式のrequest/response dumpをroot専用ディレクトリへ保存し、失敗注入1件・モデル要求1件・成功応答1件であることを事後検査します。独自の課金遮断プロキシや再試行器は追加しません。想定外の要求数や利用量欠損では不合格とし、自動再実行しません。
 

@@ -27,6 +27,7 @@ const home = '/home/ai-review/.codex';
 const directory = '/opt/ai-review-probe/private/model';
 const dumpDir = `${directory}/dump`;
 const statePath = `${directory}/state.json`;
+const schemaPath = '/opt/ai-review-probe/pr/schema.json';
 const WAIT_MS = 3660000; // 固定版auth.rsのMAX_FEDERATED_TOKEN_LIFETIME=3600秒を超える。
 export const schema = {
   type: 'object',
@@ -138,6 +139,7 @@ async function prepare(runId: string): Promise<void> {
     const info = await readInfo(infoPath, 60000);
     if (info.pid !== pid || !alive(proxy)) throw new Error('WIF proxy identity mismatch');
     chmodSync(infoPath, 0o444);
+    writeFileSync(schemaPath, JSON.stringify(schema), { mode: 0o444 });
     configureProxy(info.port, 'gpt-6-luna');
     const value: State = {
       proxy,
@@ -146,7 +148,7 @@ async function prepare(runId: string): Promise<void> {
       hash: configHash(),
       rejected: false,
     };
-    verifyProxyIsolation(info, infoPath, [process.pid]);
+    verifyProxyIsolation(info, infoPath, [process.pid], [schemaPath]);
     save(value);
     console.log(
       'WIF model probe: initial exchange and isolation passed; waiting 61 minutes for expiry',
@@ -191,7 +193,7 @@ async function waitAndReject(): Promise<void> {
   }
   checkLive(value);
   const info = await readInfo(value.infoPath);
-  verifyProxyIsolation(info, value.infoPath, [process.pid]);
+  verifyProxyIsolation(info, value.infoPath, [process.pid], [schemaPath]);
   const installed: string[] = [];
   try {
     for (const program of ['iptables', 'ip6tables']) {
@@ -229,7 +231,7 @@ async function finish(outcome: string): Promise<void> {
       checkLive(value);
       if (!value.rejected || !renewalDue(elapsed(value)) || outcome !== 'success')
         throw new Error('model acceptance incomplete');
-      verifyProxyIsolation(info, value.infoPath, [process.pid]);
+      verifyProxyIsolation(info, value.infoPath, [process.pid], [schemaPath]);
       const files = readdirSync(dumpDir);
       const requests = files.filter((file) => file.endsWith('-request.json')).sort();
       const responses = files.filter((file) => file.endsWith('-response.json'));

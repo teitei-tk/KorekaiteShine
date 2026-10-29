@@ -5,6 +5,7 @@ import {
   readFileSync,
   writeFileSync,
   chmodSync,
+  chownSync,
   lstatSync,
   readdirSync,
   readlinkSync,
@@ -44,10 +45,11 @@ type State = {
   metadataHash: string;
   origin: GenerationOrigin;
 };
-function protectTree(path: string): void {
+export function protectTree(path: string): void {
   const stat = lstatSync(path);
   if (stat.isSymbolicLink()) return;
-  if (stat.uid !== 0) throw new Error('準備ファイルの所有者不一致');
+  chownSync(path, 0, 0);
+  if (lstatSync(path).uid !== 0) throw new Error('準備ファイルの所有者不一致');
   chmodSync(path, stat.isDirectory() || stat.mode & 0o111 ? 0o755 : 0o644);
   if (stat.isDirectory()) for (const name of readdirSync(path)) protectTree(join(path, name));
 }

@@ -4,7 +4,7 @@
 
 `tools/ai-review`がGitHubのPRへ投稿する指摘と、その修正確認の要件です。2026年10月25日に追加しました。既存の実行条件と権限分離は[導入設計](../research/ai-code-review.md)に従います。
 
-公式Action方式へ移行し、実PRで行コメント投稿を確認しました。修正返信・投稿再試行の実検証は[切替記録](../runbooks/ai-review.md#公式方式への切替記録)へ追記します。旧方式の集約コメントは[検証用PR #11](https://github.com/teitei-tk/KorekaiteShine/pull/11)で検証済みです。
+公式Action方式へ移行し、実PRで行コメント投稿、修正返信、生成なしの投稿再試行、大規模差分の完了を確認しました。[切替記録](../runbooks/ai-review.md#公式方式への切替記録)に実行IDと検証範囲を記載します。旧方式の集約コメントは[検証用PR #11](https://github.com/teitei-tk/KorekaiteShine/pull/11)で検証済みです。
 
 ## 指摘の投稿
 

@@ -18,12 +18,20 @@ if (
 const input: IsolationInput = JSON.parse(readFileSync('/opt/ai-review-probe/input.json', 'utf8'));
 input.env = process.env;
 const outside = await probeIsolation(input);
+if (!input.parentPidNamespace || outside.pidNamespace !== input.parentPidNamespace)
+  throw new Error('Action boundary must share the live parent PID namespace');
 // 外側では読取り・ネットワークはOS権限に従う。資格情報・UID・昇格だけをAction境界で検査。
 const boundaryChecks = outside.checks.filter((check) =>
   ['uid', 'credential-environment', 'sudo', 'parent-environ', 'parent-mem'].includes(check.name),
 );
+console.log(
+  JSON.stringify({
+    stage: 'action-boundary',
+    pidNamespace: outside.pidNamespace,
+    checks: boundaryChecks,
+  }),
+);
 if (boundaryChecks.some((check) => !check.passed)) {
-  console.log(JSON.stringify({ stage: 'action-boundary', passed: false, checks: boundaryChecks }));
   process.exit(1);
 }
 const result = spawnSync(

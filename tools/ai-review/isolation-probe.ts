@@ -1,5 +1,5 @@
 // Linux受け入れ検査専用。本番のモデル起動・資格情報除去には使用しない。
-import { openSync, closeSync, writeFileSync, unlinkSync } from 'node:fs';
+import { openSync, closeSync, writeFileSync, unlinkSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createConnection } from 'node:net';
@@ -10,10 +10,30 @@ export type IsolationInput = {
   protectedFiles: string[];
   readOnlyDirectories: string[];
   parentPid: number;
+  parentPidNamespace?: string;
   port: number;
   env: NodeJS.ProcessEnv;
 };
-export type IsolationReport = { passed: boolean; checks: { name: string; passed: boolean }[] };
+export type IsolationReport = {
+  passed: boolean;
+  checks: { name: string; passed: boolean; observation?: string }[];
+  pidNamespace?: string;
+};
+
+export function parentAccessIsolated(
+  observation: string,
+  parentNamespace?: string,
+  currentNamespace?: string,
+): boolean {
+  // ENOENT単独では成功にしない。親の生存と外側の拒否はrun/action-probeで検証する。
+  return (
+    ['EACCES', 'EPERM', 'EROFS'].includes(observation) ||
+    (observation === 'ENOENT' &&
+      /^pid:\[\d+\]$/.test(parentNamespace ?? '') &&
+      /^pid:\[\d+\]$/.test(currentNamespace ?? '') &&
+      parentNamespace !== currentNamespace)
+  );
+}
 
 function denied(action: () => void): boolean {
   try {
@@ -47,7 +67,14 @@ async function networkDenied(port: number): Promise<boolean> {
 }
 
 export async function probeIsolation(input: IsolationInput): Promise<IsolationReport> {
-  const checks = [
+  let pidNamespace: string | undefined;
+  try {
+    const value = readlinkSync('/proc/self/ns/pid');
+    if (/^pid:\[\d+\]$/.test(value)) pidNamespace = value;
+  } catch {
+    /* 非Linuxや不可視の場合も、隔離成功の根拠にはしない。 */
+  }
+  const checks: IsolationReport['checks'] = [
     { name: 'uid', passed: input.expectedUid > 0 && process.getuid?.() === input.expectedUid },
     {
       name: 'credential-environment',
@@ -78,15 +105,23 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
     });
   }
   for (const name of ['environ', 'mem']) {
-    checks.push({
-      name: `parent-${name}`,
-      passed: denied(() => closeSync(openSync(`/proc/${input.parentPid}/${name}`, 'r'))),
-    });
+    let observation = 'readable';
+    let passed = false;
+    try {
+      closeSync(openSync(`/proc/${input.parentPid}/${name}`, 'r'));
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error ? String(error.code) : '';
+      observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(code)
+        ? code
+        : 'other-error';
+      passed = parentAccessIsolated(code, input.parentPidNamespace, pidNamespace);
+    }
+    checks.push({ name: `parent-${name}`, passed, observation });
   }
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
   checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
   checks.push({ name: 'network', passed: await networkDenied(input.port) });
-  return { passed: checks.every((check) => check.passed), checks };
+  return { passed: checks.every((check) => check.passed), checks, pidNamespace };
 }
 
 export function requireIsolationReport(text: string, names: string[]): void {

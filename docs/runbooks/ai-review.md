@@ -4,13 +4,13 @@
 
 ## 公式Action方式の運用
 
-2026年10月29日、レビュー生成を公式Action、認証を公式WIFプロキシへ移行する。既存Provider・サービスアカウント・audienceと以下の限定マッピングは変更しない。`AI_REVIEW_MODE=off`で停止、`review`で本人・同一リポジトリ・main向け非Draft PRのCI成功後に起動する。新方式の本番有効化と実PR検証は進行中である。
+2026年10月29日、レビュー生成を公式Action、認証を公式WIFプロキシへ移行する。既存Provider・サービスアカウント・audienceと以下の限定マッピングは変更しない。`AI_REVIEW_MODE=off`で停止、`review`で本人・同一リポジトリ・main向け非Draft PRのCI成功後に起動する。通常レビューを有効化し、小規模・大規模PR、修正返信、投稿だけの再試行を実検証した。
 
 生成run/attemptに固定した`ai-review-v2-<run>-<attempt>`を7日間保持する。投稿失敗時は対象head/base、履歴の改訂、手動削除の有無を確認し、同じ実行の**publishジョブだけ**を再実行する（`gh run rerun <run> --job <publish-job-id>`）。生成ジョブや全ジョブを再実行しない。生成元attemptは成功したgenerateの出力を引き継ぐ。投稿再開は追加のモデル要求を送らない。
 
 投稿済みコメントの削除、履歴改訂、Artifact失効、対象変更があれば同じArtifactを再試行しない。手動削除は未投稿と区別できない場合があり、再作成を防ぐ保証はない。履歴を人が確認した後、新しいheadのCIから再レビューする。Resolve状態は変更しない。DBや監視サービスによる削除追跡は行わない。
 
-モデル実行は15分で打ち切り、自動再生成はしない。$1厳密上限は廃止した。Artifactのusage/costがnullなら不明であり無料ではない。旧SDK・分割・予算管理は通常ジョブから接続しない。`tools/ai-review-retired`は移行確認後の削除差分を大規模PR検証に使うための一時退避で、ビルド・テスト・実行対象外である。
+モデル実行は15分で打ち切り、自動再生成はしない。$1厳密上限は廃止した。Artifactのusage/costがnullなら不明であり無料ではない。旧SDK・分割・予算管理は通常ジョブから接続しない。旧エンジンの一時退避とSDK・構文解析依存は削除済み。クレーム確認だけを再利用し、独自のトークン交換経路も廃止した。
 
 以下の初期設定・WIF検証手順は引き続き使う。旧SDK・費用予約に関する手順は移行前の記録であり、新方式では実行しない。
 
@@ -264,3 +264,13 @@ AIレビュー終了後のAI review failure notificationが、同じPRの現在�
 Schema指定、APIの完了状態、`{"status":"ok"}`だけの出力、Actionの結果、入力・出力・合計token数を照合します。生のdump・ヘッダー・本文はログやArtifactへ出さず、固定の合否と利用量だけを表示します。料金そのものは未取得（`null`）であり、ゼロと扱いません。期限超過後に同じプロキシで応答が成功することを、公式実装による新しいJWT取得・トークン交換の証拠とします。更新失敗時の期限切れトークン不使用も確認します。
 
 検証の前後で、資格情報の環境非継承・プロキシと親procへのアクセス拒否・書込み拒否・sandbox内の通信拒否と設定不変を検査し、最後に公式shutdownで停止します。公式Actionを起動するrunnerとrootの両方へsudoの環境初期化を適用します。PR由来のコードや資料は持ち込まず、初期交換から終了まで約70分を見込みます。この成功は通常レビューの有効化や履歴・投稿処理の移行完了を意味しません。
+
+## 公式方式への切替記録
+
+- PR #46で公式Action・共通履歴・固定Artifact・単一投稿器をmainへ反映。ブランチ隔離[40867233396](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40867233396)、main隔離[40867551087](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40867551087)の正常終了・拒否の両ケースが成功した。
+- 初回実PRはコピー後の文脈ファイルの所有者検査で停止し、モデル要求には到達しなかった。PR #48でroot所有を明示し、実Git checkoutを使う無資格情報Dockerと回帰テストで修正を確認した。
+- [検証PR #47](https://github.com/teitei-tk/KorekaiteShine/pull/47)の[実行40869390046](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40869390046)で、実PRの隔離、公式生成、Schema検証、行8へのP2投稿、完了概要、公式プロキシ停止が成功した。公式ログの入力57,861（うちcache read44,942）、出力1,106トークン。料金は不明。旧失敗通知コメントを含む履歴から正常に開始した。
+- 修正後の[実行40869912389](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40869912389)で全過去指摘を確認し、元コメント4412024440へ「☑️: 修正を確認しました」を返信した（返信4412061935）。新規指摘は増やしていない。
+- 同じ[実行の試行2](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40869912389/attempts/2)でpublishだけを再実行。生成元attempt=1のArtifactを再利用し、ALREADY_COMPLETEで成功した。指摘4412024440・修正返信4412061935の2件のまま重複なし。generateは元の12:01:47〜12:03:53 UTCの結果を引き継ぎ、モデルは再実行していない。
+- [旧エンジン削除PR #49](https://github.com/teitei-tk/KorekaiteShine/pull/49)のコードhead `c6273ab122f58835cd3c13e4e33933f76724fd6d`を[実行40871048275](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40871048275)で検証した。変更対象41テキストファイルの変更前後本文は545,550バイト（差分約272KB）。旧資料上限を超える規模で、隔離・生成・Schema・投稿・公式停止が成功し、新規指摘0件、完了コメント6496322229を記録した。公式ログの入力112,353（うちcache read74,986）・出力2,376トークン、料金不明。全ファイル閲覧や任意規模の完走・品質を保証する結果ではない。
+- 大規模検証後は結果の文書追記だけを行い、その間はoffで追加の有料生成を避け、通常CIで検査する。最終head・mainへの反映・通常レビュー設定の確認結果はPR #49本文に記録する。検証PR #47はDraftのまま履歴を保持し、mainへ取り込まない。

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eligible, validReview, remainingLifetime, renderReview } from './policy.ts';
+import { eligible, validReview, renderReview } from './policy.ts';
 
 const sha = 'a'.repeat(40);
 export function prFixture() {
@@ -69,13 +69,6 @@ describe('モデル出力の境界', () => {
     const r = validReview({ ...result, status: 'incomplete', findings: [] }, lines);
     expect(renderReview(r, sha, 'b'.repeat(40))).toContain('未完了');
   });
-});
-
-it('期限切れや残存240秒未満を拒否する', () => {
-  expect(remainingLifetime({ expires_at: 1300 }, 1000)).toBe(300);
-  for (const expires_at of [999, 1239, undefined, '1300']) {
-    expect(() => remainingLifetime({ expires_at }, 1000)).toThrow();
-  }
 });
 
 it('過去の全指摘に根拠付きの確認を要求し、未知・重複・欠落を拒否する', () => {

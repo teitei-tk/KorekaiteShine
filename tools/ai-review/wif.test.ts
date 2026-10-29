@@ -34,7 +34,7 @@ it('クレーム確認だけではOpenAIへ通信しない', async () => {
   }) as typeof fetch;
   const result = await authenticate(env, 'claims', request, () => {});
   expect(urls.length).toBe(1);
-  expect(result.accessToken).toBeUndefined();
+  expect('accessToken' in result).toBe(false);
 });
 it('想定外のリポジトリのトークンは交換しない', async () => {
   let calls = 0;
@@ -42,27 +42,19 @@ it('想定外のリポジトリのトークンは交換しない', async () => {
     calls++;
     return Response.json({ value: jwt('other/repo') });
   }) as typeof fetch;
-  await expect(authenticate(env, 'review', request, () => {})).rejects.toThrow();
+  await expect(authenticate(env, 'claims', request, () => {})).rejects.toThrow();
   expect(calls).toBe(1);
-});
-it('Bearerをマスクし、寿命を検査してから返す', async () => {
-  const masked: string[] = [];
-  const request = (async (url: string | URL | Request, init?: RequestInit) => {
-    if (String(url).includes('example.test')) return Response.json({ value: jwt() });
-    expect(String(url)).toBe('https://auth.openai.com/oauth/token');
-    expect(JSON.parse(init?.body as string).subject_token).toBe(jwt());
-    return Response.json({
-      access_token: 'access-secret',
-      expires_at: Math.floor(Date.now() / 1000) + 300,
-    });
-  }) as typeof fetch;
-  expect((await authenticate(env, 'review', request, (s) => masked.push(s))).accessToken).toBe(
-    'access-secret',
-  );
-  expect(masked).toContain('access-secret');
-  expect(masked).toContain(jwt());
 });
 it('エラー本文の秘密値を例外に含めない', async () => {
   const request = (async () => new Response('secret-value', { status: 403 })) as typeof fetch;
-  await expect(authenticate(env, 'review', request, () => {})).rejects.toThrow('HTTP 403');
+  await expect(authenticate(env, 'claims', request, () => {})).rejects.toThrow('HTTP 403');
+});
+it('廃止した独自交換モードでは通信を始めない', async () => {
+  let calls = 0;
+  const request = (async () => {
+    calls++;
+    return Response.json({ value: jwt() });
+  }) as typeof fetch;
+  await expect(authenticate(env, 'review', request)).rejects.toThrow('WIFモードが不正');
+  expect(calls).toBe(0);
 });

@@ -46,6 +46,8 @@
 
 **前提:** Task 1の実runner検証に成功している。
 
+2026年10月29日、利用者の指示により実資格情報を使わない事前確認だけを追加した。公式ActionのAPI-key入力を空にする経路を全体実行し、模擬キーをパイプで受け取る公式プロキシの配置・メモリ隔離、通常終了とAction失敗後の停止を実runnerで確認した。[証拠と限定](../../../tools/ai-review/isolation/README.md)を参照する。固定版Actionにプロキシ用の独自postはないため、呼出し側の`always()`から公式終了APIを使う。以下の実WIF交換・更新、実モデルとSchemaの項目は未完了のままとする。
+
 **ファイル:** `.github/workflows/ai-review.yml`、`tools/ai-review`内の小さなプロキシ起動・終了処理、対応テスト。
 
 **境界:** 既存クレーム検査を再利用し、公式プロキシへ標準入力のパイプで要求資格情報を渡す。専用HOMEの信頼する設定とserver-infoでActionを接続する。

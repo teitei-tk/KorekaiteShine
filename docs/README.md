@@ -31,7 +31,7 @@ TypeScript変更後の[敵対的検証](research/typescript-review-adversarial-v
 
 履歴の改訂検知と投稿再開の[再検証](research/review-resume-adversarial-validation.md)では、通常の再開手順は整合すると判断しました。応答喪失後に削除された返信を検知できない限界について、P2を1件記録し、設計へ反映しました。投稿済みコメントの保持・読取可能性を再開保証の前提とし、手動削除後は同じArtifactを再試行しない運用を明記しています。実装は未変更です。
 
-2026年10月28日に利用者が移行の実装開始を承認しました。[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に従い、[資格情報を使わない隔離検査](../tools/ai-review/isolation/README.md)を先行実装しています。10月29日、GitHub-hosted runnerで初期fixtureに加え、runnerの認証ファイル候補・プロセス・既知の特権ソケットと、PR設定・MCP・フックのオフライン起動検査が成功しました。実プロキシを含む接続検証・新レビュー本体の移行は未完了です。現行の有料レビューWorkflowは変更していません。
+2026年10月28日に利用者が移行の実装開始を承認しました。[実装計画](superpowers/plans/2026-10-28-codex-review-migration.md)に従い、[資格情報を使わない隔離検査](../tools/ai-review/isolation/README.md)を先行実装しています。10月29日、GitHub-hosted runnerで初期fixtureに加え、runnerの認証ファイル候補・プロセス・既知の特権ソケットと、PR設定・MCP・フックのオフライン起動検査が成功しました。模擬キーによる公式Action全体と実プロキシの配置・終了検査も成功しています。実WIF交換・期限更新、実モデル接続、新レビュー本体の移行は未完了です。現行の有料レビューWorkflowは変更していません。
 
 ## 設計判断の記録
 

@@ -169,6 +169,75 @@ async function serve(mode: string): Promise<void> {
   );
 }
 
+export function verifyProxyIsolation(
+  proxy: Info,
+  infoPath: string,
+  protectedProcesses: number[] = [],
+): void {
+  const input: IsolationInput = {
+    expectedUid: 2001,
+    parentPid: proxy.pid,
+    protectedProcesses,
+    parentPidNamespace: readlinkSync('/proc/self/ns/pid'),
+    protectedFiles: [`${privateDir}/dummy-token`],
+    readOnlyDirectories: ['/opt/ai-review-probe/pr', home, '/tmp', `${home}/tmp`],
+    readOnlyFiles: [`${home}/config.toml`, infoPath, `${home}/installation_id`],
+    port: proxy.port,
+    env: {},
+  };
+  writeFileSync('/opt/ai-review-probe/input.json', JSON.stringify(input), { mode: 0o444 });
+  const outside = spawnSync(
+    '/usr/bin/sudo',
+    ['-u', 'ai-review', '--', '/usr/local/bin/node', '/opt/ai-review-probe/pr/probe-child.js'],
+    { encoding: 'utf8', timeout: 10000 },
+  );
+  if (outside.error || outside.status === null) throw new Error('proxy boundary probe failed');
+  const report: IsolationReport = JSON.parse(outside.stdout);
+  const required = [
+    'uid',
+    'groups',
+    'credential-environment',
+    'protected-file-0',
+    'parent-environ',
+    'parent-mem',
+    'read-only-file-0',
+    'read-only-file-1',
+    'sudo',
+    ...protectedProcesses.flatMap((_, index) => [
+      `runner-process-${index}-environ`,
+      `runner-process-${index}-mem`,
+    ]),
+  ];
+  if (
+    report.pidNamespace !== input.parentPidNamespace ||
+    !required.every((name) => report.checks.some((check) => check.name === name && check.passed))
+  )
+    throw new Error('proxy credentials or configuration are accessible');
+  const inside = spawnSync(
+    '/usr/bin/sudo',
+    [
+      '-u',
+      'ai-review',
+      '--',
+      '/usr/local/bin/codex',
+      'sandbox',
+      '--permission-profile',
+      ':read-only',
+      '--cd',
+      '/opt/ai-review-probe/pr',
+      '--',
+      '/usr/local/bin/node',
+      '/opt/ai-review-probe/pr/probe-child.js',
+    ],
+    { encoding: 'utf8', timeout: 10000 },
+  );
+  if (inside.error || inside.status !== 0) throw new Error('proxy sandbox probe failed');
+  requireIsolationReport(
+    inside.stdout,
+    report.checks.map((check) => check.name),
+  );
+}
+
 async function prepare(mode: string, runId: string): Promise<void> {
   const started: Identity[] = [];
   const infoPath = `${home}/${runId}.json`;
@@ -223,62 +292,7 @@ trust_level = "untrusted"
       startedAt: process.hrtime.bigint().toString(),
     };
     writeFileSync(`${privateDir}/lifecycle.json`, JSON.stringify(state), { mode: 0o600 });
-    const input: IsolationInput = {
-      expectedUid: 2001,
-      parentPid: proxyPid,
-      parentPidNamespace: readlinkSync('/proc/self/ns/pid'),
-      protectedFiles: [`${privateDir}/dummy-token`],
-      readOnlyDirectories: ['/opt/ai-review-probe/pr', home, '/tmp', `${home}/tmp`],
-      readOnlyFiles: [`${home}/config.toml`, infoPath, `${home}/installation_id`],
-      port: proxy.port,
-      env: {},
-    };
-    writeFileSync('/opt/ai-review-probe/input.json', JSON.stringify(input), { mode: 0o444 });
-    const outside = spawnSync(
-      '/usr/bin/sudo',
-      ['-u', 'ai-review', '--', '/usr/local/bin/node', '/opt/ai-review-probe/pr/probe-child.js'],
-      { encoding: 'utf8', timeout: 10000 },
-    );
-    if (outside.error || outside.status === null) throw new Error('proxy boundary probe failed');
-    const report: IsolationReport = JSON.parse(outside.stdout);
-    const required = [
-      'uid',
-      'groups',
-      'credential-environment',
-      'protected-file-0',
-      'parent-environ',
-      'parent-mem',
-      'read-only-file-0',
-      'read-only-file-1',
-      'sudo',
-    ];
-    if (
-      !required.every((name) => report.checks.some((check) => check.name === name && check.passed))
-    )
-      throw new Error('proxy credentials or configuration are accessible');
-    const inside = spawnSync(
-      '/usr/bin/sudo',
-      [
-        '-u',
-        'ai-review',
-        '--',
-        '/usr/local/bin/codex',
-        'sandbox',
-        '--permission-profile',
-        ':read-only',
-        '--cd',
-        '/opt/ai-review-probe/pr',
-        '--',
-        '/usr/local/bin/node',
-        '/opt/ai-review-probe/pr/probe-child.js',
-      ],
-      { encoding: 'utf8', timeout: 10000 },
-    );
-    if (inside.error || inside.status !== 0) throw new Error('proxy sandbox probe failed');
-    requireIsolationReport(
-      inside.stdout,
-      report.checks.map((check) => check.name),
-    );
+    verifyProxyIsolation(proxy, infoPath);
     if (!alive(state.proxy)) throw new Error('proxy exited during probe');
     console.log('official proxy memory, config and server-info isolation: passed');
   } catch (error) {

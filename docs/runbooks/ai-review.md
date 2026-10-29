@@ -222,3 +222,19 @@ GitHub Actionsでは`Documentation checks`の`Repository lint, format and AI rev
 AIレビュー終了後のAI review failure notificationが、同じPRの現在のhead/baseへ固定理由と実行リンクを投稿する。レビュー失敗のチェックは失敗のまま残る。通常CIが失敗してAIレビューが開始されなかった場合や、対象外・更新済みPRは通知対象外。
 
 通知がない場合は、通知Workflowがmainに存在するか、元実行が完了したか、現在のhead/baseと試行が一致するかを確認する。状態Artifactが取得できなくても固定の代替理由で通知する。通知ジョブ自体にFAILURE_NOTIFICATION_FAILEDがあれば、GitHubの読み取り・PR書き込み権限と障害を確認する。通知Workflowだけの再実行はモデルを呼ばず、同じ実行・試行のコメントを重複投稿しない。
+
+## モデルを呼ばない公式WIF接続検証
+
+移行先の固定版公式プロキシによる初期交換を、既存マッピングのまま検証する手順です。有料モデル呼び出しは承認されていません。
+
+1. `AI_REVIEW_MODE`を`off`にし、`EXPECTED_AI_REVIEW_MODE=off pnpm check:ai-settings`で確認します。既存のProvider・サービスアカウント・audience・マッピング条件は変更しません。
+2. mainに反映済みの`ai-review-isolation.yml`を手動実行し、`complete`と`reject`の成功を確認します。
+3. 現在のmainのpushで開始された、成功済みの`Documentation checks`の実行IDを選びます。`AI_REVIEW_WIF_PROBE_RUN`へそのIDを設定し、そのCIを再実行します。
+4. 後続の`AI review execution`で`wif-authentication`が実行され、クレーム一致・初期交換・資格情報隔離・公式終了の成功表示が揃うことを確認します。全体がskippedだった場合は成功扱いしません。
+5. 成否にかかわらず`AI_REVIEW_WIF_PROBE_RUN`を削除します。`AI_REVIEW_MODE`は`off`のままにし、有料呼び出しの別途承認を待ちます。
+
+同じリポジトリのmainへのpush、実行ID、ソースSHAと現在のmain SHA、CI成功をすべて照合します。別Workflowや`workflow_dispatch`へWIFのマッピングを広げません。mainが進んだ場合は、新しいmainの隔離検証とCIを使います。検証用PRのコードやArtifactを認証ジョブへ持ち込みません。
+
+公式プロキシは初期交換に成功してから`server-info`を作ります。新規作成とPID一致を確認し、実資格情報を保持するプロキシとroot検査器の環境・メモリへのアクセス拒否、資格情報の環境非継承、設定・server-infoの書込み拒否、読み取り専用sandbox内の通信拒否を検査します。要求トークンは匿名パイプだけで公式プロキシへ渡し、ファイル・引数・その環境変数へ保存しません。診断にトークンや外部応答本文を記録しません。
+
+この検証では`codex exec`やResponses APIを呼ばず、ローカルHTTPは公式の`GET /shutdown`だけを使います。公式Action全体は前段の模擬資格情報の検証、実資格情報の段階は既存の別UID・公式sandboxの検査を再利用します。初期交換成功は期限更新・更新失敗・モデル権限・Schema出力・実利用量の証明ではありません。これらと本体の切替は未完了のままです。通常終了・検査失敗時は子プロセスを停止しますが、runnerの強制終了時の後処理まで保証しません。

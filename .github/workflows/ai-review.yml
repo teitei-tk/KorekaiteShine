@@ -13,6 +13,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 実資格情報を使うがモデル要求は送らない。指定されたmainのCI完了だけを対象にする。
+  wif-authentication:
+    if: >-
+      vars.AI_REVIEW_MODE == 'off' &&
+      vars.AI_REVIEW_WIF_PROBE_RUN != '' &&
+      vars.AI_REVIEW_WIF_PROBE_RUN == format('{0}', github.event.workflow_run.id) &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_sha == github.sha &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.repository.id == 1426899426 &&
+      github.event.workflow_run.head_repository.id == github.event.repository.id
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: openai/codex-action
+          ref: bdf19a4a223ec2549a3e2274a0cf61556bc07675
+          path: .official-codex-action
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Prepare trusted isolation verification
+        run: bash tools/ai-review/isolation/prepare.sh
+      - name: Verify real WIF authentication without model requests
+        env:
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
+          OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
+        run: |
+          sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID \
+            /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/isolation/wif.js"
+
   gate:
     if: >-
       github.event.workflow_run.event == 'pull_request' &&

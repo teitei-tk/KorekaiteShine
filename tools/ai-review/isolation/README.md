@@ -107,3 +107,9 @@ bash /fixture/setup.sh /official-action/dist/main.js /compiled
 対象は検査器の親プロセス、模擬資格情報、固定ディレクトリ、実runnerの上記対象、PR設定、公式ActionのAPI-key入力を空にする経路と実プロキシの配置・通常の後始末です。既存WIF交換・期限更新と更新失敗、実モデル・Schema出力・実利用量、実投稿は未検証です。このfixtureの成功を、それらの安全性や新レビュー方式の実装完了として扱いません。
 
 設計の受け入れ順に従い、実runnerでの境界検証を完了してからWIF接続へ進みます。後段の履歴・投稿の置換は、その接続検証が成立してから実装します。
+
+## 認証だけを行う実WIF検証
+
+PR #43のマージ後、mainの`8287a94332cd60bde813d8f5c5baf5b0c1e3eada`で[隔離検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40836689147)の2ケースが成功しました。
+
+実WIF用の`wif.ts`は、初期交換を公式プロキシに任せ、`lifecycle.ts`の隔離検査を共用します。`prepare.sh`は両Workflowの固定版導入・公式Action境界・sandbox検査を共用するものです。初期交換を模擬するHTTPサーバーや独自OAuth処理は追加しません。実行条件・停止手順・証明できる範囲は[運用手順](../../../docs/runbooks/ai-review.md#モデルを呼ばない公式wif接続検証)を参照してください。

@@ -13,12 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 実資格情報を使うがモデル要求は送らない。指定されたmainのCI完了だけを対象にする。
-  wif-authentication:
+  # 指定されたmainのCIだけを検証する。通常レビューはoffのまま。
+  wif-validation:
     if: >-
       vars.AI_REVIEW_MODE == 'off' &&
-      vars.AI_REVIEW_WIF_PROBE_RUN != '' &&
-      vars.AI_REVIEW_WIF_PROBE_RUN == format('{0}', github.event.workflow_run.id) &&
+      ((vars.AI_REVIEW_WIF_PROBE_RUN != '' && vars.AI_REVIEW_WIF_PROBE_RUN == format('{0}', github.event.workflow_run.id)) ||
+       (vars.AI_REVIEW_WIF_MODEL_RUN != '' && vars.AI_REVIEW_WIF_MODEL_RUN == format('{0}', github.event.workflow_run.id))) &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_sha == github.sha &&
@@ -26,7 +26,7 @@ jobs:
       github.event.repository.id == 1426899426 &&
       github.event.workflow_run.head_repository.id == github.event.repository.id
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 80
     permissions:
       contents: read
       id-token: write
@@ -52,6 +52,7 @@ jobs:
       - name: Prepare trusted isolation verification
         run: bash tools/ai-review/isolation/prepare.sh
       - name: Verify real WIF authentication without model requests
+        if: vars.AI_REVIEW_WIF_MODEL_RUN != format('{0}', github.event.workflow_run.id)
         env:
           OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
           OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
@@ -59,6 +60,49 @@ jobs:
         run: |
           sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID \
             /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/isolation/wif.js"
+
+      - name: Start official WIF proxy for expiry verification
+        id: model-prepare
+        if: vars.AI_REVIEW_WIF_MODEL_RUN == format('{0}', github.event.workflow_run.id)
+        env:
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
+          OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
+        run: |
+          sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID \
+            /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/isolation/model.js" prepare "$GITHUB_RUN_ID"
+      - name: Wait past maximum token lifetime and verify closed renewal failure
+        id: model-expiry
+        if: steps.model-prepare.outcome == 'success'
+        timeout-minutes: 65
+        run: sudo /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/isolation/model.js" wait
+      - name: Verify model and Schema with official Action
+        id: wif-model
+        if: steps.model-expiry.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: openai/codex-action@v1.13
+        with:
+          codex-version: 0.164.0
+          openai-api-key: ''
+          allow-users: ${{ github.actor }}
+          prompt: 'Return exactly {"status":"ok"} for this connection test. Do not use tools or read files.'
+          output-schema: '{"type":"object","properties":{"status":{"type":"string","enum":["ok"]}},"required":["status"],"additionalProperties":false}'
+          model: gpt-6-luna
+          effort: medium
+          working-directory: /opt/ai-review-probe/pr
+          codex-home: /home/ai-review/.codex
+          safety-strategy: unprivileged-user
+          codex-user: ai-review
+          sandbox: read-only
+          codex-args: '["--ephemeral"]'
+      - name: Verify renewal evidence and stop official WIF proxy
+        if: ${{ always() && steps.model-prepare.outcome == 'success' }}
+        env:
+          MODEL_OUTCOME: ${{ steps.wif-model.outcome }}
+          MODEL_OUTPUT: ${{ steps.wif-model.outputs.final-message }}
+        run: |
+          sudo --preserve-env=MODEL_OUTPUT /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/isolation/model.js" finish "$MODEL_OUTCOME"
 
   gate:
     if: >-

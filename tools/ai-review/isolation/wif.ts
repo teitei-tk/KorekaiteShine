@@ -7,13 +7,7 @@ import { verifyProxyIsolation } from './lifecycle.js';
 
 export type Launch = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 type Info = { pid: number; port: number };
-export async function authenticateProxy(
-  env: NodeJS.ProcessEnv,
-  infoPath: string,
-  inspect: (info: Info) => void,
-  timeoutMs = 60000,
-  launch: Launch = spawn,
-): Promise<void> {
+export function wifProxyArgs(env: NodeJS.ProcessEnv, infoPath: string): string[] {
   const required = [
     'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
     'ACTIONS_ID_TOKEN_REQUEST_URL',
@@ -22,30 +16,36 @@ export async function authenticateProxy(
     'OPENAI_SERVICE_ACCOUNT_ID',
   ];
   if (required.some((key) => !env[key])) throw new Error('missing WIF settings');
+  return [
+    '--github-oidc',
+    '--http-shutdown',
+    '--server-info',
+    infoPath,
+    '--oidc-audience',
+    env.OPENAI_WIF_AUDIENCE!,
+    '--identity-provider-id',
+    env.OPENAI_IDENTITY_PROVIDER_ID!,
+    '--service-account-id',
+    env.OPENAI_SERVICE_ACCOUNT_ID!,
+    '--github-oidc-request-url',
+    env.ACTIONS_ID_TOKEN_REQUEST_URL!,
+  ];
+}
+
+export async function authenticateProxy(
+  env: NodeJS.ProcessEnv,
+  infoPath: string,
+  inspect: (info: Info) => void,
+  timeoutMs = 60000,
+  launch: Launch = spawn,
+): Promise<void> {
   // 過去のserver-infoを初期交換成功の証拠にしない。
   rmSync(infoPath, { force: true });
-  const child = launch(
-    '/usr/local/bin/codex-responses-api-proxy',
-    [
-      '--github-oidc',
-      '--http-shutdown',
-      '--server-info',
-      infoPath,
-      '--oidc-audience',
-      env.OPENAI_WIF_AUDIENCE!,
-      '--identity-provider-id',
-      env.OPENAI_IDENTITY_PROVIDER_ID!,
-      '--service-account-id',
-      env.OPENAI_SERVICE_ACCOUNT_ID!,
-      '--github-oidc-request-url',
-      env.ACTIONS_ID_TOKEN_REQUEST_URL!,
-    ],
-    {
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/root' },
-      // 標準エラーにも外部応答や資格情報を出さない。
-      stdio: ['pipe', 'ignore', 'ignore'],
-    },
-  );
+  const child = launch('/usr/local/bin/codex-responses-api-proxy', wifProxyArgs(env, infoPath), {
+    env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/root' },
+    // 標準エラーにも外部応答や資格情報を出さない。
+    stdio: ['pipe', 'ignore', 'ignore'],
+  });
   let failed = false;
   child.on('error', () => {
     failed = true;

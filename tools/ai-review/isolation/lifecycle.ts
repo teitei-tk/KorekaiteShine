@@ -55,13 +55,13 @@ export function lifecyclePassed(
   );
 }
 
-function identity(pid: number): Identity {
+export function identity(pid: number): Identity {
   const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
   const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
   if (!/^\d+$/.test(start ?? '')) throw new Error('process identity unavailable');
   return { pid, start };
 }
-function alive(process: Identity): boolean {
+export function alive(process: Identity): boolean {
   try {
     const stat = readFileSync(`/proc/${process.pid}/stat`, 'utf8');
     return (
@@ -72,13 +72,14 @@ function alive(process: Identity): boolean {
     return false;
   }
 }
-function configHash(): string {
+export function configHash(): string {
   return createHash('sha256')
     .update(readFileSync(`${home}/config.toml`))
     .digest('hex');
 }
-async function readInfo(path: string): Promise<Info> {
-  for (let attempt = 0; attempt < 100; attempt++) {
+export async function readInfo(path: string, timeoutMs = 5000): Promise<Info> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     try {
       const info: Partial<Info> = JSON.parse(readFileSync(path, 'utf8'));
       if (
@@ -96,7 +97,7 @@ async function readInfo(path: string): Promise<Info> {
   }
   throw new Error('official proxy or fixture did not become ready');
 }
-function start(program: string, args: string[], input?: string): number {
+export function start(program: string, args: string[], input?: string): number {
   const child = spawn(program, args, {
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/root' },
     detached: true,
@@ -166,6 +167,28 @@ async function serve(mode: string): Promise<void> {
     `${privateDir}/backend.json`,
     JSON.stringify({ port: address.port, pid: process.pid }),
     { mode: 0o600 },
+  );
+}
+
+export function configureProxy(port: number, model: 'isolation-fixture' | 'gpt-6-luna'): void {
+  writeFileSync(
+    `${home}/config.toml`,
+    `model = "${model}"
+model_provider = "official-proxy"
+approval_policy = "never"
+sandbox_mode = "read-only"
+sqlite_home = "${home}/tmp"
+log_dir = "${home}/tmp"
+[model_providers.official-proxy]
+name = "Official proxy isolation fixture"
+base_url = "http://127.0.0.1:${port}/v1"
+wire_api = "responses"
+requires_openai_auth = false
+request_max_retries = 0
+stream_max_retries = 0
+[projects."/opt/ai-review-probe/pr"]
+trust_level = "untrusted"
+`,
   );
 }
 
@@ -265,25 +288,7 @@ async function prepare(mode: string, runId: string): Promise<void> {
     const proxy = await readInfo(infoPath);
     if (proxy.pid !== proxyPid) throw new Error('proxy identity mismatch');
     chmodSync(infoPath, 0o444);
-    writeFileSync(
-      `${home}/config.toml`,
-      `model = "isolation-fixture"
-model_provider = "official-proxy"
-approval_policy = "never"
-sandbox_mode = "read-only"
-sqlite_home = "${home}/tmp"
-log_dir = "${home}/tmp"
-[model_providers.official-proxy]
-name = "Official proxy isolation fixture"
-base_url = "http://127.0.0.1:${proxy.port}/v1"
-wire_api = "responses"
-requires_openai_auth = false
-request_max_retries = 0
-stream_max_retries = 0
-[projects."/opt/ai-review-probe/pr"]
-trust_level = "untrusted"
-`,
-    );
+    configureProxy(proxy.port, 'isolation-fixture');
     const state: State = {
       proxy: identity(proxyPid),
       backend: identity(backendPid),

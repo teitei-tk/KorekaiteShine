@@ -147,3 +147,12 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# TypeSpec・TanStack Startのローカル連携検証の生成物
+apps/typespec-spike/generated/
+apps/typespec-spike/src/routeTree.gen.ts
+apps/typespec-spike/.void/
+apps/typespec-spike/.wrangler/
+apps/typespec-spike/.tanstack/
+apps/typespec-spike/.void-wrangler.jsonc
+apps/typespec-spike/void.lock.json

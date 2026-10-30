@@ -162,6 +162,20 @@ PRのチェック一覧には専用Workflowの`AI review / Review result`を表�
 
 表示が終了しない場合はActionsの`AI review`を確認する。元のAI実行を再試行した場合は、完了後に表示側のWorkflowも再実行する。表示側だけの再実行はモデルを呼ばず、最新試行と投稿記録を検証する。Artifactが1日の保持期間を過ぎていれば、記録を推測せず`REPORT_MISSING`で失敗する。必要ならAI実行も再試行し、投稿済み記録を作り直す。main向けでないPR・Draft・`claims`モードは表示ジョブをスキップする。
 
+### 固定診断の実地検証記録
+
+2026年10月30日、[実行40992153632](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40992153632)で3ケースすべて成功した。検証対象はmainの`cc3a2327e24b14d8a711534a20dd3a01c150cc11`。検証専用Workflowのコミットは`7f93484c16011a556ea80335c17ea2a0a819ac57`で、[保存タグ](https://github.com/teitei-tk/KorekaiteShine/tree/verification/runtime-diagnostics-40992153632)から参照できる。専用ブランチはタグと証跡の保存後に削除し、本番Workflowへは取り込まない。
+
+| 発生させた失敗             | 実行ユーザー | 保存された対象      |
+| -------------------------- | ------------ | ------------------- |
+| root以外で起動             | runner       | `runtime/preflight` |
+| 不正な入力JSON             | root         | `setup/metadata`    |
+| コピー元ディレクトリの欠落 | root         | `setup/pr-copy`     |
+
+実際のCLIが終了コード1で停止し、固定診断を状態ArtifactとActions概要へ保存することを確認した。同一実行・試行の汎用失敗処理で診断が上書きされないこと、入力に埋め込んだ検査用文字列や外部例外本文が出力されないことも確認した。保存したArtifactを取得し、実行ID・試行番号・対象・概要の内容を照合済み。実WIF資格情報・モデル呼び出しは使用していない。所有権検査、プロキシ起動・終了、強制停止の全失敗経路を実地検証したものではない。
+
+Actions上のArtifactは7日保持のため、[証跡アーカイブ](../evidence/runtime-diagnostic-40992153632.tar.gz)をリポジトリにも保存する。3ケースの`status.json`・`summary.md`・`verification.json`、実行・ジョブ情報の`run.json`、検証WorkflowとActions固定情報を含む。SHA-256は`4a805a701a0fd2296b2e2ad7d4cbf6147d5198e68f1f7abae889826034de7650`。ダウンロード後にハッシュを照合して展開すれば、Actionsの保持期限後も確認できる。再検証時は通常レビューを故意に壊さず、保存済みWorkflowを検証専用ブランチで使い、対象コミットを固定する。
+
 ### 未完了理由の読み方
 
 公式ランタイムの失敗は、許可リストにある固定対象（例：`setup/pr-owner`、`setup/context-owner`、`start/isolation`、`finish/shutdown`）を状態ArtifactとActions概要に残す。外部例外の本文・ファイルパス・資格情報は転記しない。同じ実行・試行・ジョブの有効な失敗記録は、後続の汎用失敗処理で上書きしない。記録が欠落・不正・別試行の場合は`generate / EXECUTION_FAILED`を保存する。強制停止などで記録処理まで到達できない場合は、固定対象の保存を保証しない。

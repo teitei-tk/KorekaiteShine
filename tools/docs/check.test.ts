@@ -165,3 +165,44 @@ test('removeの別名は組み込み操作として除外し、runで明示し�
     'README.md:1: スクリプトが存在しない: uninstall (package.json)',
   ]);
 });
+
+test('設定・依存管理・公開などの組み込み操作と別名をスクリプト欠落にしない', async () => {
+  const commands = [
+    'config get registry',
+    'c get registry',
+    'audit',
+    'outdated',
+    'cache list',
+    'store status',
+    'publish --dry-run',
+    'i',
+    'up',
+    'ls',
+    'info example',
+    'clean',
+    'purge',
+    'tasks',
+    'pm tasks',
+  ];
+  const root = await fixture({
+    'README.md': '```sh\n' + commands.map((command) => `pnpm ${command}`).join('\n') + '\n```\n',
+  });
+  expect(await checkCommands(root, ['README.md'])).toEqual([]);
+  await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: {} }));
+  await writeFile(path.join(root, 'README.md'), '`pnpm run config`\n');
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:1: スクリプトが存在しない: config (package.json)',
+  ]);
+});
+
+test('runとtestの別名はスクリプト呼び出しとして照合する', async () => {
+  const root = await fixture({
+    'package.json': JSON.stringify({ scripts: { test: 'exit 99' } }),
+    'README.md': '`pnpm t`\n\n`pnpm tst`\n\n`pnpm run-script test`\n',
+  });
+  expect(await checkCommands(root, ['README.md'])).toEqual([]);
+  await writeFile(path.join(root, 'README.md'), '`pnpm run-script config`\n');
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:1: スクリプトが存在しない: config (package.json)',
+  ]);
+});

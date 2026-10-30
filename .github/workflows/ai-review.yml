@@ -211,7 +211,7 @@ jobs:
         run: node tools/ai-review/wif.ts
       - name: Protect actual PR and context
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
-        run: sudo /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" setup "$REVIEW_DIRECTORY" "$GITHUB_WORKSPACE"
+        run: sudo --preserve-env=RUNNER_TEMP,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,AI_REVIEW_JOB,GITHUB_STEP_SUMMARY /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" setup "$REVIEW_DIRECTORY" "$GITHUB_WORKSPACE"
       - name: Start official WIF proxy and verify actual PR isolation
         id: proxy
         if: steps.material.outputs.allowed == 'true' && vars.AI_REVIEW_MODE == 'review'
@@ -220,7 +220,7 @@ jobs:
           OPENAI_IDENTITY_PROVIDER_ID: ${{ vars.OPENAI_IDENTITY_PROVIDER_ID }}
           OPENAI_SERVICE_ACCOUNT_ID: ${{ vars.OPENAI_SERVICE_ACCOUNT_ID }}
         run: |
-          sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_SHA \
+          sudo --preserve-env=ACTIONS_ID_TOKEN_REQUEST_TOKEN,ACTIONS_ID_TOKEN_REQUEST_URL,OPENAI_WIF_AUDIENCE,OPENAI_IDENTITY_PROVIDER_ID,OPENAI_SERVICE_ACCOUNT_ID,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,GITHUB_SHA,RUNNER_TEMP,AI_REVIEW_JOB,GITHUB_STEP_SUMMARY \
             /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" start
       - name: Review with official Action
         id: review
@@ -248,7 +248,7 @@ jobs:
         if: ${{ always() && steps.proxy.outcome == 'success' }}
         env:
           REVIEW_OUTCOME: ${{ steps.review.outcome }}
-        run: sudo --preserve-env=GITHUB_OUTPUT /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" finish "$REVIEW_DIRECTORY" "$REVIEW_OUTCOME"
+        run: sudo --preserve-env=GITHUB_OUTPUT,RUNNER_TEMP,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,AI_REVIEW_JOB,GITHUB_STEP_SUMMARY /usr/local/bin/node "$RUNNER_TEMP/isolation-compiled/runtime.js" finish "$REVIEW_DIRECTORY" "$REVIEW_OUTCOME"
       - uses: actions/upload-artifact@v7.0.2
         if: steps.finish.outcome == 'success'
         with:
@@ -259,7 +259,7 @@ jobs:
       - name: Record incomplete execution
         if: failure()
         run: |
-          node --input-type=module -e "import {writeStatusReport} from './tools/ai-review/status-report.ts'; writeStatusReport(process.env, 'failure', 'generate', 'EXECUTION_FAILED');"
+          node --input-type=module -e "import {recordExecutionFailure} from './tools/ai-review/status-report.ts'; recordExecutionFailure(process.env);"
       - name: Preserve check status
         if: always()
         uses: actions/upload-artifact@v7.0.2

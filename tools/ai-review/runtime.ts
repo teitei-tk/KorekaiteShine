@@ -32,6 +32,8 @@ import {
   type GenerationOrigin,
 } from './artifact.ts';
 import { digest } from './snapshot.ts';
+import { writeStatusReport, type RuntimeTarget } from './status-report.ts';
+type Mark = (target?: RuntimeTarget) => RuntimeTarget;
 import type { ReviewInput } from './policy.ts';
 const root = '/opt/ai-review',
   worktree = `${root}/pr`,
@@ -53,19 +55,26 @@ export function protectTree(path: string): void {
   chmodSync(path, stat.isDirectory() || stat.mode & 0o111 ? 0o755 : 0o644);
   if (stat.isDirectory()) for (const name of readdirSync(path)) protectTree(join(path, name));
 }
-function setup(directory: string, workspace: string): void {
+function setup(directory: string, workspace: string, mark: Mark): void {
+  mark('setup/metadata');
   const metadata: Metadata = validateMetadata(
     JSON.parse(readFileSync(join(directory, 'metadata.json'), 'utf8')),
   );
+  mark('setup/directories');
   mkdirSync(context, { recursive: true, mode: 0o755 });
   mkdirSync(privateDir, { mode: 0o700 });
+  mark('setup/pr-copy');
   cpSync(join(directory, 'repository'), worktree, { recursive: true, verbatimSymlinks: true });
+  mark('setup/pr-owner');
   protectTree(worktree);
+  mark('setup/context-copy');
   for (const name of ['request.json', 'history.json'])
     cpSync(join(directory, name), join(context, name));
   for (const name of ['schema.json', 'prompt.md'])
     cpSync(join(workspace, 'tools/ai-review', name), join(context, name));
+  mark('setup/context-owner');
   protectTree(context);
+  mark('setup/config');
   writeFileSync(join(privateDir, 'metadata.json'), JSON.stringify(metadata), { mode: 0o600 });
   writeFileSync('/home/ai-review/.gitconfig', `[safe]\n directory = ${worktree}\n`, {
     mode: 0o644,
@@ -161,13 +170,16 @@ async function verify(state: State): Promise<void> {
   if (response.status !== 403 || !alive(state.proxy))
     throw new Error('検査中にプロキシが停止しました');
 }
-async function begin(): Promise<void> {
+async function begin(mark: Mark): Promise<void> {
+  mark('start/claims');
   await authenticate(process.env, 'claims');
+  mark('start/origin');
   const run = process.env.GITHUB_RUN_ID!,
     attempt = process.env.GITHUB_RUN_ATTEMPT!,
     sha = process.env.GITHUB_SHA!;
   if (!/^[1-9]\d*$/.test(run) || !/^[1-9]\d*$/.test(attempt) || !/^[a-f0-9]{40}$/.test(sha))
     throw new Error('生成元が不正です');
+  mark('start/proxy');
   const infoPath = `${home}/${run}.json`;
   rmSync(infoPath, { force: true });
   const pid = start(
@@ -179,6 +191,7 @@ async function begin(): Promise<void> {
   try {
     const info = await readInfo(infoPath, 60000);
     if (info.pid !== pid) throw new Error('初期交換失敗');
+    mark('start/config');
     chmodSync(infoPath, 0o444);
     writeFileSync(
       `${home}/config.toml`,
@@ -191,12 +204,16 @@ async function begin(): Promise<void> {
       metadataHash: metadataHash(),
       origin: { run, attempt, sha },
     };
+    mark('start/isolation');
     await verify(state);
+    mark('start/state');
     writeFileSync(`${privateDir}/state.json`, JSON.stringify(state), { mode: 0o600 });
     console.log('Official WIF proxy and PR isolation: passed');
   } catch (error) {
+    const failed = mark('start/cleanup');
     if (alive(proxy)) process.kill(proxy.pid, 'SIGKILL');
     rmSync(infoPath, { force: true });
+    mark(failed);
     throw error;
   }
 }
@@ -212,17 +229,22 @@ async function shutdown(state: State): Promise<boolean> {
   console.log(`Official WIF shutdown: ${stopped ? 'passed' : 'failed'}`);
   return stopped;
 }
-async function finish(directory: string, outcome: string): Promise<void> {
+async function finish(directory: string, outcome: string, mark: Mark): Promise<void> {
+  mark('finish/state');
   const state: State = JSON.parse(readFileSync(`${privateDir}/state.json`, 'utf8'));
   let stopped = false;
   try {
     try {
+      mark('finish/action');
       if (outcome !== 'success') throw new Error('公式Action未完了');
+      mark('finish/isolation');
       await verify(state);
+      mark('finish/output');
       const file = `${home}/tmp/review.json`;
       if (!lstatSync(file).isFile()) throw new Error('結果ファイル不正');
       const review: ReviewInput = JSON.parse(readFileSync(file, 'utf8'));
       const metadata: Metadata = JSON.parse(readFileSync(`${privateDir}/metadata.json`, 'utf8'));
+      mark('finish/artifact');
       const artifact = createArtifact(metadata, review, state.origin, null);
       saveArtifact(directory, artifact);
       appendFileSync(
@@ -233,25 +255,51 @@ async function finish(directory: string, outcome: string): Promise<void> {
         `Validated review: findings=${artifact.review.findings.length}, checks=${artifact.review.checks?.length ?? 0}; usage unavailable, cost unknown`,
       );
     } finally {
+      const previous = mark('finish/shutdown');
       stopped = await shutdown(state);
+      if (stopped) mark(previous);
     }
   } finally {
+    const previous = mark('finish/cleanup');
     if (alive(state.proxy)) process.kill(state.proxy.pid, 'SIGKILL');
     rmSync(state.infoPath, { force: true });
+    mark(previous);
   }
   if (!stopped) throw new Error('公式終了API失敗');
 }
-if (import.meta.main) {
-  const [command, directory, extra] = process.argv.slice(2);
+export async function executeRuntime(
+  command: string,
+  directory: string,
+  extra: string,
+  env: Record<string, string | undefined> = process.env,
+): Promise<boolean> {
+  let target: RuntimeTarget = 'runtime/preflight';
+  const mark: Mark = (next) => {
+    const previous = target;
+    if (next) target = next;
+    return previous;
+  };
   try {
     if (process.platform !== 'linux' || process.getuid?.() !== 0)
       throw new Error('Linux rootが必要です');
-    if (command === 'setup') setup(directory, extra);
-    else if (command === 'start') await begin();
-    else if (command === 'finish') await finish(directory, extra);
+    if (command === 'setup') setup(directory, extra, mark);
+    else if (command === 'start') await begin(mark);
+    else if (command === 'finish') await finish(directory, extra, mark);
     else throw new Error('コマンド不正');
+    return true;
   } catch {
-    console.error('公式レビューの準備・生成・検証が未完了です。');
-    process.exitCode = 1;
+    const message = `公式レビュー未完了: ${target}。`;
+    console.error(message);
+    try {
+      writeStatusReport(env, 'failure', target, 'EXECUTION_FAILED');
+      if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, message + '\n');
+    } catch {
+      console.error('固定診断の保存に失敗しました。');
+    }
+    return false;
   }
+}
+if (import.meta.main) {
+  const [command, directory, extra] = process.argv.slice(2);
+  if (!(await executeRuntime(command, directory, extra))) process.exitCode = 1;
 }

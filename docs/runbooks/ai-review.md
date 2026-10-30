@@ -164,6 +164,8 @@ PRのチェック一覧には専用Workflowの`AI review / Review result`を表�
 
 ### 未完了理由の読み方
 
+公式ランタイムの失敗は、許可リストにある固定対象（例：`setup/pr-owner`、`setup/context-owner`、`start/isolation`、`finish/shutdown`）を状態ArtifactとActions概要に残す。外部例外の本文・ファイルパス・資格情報は転記しない。同じ実行・試行・ジョブの有効な失敗記録は、後続の汎用失敗処理で上書きしない。記録が欠落・不正・別試行の場合は`generate / EXECUTION_FAILED`を保存する。強制停止などで記録処理まで到達できない場合は、固定対象の保存を保証しない。
+
 失敗時は対象ID・理由に加え、Actions概要のサブコードと不足情報分類を確認する。診断の分類と記録範囲は[未完了の安全な診断](../spec/ai-review.md#未完了の安全な診断)に従う。
 
 - `TOKEN_LIMIT`・`OUTPUT_LIMIT`なら、出力予算と作業分割を確認する。

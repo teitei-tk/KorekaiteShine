@@ -78,3 +78,27 @@ it('失敗通知は終了イベントから信頼済みコードだけで実行�
   expect(notify).toContain('continue-on-error: true');
   expect(notify).toContain("if: always() && steps.target.outputs.allowed == 'true'");
 });
+
+it('root実行の固定診断を保存し、後続の汎用失敗で上書きしない', () => {
+  const generate = workflow('ai-review').split('\n  generate:')[1].split('\n  publish:')[0];
+  const calls = generate
+    .split('\n')
+    .filter(
+      (line) =>
+        line.trim().startsWith('run: sudo ') || line.trim().startsWith('sudo --preserve-env='),
+    );
+  expect(calls).toHaveLength(3);
+  for (const call of calls) {
+    const preserved = call.match(/--preserve-env=([^ ]+)/)?.[1].split(',');
+    expect(preserved).toEqual(
+      expect.arrayContaining([
+        'RUNNER_TEMP',
+        'GITHUB_RUN_ID',
+        'GITHUB_RUN_ATTEMPT',
+        'AI_REVIEW_JOB',
+        'GITHUB_STEP_SUMMARY',
+      ]),
+    );
+  }
+  expect(generate).toContain('recordExecutionFailure(process.env)');
+});

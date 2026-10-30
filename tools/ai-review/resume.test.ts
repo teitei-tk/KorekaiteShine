@@ -241,3 +241,83 @@ it('投稿直前に対象が変われば書き込まない', async () => {
   await expect(publishArtifact(api, f.artifact)).resolves.toBe('TARGET_CHANGED');
   expect(f.count()).toBe(0);
 });
+it.each(['failure', 'cancelled', 'timed_out'])(
+  '応答喪失→%s通知→固定Artifact再開を通して重複なく完了する',
+  async (conclusion) => {
+    const { notifyFailure } = await import('./failure-notify.ts');
+    const { saveArtifact, readArtifact } = await import('./artifact.ts');
+    const { writeStatusReport } = await import('./status-report.ts');
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const f = fixture(),
+      directory = mkdtempSync(join(tmpdir(), 'resume-flow-'));
+    const api: Api = async <T>(path: string, method?: string, body?: ApiBody) => {
+      if (path === 'actions/runs/20')
+        return {
+          id: 20,
+          run_attempt: 1,
+          event: 'workflow_run',
+          path: '.github/workflows/ai-review.yml',
+          head_branch: 'main',
+          display_title: 'AI review / source run 12 attempt 1 / review',
+          status: 'completed',
+          conclusion,
+          repository: { id: 1426899426 },
+          head_repository: { id: 1426899426 },
+        } as T;
+      if (path === 'actions/runs/12')
+        return {
+          id: 12,
+          run_attempt: 1,
+          event: 'pull_request',
+          conclusion: 'success',
+          path: '.github/workflows/docs.yml',
+          head_sha: head,
+          repository: { id: 1426899426 },
+          head_repository: { id: 1426899426 },
+          pull_requests: [{ number: 7, head: { sha: head }, base: { sha: base } }],
+        } as T;
+      if (path === 'actions/runs/20/attempts/1/jobs?per_page=100')
+        return {
+          jobs: [
+            { name: 'generate', conclusion: 'success' },
+            { name: 'publish', conclusion },
+          ],
+        } as T;
+      return f.api<T>(path, method, body);
+    };
+    try {
+      saveArtifact(directory, f.artifact);
+      f.lose();
+      await expect(
+        publishArtifact(api, readArtifact(directory, f.artifact.origin)),
+      ).rejects.toThrow('response lost');
+      writeStatusReport(
+        {
+          AI_REVIEW_REPORT: join(directory, 'status.json'),
+          GITHUB_RUN_ID: '20',
+          GITHUB_RUN_ATTEMPT: '1',
+          AI_REVIEW_JOB: 'publish',
+        },
+        'failure',
+        'publish',
+        'PUBLISH_FAILED',
+      );
+      expect(await notifyFailure(api, 20, 1, directory)).toEqual({ status: 'skipped' });
+      expect(f.snapshot.issues).toHaveLength(0);
+      expect(await publishArtifact(api, readArtifact(directory, f.artifact.origin))).toBe(
+        'REVIEW_COMPLETE',
+      );
+      expect(await publishArtifact(api, readArtifact(directory, f.artifact.origin))).toBe(
+        'ALREADY_COMPLETE',
+      );
+      expect(f.count()).toBe(2);
+      expect(f.snapshot.inline.filter((c) => c.in_reply_to_id === 1)).toHaveLength(1);
+      expect(f.snapshot.issues).toHaveLength(1);
+      expect(f.snapshot.threads[0].resolved).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

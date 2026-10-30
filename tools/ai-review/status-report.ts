@@ -32,12 +32,39 @@ export interface StatusReport {
   diagnostic?: Diagnostic;
   commentId?: number;
 }
+// 外部入力を分類名へ流用しない。本番runtimeと読取側で同じ許可リストを使う。
+export const runtimeTargets = [
+  'runtime/preflight',
+  'setup/metadata',
+  'setup/directories',
+  'setup/pr-copy',
+  'setup/pr-owner',
+  'setup/context-copy',
+  'setup/context-owner',
+  'setup/config',
+  'start/claims',
+  'start/origin',
+  'start/proxy',
+  'start/config',
+  'start/isolation',
+  'start/state',
+  'start/cleanup',
+  'finish/state',
+  'finish/action',
+  'finish/isolation',
+  'finish/output',
+  'finish/artifact',
+  'finish/shutdown',
+  'finish/cleanup',
+] as const;
+export type RuntimeTarget = (typeof runtimeTargets)[number];
 export function validTarget(value: string): boolean {
   return (
     typeof value === 'string' &&
-    /^(gate|history|collect|preflight|artifact|publish|generate|workflow|invalid-task-id|(?:task|reconcile)-[1-9]\d{0,5})$/.test(
-      value,
-    )
+    (runtimeTargets.some((target) => target === value) ||
+      /^(gate|history|collect|preflight|artifact|publish|generate|workflow|invalid-task-id|(?:task|reconcile)-[1-9]\d{0,5})$/.test(
+        value,
+      ))
   );
 }
 export function validReport(value: Partial<StatusReport> | null): value is StatusReport {
@@ -140,4 +167,26 @@ export function readStatusReports(
     reports.push(readReport(single));
   }
   return reports;
+}
+
+// Workflowの後続failure()から呼ぶ。先に保存した具体的な失敗を維持する。
+export function recordExecutionFailure(env: Record<string, string | undefined>): void {
+  const path =
+    env.AI_REVIEW_REPORT ?? (env.RUNNER_TEMP ? join(env.RUNNER_TEMP, 'status.json') : undefined);
+  if (path) {
+    try {
+      const value: Partial<StatusReport> = JSON.parse(readFileSync(path, 'utf8'));
+      if (
+        validReport(value) &&
+        value.run === env.GITHUB_RUN_ID &&
+        value.attempt === env.GITHUB_RUN_ATTEMPT &&
+        value.job === env.AI_REVIEW_JOB &&
+        value.status === 'failure'
+      )
+        return;
+    } catch {
+      /* 欠落・旧試行・不正な記録を信用しない。 */
+    }
+  }
+  writeStatusReport(env, 'failure', 'generate', 'EXECUTION_FAILED');
 }

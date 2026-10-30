@@ -1,29 +1,22 @@
+# 検証専用ブランチ限定。本番コードはmainのマージコミットへ固定する。
 name: AI review isolation acceptance
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  isolation:
-    name: Verify official isolation (${{ matrix.result }})
+  diagnostics:
+    name: Verify runtime diagnostic (${{ matrix.failure }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        result: [complete, reject]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+        failure: [preflight, metadata, pr-copy]
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          persist-credentials: false
-      - uses: actions/checkout@v7.0.1
-        with:
-          repository: openai/codex-action
-          ref: bdf19a4a223ec2549a3e2274a0cf61556bc07675
-          path: .official-codex-action
+          ref: cc3a2327e24b14d8a711534a20dd3a01c150cc11
           persist-credentials: false
       - uses: pnpm/action-setup@v6.1.0
         with:
@@ -33,46 +26,69 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - name: Prepare trusted isolation verification
-        run: bash tools/ai-review/isolation/prepare.sh
-      - name: Verify untrusted PR startup without external network
+      - name: Compile pinned production runtime
         run: |
-          # モデルの代わりに400を返すローカル受信器だけを使う。外部通信経路を作らない。
-          sudo unshare --net bash -c 'ip link set lo up; exec /usr/local/bin/node /opt/ai-review-probe/startup.js "$1"' \
-            bash "$GITHUB_WORKSPACE/.official-codex-action/dist/main.js"
-      - name: Prepare isolated official proxy with dummy credential
-        id: prepare
+          test "$(git rev-parse HEAD)" = cc3a2327e24b14d8a711534a20dd3a01c150cc11
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node runtime.ts \
+            --rewriteRelativeImportExtensions --module NodeNext --target ES2022 --skipLibCheck \
+            --outDir "$RUNNER_TEMP/isolation-compiled"
+      - name: Exercise actual failure and verify persisted diagnostic
         env:
-          FIXTURE_MODE: ${{ matrix.result }}
+          FAILURE_CASE: ${{ matrix.failure }}
+          AI_REVIEW_JOB: generate
         run: |
-          # npm等の準備はrunner UIDで実行する。専用UIDと模擬資格情報を持つrootは外へ通信できない。
-          for uid in 0 2001; do
-            sudo iptables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d 127.0.0.0/8 -j REJECT
-            sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$uid" ! -d ::1/128 -j REJECT
-          done
-          sudo /usr/local/bin/node /opt/ai-review-probe/lifecycle.js prepare "$FIXTURE_MODE" "$GITHUB_RUN_ID"
-      - name: Run complete official Action against local fixture
-        id: full
-        continue-on-error: true
-        timeout-minutes: 3
-        uses: openai/codex-action@v1.13
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { mkdirSync, writeFileSync, readFileSync, copyFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { spawnSync } from 'node:child_process';
+          import { recordExecutionFailure, readStatusReports } from './tools/ai-review/status-report.ts';
+          const { FAILURE_CASE: failure, RUNNER_TEMP: temp, GITHUB_STEP_SUMMARY: summary } = process.env;
+          assert.notEqual(process.getuid(), 0);
+          const directory = join(temp, 'SECRET_SENTINEL_input');
+          mkdirSync(directory);
+          writeFileSync(join(directory, 'metadata.json'), failure === 'metadata' ? 'SECRET_SENTINEL invalid JSON' : JSON.stringify({
+            version: 2, repository: 'teitei-tk/KorekaiteShine', number: 51,
+            head: 'a'.repeat(40), base: 'b'.repeat(40), sourceRun: '1', lines: {},
+            history: { issues: [], inline: [], threads: [] },
+          }));
+          const env = Object.fromEntries(['PATH', 'RUNNER_TEMP', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'AI_REVIEW_JOB', 'GITHUB_STEP_SUMMARY'].map(key => [key, process.env[key]]));
+          const args = [join(temp, 'isolation-compiled/runtime.js'), 'setup', directory, process.cwd()];
+          const result = failure === 'preflight'
+            ? spawnSync(process.execPath, args, { env, encoding: 'utf8' })
+            : spawnSync('sudo', ['--preserve-env=RUNNER_TEMP,GITHUB_RUN_ID,GITHUB_RUN_ATTEMPT,AI_REVIEW_JOB,GITHUB_STEP_SUMMARY', process.execPath, ...args], { env, encoding: 'utf8' });
+          assert.equal(result.status, 1);
+          assert.equal(result.signal, null);
+          const target = failure === 'preflight' ? 'runtime/preflight' : `setup/${failure}`;
+          const expected = `公式レビュー未完了: ${target}。\n`;
+          assert.equal(result.stderr, expected);
+          assert.equal(result.stdout, '');
+          assert.equal(readFileSync(summary, 'utf8'), expected);
+          const path = join(temp, 'status.json');
+          const before = readFileSync(path, 'utf8');
+          recordExecutionFailure(process.env);
+          assert.equal(readFileSync(path, 'utf8'), before);
+          const [report] = readStatusReports(temp, Number(env.GITHUB_RUN_ID), Number(env.GITHUB_RUN_ATTEMPT));
+          assert.equal(report.target, target);
+          assert.equal(report.reason, 'EXECUTION_FAILED');
+          assert.equal(report.status, 'failure');
+          assert.equal(report.job, 'generate');
+          assert.ok(!before.includes('SECRET_SENTINEL'));
+          const evidence = join(temp, 'diagnostic-evidence');
+          mkdirSync(evidence);
+          copyFileSync(path, join(evidence, 'status.json'));
+          copyFileSync(summary, join(evidence, 'summary.md'));
+          writeFileSync(join(evidence, 'verification.json'), JSON.stringify({
+            productionSha: 'cc3a2327e24b14d8a711534a20dd3a01c150cc11', failure, target,
+            exitCode: result.status, summaryVerified: true, fallbackPreserved: true, sentinelAbsent: true,
+          }));
+          console.log(`Verified ${target}: exit=1, status, summary, fallback, no external error text`);
+          NODE
+      - name: Preserve verified evidence
+        uses: actions/upload-artifact@v7.0.2
         with:
-          codex-version: 0.164.0
-          openai-api-key: ''
-          allow-users: ${{ github.actor }}
-          prompt: Return the fixed offline fixture response.
-          working-directory: /opt/ai-review-probe/pr
-          codex-home: /home/ai-review/.codex
-          safety-strategy: unprivileged-user
-          codex-user: ai-review
-          sandbox: read-only
-          codex-args: '["--ephemeral"]'
-      - name: Verify result and stop official proxy
-        if: ${{ always() && steps.prepare.outcome == 'success' }}
-        env:
-          FIXTURE_MODE: ${{ matrix.result }}
-          FIXTURE_OUTCOME: ${{ steps.full.outcome }}
-          FIXTURE_OUTPUT: ${{ steps.full.outputs.final-message }}
-        run: |
-          sudo --preserve-env=FIXTURE_OUTPUT /usr/local/bin/node /opt/ai-review-probe/lifecycle.js \
-            finish "$FIXTURE_MODE" "$FIXTURE_OUTCOME"
+          name: runtime-diagnostic-${{ matrix.failure }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/diagnostic-evidence
+          if-no-files-found: error
+          retention-days: 7

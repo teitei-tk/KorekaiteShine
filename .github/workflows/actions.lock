@@ -10,7 +10,7 @@ workflows:
     '.github/workflows/ai-review-isolation.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
-        - 'openai/codex-action@v1.13'
+        - 'actions/upload-artifact@v7.0.2'
         - 'pnpm/action-setup@v6.1.0'
     '.github/workflows/ai-review-notify.yml':
         - 'actions/checkout@v7.0.1'

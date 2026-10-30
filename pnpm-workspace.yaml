@@ -9,6 +9,9 @@ minimumReleaseAgeIgnoreMissingTime: false
 
 # 未審査の依存ビルドと、推移依存の不正な取得経路を拒否する。
 strictDepBuilds: true
+# Gitフックは pnpm hooks:install で明示的に登録する。
+allowBuilds:
+  lefthook: false
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
 trustLockfile: false

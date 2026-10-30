@@ -15,6 +15,12 @@ pnpmはルートの[package.json](../../package.json)の`packageManager`で固�
 
 ネットワークとGitHub認証が必要なActions検証は`pnpm check:actions`に分けます。CIのActions検証ジョブはNode.js・pnpmの準備に依存しないよう、同じ`gh actions-lock --verify`を直接実行します。
 
+## 文書内のコマンド検査
+
+`pnpm check:docs`は、インラインコードと`sh`・`shell`・`bash`・`zsh`コードブロックの各行の先頭にあるpnpm呼び出しを検査します。`pnpm <script>`、`pnpm run <script>`、それぞれの`--dir <path>`付き形式が対象です。対象の`package.json`の`scripts`に名前があるかを確認し、欠落時は文書名と行を報告します。既存の文書検査CIで実行されます。
+
+作業ディレクトリはリポジトリルートを基準にします。子パッケージのコマンドは`--dir`で明示してください。パスは空白・引用符を含まない相対パスに対応します。固定版pnpm 12.15.0の`--help`に掲載された組み込み操作と別名、および組み込み操作を明示する`pm`は除外します。`test`（`t`・`tst`を含む）・`start`・`stop`・`restart`はスクリプトとして照合します。`run`（`run-script`を含む）で明示した名前は組み込み操作と同名でも検査します。pnpm更新時は組み込み一覧を照合してください。引数、シェルの連結・変数展開、その他のオプション形式、外部CLIの実在や説明との意味上の一致は検査しません。コマンド自体は実行しません。
+
 ## commit・push前の検査
 
 [Lefthook設定](../../lefthook.yml)で、commit前とpush前の両方に`pnpm lint`、`pnpm format:check`、`pnpm test`を実行します。検査が失敗すると操作を中止します。作業ツリー全体が対象で、整形の自動修正や自動stageは行いません。部分stage時も未stageの内容を含むため、commit対象そのものの検証はCIでも行います。

@@ -152,3 +152,16 @@ test('ドットを含む名前を省略形・run形式・子パッケージで�
     'README.md:9: スクリプトが存在しない: missing.script (tools/example/package.json)',
   ]);
 });
+
+test('removeの別名は組み込み操作として除外し、runで明示した同名スクリプトは検査する', async () => {
+  const aliases = ['rm', 'uninstall', 'un', 'uni'];
+  const root = await fixture({
+    'package.json': JSON.stringify({ scripts: {} }),
+    'README.md': '```sh\n' + aliases.map((alias) => `pnpm ${alias} example`).join('\n') + '\n```\n',
+  });
+  expect(await checkCommands(root, ['README.md'])).toEqual([]);
+  await writeFile(path.join(root, 'README.md'), '`pnpm run uninstall`\n');
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:1: スクリプトが存在しない: uninstall (package.json)',
+  ]);
+});

@@ -49,6 +49,7 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 - `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
 - `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。
+- `allowBuilds.lefthook: false`：Gitフックを自動登録するインストールスクリプトを明示的に拒否します。未審査としてのエラーを防ぎ、フックの登録は`pnpm hooks:install`で行います。
 - `blockExoticSubdeps: true`：推移依存からの未信頼なGit・tarball URL等を制限します。直接依存の取得元は別途レビューします。
 - `trustPolicy: no-downgrade`：以前の公開版より信頼情報が弱い版を拒否します。すべてのパッケージにprovenanceを要求する設定ではありません。
 - `trustLockfile: false`：ロック済み依存も待機期間・信頼情報の検証対象にします。

@@ -280,6 +280,8 @@ export async function executeRuntime(
     return previous;
   };
   try {
+    if (process.platform !== 'linux' || process.getuid?.() !== 0)
+      throw new Error('Linux rootが必要です');
     if (command === 'setup') setup(directory, extra, mark);
     else if (command === 'start') await begin(mark);
     else if (command === 'finish') await finish(directory, extra, mark);
@@ -299,8 +301,5 @@ export async function executeRuntime(
 }
 if (import.meta.main) {
   const [command, directory, extra] = process.argv.slice(2);
-  if (process.platform !== 'linux' || process.getuid?.() !== 0) {
-    console.error('公式レビュー未完了: runtime/preflight。');
-    process.exitCode = 1;
-  } else if (!(await executeRuntime(command, directory, extra))) process.exitCode = 1;
+  if (!(await executeRuntime(command, directory, extra))) process.exitCode = 1;
 }

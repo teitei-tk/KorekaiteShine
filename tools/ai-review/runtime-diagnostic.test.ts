@@ -1,5 +1,5 @@
-import { expect, it, vi, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { expect, it, vi, afterEach, beforeEach } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const mock = vi.hoisted(() => ({ stage: 'copy' }));
@@ -21,8 +21,15 @@ vi.mock('node:fs', async (original) => ({
 import { executeRuntime } from './runtime.ts';
 import { recordExecutionFailure, readStatusReports, validReport } from './status-report.ts';
 const dirs: string[] = [];
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+beforeEach(() => {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'linux' });
+  vi.spyOn(process, 'getuid').mockReturnValue(0);
+  vi.mocked(cpSync).mockClear();
+});
 afterEach(() => {
   vi.restoreAllMocks();
+  Object.defineProperty(process, 'platform', platformDescriptor);
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 it.each([
@@ -131,3 +138,32 @@ it.each([false, true])(
     expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET');
   },
 );
+
+it.each([
+  ['darwin', 0],
+  ['linux', 1001],
+] as const)('事前確認失敗 %s/uid=%s を保存し処理を開始しない', async (platform, uid) => {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: platform });
+  vi.spyOn(process, 'getuid').mockReturnValue(uid);
+  const dir = mkdtempSync(join(tmpdir(), 'runtime-preflight-'));
+  dirs.push(dir);
+  const env = {
+    RUNNER_TEMP: dir,
+    AI_REVIEW_JOB: 'generate',
+    GITHUB_RUN_ID: '20',
+    GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_STEP_SUMMARY: join(dir, 'summary.md'),
+  };
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  expect(await executeRuntime('setup', dir, '/source', env)).toBe(false);
+  recordExecutionFailure(env);
+  expect(readStatusReports(dir, 20, 1)[0]).toMatchObject({
+    target: 'runtime/preflight',
+    reason: 'EXECUTION_FAILED',
+  });
+  expect(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8')).toBe(
+    '公式レビュー未完了: runtime/preflight。\n',
+  );
+  expect(log).toHaveBeenCalledWith('公式レビュー未完了: runtime/preflight。');
+  expect(cpSync).not.toHaveBeenCalled();
+});

@@ -15,3 +15,10 @@ allowBuilds:
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
 trustLockfile: false
+
+# ローカル連携検証: Babelの旧semverを、provenanceのある版へ置換する。
+overrides:
+  '@babel/core>semver': '7.8.5'
+  '@babel/helper-compilation-targets>semver': '7.8.5'
+  # 1.66.0では開発時のWorker初期化が失敗するため、Voidの対応範囲内で固定。
+  'void>@cloudflare/vite-plugin': '1.64.0'

@@ -1,6 +1,6 @@
 # 基盤連携の調査記録
 
-2026年10月24日整理。音声連携・外部保持・クレジットは2026年10月30日にOpenAI公式資料で更新。2026年10月20日から24日の設計相談で参照した公式資料を記録します。以下は資料上の確認であり、アプリを動かしての検証ではありません。モデル・SDK・料金・制限は採用版の固定時と配置前に再確認します。
+2026年10月24日整理。音声連携・外部保持・クレジットは2026年10月30日にOpenAI公式資料で更新。同日にTypeSpecを使うHTTP APIのローカル検証結果への参照を追加しました。公式資料による確認と実動作の検証範囲を分けて記録します。モデル・SDK・料金・制限は採用版の固定時と配置前に再確認します。
 
 製品が満たすべき動作と未確定事項の一覧は[MVP仕様書](../spec/mvp.md)を正とします。
 
@@ -15,7 +15,9 @@
 | shadcn/uiにTanStack Router向けの導入案内がある                                             | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router)                                                                                                                      |
 | TanStack StartにCloudflareへの配置とカスタムエントリの案内がある                           | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
 
-採用構成全体の互換性と具体的なパッケージバージョンは未検証です。資料の存在だけで、音声中継・D1・Queue・DLQが一体で動くとは判断しません。
+2026年10月30日、[面接一覧APIのローカル試作](../../apps/typespec-spike/README.md)でTypeSpecからOpenAPI・型・検証コードを生成し、React・TanStack Start・Voidを接続しました。開発サーバーとビルド済みWorkerのHTTP応答、ブラウザでの一覧表示・再取得を確認しています。固定版と互換性の調整、再現手順は同記録を参照してください。
+
+この結果を根拠に[ADR 0006](../adr/0006-typespec-api-contracts.md)でTypeSpecを正式採用しました。採用構成全体の互換性は未検証です。音声中継・D1・Queue・DLQ・認可・クラウド配置が一体で動くとは判断しません。現在の依存制約と残る検証は[MVP仕様書](../spec/mvp.md#依存バージョンの制約)を正とします。
 
 ## WebSocket・再開・外部保持
 

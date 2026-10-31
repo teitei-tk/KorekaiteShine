@@ -116,3 +116,7 @@ jobs:
         run: pnpm --dir tools/ai-review typecheck
       - name: Test AI review tooling
         run: pnpm --dir tools/ai-review test
+      - name: Build and typecheck TypeSpec integration
+        run: pnpm --dir apps/typespec-spike typecheck
+      - name: Test TypeSpec API contracts
+        run: pnpm --dir apps/typespec-spike test

@@ -51,7 +51,7 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 ## 依存のサプライチェーン対策
 
-設定はルートの[pnpm-workspace.yaml](../../pnpm-workspace.yaml)で管理します。`packages`で`tools/*`と`apps/*`を対象にするため、将来追加する`apps/worker`・`apps/frontend`にも共通の保護設定が適用されます。各パッケージには`package.json`を置き、入れ子の`pnpm-workspace.yaml`で別ワークスペースに分離しない方針です。アプリのディレクトリや雛形はまだ作成していません。
+設定はルートの[pnpm-workspace.yaml](../../pnpm-workspace.yaml)で管理します。`packages`で`tools/*`と`apps/*`を対象にするため、将来追加するアプリにも共通の保護設定が適用されます。各パッケージには`package.json`を置き、入れ子の`pnpm-workspace.yaml`で別ワークスペースに分離しない方針です。現在は[TypeSpec連携のローカル試作](../../apps/typespec-spike/README.md)があり、本番アプリは未実装です。
 
 - `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
 - `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。
@@ -80,7 +80,7 @@ Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。ローカルのgit-secretsによるpre-commit検査はLefthookから実行します。
 
-`Documentation checks`内で、文書検査・Actionsロック検証・`Repository lint, format and AI review checks`を独立したジョブとして実行します。同ジョブでリポジトリ全体のLint・整形確認と、`tools/ai-review`のTypeScript・Vitestを個別ステップで実行します。CIでは整形を書き換えず、OpenAIへの通信も行いません。ローカルの`pnpm check`はこれらのコード・文書検査をまとめて実行する入口として維持します。
+`Documentation checks`内で、文書検査・Actionsロック検証・`Repository lint, format and AI review checks`を独立したジョブとして実行します。同ジョブでリポジトリ全体のLint・整形確認、`tools/ai-review`のTypeScript・Vitest、`apps/typespec-spike`の契約生成・ビルド・型検査・Vitestを個別ステップで実行します。CIでは整形を書き換えず、OpenAIへの通信も行いません。ローカルの`pnpm check`はこれらのコード・文書検査をまとめて実行する入口として維持します。
 
 文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・AIレビューツール検査は毎回実行します。
 

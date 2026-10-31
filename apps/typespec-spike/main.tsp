@@ -28,5 +28,6 @@ model InvalidQuery {
 @route("/api/interviews")
 @get
 op listInterviews(
+  @doc("ASCII数字だけの十進整数で指定する。符号・空白・小数点・指数・基数接頭辞は受け付けない。")
   @query @minValue(1) @maxValue(20) limit?: int32,
 ): InterviewList | InvalidQuery;

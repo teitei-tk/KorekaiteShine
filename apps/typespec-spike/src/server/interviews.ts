@@ -22,7 +22,12 @@ const interviews: components['schemas']['Interview'][] = [
 
 export function listInterviews(request: Request): Response {
   const parameters = new URL(request.url).searchParams;
-  const query = Object.fromEntries([...parameters].map(([key, value]) => [key, Number(value)]));
+  const query = Object.fromEntries(
+    [...parameters].map(([key, value]) => [
+      key,
+      value.length > 0 && !/[^0-9]/u.test(value) ? Number(value) : value,
+    ]),
+  );
   if (parameters.getAll('limit').length > 1 || !validateQuery(query)) {
     return Response.json(
       { code: 'INVALID_QUERY', message: 'limitは1〜20の整数で指定してください。' },

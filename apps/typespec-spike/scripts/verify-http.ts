@@ -20,6 +20,14 @@ for (const query of [
   'limit=1.5',
   'limit=',
   'limit=1&limit=2',
+  'limit=1e1',
+  'limit=0x10',
+  'limit=0b10',
+  'limit=0o10',
+  'limit=1.0',
+  'limit=%201',
+  'limit=1%20',
+  'limit=%2B1',
 ]) {
   const response = await fetch(`${baseUrl}/api/interviews?${query}`);
   assert.equal(response.status, 400, query);
@@ -33,4 +41,4 @@ for (const query of [
 const page = await fetch(baseUrl);
 assert.equal(page.status, 200);
 assert.match(await page.text(), /面接一覧/);
-console.log('HTTP検証成功: 一覧・件数制限・不正入力6件・HTML応答');
+console.log('HTTP検証成功: 一覧・件数制限・不正入力14件・HTML応答');

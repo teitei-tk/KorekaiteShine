@@ -30,3 +30,13 @@ test('400応答の本文がTypeSpecから生成した契約に一致する', asy
   const response = listInterviews(new Request('http://localhost/api/interviews?limit=0'));
   expect(validateBadRequest(await response.json())).toBe(true);
 });
+
+test('limitの指数・基数・小数・空白付き表記を数値化前に拒否する', async () => {
+  for (const limit of ['1e1', '0x10', '0b10', '0o10', '1.0', ' 1', '1 ', '+1']) {
+    const response = listInterviews(
+      new Request(`http://localhost/api/interviews?limit=${encodeURIComponent(limit)}`),
+    );
+    expect(response.status, `limit=${limit}`).toBe(400);
+    expect(validateBadRequest(await response.json())).toBe(true);
+  }
+});

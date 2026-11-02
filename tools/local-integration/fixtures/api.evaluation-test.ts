@@ -1,0 +1,22 @@
+import { createFileRoute } from '@tanstack/react-router';
+import { env } from 'cloudflare:workers';
+
+export const Route = createFileRoute('/api/evaluation-test')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const query = new URL(request.url).searchParams;
+        const now = query.has('now') ? Number(query.get('now')) : undefined;
+        if (now !== undefined && !Number.isSafeInteger(now))
+          return new Response(null, { status: 400 });
+        return Response.json(
+          await env.EVALUATION_PROBE.evaluate(
+            await request.json(),
+            query.get('hold') === 'true',
+            now,
+          ),
+        );
+      },
+    },
+  },
+});

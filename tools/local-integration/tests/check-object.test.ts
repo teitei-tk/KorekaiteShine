@@ -15,7 +15,7 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config);
+  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
   let succeeded = false;
   try {
     await runDatabaseCommand(config, [
@@ -44,7 +44,7 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
     ]);
     await runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
-    runtime = await startRuntime(config);
+    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtime.runScheduled();
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     expect(status.status).toBe(200);
@@ -63,7 +63,10 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  const runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -103,7 +106,10 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  const runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -149,7 +155,10 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -184,7 +193,10 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     ]);
     await runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
-    runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+    runtime = await startRuntime(config, 'dev', {
+      manualDiagnostics: true,
+      probeOnlyEvaluation: true,
+    });
     const recovered = await initialize();
     expect(recovered.status).toBe(200);
     const saved = await recovered.json();
@@ -213,7 +225,10 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  const runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -265,7 +280,7 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -306,7 +321,10 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -317,7 +335,7 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     expect(response.status).toBe(202);
     const accepted = await response.json();
     await runtime.stop();
-    runtime = await startRuntime(config);
+    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtime.runScheduled();
     let receipt = null;
     const deadline = Date.now() + 5_000;
@@ -358,7 +376,10 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   const assertDeliveries = async (count: number) => {
     await expect
@@ -410,7 +431,7 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
     ]);
     await runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_sent;']);
-    runtime = await startRuntime(config);
+    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtime.runScheduled();
     await assertDeliveries(2);
     await runDatabaseCommand(config, [
@@ -437,7 +458,10 @@ test('予定時刻前には通知せず、送信前に停止しても期限到�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let runtime = await startRuntime(config, 'dev', {
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+  });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -474,7 +498,7 @@ test('予定時刻前には通知せず、送信前に停止しても期限到�
       'execute',
       "DROP TRIGGER defer_notification; UPDATE job_outbox SET scheduled_at = 0 WHERE operation = 'notify';",
     ]);
-    runtime = await startRuntime(config);
+    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtime.runScheduled();
     await expect
       .poll(

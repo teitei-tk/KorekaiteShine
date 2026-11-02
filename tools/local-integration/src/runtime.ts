@@ -19,13 +19,15 @@ export interface LocalRuntime {
 export interface LocalRuntimeOptions {
   /** 受付・障害境界テストでだけ使用し、通常起動では自動初期化する。 */
   manualDiagnostics?: boolean;
+  /** DO・送信境界のテストだけで評価の業務処理を保留する。 */
+  probeOnlyEvaluation?: boolean;
 }
 
 async function prepareRuntime(
   config: RuntimeConfig,
   options: LocalRuntimeOptions = {},
 ): Promise<string> {
-  if (options.manualDiagnostics && config.environment !== 'test')
+  if ((options.manualDiagnostics || options.probeOnlyEvaluation) && config.environment !== 'test')
     throw new Error('初期化の保留は独立test環境だけで利用できます。');
   if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカル環境だけを起動できます。');
@@ -78,6 +80,11 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
 });\n`,
   );
   if (config.environment === 'test') {
+    await cp(join(fixtures, 'api.lease-test.ts'), join(project, 'src/routes/api.lease-test.ts'));
+    await cp(
+      join(fixtures, 'api.evaluation-test.ts'),
+      join(project, 'src/routes/api.evaluation-test.ts'),
+    );
     await cp(
       join(fixtures, 'api.check-object-test.ts'),
       join(project, 'src/routes/api.check-object-test.ts'),
@@ -133,16 +140,17 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   await writeFile(
     evaluationEntry,
     `import application from ${JSON.stringify(join(repositoryRoot, 'apps/evaluation/src/worker.local.ts'))};
-import probe from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
+import probe, { recordQueueDelivery } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export default {
-  queue: probe.queue,
+  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : 'async (batch, env) => { await recordQueueDelivery(batch); await application.queue(batch, env); }'},
   async scheduled(controller, env) { await application.scheduled(controller, env); await probe.scheduled(controller); },
 };\n`,
   );
   const evaluation = {
     ...common,
     name: config.workers.evaluation,
+    vars: { ...common.vars, DIAGNOSTIC_QUEUE_NAME: diagnostics.queue },
     main: evaluationEntry,
     durable_objects: {
       bindings: [{ name: 'CHECK_OBJECT', class_name: 'CheckObject', script_name: config.doOwner }],
@@ -345,7 +353,7 @@ export async function startRuntime(
   mode: 'dev' | 'preview' = 'dev',
   options: LocalRuntimeOptions = {},
 ): Promise<LocalRuntime> {
-  if (mode === 'preview' && options.manualDiagnostics)
+  if (mode === 'preview' && (options.manualDiagnostics || options.probeOnlyEvaluation))
     throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
   const release = await lockEnvironment(config);
   try {

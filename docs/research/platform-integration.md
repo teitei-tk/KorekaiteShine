@@ -6,14 +6,14 @@
 
 ## Void・TanStack Start・UI
 
-| 資料上で確認した内容                                                                       | 公式資料                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| VoidとTanStack StartのViteプラグインを組み合わせる連携手順がある                           | [TanStack Start連携](https://void.cloud/integrations/frameworks/tanstack-start)                                                                                                           |
-| カスタムWorkerエントリからDOクラスを公開し、Cloudflareのバインディングを設定する方式がある | [同・カスタムWorkerエントリ](https://void.cloud/integrations/frameworks/tanstack-start#custom-worker-entry)                                                                               |
-| native Void向けDO自動検出と、メタフレームワーク構成のDO組み込みは区別が必要                | [Durable State](https://void.cloud/guide/durable-state)                                                                                                                                   |
-| Void標準の型付きWebSocketルートはnative Void向けで、直接のバイナリメッセージには対応しない | [WebSockets](https://void.cloud/guide/websockets)                                                                                                                                         |
-| shadcn/uiにTanStack Router向けの導入案内がある                                             | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router)                                                                                                                      |
-| TanStack StartにCloudflareへの配置とカスタムエントリの案内がある                           | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
+| 資料上で確認した内容                                                                             | 公式資料                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| VoidとTanStack StartのViteプラグインを組み合わせる連携手順がある                                 | [TanStack Start連携](https://void.cloud/integrations/frameworks/tanstack-start)                                                                                                           |
+| カスタムWorkerエントリからDOクラスを公開する方式がある。現在は独立Interview Workerへの配置を採用 | [同・カスタムWorkerエントリ](https://void.cloud/integrations/frameworks/tanstack-start#custom-worker-entry)                                                                               |
+| native Void向けDO自動検出と、メタフレームワーク構成のDO組み込みは区別が必要                      | [Durable State](https://void.cloud/guide/durable-state)                                                                                                                                   |
+| Void標準の型付きWebSocketルートはnative Void向けで、直接のバイナリメッセージには対応しない       | [WebSockets](https://void.cloud/guide/websockets)                                                                                                                                         |
+| shadcn/uiにTanStack Router向けの導入案内がある                                                   | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router)                                                                                                                      |
+| TanStack StartにCloudflareへの配置とカスタムエントリの案内がある                                 | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
 
 2026年10月30日、[面接一覧APIのローカル試作](../../apps/typespec-spike/README.md)でTypeSpecからOpenAPI・型・検証コードを生成し、React・TanStack Start・Voidを接続しました。開発サーバーとビルド済みWorkerのHTTP応答、ブラウザでの一覧表示・再取得を確認しています。固定版と互換性の調整、再現手順は同記録を参照してください。
 

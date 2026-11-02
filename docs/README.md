@@ -2,7 +2,7 @@
 
 この文書群は、開発者本人と開発を支援するエージェントが、合意済みの要件と選定理由を確認するためのものです。本文は日本語で記述します。製品名、API名、ファイル名は公式の表記を使います。
 
-2026年10月24日時点の設計相談を整理し、2026年10月30日にGPT-Live採用、保存済みテキストからの再開、TypeSpecの正式採用を反映した文書です。本番アプリは未実装です。技術連携は下記の面接一覧APIに限りローカル検証済みで、構成全体は未検証です。文書の作成は実装・依存追加・クラウド作成の承認を意味しません。
+2026年10月24日時点の設計相談を整理し、2026年10月30日にGPT-Live採用、保存済みテキストからの再開、TypeSpecの正式採用を反映し、2026年11月2日に3 Workers・共有D1・環境分離、Queue契約・評価ジョブ制御の合意を追加した文書です。本番アプリは未実装です。技術連携は下記の面接一覧APIに限りローカル検証済みで、構成全体は未検証です。文書の作成は実装・依存追加・クラウド作成の承認を意味しません。
 
 ## 読む順序
 
@@ -29,7 +29,23 @@ AIレビューの正式な動作は[コメントと修正確認の要件](spec/a
 | [0004](adr/0004-tanstack-start-with-void.md)      | TanStack Startをアプリの土台とし、VoidでCloudflareへ配置する              |
 | [0006](adr/0006-typespec-api-contracts.md)        | 通常のHTTP APIの契約をTypeSpecで管理し、OpenAPI・型・検証コードを生成する |
 
+- [ADR 0007](adr/0007-three-workers.md)：Web・面接DO・評価Consumerの配置を分ける。
+- [ADR 0008](adr/0008-shared-d1-with-void.md)：D1を共有し、Void経由のDrizzleで一元管理する。
+- [ADR 0009](adr/0009-explicit-environments.md)：環境名からWorkerとリソースの対応を一元化する。
+
+- [ADR 0010](adr/0010-queue-contracts-and-job-control.md)：Queue契約とD1の状態・実行権を分け、Evaluation Workerで回復する。
+
+- [ADR 0011](adr/0011-access-and-diagnostics-isolation.md)：Accessによる本人限定と診断機能の本番成果物からの除外を組み合わせる。
+
 [ADR 0005](adr/0005-partitioned-ai-review.md)には分割レビューと横断確認を採用した理由を記録しています。
+
+- [ADR 0012](adr/0012-idempotent-diagnostics-api.md)：診断APIの受付をD1で冪等化し、TypeSpecで入出力と型付きエラーを管理する。
+
+- [ADR 0013](adr/0013-diagnostics-queue-isolation.md)：D1とジョブ制御を共有し、診断用Queue・DLQと配送入口を分ける。
+
+- [ADR 0014](adr/0014-quarantine-invalid-job-notifications.md)：存在しないジョブ・用途不一致の通知をD1に隔離し、保存後にackする。
+
+[Drizzle連携調査](research/void-drizzle.md)と[環境切替調査](research/void-environments.md)に固定版の静的確認を記録しています。最小骨格の着手前の判断と実動作の検証は、[仕様書の補足事項](spec/mvp.md#補足事項)を参照してください。
 
 ## 文書ごとの役割
 

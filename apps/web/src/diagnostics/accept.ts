@@ -16,6 +16,8 @@ export interface CheckDependencies extends AcceptanceContext {
 export async function acceptCheck(request: Request, deps: CheckDependencies): Promise<Response> {
   const requestId = deps.newId();
   const headers = { 'Cache-Control': 'no-store' };
+  // 拒否する要求も本文を消費し、ローカルランタイムで次の接続再利用を壊さない。
+  const body = await request.text().catch(() => null);
   if (
     request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
   ) {
@@ -34,7 +36,8 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   }
   let input;
   try {
-    input = await request.json();
+    if (body === null) throw new Error('本文を読み取れませんでした。');
+    input = JSON.parse(body);
   } catch {
     return validationResponse(requestId, [
       {

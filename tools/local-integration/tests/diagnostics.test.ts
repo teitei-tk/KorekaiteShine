@@ -399,3 +399,36 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('ヘッダー不正で本文を拒否した後も、次の要求へ契約どおり応答する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    for (let iteration = 0; iteration < 40; iteration++) {
+      const rejected = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: 'x'.repeat(32_000) }),
+      });
+      expect(rejected.status).toBe(400);
+      await rejected.text();
+      const next = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+        body: '{}',
+      });
+      expect(next.status).toBe(400);
+      await next.text();
+    }
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

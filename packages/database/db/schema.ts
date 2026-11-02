@@ -12,5 +12,6 @@ export {
   jobAttempts,
   deliveryAnomalies,
   deletedJobs,
+  dlqReceipts,
 } from './schema/jobs.ts';
 export { diagnosticRequests, diagnosticChecks } from './schema/diagnostics.ts';

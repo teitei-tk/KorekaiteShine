@@ -14,6 +14,8 @@ export const Route = createFileRoute('/api/evaluation-test')({
             await request.json(),
             query.get('hold') === 'true',
             now,
+            query.get('messageId') ?? undefined,
+            query.get('kind') === 'dlq' ? 'dlq' : 'normal',
           ),
         );
       },

@@ -6,6 +6,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 export async function recoverInitializations(
   binding: D1Database,
   initialize: (jobId: string) => Promise<void>,
+  now: () => number = Date.now,
 ): Promise<void> {
   const db = createPrimaryDb(binding);
   const pending = await db
@@ -19,7 +20,7 @@ export async function recoverInitializations(
         eq(jobs.status, 'pending'),
         eq(jobOutbox.purpose, 'diagnostics'),
         isNull(jobOutbox.sentAt),
-        lte(jobOutbox.scheduledAt, Date.now()),
+        lte(jobOutbox.scheduledAt, now()),
         or(
           eq(jobOutbox.operation, 'initialize_do'),
           and(eq(jobOutbox.operation, 'notify'), eq(jobOutbox.generation, 0)),

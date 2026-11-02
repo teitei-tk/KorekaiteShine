@@ -105,3 +105,20 @@ export const deletedJobs = sqliteTable('deleted_jobs', {
   jobId: text('job_id').primaryKey(),
   deletedAt: integer('deleted_at').notNull(),
 });
+
+// 配送異常の隔離とは分け、正常なDLQ照合も受信単位で記録する。
+export const dlqReceipts = sqliteTable(
+  'dlq_receipts',
+  {
+    queueName: text('queue_name').notNull(),
+    messageId: text('message_id').notNull(),
+    jobId: text('job_id').notNull(),
+    purpose: text('purpose', { enum: ['evaluation', 'diagnostics'] }).notNull(),
+    observedStatus: text('observed_status', {
+      enum: ['pending', 'running', 'retry_wait', 'completed', 'failed', 'cancelled'],
+    }).notNull(),
+    firstReceivedAt: integer('first_received_at').notNull(),
+    lastReceivedAt: integer('last_received_at').notNull(),
+  },
+  (table) => [uniqueIndex('dlq_receipts_queue_message').on(table.queueName, table.messageId)],
+);

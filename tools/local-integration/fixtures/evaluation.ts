@@ -46,16 +46,22 @@ export class TopologyEvaluation extends WorkerEntrypoint<{ DB: D1Database; APP_E
     if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
     return completeExecution(createPrimaryDb(this.env.DB), lease, { summary: '期限検証' }, now);
   }
-  async evaluate(notification: JobNotification, hold = false, now?: number) {
+  async evaluate(
+    notification: JobNotification,
+    hold = false,
+    now?: number,
+    messageId?: string,
+    kind: 'normal' | 'dlq' = 'normal',
+  ) {
     if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
     const primary = createPrimaryDb(this.env.DB);
     return consumeJob(
       notification,
       {
-        queueName: 'test-rpc',
-        messageId: crypto.randomUUID(),
+        queueName: kind === 'dlq' ? 'test-dlq' : 'test-rpc',
+        messageId: messageId ?? crypto.randomUUID(),
         expectedPurpose: 'diagnostics',
-        kind: 'normal',
+        kind,
       },
       {
         db: primary,
@@ -110,8 +116,8 @@ export async function recordQueueDelivery(batch: {
   messages: { id: string; body: JobNotification }[];
 }) {
   for (const message of batch.messages) {
-    if (!validateJobNotification(message.body))
-      throw new Error('接続検証で通知契約違反を検知しました。');
+    // 不正通知の判断は業務Consumerへ委ね、probeは本文を保存しない。
+    if (!validateJobNotification(message.body)) continue;
     const value = JSON.stringify({ queue: batch.queue, message: message.body });
     await db
       .insert(connectionChecks)

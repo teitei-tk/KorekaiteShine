@@ -150,12 +150,22 @@ export default {
   const evaluation = {
     ...common,
     name: config.workers.evaluation,
-    vars: { ...common.vars, DIAGNOSTIC_QUEUE_NAME: diagnostics.queue },
+    vars: {
+      ...common.vars,
+      DIAGNOSTIC_QUEUE_NAME: diagnostics.queue,
+      DIAGNOSTIC_DLQ_NAME: diagnostics.dlq,
+    },
     main: evaluationEntry,
     durable_objects: {
       bindings: [{ name: 'CHECK_OBJECT', class_name: 'CheckObject', script_name: config.doOwner }],
     },
     queues: {
+      producers: [
+        { binding: 'DIAGNOSTIC_QUEUE', queue: diagnostics.queue },
+        { binding: 'DIAGNOSTIC_DLQ', queue: diagnostics.dlq },
+        { binding: 'EVALUATION_QUEUE', queue: config.queues.evaluation.queue },
+        { binding: 'EVALUATION_DLQ', queue: config.queues.evaluation.dlq },
+      ],
       consumers: [
         {
           queue: diagnostics.queue,

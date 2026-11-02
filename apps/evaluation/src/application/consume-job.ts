@@ -1,3 +1,9 @@
+import { consumeDlq } from './consume-dlq';
+import { classifyDelivery } from './classify-delivery';
+import {
+  recordDeliveryAnomaly,
+  refreshRecordedAnomaly,
+} from '../server/repositories/delivery-anomalies';
 import { runEvaluationAttempt } from './run-evaluation-attempt';
 import type { EvaluationResult } from '../domain/evaluation-result';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
@@ -33,8 +39,55 @@ export async function consumeJob(
   deps: EvaluationDependencies,
 ): Promise<DeliveryDecision> {
   const retry = { action: 'retry', delaySeconds: 30 } as const;
-  if (!validateJobNotification(notification) || context.kind !== 'normal') return retry;
   try {
+    if (await refreshRecordedAnomaly(deps.db, context, deps.now())) return { action: 'ack' };
+    if (!validateJobNotification(notification)) {
+      const unsupportedVersion = validateJobNotification.errors?.some(
+        (error) => error.instancePath === '/schemaVersion' && error.keyword === 'const',
+      );
+      await recordDeliveryAnomaly(
+        deps.db,
+        context,
+        {
+          code: unsupportedVersion ? 'UNSUPPORTED_SCHEMA_VERSION' : 'INVALID_NOTIFICATION',
+          schemaVersion: null,
+          jobId: null,
+          observedPurpose: null,
+        },
+        deps.now(),
+      );
+      return { action: 'ack' };
+    }
+    const classification = await classifyDelivery(deps.db, notification);
+    if (classification.kind === 'missing' || classification.kind === 'deleted') {
+      await recordDeliveryAnomaly(
+        deps.db,
+        context,
+        {
+          code: classification.kind === 'deleted' ? 'JOB_DELETED' : 'JOB_NOT_FOUND',
+          schemaVersion: notification.schemaVersion,
+          jobId: notification.jobId,
+          observedPurpose: null,
+        },
+        deps.now(),
+      );
+      return { action: 'ack' };
+    }
+    if (classification.job.purpose !== context.expectedPurpose) {
+      await recordDeliveryAnomaly(
+        deps.db,
+        context,
+        {
+          code: 'JOB_PURPOSE_MISMATCH',
+          schemaVersion: notification.schemaVersion,
+          jobId: notification.jobId,
+          observedPurpose: classification.job.purpose,
+        },
+        deps.now(),
+      );
+      return { action: 'ack' };
+    }
+    if (context.kind === 'dlq') return await consumeDlq(notification, context, deps);
     const lease = await acquireExecution(
       deps.db,
       notification.jobId,

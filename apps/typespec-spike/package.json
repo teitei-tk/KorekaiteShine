@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate": "tsp compile . && openapi-typescript generated/openapi.json -o generated/api.d.ts && node scripts/generate-validation.ts",
+    "generate": "tsp compile . && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts",
     "dev": "pnpm generate && vite --host 127.0.0.1 --port 4317 --strictPort",
     "preview": "vite preview --host 127.0.0.1 --port 4318 --strictPort",
     "verify:http": "node scripts/verify-http.ts",
@@ -29,7 +29,6 @@
     "@typespec/openapi": "1.17.0",
     "@typespec/openapi3": "1.17.0",
     "@vitejs/plugin-react": "6.1.2",
-    "openapi-typescript": "7.13.0",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.0.5",

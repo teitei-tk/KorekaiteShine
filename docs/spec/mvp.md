@@ -120,7 +120,7 @@ Web・Interview・Evaluationを独立した3 Workersとして配置します。W
 
 同じ環境の3 WorkersでD1を1つ共有します。DrizzleはVoid経由で使用し、全パッケージのVoid版を揃えます。DBスキーマの原本は`packages/database/db/schema.ts`と`db/schema/`、SQLと生成メタデータは同パッケージの`db/migrations/`に集約してGit管理します。接続済みインスタンスは共有せず、各WorkerのD1バインディングから取得します。
 
-マイグレーションはリポジトリルートの操作入口から`packages/database`を作業ディレクトリにして、Void CLIの生成・適用を実行する方針です。SQLをレビューしてから適用し、DB管理パッケージを4つ目のWorkerとして配置しません。各Workerのデプロイから意図せず適用されないことも検証します。DOクラスのマイグレーションはD1のSQLと別で、Interview Workerが管理します。
+マイグレーションはリポジトリルートの操作入口から、`packages/database`のスキーマとSQLを参照する環境別の作業ディレクトリで、Void CLIの生成・適用を実行します。固定版Voidが作業ディレクトリへ生成設定・lock・DB保存先情報を書き込むため、並列テストと開発の管理情報も分離します。原本は`packages/database`に維持し、作業先に別のDB定義を設けません。SQLをレビューしてから適用し、DB管理パッケージを4つ目のWorkerとして配置しません。各Workerのデプロイから意図せず適用されないことも検証します。DOクラスのマイグレーションはD1のSQLと別で、Interview Workerが管理します。
 
 共有D1のため、Workerを独立配置してもDB変更には互換性が必要です。旧版・新版が共存できる追加変更を先に行い、列削除などは利用側の移行後に行います。採用理由と負担は[ADR 0008](../adr/0008-shared-d1-with-void.md)、固定版の確認範囲は[Drizzle連携調査](../research/void-drizzle.md)を参照してください。
 

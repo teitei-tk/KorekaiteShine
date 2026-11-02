@@ -134,7 +134,7 @@ D1の保存単位は次を基準とする。
 - [ ] `topology.test.ts`にWebからInterview DOへの呼び出し、3 WorkersとDB CLIからの同一D1読み戻しを追加してRedを確認する。固定版の型定義・配布コードを調べ、`auxiliaryWorkers`を第一候補に入口とbindingを組み立てる。
 - [ ] 独立したtest環境で接続を実装し、同じテストをGreenにする。バックエンドの実際の入口、D1の取得方法、primary読み取り、原子的batch、CLIの状態保存先、ローカルscheduled起動方法を記録する。
 - [ ] 開発とテストを同時起動し、片方の固定値が他方から読めないことを確認する。異なる環境のlockが残る場合は起動時に拒否するか、環境固有作業先へ生成する。黙って再利用しない。
-- [ ] ルートへ`dev:local / build:local / preview:local / test:integration / db:generate / db:migrate / db:reset-seed`を追加する。DB操作はdatabaseを作業ディレクトリとするVoid CLIに限定し、remote操作を受け付けない。
+- [ ] ルートへ`dev:local / build:local / preview:local / test:integration / db:generate / db:migrate / db:reset-seed`を追加する。DB操作はdatabaseの原本を参照する環境別作業先からVoid CLIで行い、remote操作を受け付けない。
 - [ ] 実ランタイム検証をcommitする。成立しなければこのタスクを未完了にし、単なるモックの成功で後続へ進めない。
 
 ### タスク3：診断HTTP契約とQueue契約を生成する

@@ -1,3 +1,4 @@
+import { lockEnvironment } from './lock.ts';
 import { runDatabaseCommand } from './database.ts';
 export { runDatabaseCommand } from './database.ts';
 import { spawn } from 'node:child_process';
@@ -117,7 +118,7 @@ function runtimeEnvironment(config: RuntimeConfig) {
   };
 }
 
-export async function buildRuntime(config: RuntimeConfig): Promise<void> {
+async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
   const project = await prepareRuntime(config);
   const child = spawn(
     process.execPath,
@@ -144,7 +145,7 @@ export async function buildRuntime(config: RuntimeConfig): Promise<void> {
   if (code !== 0) throw new Error(`ローカルビルド失敗（${code}）。${logPath}を確認してください。`);
 }
 
-export async function startRuntime(
+async function startUnlockedRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
 ): Promise<LocalRuntime> {
@@ -226,6 +227,38 @@ export async function startRuntime(
   } catch (error) {
     await stop();
     await writeFile(join(config.artifactDirectory, 'runtime.log'), output);
+    throw error;
+  }
+}
+
+export async function buildRuntime(config: RuntimeConfig): Promise<void> {
+  const release = await lockEnvironment(config);
+  try {
+    await buildUnlockedRuntime(config);
+  } finally {
+    release();
+  }
+}
+
+export async function startRuntime(
+  config: RuntimeConfig,
+  mode: 'dev' | 'preview' = 'dev',
+): Promise<LocalRuntime> {
+  const release = await lockEnvironment(config);
+  try {
+    const runtime = await startUnlockedRuntime(config, mode);
+    return {
+      ...runtime,
+      async stop() {
+        try {
+          await runtime.stop();
+        } finally {
+          release();
+        }
+      },
+    };
+  } catch (error) {
+    release();
     throw error;
   }
 }

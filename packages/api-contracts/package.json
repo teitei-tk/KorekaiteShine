@@ -9,7 +9,8 @@
   },
   "scripts": {
     "generate": "tsp compile http/main.tsp --config tspconfig.yaml && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts",
-    "typecheck": "pnpm generate && tsc --noEmit"
+    "typecheck": "pnpm generate && tsc --noEmit",
+    "test": "pnpm generate"
   },
   "dependencies": {
     "ajv": "8.20.0",

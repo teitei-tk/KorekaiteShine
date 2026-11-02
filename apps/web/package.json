@@ -9,7 +9,7 @@
     "verify:http": "node scripts/verify-http.ts",
     "build": "pnpm generate && vite build",
     "typecheck": "pnpm build && tsc --noEmit",
-    "test": "pnpm generate && vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@korekaite/api-contracts": "workspace:*",

@@ -8,7 +8,7 @@ Void 1.4.0には、Rails.envに相当するアプリの環境選択を任せら�
 
 独自変数`APP_ENV`を`development`・`test`・`production`の必須列挙値として検証し、共通の`packages/runtime-config`から各Workerの名前・binding・状態保存先を決める案が考えられます。`NODE_ENV`とは独立させます。1.4.0の`dist/project-paths-DGu_QZ_Q.mjs`にある`loadTypedVoidConfigFile`はjitiでTypeScript設定を評価するため、shellから渡した`process.env.APP_ENV`を設定計算に使えます。これは独自の規約であり、Void標準の環境機能ではありません。
 
-Worker実行時には`worker.vars.APP_ENV`を渡す案とします。同名を`env.ts`のserver keyにも登録すると、plaintext varsとsecretの扱いが競合するため避けます。現行資料ではルートの`.env`だけをローカル値として読み、shell値を優先します。`.env.production`や`.env.local`は非対応で、production buildは`.env`を読みません。[環境変数](https://void.cloud/guide/env-vars)、[設定](https://void.cloud/reference/config)
+Worker実行時にはVoid設定の`cloudflare.vars.APP_ENV`を渡します。固定版の実行確認で、raw binding設定は`cloudflare`配下へ置く必要があることを確認しました。同名を`env.ts`のserver keyにも登録すると、plaintext varsとsecretの扱いが競合するため避けます。現行資料ではルートの`.env`だけをローカル値として読み、shell値を優先します。`.env.production`や`.env.local`は非対応で、production buildは`.env`を読みません。[環境変数](https://void.cloud/guide/env-vars)、[設定](https://void.cloud/reference/config)
 
 `VOID_REMOTE`はローカルコードから配備済みD1・KV・R2を使う切替であり、環境名ではありません。Void platform側のstageや配置方式も、アプリ側の環境名と同一視しません。現行の`deploy.cloudflare.mode: 'staged'`は公開前検証の方式です。1.4.0のplatform stageの詳細は未確認です。[Remote Development](https://void.cloud/guide/remote-dev)、[配置設定](https://void.cloud/reference/config#deploy-cloudflare-mode)
 
@@ -32,3 +32,15 @@ Void 1.4.0の`dist/index.d.mts`では`voidPlugin`のオプションに`persistTo
 4. 環境を切り替えた際に`.void`の生成物や`void.lock.json`のresource IDが別環境へ流用されない管理方法を確認します。`APP_ENV`の変更だけで安全に切り替わるとは扱いません。
 
 配布物の確認対象はnpmの`void@1.4.0`です。確認時は`/tmp/korekaite-void-inspect/package`へ展開しました。一時パスは証拠の恒久保存先ではないため、再確認時は同じ版の配布物から上記ファイルと関数を参照してください。
+
+## 2026年11月2日のローカル実行確認
+
+上記の未検証項目のうち、[接続検証](../../tools/local-integration/README.md)で次を確認しました。Queue配送と診断ジョブ全体は後続タスクです。
+
+- `auxiliaryWorkers`でWeb・Interview DO・Evaluationを同時に起動し、DO呼び出しと3 Workersの共有D1が成立しました。ビルド済み成果物のpreviewでも同じ接続を確認しました。
+- DB CLIは環境別作業先から実行し、スキーマ・SQL・固定データはdatabaseパッケージの原本へリンクします。WebとCLIが生成した`.void/local-d1.json`のprojectRootとpersistRootが、環境別作業先と同じ状態保存先を示すことを検査しました。
+- developmentと同一テスト実行の2つの並列番号を同時起動し、同じ主キーの別値とViteキャッシュが混ざらないことを確認しました。デバッグポートの競合は固定版Voidの`VOID_INSPECTOR_PORT=false`で回避します。
+- EvaluationのscheduledイベントはCloudflare ViteのLocal Explorer APIで対象Workerを指定して起動し、応答のoutcomeとD1保存を確認しました。アプリの公開HTTP入口は追加していません。
+- reset・seedは明示操作に限定し、起動・ビルドと排他します。ローカル操作のロックはNode.js内蔵SQLiteで保持し、アプリのD1とは別の生成先に置きます。別プロセスの競合拒否と、保持プロセス強制終了後の再取得を検証しました。
+
+共有HTTP契約は環境識別子を含まない生成物です。ルートのテストではapi-contractsの生成を先行させ、後続パッケージから二重生成しません。型検査は既存の単独実行との互換性を保って順次実行します。契約生成物のない状態からも全テストが成功しました。

@@ -1,3 +1,4 @@
+import { lockEnvironment } from './lock.ts';
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readlink, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,7 +7,7 @@ import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
-export type DatabaseCommand = ['generate'] | ['migrate'] | ['execute', string];
+export type DatabaseCommand = ['generate'] | ['migrate'] | ['reset-seed'] | ['execute', string];
 
 async function linkDirectory(source: string, target: string): Promise<void> {
   try {
@@ -17,15 +18,13 @@ async function linkDirectory(source: string, target: string): Promise<void> {
   }
 }
 
-export async function runDatabaseCommand(
-  config: RuntimeConfig,
-  args: DatabaseCommand,
-): Promise<void> {
+async function executeDatabaseCommand(config: RuntimeConfig, args: DatabaseCommand): Promise<void> {
   if (config.environment === 'production' || !config.stateDirectory)
     throw new Error('ローカルDBだけを操作できます。');
   if (
     !(
-      (args.length === 1 && (args[0] === 'generate' || args[0] === 'migrate')) ||
+      (args.length === 1 &&
+        (args[0] === 'generate' || args[0] === 'migrate' || args[0] === 'reset-seed')) ||
       (args.length === 2 && args[0] === 'execute' && !args[1].startsWith('--'))
     )
   ) {
@@ -40,6 +39,10 @@ export async function runDatabaseCommand(
     join(project, 'node_modules'),
   );
   await linkDirectory(join(repositoryRoot, 'packages/database/db'), join(project, 'db'));
+  await linkDirectory(
+    join(repositoryRoot, 'packages/database/fixtures'),
+    join(project, 'fixtures'),
+  );
   const configuration = {
     worker: { compatibility_date: '2026-10-19' },
     cloudflare: {
@@ -63,7 +66,11 @@ export async function runDatabaseCommand(
   };
   for (const command of [
     [join(project, 'prepare.ts')],
-    [join(repositoryRoot, 'packages/database/node_modules/void/dist/cli/cli.mjs'), 'db', ...args],
+    [
+      join(repositoryRoot, 'packages/database/node_modules/void/dist/cli/cli.mjs'),
+      'db',
+      ...(args[0] === 'reset-seed' ? ['seed', '--yes'] : args),
+    ],
   ]) {
     const child = spawn(process.execPath, command, {
       cwd: project,
@@ -86,5 +93,18 @@ export async function runDatabaseCommand(
       throw new Error(
         `DB ${args[0]}失敗（${code}）。${join(config.artifactDirectory, `db-${args[0]}.log`)}を確認してください。`,
       );
+  }
+}
+
+export async function runDatabaseCommand(
+  config: RuntimeConfig,
+  args: DatabaseCommand,
+): Promise<void> {
+  if (args[0] !== 'reset-seed') return executeDatabaseCommand(config, args);
+  const release = await lockEnvironment(config);
+  try {
+    await executeDatabaseCommand(config, args);
+  } finally {
+    release();
   }
 }

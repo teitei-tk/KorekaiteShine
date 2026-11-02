@@ -40,7 +40,7 @@ pnpm --dir apps/typespec-spike verify:http http://127.0.0.1:4318
 
 ブラウザでは面接2件が表示されることと、「再取得」で再び表示されることを確認します。画面の一覧取得はブラウザ側で行います。サーバーは初期HTMLを返しますが、一覧データのSSR取得や認証情報の転送は検証していません。
 
-`dev`、`build`、`test`は契約を事前生成します。起動中にTypeSpecを変更した場合は、別のターミナルで次を実行してください。生成物は編集せず、Gitにも含めません。
+`dev`、`build`は契約を事前生成します。通常のテストはルートの`pnpm test`で依存順に共有契約を生成します。単独の`test`実行前には`pnpm --dir apps/typespec-spike generate`が必要です。起動中にTypeSpecを変更した場合は、別のターミナルで次を実行してください。生成物は編集せず、Gitにも含めません。
 
 ```sh
 pnpm --dir apps/typespec-spike generate

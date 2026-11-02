@@ -129,13 +129,15 @@ D1の保存単位は次を基準とする。
 
 **境界：** `resolveRuntime(input: RuntimeInput): RuntimeConfig`。入力はAPP_ENV、テスト実行ID、並列番号、リポジトリルート。出力は環境、3 Worker名、D1識別子、DO参照先、用途別Queue・DLQ名、状態と生成物の絶対パス。testで識別子が欠ければ失敗する。`startRuntime(config: RuntimeConfig): Promise<LocalRuntime>`は`baseUrl`、`stop(): Promise<void>`、`runScheduled(): Promise<void>`を返す。定期実行の入口はテスト用ランタイム機構を使い、HTTP公開しない。
 
-- [ ] `resources.test.ts`へ未指定・誤記、同一環境の参照一致、異なる実行IDと並列番号の非共有を一つずつ追加し、各回`pnpm test`でRedを確認する。
-- [ ] 仕様の命名表に沿って設定を実装し、`pnpm test`でGreenを確認する。状態だけでなくVoidの生成設定・lock・Vite出力の解決先も検査する。
-- [ ] `topology.test.ts`にWebからInterview DOへの呼び出し、3 WorkersとDB CLIからの同一D1読み戻しを追加してRedを確認する。固定版の型定義・配布コードを調べ、`auxiliaryWorkers`を第一候補に入口とbindingを組み立てる。
-- [ ] 独立したtest環境で接続を実装し、同じテストをGreenにする。バックエンドの実際の入口、D1の取得方法、primary読み取り、原子的batch、CLIの状態保存先、ローカルscheduled起動方法を記録する。
-- [ ] 開発とテストを同時起動し、片方の固定値が他方から読めないことを確認する。異なる環境のlockが残る場合は起動時に拒否するか、環境固有作業先へ生成する。黙って再利用しない。
-- [ ] ルートへ`dev:local / build:local / preview:local / test:integration / db:generate / db:migrate / db:reset-seed`を追加する。DB操作はdatabaseの原本を参照する環境別作業先からVoid CLIで行い、remote操作を受け付けない。
-- [ ] 実ランタイム検証をcommitする。成立しなければこのタスクを未完了にし、単なるモックの成功で後続へ進めない。
+- [x] `resources.test.ts`へ未指定・誤記、同一環境の参照一致、異なる実行IDと並列番号の非共有を一つずつ追加し、各回`pnpm test`でRedを確認する。
+- [x] 仕様の命名表に沿って設定を実装し、`pnpm test`でGreenを確認する。状態だけでなくVoidの生成設定・lock・Vite出力の解決先も検査する。
+- [x] `topology.test.ts`にWebからInterview DOへの呼び出し、3 WorkersとDB CLIからの同一D1読み戻しを追加してRedを確認する。固定版の型定義・配布コードを調べ、`auxiliaryWorkers`を第一候補に入口とbindingを組み立てる。
+- [x] 独立したtest環境で接続を実装し、同じテストをGreenにする。バックエンドの実際の入口、D1の取得方法、primary読み取り、原子的batch、CLIの状態保存先、ローカルscheduled起動方法を記録する。
+- [x] 開発とテストを同時起動し、片方の固定値が他方から読めないことを確認する。異なる環境のlockが残る場合は起動時に拒否するか、環境固有作業先へ生成する。黙って再利用しない。
+- [x] ルートへ`dev:local / build:local / preview:local / test:integration / db:generate / db:migrate / db:reset-seed`を追加する。DB操作はdatabaseの原本を参照する環境別作業先からVoid CLIで行い、remote操作を受け付けない。
+- [x] 実ランタイム検証をcommitする。成立しなければこのタスクを未完了にし、単なるモックの成功で後続へ進めない。
+
+実行検証：2026年11月2日、接続専用fixtureでDO・共有D1・scheduled・primary指定・batchロールバック・停止後の保持・build/previewを確認。開発と同一実行の並列2枠でデータと生成先を分離し、reset・seedの明示実行と使用中拒否も検証した。契約生成物なしから379テスト成功。実アプリの診断入口は後続タスクで置き換え、fixture成功を診断ジョブ全体の完成とは扱わない。
 
 ### タスク3：診断HTTP契約とQueue契約を生成する
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -81,13 +82,20 @@ test('ローカルランタイムからEvaluationのscheduledイベントを起�
 
 test('開発とテストを同時起動してもD1とViteキャッシュを共有しない', async () => {
   const isolatedRoot = await mkdtemp(join(tmpdir(), 'korekaite-environments-'));
+  const parallelRunId = randomUUID();
   const configs = [
     resolveRuntime({ repositoryRoot: isolatedRoot, appEnv: 'development' }),
     resolveRuntime({
       repositoryRoot: isolatedRoot,
       appEnv: 'test',
-      runId: randomUUID(),
+      runId: parallelRunId,
       parallelIndex: 0,
+    }),
+    resolveRuntime({
+      repositoryRoot: isolatedRoot,
+      appEnv: 'test',
+      runId: parallelRunId,
+      parallelIndex: 1,
     }),
   ];
   const started = await Promise.allSettled(configs.map((config) => startRuntime(config)));
@@ -108,6 +116,16 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
       expect(
         (await stat(join(configs[index]!.artifactDirectory, 'vite-cache'))).isDirectory(),
       ).toBe(true);
+      for (const project of ['web', 'database']) {
+        const projectRoot = join(configs[index]!.artifactDirectory, project);
+        const metadata = JSON.parse(
+          await readFile(join(projectRoot, '.void/local-d1.json'), 'utf8'),
+        );
+        expect(await realpath(metadata.projectRoot)).toBe(await realpath(projectRoot));
+        expect(await realpath(metadata.persistRoot)).toBe(
+          await realpath(configs[index]!.stateDirectory!),
+        );
+      }
     }
     succeeded = true;
   } finally {
@@ -214,3 +232,69 @@ test('3 Workersのビルド済み成果物でもWeb・DO・共有D1が接続で�
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 120_000);
+
+test('明示したreset-seedだけが既存データを消して固定データを投入する', async () => {
+  const runId = randomUUID();
+  const config = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 0 });
+  let runtime = await startRuntime(config);
+  let succeeded = false;
+  try {
+    await runDatabaseCommand(config, [
+      'execute',
+      "INSERT INTO connection_checks (writer, value) VALUES ('temporary', 'remove-me')",
+    ]);
+    const before = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    const beforeRows = await before.json();
+    expect(beforeRows).toContainEqual({ writer: 'temporary', value: 'remove-me' });
+    expect(beforeRows).not.toContainEqual({ writer: 'fixture', value: 'local-only' });
+    await runtime.stop();
+    const seeded = spawnSync('pnpm', ['db:reset-seed'], {
+      cwd: repositoryRoot,
+      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    expect(seeded.status, seeded.stderr).toBe(0);
+    runtime = await startRuntime(config);
+    const after = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    expect(after.status).toBe(200);
+    expect(await after.json()).toEqual([
+      { writer: 'evaluation', value: 'shared' },
+      { writer: 'fixture', value: 'local-only' },
+      { writer: 'interview', value: 'shared' },
+      { writer: 'web', value: 'shared' },
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 120_000);
+
+test('起動中の環境では別プロセスのreset-seedを拒否しデータを維持する', async () => {
+  const runId = randomUUID();
+  const config = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 0 });
+  const runtime = await startRuntime(config);
+  let succeeded = false;
+  try {
+    await runDatabaseCommand(config, [
+      'execute',
+      "INSERT INTO connection_checks (writer, value) VALUES ('active', 'retained')",
+    ]);
+    const attempted = spawnSync('pnpm', ['db:reset-seed'], {
+      cwd: repositoryRoot,
+      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    expect(attempted.status).toBe(1);
+    expect(attempted.stderr).toContain('環境は使用中です');
+    const response = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toContainEqual({ writer: 'active', value: 'retained' });
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

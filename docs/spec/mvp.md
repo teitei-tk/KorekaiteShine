@@ -91,7 +91,7 @@
 | D1                             | 文字起こし、材料の参照・抜粋、評価、追記メモ、実行履歴           |
 | Cloudflare Access              | Cloudflare配置時の本人限定アクセス                               |
 
-Web・Interview・Evaluationを独立した3 Workersとして配置します。WebはTanStack Start、InterviewはCloudflare標準の面接DOを公開し、Evaluationは評価QueueとDLQを受信します。WebのDOバインディングは同じ環境のInterview Workerを参照します。Webは手動再実行など、Interviewは面接終了時の評価依頼を同じQueueへ送ります。アプリ全体をnative Voidへ置き換える方針ではなく、各バックエンドWorkerのエントリ方式は検証で確定します。通常のHTTP APIは試作でローカル検証済みですが、Worker間の接続は未検証です。分割理由は[ADR 0007](../adr/0007-three-workers.md)に記録します。
+Web・Interview・Evaluationを独立した3 Workersとして配置します。WebはTanStack Start、InterviewはCloudflare標準の面接DOを公開し、Evaluationは評価QueueとDLQを受信します。WebのDOバインディングは同じ環境のInterview Workerを参照します。Webは手動再実行など、Interviewは面接終了時の評価依頼を同じQueueへ送ります。アプリ全体をnative Voidへ置き換える方針ではなく、各バックエンドWorkerのエントリ方式は検証で確定します。通常のHTTP APIに加え、検証専用入口でWebからInterview DOへの呼び出し、3 Workersの共有D1、Evaluationのscheduledイベントをローカル検証済みです。Queueを含む診断ジョブ全体は引き続き実装中です。分割理由は[ADR 0007](../adr/0007-three-workers.md)に記録します。
 
 音声はブラウザからDOを経由してGPT-Liveへ送信します。アプリでは音声を永続保存せず、中継に必要な短いメモリ内バッファだけを使います。GPT-Liveの録音保存は無効にし、保存録音からの再開は使いません。再開にはD1の文字起こしと面接状態を使います。OpenAI側の不正利用監視等による保持は、アプリの音声非保存や録音保存の無効化とは区別します。外部保持の条件と検証状況は[技術調査](../research/platform-integration.md#websocket再開外部保持)を参照してください。
 

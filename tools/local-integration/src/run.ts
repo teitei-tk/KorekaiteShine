@@ -5,8 +5,14 @@ import { buildRuntime, runDatabaseCommand, startRuntime } from './runtime.ts';
 async function main(): Promise<void> {
   const [command, ...extra] = process.argv.slice(2);
   if (extra.length) throw new Error('追加引数は受け付けません。ローカル専用の操作入口です。');
-  if (!['dev', 'build', 'preview', 'db:generate', 'db:migrate'].includes(command ?? '')) {
-    throw new Error('操作を指定してください: dev / build / preview / db:generate / db:migrate');
+  if (
+    !['dev', 'build', 'preview', 'db:generate', 'db:migrate', 'db:reset-seed'].includes(
+      command ?? '',
+    )
+  ) {
+    throw new Error(
+      '操作を指定してください: dev / build / preview / db:generate / db:migrate / db:reset-seed',
+    );
   }
   const config = resolveRuntime({
     repositoryRoot: fileURLToPath(new URL('../../../', import.meta.url)),
@@ -17,6 +23,8 @@ async function main(): Promise<void> {
   });
   if (command === 'build') {
     await buildRuntime(config);
+  } else if (command === 'db:reset-seed') {
+    await runDatabaseCommand(config, ['reset-seed']);
   } else if (command === 'db:generate' || command === 'db:migrate') {
     await runDatabaseCommand(config, [command === 'db:generate' ? 'generate' : 'migrate']);
   } else {

@@ -186,13 +186,13 @@ D1の保存単位は次を基準とする。
 
 **境界：** `consumeJob(notification: JobNotification, context: DeliveryContext, deps: EvaluationDependencies): Promise<DeliveryDecision>`。`DeliveryDecision`はackまたは30秒後のretry。`DeliveryContext`はQueue名・メッセージID・期待用途・通常/DLQ区分。固定スタブの`evaluateDiagnostic(scenario, attemptNumber)`は成功結果か`SIMULATED_AI_FAILURE`を返し、共通制御処理はscenarioを参照しない。
 
-- [ ] `success`が試行1回で結果とcompletedを保存するケースを追加し、`pnpm test`でRedを確認する。
-- [ ] 主体枠とジョブを原子的に取得し、試行開始を記録してスタブを呼ぶ。所有者・世代・期限・状態・未削除を保存時にも照合し、結果・終端状態・枠解放を整合させてGreenにする。
-- [ ] 同時取得で一つだけが実行すること、別ジョブの枠待ちでは試行回数を増やさず次回通知を保存することを、一つずつ実D1でRed/Greenにする。
-- [ ] 時計を差し替え、AI待機120秒、試行上限180秒、30秒ごとの更新、期限ちょうどの保存拒否、期限＋30秒での引き継ぎ、世代が古い保存の拒否を一つずつ検証する。
-- [ ] `retry_then_success`は試行2回でcompleted、`exhaust_retries`は試行4回でfailedとなるケースを追加する。再試行間隔30・120・300秒、次回時刻より前の実行拒否、最後のエラーを成功後も保持することを検証する。
-- [ ] 失敗確定時はDLQ送信待ちを保存する。`consumerCompletion`と`dlqReceipt`のpending・passed・not_expectedをシナリオごとに仕様と照合する。
-- [ ] Queueの配送回数が増えても業務試行回数に加算されないこと、完了後の再配送がスタブを呼ばないことを確認し、commitする。
+- [x] `success`が試行1回で結果とcompletedを保存するケースを追加し、`pnpm test`でRedを確認する。
+- [x] 主体枠とジョブを原子的に取得し、試行開始を記録してスタブを呼ぶ。所有者・世代・期限・状態・未削除を保存時にも照合し、結果・終端状態・枠解放を整合させてGreenにする。
+- [x] 同時取得で一つだけが実行すること、別ジョブの枠待ちでは試行回数を増やさず次回通知を保存することを、一つずつ実D1でRed/Greenにする。
+- [x] 時計を差し替え、AI待機120秒、試行上限180秒、30秒ごとの更新、期限ちょうどの保存拒否、期限＋30秒での引き継ぎ、世代が古い保存の拒否を一つずつ検証する。
+- [x] `retry_then_success`は試行2回でcompleted、`exhaust_retries`は試行4回でfailedとなるケースを追加する。再試行間隔30・120・300秒、次回時刻より前の実行拒否、最後のエラーを成功後も保持することを検証する。
+- [x] 失敗確定時はDLQ送信待ちを保存する。`consumerCompletion`と`dlqReceipt`のpending・passed・not_expectedをシナリオごとに仕様と照合する。
+- [x] Queueの配送回数が増えても業務試行回数に加算されないこと、完了後の再配送がスタブを呼ばないことを確認し、commitする。
 
 ### タスク7：定期回復・DLQ・配送異常の隔離を実装する
 

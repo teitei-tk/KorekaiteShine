@@ -271,3 +271,72 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('停止した評価の期限切れ実行権を、再起動後のscheduledで回復する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(acceptedResponse.status).toBe(202);
+    const accepted = await acceptedResponse.json();
+    const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        operation: 'acquire',
+        notification: { schemaVersion: 1, jobId: accepted.jobId },
+        now: Date.parse(accepted.acceptedAt),
+      }),
+    });
+    expect(acquire.status).toBe(200);
+    expect(await acquire.json()).toMatchObject({ attemptNumber: 1 });
+    await runtime.stop();
+    // 待機時間を短縮し、停止中に期限と猶予が経過した状態を作る。
+    const expiredAt = Date.now() - 31_000;
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      UPDATE jobs SET lease_until = ${expiredAt}, attempt_deadline = ${expiredAt};
+      UPDATE execution_slots SET lease_until = ${expiredAt};
+    `,
+    ]);
+    runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+    await runtime.runScheduled();
+    const status = await (
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
+    ).json();
+    expect(status).toMatchObject({
+      status: 'retry_wait',
+      attemptCount: 1,
+      lastErrorCode: 'EXECUTION_LEASE_EXPIRED',
+    });
+    await runtime.runScheduled();
+    expect(
+      await (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json(),
+    ).toEqual(status);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NULL;
+      INSERT INTO one SELECT COUNT(*) FROM job_attempts WHERE error_code = 'EXECUTION_LEASE_EXPIRED' AND finished_at IS NOT NULL;
+      CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
+      INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

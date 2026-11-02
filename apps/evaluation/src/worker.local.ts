@@ -2,6 +2,7 @@ import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { consumeDiagnostic } from './diagnostics/consume';
 import type { D1Database, ScheduledController, MessageBatch } from '@cloudflare/workers-types';
 import { recoverInitializations } from './application/recover-initialization';
+import { recoverExecutions } from './application/recover-executions';
 
 interface RecoveryEnvironment {
   DB: D1Database;
@@ -40,6 +41,7 @@ export default {
   async scheduled(_controller: ScheduledController, env: RecoveryEnvironment): Promise<void> {
     if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test')
       throw new Error('診断回復を利用できない環境です。');
+    await recoverExecutions(env.DB);
     await recoverInitializations(env.DB, async (jobId) => {
       await env.CHECK_OBJECT.getByName(`${env.APP_ENV}:diagnostics:${jobId}`).initializeCheck(
         jobId,

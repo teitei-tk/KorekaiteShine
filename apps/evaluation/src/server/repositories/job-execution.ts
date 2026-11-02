@@ -1,3 +1,4 @@
+import { runnableJobStates, terminalJobStates } from '../../domain/job-state';
 import type { EvaluationFailure } from '../../domain/evaluation-result';
 import { retryDelayMs } from '../../domain/retry-policy';
 import { and, eq, exists, gt, inArray, isNull, lt, lte, ne, notExists, or, sql } from 'void/db';
@@ -32,7 +33,7 @@ export async function acquireExecution(
   const available = and(
     eq(jobs.jobId, jobId),
     eq(jobs.purpose, purpose),
-    inArray(jobs.status, ['pending', 'retry_wait']),
+    inArray(jobs.status, runnableJobStates),
     lt(jobs.attemptCount, 4),
     or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, now)),
     notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
@@ -210,7 +211,7 @@ export async function isTerminalJob(
       and(
         eq(jobs.jobId, jobId),
         eq(jobs.purpose, purpose),
-        inArray(jobs.status, ['completed', 'failed', 'cancelled']),
+        inArray(jobs.status, terminalJobStates),
       ),
     );
   return Boolean(job);
@@ -258,7 +259,7 @@ export async function deferForBusySlot(
   const pending = and(
     eq(jobs.jobId, jobId),
     eq(jobs.purpose, purpose),
-    inArray(jobs.status, ['pending', 'retry_wait']),
+    inArray(jobs.status, runnableJobStates),
     notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
   );
   const busy = exists(
@@ -273,7 +274,7 @@ export async function deferForBusySlot(
         ),
       ),
   );
-  const nextAttemptAt = now + 30_000;
+  const nextAttemptAt = now + executionTiming.slotWaitMs;
   await db.batch([
     db
       .update(jobs)

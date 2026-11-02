@@ -16,7 +16,7 @@ test('同じ冪等キーの同時要求は実D1のジョブと初期化outbox各
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const key = randomUUID();
@@ -68,7 +68,7 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     for (const fixture of diagnosticRequests.filter((entry) => entry.method === 'POST')) {
@@ -120,7 +120,7 @@ test('受付済みジョブの状態を必須null項目と観測結果付きで�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -165,7 +165,7 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const invalid = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/invalid`);
@@ -216,7 +216,7 @@ test('同じキーと入力の逐次再送はJSONの空白によらず元の受�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const key = randomUUID();
@@ -251,7 +251,7 @@ test('同じキーで異なるscenarioを送ると409となり元のジョブを
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const key = randomUUID();
@@ -296,7 +296,7 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const key = randomUUID();
@@ -355,7 +355,7 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     await runDatabaseCommand(config, [

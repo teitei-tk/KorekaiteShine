@@ -9,7 +9,9 @@ import {
   type AcceptanceContext,
 } from '../server/repositories/diagnostic-jobs';
 
-export type CheckDependencies = AcceptanceContext;
+export interface CheckDependencies extends AcceptanceContext {
+  scheduleInitialization?(jobId: string): void;
+}
 
 export async function acceptCheck(request: Request, deps: CheckDependencies): Promise<Response> {
   const requestId = deps.newId();
@@ -54,6 +56,18 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
         'IDEMPOTENCY_KEY_CONFLICT',
         '同じ冪等キーが異なる入力で使用されています。',
       );
+    try {
+      deps.scheduleInitialization?.(accepted.jobId);
+    } catch {
+      // 受付は既に永続化済み。継続処理の開始失敗で受付結果を取り消さない。
+      console.info(
+        JSON.stringify({
+          event: 'diagnostic_initialization_deferred',
+          requestId,
+          jobId: accepted.jobId,
+        }),
+      );
+    }
     return Response.json(accepted, {
       status: 202,
       headers: { ...headers, Location: `/api/diagnostics/check-jobs/${accepted.jobId}` },

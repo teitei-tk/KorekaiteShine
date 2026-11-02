@@ -1,4 +1,4 @@
-import { and, eq, exists, inArray, isNull, notExists, sql } from 'void/db';
+import { and, eq, exists, inArray, isNull, lte, notExists, sql } from 'void/db';
 import { jobs, jobOutbox, diagnosticChecks, deletedJobs } from '@korekaite/database';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -141,6 +141,7 @@ export async function pendingCheckNotification(binding: D1Database, jobId: strin
         eq(jobOutbox.purpose, 'diagnostics'),
         eq(jobOutbox.generation, 0),
         isNull(jobOutbox.sentAt),
+        lte(jobOutbox.scheduledAt, Date.now()),
         eq(jobs.purpose, 'diagnostics'),
         eq(jobs.actorId, 'local-developer'),
         eq(jobs.status, 'pending'),

@@ -16,7 +16,17 @@ export interface LocalRuntime {
   runScheduled(): Promise<void>;
 }
 
-async function prepareRuntime(config: RuntimeConfig): Promise<string> {
+export interface LocalRuntimeOptions {
+  /** 受付・障害境界テストでだけ使用し、通常起動では自動初期化する。 */
+  manualDiagnostics?: boolean;
+}
+
+async function prepareRuntime(
+  config: RuntimeConfig,
+  options: LocalRuntimeOptions = {},
+): Promise<string> {
+  if (options.manualDiagnostics && config.environment !== 'test')
+    throw new Error('初期化の保留は独立test環境だけで利用できます。');
   if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカル環境だけを起動できます。');
   }
@@ -43,13 +53,14 @@ async function prepareRuntime(config: RuntimeConfig): Promise<string> {
   await writeFile(
     join(project, 'src/routes/api.diagnostics.check-jobs.ts'),
     `import { createFileRoute } from '@tanstack/react-router';
-import { env } from 'cloudflare:workers';
+import { env, waitUntil } from 'cloudflare:workers';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { acceptCheck } from '../diagnostics/accept';
 export const Route = createFileRoute('/api/diagnostics/check-jobs')({
   server: { handlers: { POST: ({ request }) => acceptCheck(request, {
     db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
     actorId: 'local-developer', now: () => Date.now(), newId: () => crypto.randomUUID(),
+    scheduleInitialization: ${options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
   }) } },
 });\n`,
   );
@@ -118,10 +129,24 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
       { tag: 'v2', new_sqlite_classes: ['CheckObject'] },
     ],
   };
+  const evaluationEntry = join(project, 'evaluation.local.ts');
+  await writeFile(
+    evaluationEntry,
+    `import application from ${JSON.stringify(join(repositoryRoot, 'apps/evaluation/src/worker.local.ts'))};
+import probe from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
+export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
+export default {
+  queue: probe.queue,
+  async scheduled(controller, env) { await application.scheduled(controller, env); await probe.scheduled(controller); },
+};\n`,
+  );
   const evaluation = {
     ...common,
     name: config.workers.evaluation,
-    main: join(fixtures, 'evaluation.ts'),
+    main: evaluationEntry,
+    durable_objects: {
+      bindings: [{ name: 'CHECK_OBJECT', class_name: 'CheckObject', script_name: config.doOwner }],
+    },
     queues: {
       consumers: [
         {
@@ -222,8 +247,9 @@ async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
 async function startUnlockedRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
+  options: LocalRuntimeOptions = {},
 ): Promise<LocalRuntime> {
-  const project = await prepareRuntime(config);
+  const project = await prepareRuntime(config, options);
   const child = spawn(
     process.execPath,
     [
@@ -317,10 +343,13 @@ export async function buildRuntime(config: RuntimeConfig): Promise<void> {
 export async function startRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
+  options: LocalRuntimeOptions = {},
 ): Promise<LocalRuntime> {
+  if (mode === 'preview' && options.manualDiagnostics)
+    throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
   const release = await lockEnvironment(config);
   try {
-    const runtime = await startUnlockedRuntime(config, mode);
+    const runtime = await startUnlockedRuntime(config, mode, options);
     return {
       ...runtime,
       async stop() {

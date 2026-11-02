@@ -8,6 +8,54 @@ import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
+test('Webの非同期初期化が失敗しても受付を保持し、scheduledで回復する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config);
+  let succeeded = false;
+  try {
+    await runDatabaseCommand(config, [
+      'execute',
+      "CREATE TRIGGER reject_notification BEFORE INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_outbox_failure'); END;",
+    ]);
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    // 同じDOへ再度RPCし、障害中に初期化が完了できないことも確認する。
+    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: accepted.jobId }),
+    });
+    expect(initialized.status).toBe(500);
+    await runDatabaseCommand(config, [
+      'execute',
+      `CREATE TEMP TABLE retained (count INTEGER CHECK (count = 1));
+       INSERT INTO retained SELECT COUNT(*) FROM jobs WHERE status = 'pending';
+       INSERT INTO retained SELECT COUNT(*) FROM job_outbox WHERE operation = 'initialize_do' AND sent_at IS NULL;`,
+    ]);
+    await runtime.stop();
+    await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
+    runtime = await startRuntime(config);
+    await runtime.runScheduled();
+    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    expect(status.status).toBe(200);
+    expect((await status.json()).checks.doPersistence).toBe('passed');
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
 test('同じ診断ジョブでDOを二回初期化しても初回保存日時を維持する', async () => {
   const config = resolveRuntime({
     repositoryRoot,
@@ -15,7 +63,7 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -55,7 +103,7 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -101,7 +149,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config);
+  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -136,7 +184,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     ]);
     await runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
-    runtime = await startRuntime(config);
+    runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
     const recovered = await initialize();
     expect(recovered.status).toBe(200);
     const saved = await recovered.json();
@@ -165,7 +213,7 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  const runtime = await startRuntime(config);
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
   let succeeded = false;
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -203,6 +251,99 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     // ここでは配送先の確認だけ。評価処理の完了を偽装しない。
     expect((await status.json()).checks.consumerCompletion).toBe('pending');
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
+test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config);
+  let succeeded = false;
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    let receipt = null;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      const observed = await fetch(
+        `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
+      );
+      expect(observed.status).toBe(200);
+      receipt = await observed.json();
+      if (receipt !== null) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(receipt).toEqual({
+      queue: config.queues.diagnostics?.queue,
+      message: { schemaVersion: 1, jobId: accepted.jobId },
+    });
+    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    expect((await status.json()).checks.doPersistence).toBe('passed');
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
+test('受付直後に停止してもEvaluationのscheduledイベントが初期化待ちを回復する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    await runtime.stop();
+    runtime = await startRuntime(config);
+    await runtime.runScheduled();
+    let receipt = null;
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      receipt = await (
+        await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`)
+      ).json();
+      if (receipt !== null) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    expect(receipt).toEqual({
+      queue: config.queues.diagnostics?.queue,
+      message: { schemaVersion: 1, jobId: accepted.jobId },
+    });
+    await runtime.runScheduled();
+    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    expect((await status.json()).checks.doPersistence).toBe('passed');
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE recovered_once (count INTEGER CHECK (count = 1));
+      INSERT INTO recovered_once SELECT COUNT(*) FROM jobs;
+      INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'initialize_do' AND sent_at IS NOT NULL;
+      INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
+    `,
+    ]);
     succeeded = true;
   } finally {
     await runtime.stop();

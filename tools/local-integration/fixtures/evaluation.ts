@@ -36,6 +36,9 @@ export default {
     }
   },
   async scheduled(controller: { cron: string }) {
-    await db.insert(connectionChecks).values({ writer: 'scheduled', value: controller.cron });
+    await db
+      .insert(connectionChecks)
+      .values({ writer: 'scheduled', value: controller.cron })
+      .onConflictDoUpdate({ target: connectionChecks.writer, set: { value: controller.cron } });
   },
 };

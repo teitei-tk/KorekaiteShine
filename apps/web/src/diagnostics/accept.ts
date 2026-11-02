@@ -1,4 +1,5 @@
-import { bodyValidationDetails, validationResponse } from './errors';
+import { DiagnosticDatabaseError } from '../server/repositories/database-error';
+import { bodyValidationDetails, errorResponse, validationResponse } from './errors';
 import {
   validateCheckIdempotencyKey,
   validateCheckStart,
@@ -13,12 +14,10 @@ export type CheckDependencies = AcceptanceContext;
 export async function acceptCheck(request: Request, deps: CheckDependencies): Promise<Response> {
   const requestId = deps.newId();
   const headers = { 'Cache-Control': 'no-store' };
-  const error = (status: number, code: string, message: string) =>
-    Response.json({ error: { code, message, requestId } }, { status, headers });
   if (
     request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
   ) {
-    return error(415, 'UNSUPPORTED_MEDIA_TYPE', 'JSON形式で送信してください。');
+    return errorResponse(requestId, 'UNSUPPORTED_MEDIA_TYPE', 'JSON形式で送信してください。');
   }
   const key = request.headers.get('Idempotency-Key');
   if (!validateCheckIdempotencyKey(key)) {
@@ -50,12 +49,23 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   try {
     const accepted = await acceptDiagnosticJob(deps, key, input);
     if (accepted === 'conflict')
-      return error(409, 'IDEMPOTENCY_KEY_CONFLICT', '同じ冪等キーが異なる入力で使用されています。');
+      return errorResponse(
+        requestId,
+        'IDEMPOTENCY_KEY_CONFLICT',
+        '同じ冪等キーが異なる入力で使用されています。',
+      );
     return Response.json(accepted, {
       status: 202,
       headers: { ...headers, Location: `/api/diagnostics/check-jobs/${accepted.jobId}` },
     });
-  } catch {
-    return error(503, 'SERVICE_UNAVAILABLE', '受付を確認できません。同じキーで再送してください。');
+  } catch (error) {
+    if (!(error instanceof DiagnosticDatabaseError)) {
+      return errorResponse(requestId, 'INTERNAL_ERROR', '内部エラーが発生しました。');
+    }
+    return errorResponse(
+      requestId,
+      'SERVICE_UNAVAILABLE',
+      '受付を確認できません。同じキーで再送してください。',
+    );
   }
 }

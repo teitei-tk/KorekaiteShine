@@ -1,3 +1,4 @@
+import { databaseOperation } from './database-error';
 import { and, eq } from 'void/db';
 import { jobs, jobOutbox, diagnosticRequests, diagnosticChecks } from '@korekaite/database';
 import type { createPrimaryDb } from '@korekaite/database/connection';
@@ -27,44 +28,50 @@ export async function acceptDiagnosticJob(
   );
   const jobId = context.newId();
   const acceptedAt = context.now();
+  const requestRecordId = context.newId();
+  const outboxId = context.newId();
   try {
-    await db.batch([
-      db.insert(jobs).values({
-        jobId,
-        actorId,
-        purpose: 'diagnostics',
-        status: 'pending',
-        acceptedAt,
-        updatedAt: acceptedAt,
-      }),
-      db.insert(diagnosticChecks).values({
-        jobId,
-        scenario: input.scenario,
-        doPersistence: 'pending',
-        consumerCompletion: input.scenario === 'exhaust_retries' ? 'not_expected' : 'pending',
-        dlqReceipt: input.scenario === 'exhaust_retries' ? 'pending' : 'not_expected',
-      }),
-      db.insert(diagnosticRequests).values({
-        id: context.newId(),
-        environment,
-        actorId,
-        operation: 'start_check',
-        idempotencyKey: key,
-        scenario: input.scenario,
-        jobId,
-        acceptedAt,
-      }),
-      db.insert(jobOutbox).values({
-        id: context.newId(),
-        jobId,
-        purpose: 'diagnostics',
-        operation: 'initialize_do',
-        scheduledAt: acceptedAt,
-      }),
-    ]);
+    await databaseOperation(async () =>
+      db.batch([
+        db.insert(jobs).values({
+          jobId,
+          actorId,
+          purpose: 'diagnostics',
+          status: 'pending',
+          acceptedAt,
+          updatedAt: acceptedAt,
+        }),
+        db.insert(diagnosticChecks).values({
+          jobId,
+          scenario: input.scenario,
+          doPersistence: 'pending',
+          consumerCompletion: input.scenario === 'exhaust_retries' ? 'not_expected' : 'pending',
+          dlqReceipt: input.scenario === 'exhaust_retries' ? 'pending' : 'not_expected',
+        }),
+        db.insert(diagnosticRequests).values({
+          id: requestRecordId,
+          environment,
+          actorId,
+          operation: 'start_check',
+          idempotencyKey: key,
+          scenario: input.scenario,
+          jobId,
+          acceptedAt,
+        }),
+        db.insert(jobOutbox).values({
+          id: outboxId,
+          jobId,
+          purpose: 'diagnostics',
+          operation: 'initialize_do',
+          scheduledAt: acceptedAt,
+        }),
+      ]),
+    );
   } catch (error) {
     // batchの失敗時は全体がrollbackされる。競合した確定済み受付だけを読み直す。
-    const [existing] = await db.select().from(diagnosticRequests).where(scope);
+    const [existing] = await databaseOperation(async () =>
+      db.select().from(diagnosticRequests).where(scope),
+    );
     if (!existing) throw error;
     if (existing.scenario !== input.scenario) return 'conflict';
     return {
@@ -82,17 +89,19 @@ export async function findDiagnosticJob(
   context: AcceptanceContext,
   jobId: string,
 ): Promise<CheckStatus | null> {
-  const [row] = await context.db
-    .select({ job: jobs, check: diagnosticChecks })
-    .from(jobs)
-    .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
-    .where(
-      and(
-        eq(jobs.jobId, jobId),
-        eq(jobs.actorId, context.actorId),
-        eq(jobs.purpose, 'diagnostics'),
+  const [row] = await databaseOperation(async () =>
+    context.db
+      .select({ job: jobs, check: diagnosticChecks })
+      .from(jobs)
+      .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
+      .where(
+        and(
+          eq(jobs.jobId, jobId),
+          eq(jobs.actorId, context.actorId),
+          eq(jobs.purpose, 'diagnostics'),
+        ),
       ),
-    );
+  );
   if (!row) return null;
   const { job, check } = row;
   return {

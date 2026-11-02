@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { readFile, rm } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
@@ -339,6 +339,60 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
       'execute',
       `CREATE TEMP TABLE new_key_assertion (count INTEGER CHECK (count = 2)); INSERT INTO new_key_assertion SELECT COUNT(*) FROM jobs; INSERT INTO new_key_assertion SELECT COUNT(*) FROM job_outbox;`,
     ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
+test('D1障害は503で返し、内部例外を公開せずrequestIdでログを追跡できる', async () => {
+  const { validateCheckUnavailable } =
+    await import('@korekaite/api-contracts/http/diagnostics-validators');
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config);
+  let succeeded = false;
+  try {
+    await runDatabaseCommand(config, [
+      'execute',
+      "CREATE TRIGGER fail_accept BEFORE INSERT ON jobs BEGIN SELECT RAISE(FAIL, 'private_database_failure'); END;",
+    ]);
+    const key = randomUUID();
+    const post = () =>
+      fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+        body: '{"scenario":"success"}',
+      });
+    const unavailable = await post();
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get('Cache-Control')).toBe('no-store');
+    const failure = await unavailable.json();
+    expect(validateCheckUnavailable(failure)).toBe(true);
+    expect(JSON.stringify(failure)).not.toContain('private_database_failure');
+    await runDatabaseCommand(config, ['execute', 'DROP TRIGGER fail_accept;']);
+    const recovered = await post();
+    expect(recovered.status).toBe(202);
+    const accepted = await recovered.json();
+    await runDatabaseCommand(config, ['execute', 'DROP TABLE diagnostic_checks;']);
+    const readFailure = await fetch(
+      `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+    );
+    expect(readFailure.status).toBe(503);
+    const readBody = await readFailure.json();
+    expect(validateCheckUnavailable(readBody)).toBe(true);
+    expect(JSON.stringify(readBody)).not.toContain('diagnostic_checks');
+    expect(readBody.error.requestId).not.toBe(failure.error.requestId);
+    await runtime.stop();
+    const log = await readFile(join(config.artifactDirectory, 'runtime.log'), 'utf8');
+    expect(log).toContain(failure.error.requestId);
+    expect(log).toContain(readBody.error.requestId);
+    expect(log).not.toContain('private_database_failure');
     succeeded = true;
   } finally {
     await runtime.stop();

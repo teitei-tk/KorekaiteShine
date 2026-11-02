@@ -1,7 +1,7 @@
 import { lockEnvironment } from './lock.ts';
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readlink, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
@@ -18,7 +18,15 @@ async function linkDirectory(source: string, target: string): Promise<void> {
   }
 }
 
-async function executeDatabaseCommand(config: RuntimeConfig, args: DatabaseCommand): Promise<void> {
+interface DatabaseOptions {
+  schemaDirectory?: string;
+}
+
+async function executeDatabaseCommand(
+  config: RuntimeConfig,
+  args: DatabaseCommand,
+  options: DatabaseOptions = {},
+): Promise<void> {
   if (config.environment === 'production' || !config.stateDirectory)
     throw new Error('ローカルDBだけを操作できます。');
   if (
@@ -30,15 +38,33 @@ async function executeDatabaseCommand(config: RuntimeConfig, args: DatabaseComma
   ) {
     throw new Error('未対応のDB操作です。');
   }
+  if (options.schemaDirectory) {
+    const path = relative(config.artifactDirectory, resolve(options.schemaDirectory));
+    if (
+      config.environment !== 'test' ||
+      !path ||
+      path.startsWith('..') ||
+      args[0] === 'generate' ||
+      args[0] === 'reset-seed'
+    ) {
+      throw new Error('履歴の差し替えは独立テスト環境のmigration検証だけで利用できます。');
+    }
+  }
   await claimArtifactDirectory(config);
-  const project = join(config.artifactDirectory, 'database');
+  const project = join(
+    config.artifactDirectory,
+    options.schemaDirectory ? 'database-fixture' : 'database',
+  );
   await mkdir(project, { recursive: true });
   await cp(join(repositoryRoot, 'packages/database/package.json'), join(project, 'package.json'));
   await linkDirectory(
     join(repositoryRoot, 'packages/database/node_modules'),
     join(project, 'node_modules'),
   );
-  await linkDirectory(join(repositoryRoot, 'packages/database/db'), join(project, 'db'));
+  await linkDirectory(
+    options.schemaDirectory ?? join(repositoryRoot, 'packages/database/db'),
+    join(project, 'db'),
+  );
   await linkDirectory(
     join(repositoryRoot, 'packages/database/fixtures'),
     join(project, 'fixtures'),
@@ -99,11 +125,12 @@ async function executeDatabaseCommand(config: RuntimeConfig, args: DatabaseComma
 export async function runDatabaseCommand(
   config: RuntimeConfig,
   args: DatabaseCommand,
+  options: DatabaseOptions = {},
 ): Promise<void> {
-  if (args[0] !== 'reset-seed') return executeDatabaseCommand(config, args);
+  if (args[0] !== 'reset-seed') return executeDatabaseCommand(config, args, options);
   const release = await lockEnvironment(config);
   try {
-    await executeDatabaseCommand(config, args);
+    await executeDatabaseCommand(config, args, options);
   } finally {
     release();
   }

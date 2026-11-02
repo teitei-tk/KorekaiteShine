@@ -1,7 +1,8 @@
+import { DiagnosticDatabaseError } from '../server/repositories/database-error';
 import { validateCheckJobId } from '@korekaite/api-contracts/http/diagnostics-validators';
 import { findDiagnosticJob } from '../server/repositories/diagnostic-jobs';
 import type { CheckDependencies } from './accept';
-import { validationResponse } from './errors';
+import { errorResponse, validationResponse } from './errors';
 
 export async function getCheck(
   _request: Request,
@@ -22,22 +23,16 @@ export async function getCheck(
   }
   try {
     const status = await findDiagnosticJob(deps, jobId);
-    if (!status)
-      return Response.json(
-        { error: { code: 'JOB_NOT_FOUND', message: '対象ジョブが見つかりません。', requestId } },
-        { status: 404, headers },
-      );
+    if (!status) return errorResponse(requestId, 'JOB_NOT_FOUND', '対象ジョブが見つかりません。');
     return Response.json(status, { headers });
-  } catch {
-    return Response.json(
-      {
-        error: {
-          code: 'SERVICE_UNAVAILABLE',
-          message: '状態を取得できません。時間をおいて再度確認してください。',
-          requestId,
-        },
-      },
-      { status: 503, headers },
+  } catch (error) {
+    if (!(error instanceof DiagnosticDatabaseError)) {
+      return errorResponse(requestId, 'INTERNAL_ERROR', '内部エラーが発生しました。');
+    }
+    return errorResponse(
+      requestId,
+      'SERVICE_UNAVAILABLE',
+      '状態を取得できません。時間をおいて再度確認してください。',
     );
   }
 }

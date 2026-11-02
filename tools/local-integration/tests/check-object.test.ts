@@ -350,3 +350,160 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('Queue送信後に送信済み記録が失敗しても、再起動後に同じ通知を再送できる', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  const assertDeliveries = async (count: number) => {
+    await expect
+      .poll(
+        async () => {
+          try {
+            await runDatabaseCommand(config, [
+              'execute',
+              `
+          CREATE TEMP TABLE deliveries (count INTEGER CHECK (count = ${count}));
+          INSERT INTO deliveries SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'queue-message:%';
+        `,
+            ]);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 10_000, interval: 100 },
+      )
+      .toBe(true);
+  };
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    await runDatabaseCommand(config, [
+      'execute',
+      "CREATE TRIGGER reject_sent BEFORE UPDATE OF sent_at ON job_outbox WHEN OLD.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_sent_failure'); END;",
+    ]);
+    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: accepted.jobId }),
+    });
+    expect(initialized.status).toBe(500);
+    await assertDeliveries(1);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE unsent (count INTEGER CHECK (count = 1));
+      INSERT INTO unsent SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NULL;
+      CREATE TABLE before_restart AS SELECT first_received_at FROM diagnostic_checks;
+    `,
+    ]);
+    await runtime.stop();
+    await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_sent;']);
+    runtime = await startRuntime(config);
+    await runtime.runScheduled();
+    await assertDeliveries(2);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE recovered_once (count INTEGER CHECK (count = 1));
+      INSERT INTO recovered_once SELECT COUNT(*) FROM jobs;
+      INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
+      INSERT INTO recovered_once SELECT COUNT(*) FROM diagnostic_checks JOIN before_restart USING (first_received_at);
+      INSERT INTO recovered_once SELECT COUNT(DISTINCT json_extract(value, '$.message.jobId')) FROM connection_checks WHERE writer LIKE 'queue-message:%';
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
+test('予定時刻前には通知せず、送信前に停止しても期限到来後のscheduledで配送する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: '{"scenario":"success"}',
+    });
+    expect(response.status).toBe(202);
+    const accepted = await response.json();
+    await runDatabaseCommand(config, [
+      'execute',
+      `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Date.now() + 60_000} WHERE id = NEW.id; END;`,
+    ]);
+    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: accepted.jobId }),
+    });
+    expect(initialized.status).toBe(200);
+    const saved = await initialized.json();
+    await runtime.runScheduled();
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE pending_once (count INTEGER CHECK (count = 1));
+      INSERT INTO pending_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NULL;
+      INSERT INTO pending_once SELECT COUNT(*) FROM diagnostic_checks WHERE do_persistence = 'passed';
+      CREATE TEMP TABLE no_delivery (count INTEGER CHECK (count = 0));
+      INSERT INTO no_delivery SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'queue-message:%';
+    `,
+    ]);
+    await runtime.stop();
+    await runDatabaseCommand(config, [
+      'execute',
+      "DROP TRIGGER defer_notification; UPDATE job_outbox SET scheduled_at = 0 WHERE operation = 'notify';",
+    ]);
+    runtime = await startRuntime(config);
+    await runtime.runScheduled();
+    await expect
+      .poll(
+        async () =>
+          (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`)).json(),
+        { timeout: 5_000, interval: 100 },
+      )
+      .toEqual({
+        queue: config.queues.diagnostics?.queue,
+        message: { schemaVersion: 1, jobId: accepted.jobId },
+      });
+    const repeated = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: accepted.jobId }),
+    });
+    expect(repeated.status).toBe(200);
+    expect(await repeated.json()).toEqual(saved);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE recovered_once (count INTEGER CHECK (count = 1));
+      INSERT INTO recovered_once SELECT COUNT(*) FROM jobs;
+      INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

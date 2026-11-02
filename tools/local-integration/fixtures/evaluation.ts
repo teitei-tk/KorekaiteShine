@@ -23,11 +23,18 @@ export class TopologyEvaluation extends WorkerEntrypoint {
 
 export default {
   // 接続確認専用Consumer。受信を記録し、評価の業務状態は変更しない。
-  async queue(batch: { queue: string; messages: { body: JobNotification; ack(): void }[] }) {
+  async queue(batch: {
+    queue: string;
+    messages: { id: string; body: JobNotification; ack(): void }[];
+  }) {
     for (const message of batch.messages) {
       if (!validateJobNotification(message.body))
         throw new Error('接続検証で通知契約違反を検知しました。');
       const value = JSON.stringify({ queue: batch.queue, message: message.body });
+      await db
+        .insert(connectionChecks)
+        .values({ writer: `queue-message:${batch.queue}:${message.id}`, value })
+        .onConflictDoNothing();
       await db
         .insert(connectionChecks)
         .values({ writer: `queue:${message.body.jobId}`, value })

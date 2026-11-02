@@ -8,10 +8,11 @@
     "./http/openapi": "./generated/http/openapi.json",
     "./messages": "./generated/messages/types.d.ts",
     "./messages/validators": "./generated/messages/validators.mjs",
-    "./messages/schema": "./generated/messages/JobNotification.json"
+    "./messages/schema": "./generated/messages/JobNotification.json",
+    "./http/diagnostics-validators": "./generated/http/diagnostics-validators.mjs"
   },
   "scripts": {
-    "generate": "tsp compile http/main.tsp --config tspconfig.yaml && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts && tsp compile messages/main.tsp --config tspconfig.messages.yaml && node scripts/generate-messages.ts",
+    "generate": "tsp compile http/main.tsp --config tspconfig.yaml && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts && node scripts/generate-diagnostics-validation.ts && tsp compile messages/main.tsp --config tspconfig.messages.yaml && node scripts/generate-messages.ts",
     "typecheck": "pnpm generate && tsc --noEmit",
     "test": "pnpm generate && vitest run"
   },

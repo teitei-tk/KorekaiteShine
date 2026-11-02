@@ -145,11 +145,13 @@ D1の保存単位は次を基準とする。
 
 **境界：** HTTPの開始・状態・エラー型とバリデーターを公開する。Queueの`JobNotification`は`schemaVersion: 1`と小文字UUID v4の`jobId`のみ。`validateJobNotification`を生成し、未検証データと検証済み通知を区別する。型の原本を手書きで増やさない。
 
-- [ ] 固定の正常通知が通り、版2・文字列の版・余分な項目・不正UUIDが拒否されるケースを一つずつ追加し、`pnpm test`でRedを確認する。
-- [ ] TypeSpec JSON Schema emitterと型生成手段の固定版互換性を確認し、生成→Ajv ES Modules→Worker importを実装して各ケースをGreenにする。入力変換・既定値補完・余分な項目削除を無効にする。
-- [ ] HTTPの3シナリオ、開始202、GET 200、400・404・409・415・500・503を操作ごとに定義する。`no-store`、`Location`、UUID、ミリ秒付き日時、必須null項目、型付きdetailsを仕様どおりに定義する。
-- [ ] 不正JSON・空本文・キー不足・未知scenario・未知項目・不正jobIdの契約ケースを一つずつRed/Greenで追加する。実ハンドラーの検査はタスク4で同じケースを再利用する。
-- [ ] 生成物なしからの生成・型検査・`pnpm test`を確認する。新規依存は完全な版番号で固定し、保護設定を維持したlock更新をcommitする。
+- [x] 固定の正常通知が通り、版2・文字列の版・余分な項目・不正UUIDが拒否されるケースを一つずつ追加し、`pnpm test`でRedを確認する。
+- [x] TypeSpec JSON Schema emitterと型生成手段の固定版互換性を確認し、生成→Ajv ES Modules→Worker importを実装して各ケースをGreenにする。入力変換・既定値補完・余分な項目削除を無効にする。
+- [x] HTTPの3シナリオ、開始202、GET 200、400・404・409・415・500・503を操作ごとに定義する。`no-store`、`Location`、UUID、ミリ秒付き日時、必須null項目、型付きdetailsを仕様どおりに定義する。
+- [x] 不正JSON・空本文・キー不足・未知scenario・未知項目・不正jobIdの契約ケースを一つずつRed/Greenで追加する。実ハンドラーの検査はタスク4で同じケースを再利用する。
+- [x] 生成物なしからの生成・型検査・`pnpm test`を確認する。新規依存は完全な版番号で固定し、保護設定を維持したlock更新をcommitする。
+
+実装検証：Queue通知はJSON Schema・型・Ajvの生成と実Workerへのimportを確認。診断HTTPは開始・状態・エラーの型と専用バリデーターを生成し、UUID・日時・必須null・型付きdetails・未知項目拒否を検証した。既存の制約で初回から成功するケースは、人工的に制約を弱めず補足検証とした。不正JSON・空本文は要求fixtureと期待エラーを用意し、実際のHTTP解析と応答はタスク4で確認する。
 
 ### タスク4：共有スキーマと冪等な開始受付を実装する
 

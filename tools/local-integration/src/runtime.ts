@@ -40,6 +40,32 @@ async function prepareRuntime(config: RuntimeConfig): Promise<string> {
       throw new Error('Web依存の参照先が一致しません。');
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
+  await writeFile(
+    join(project, 'src/routes/api.diagnostics.check-jobs.ts'),
+    `import { createFileRoute } from '@tanstack/react-router';
+import { env } from 'cloudflare:workers';
+import { createPrimaryDb } from '@korekaite/database/connection';
+import { acceptCheck } from '../diagnostics/accept';
+export const Route = createFileRoute('/api/diagnostics/check-jobs')({
+  server: { handlers: { POST: ({ request }) => acceptCheck(request, {
+    db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
+    actorId: 'local-developer', now: () => Date.now(), newId: () => crypto.randomUUID(),
+  }) } },
+});\n`,
+  );
+  await writeFile(
+    join(project, 'src/routes/api.diagnostics.check-jobs.$jobId.ts'),
+    `import { createFileRoute } from '@tanstack/react-router';
+import { env } from 'cloudflare:workers';
+import { createPrimaryDb } from '@korekaite/database/connection';
+import { getCheck } from '../diagnostics/get';
+export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
+  server: { handlers: { GET: ({ request, params }) => getCheck(request, params.jobId, {
+    db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
+    actorId: 'local-developer', now: () => Date.now(), newId: () => crypto.randomUUID(),
+  }) } },
+});\n`,
+  );
   await cp(join(fixtures, 'api.topology.ts'), join(project, 'src/routes/api.topology.ts'));
   await cp(
     join(fixtures, 'api.database-topology.ts'),

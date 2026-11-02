@@ -53,6 +53,10 @@ async function prepareRuntime(config: RuntimeConfig): Promise<string> {
     join(fixtures, 'api.primary-topology.ts'),
     join(project, 'src/routes/api.primary-topology.ts'),
   );
+  await cp(
+    join(fixtures, 'api.queue-contract-topology.ts'),
+    join(project, 'src/routes/api.queue-contract-topology.ts'),
+  );
   const common = {
     d1_databases: [{ binding: 'DB', database_name: config.d1.name, database_id: config.d1.id }],
     compatibility_date: '2026-10-19',

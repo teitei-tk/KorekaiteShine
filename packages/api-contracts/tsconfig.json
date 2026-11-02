@@ -10,5 +10,5 @@
     "esModuleInterop": true,
     "types": ["node"]
   },
-  "include": ["scripts", "generated/**/*.d.ts", "generated/**/*.d.mts"]
+  "include": ["scripts", "generated/**/*.d.ts", "generated/**/*.d.mts", "tests"]
 }

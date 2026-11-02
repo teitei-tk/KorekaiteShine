@@ -298,3 +298,38 @@ test('起動中の環境では別プロセスのreset-seedを拒否しデータ�
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('生成したQueue検証コードを実Workerへimportし、入力を変換せず検証する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config);
+  const jobId = '7e318b72-f255-4f17-845b-714d487ae621';
+  let succeeded = false;
+  try {
+    for (const input of [
+      { body: { schemaVersion: 1, jobId }, valid: true },
+      { body: { schemaVersion: '1', jobId }, valid: false },
+      { body: { schemaVersion: 1, jobId, extra: 'preserved' }, valid: false },
+      { body: { schemaVersion: 1, jobId: 'invalid' }, valid: false },
+      { body: { jobId }, valid: false },
+      { body: { schemaVersion: 1 }, valid: false },
+      { body: null, valid: false },
+    ]) {
+      const response = await fetch(`${runtime.baseUrl}/api/queue-contract-topology`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input.body),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(input);
+    }
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

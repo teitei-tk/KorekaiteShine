@@ -1,3 +1,4 @@
+import "./diagnostics.tsp";
 import "@typespec/http";
 import "@typespec/openapi3";
 

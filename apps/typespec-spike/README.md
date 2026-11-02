@@ -74,7 +74,7 @@ CIでも試作の`typecheck`と`test`を実行し、契約生成・ビルド・�
 
 次の調整が必要でした。
 
-- openapi-typescriptはTypeScript 5系のCompiler APIを使います。既存の7.0.2では型生成に失敗したため、この試作だけ5.9.3に固定しました。既存の文書・レビュー用ツールは7系を維持します。
+- openapi-typescriptはTypeScript 5系のCompiler APIを使います。7.0.2では型生成に失敗したため、当初はこの試作を5.9.3に固定しました。2026年11月2日に型生成を[専用ワークスペース](../../tools/api-codegen/package.json)へ分離し、生成用の5.9.3を維持したままアプリの型検査を7.0.2へ更新しました。`pnpm --dir apps/typespec-spike generate`から専用ワークスペースを呼び出します。
 - Cloudflare Viteプラグイン1.66.0では開発時に`Parent environment not initialized`が発生しました。Voidの依存範囲内の1.64.0に固定した構成では起動しました。原因となる上流の変更までは特定していません。
 - 生成したCommonJS形式の検証コードはビルド後には動作しましたが、開発時は`exports is not defined`で失敗しました。AjvのES Modules出力へ変更し、両方で使用します。実行時にスキーマをコンパイルしません。
 - Babel経由のsemver 6.3.1はpnpmの信頼ポリシーに拒否されました。Babelのcoreとhelper-compilation-targetsに限り、provenanceのある7.8.5へ置換しています。使用する比較・範囲判定APIを確認し、この構成のビルドで検証しました。メジャーをまたぐ置換のため、Babelの全機能の互換性を保証するものではありません。

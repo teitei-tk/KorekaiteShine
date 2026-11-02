@@ -66,6 +66,12 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   }) } },
 });\n`,
   );
+  if (config.environment === 'test') {
+    await cp(
+      join(fixtures, 'api.check-object-test.ts'),
+      join(project, 'src/routes/api.check-object-test.ts'),
+    );
+  }
   await cp(join(fixtures, 'api.topology.ts'), join(project, 'src/routes/api.topology.ts'));
   await cp(
     join(fixtures, 'api.database-topology.ts'),
@@ -89,17 +95,52 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     compatibility_flags: ['nodejs_compat'],
     vars: { APP_ENV: config.environment },
   };
+  const interviewEntry = join(project, 'interview.local.ts');
+  await writeFile(
+    interviewEntry,
+    `export { default, CheckObject } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
+  );
+  const diagnostics = config.queues.diagnostics;
+  if (!diagnostics) throw new Error('ローカル診断Queueが未設定です。');
   const interview = {
     ...common,
     name: config.workers.interview,
-    main: join(fixtures, 'interview.ts'),
-    durable_objects: { bindings: [{ name: 'INTERVIEW', class_name: 'TopologyObject' }] },
-    migrations: [{ tag: 'v1', new_sqlite_classes: ['TopologyObject'] }],
+    main: interviewEntry,
+    queues: { producers: [{ binding: 'DIAGNOSTIC_QUEUE', queue: diagnostics.queue }] },
+    durable_objects: {
+      bindings: [
+        { name: 'INTERVIEW', class_name: 'TopologyObject' },
+        { name: 'CHECK_OBJECT', class_name: 'CheckObject' },
+      ],
+    },
+    migrations: [
+      { tag: 'v1', new_sqlite_classes: ['TopologyObject'] },
+      { tag: 'v2', new_sqlite_classes: ['CheckObject'] },
+    ],
   };
   const evaluation = {
     ...common,
     name: config.workers.evaluation,
     main: join(fixtures, 'evaluation.ts'),
+    queues: {
+      consumers: [
+        {
+          queue: diagnostics.queue,
+          max_batch_size: 1,
+          max_batch_timeout: 1,
+          max_retries: 3,
+          retry_delay: 30,
+          dead_letter_queue: diagnostics.dlq,
+        },
+        {
+          queue: diagnostics.dlq,
+          max_batch_size: 1,
+          max_batch_timeout: 1,
+          max_retries: 3,
+          retry_delay: 30,
+        },
+      ],
+    },
     triggers: { crons: ['* * * * *'] },
   };
   const web = {
@@ -113,7 +154,10 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
       },
     ],
     durable_objects: {
-      bindings: [{ name: 'INTERVIEW', class_name: 'TopologyObject', script_name: config.doOwner }],
+      bindings: [
+        { name: 'INTERVIEW', class_name: 'TopologyObject', script_name: config.doOwner },
+        { name: 'CHECK_OBJECT', class_name: 'CheckObject', script_name: config.doOwner },
+      ],
     },
   };
   await writeFile(

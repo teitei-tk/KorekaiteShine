@@ -157,3 +157,14 @@ apps/typespec-spike/.tanstack/
 apps/typespec-spike/.void-wrangler.jsonc
 apps/typespec-spike/void.lock.json
 apps/typespec-spike/.cloudflare/
+
+# アプリ移行後の生成物とローカル状態
+packages/*/generated/
+apps/web/src/routeTree.gen.ts
+apps/web/.void/
+apps/web/.wrangler/
+apps/web/.tanstack/
+apps/web/.void-wrangler.jsonc
+apps/web/void.lock.json
+.local/
+.playwright-mcp/

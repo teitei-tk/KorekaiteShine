@@ -8,6 +8,8 @@
 
 TypeSpecとReact・TanStack Start・Voidの接続は、[面接一覧APIのローカル試作](../apps/typespec-spike/README.md)で検証しています。架空データを使う限定的な検証であり、本番アプリ、DB・認可・音声連携の実装完了を意味しません。
 
+次の着手範囲は[既存試作の移行と3 Workersのローカル接続確認の実装計画](superpowers/plans/2026-11-02-local-worker-skeleton.md)にまとめています。診断ジョブの正常系、再試行・DLQ、停止後の回復までを対象とする計画です。一覧APIの移行を進めており、接続全体は未検証です。
+
 1. [用語集](../GLOSSARY.md)：プロジェクト固有の言葉の意味。
 2. [MVP仕様書](spec/mvp.md)：目的、合意済みの動作、採用構成、未確定事項。
 3. 関係するADR：現在の選択に至った理由と引き受ける負担。

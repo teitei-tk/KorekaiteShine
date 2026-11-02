@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { validateBadRequest, validateList } from '../../generated/validators.mjs';
+import { validateBadRequest, validateList } from '@korekaite/api-contracts/http/validators';
 
 // 変換前のHTTP表記を保持する。期待値をハンドラーやスキーマから計算しない。
 export const interviewCases: { query: string; status: 200 | 400; count?: number }[] = [

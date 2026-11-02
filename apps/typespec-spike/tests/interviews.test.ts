@@ -31,7 +31,7 @@ test.each(interviewCases)('HTTP契約: $query → $status', async (example) => {
 
 test('OpenAPIに定義したすべての応答に検証コードと実行ケースがある', async () => {
   const document = JSON.parse(
-    await readFile(new URL('../generated/openapi.json', import.meta.url), 'utf8'),
+    await readFile(new URL(import.meta.resolve('@korekaite/api-contracts/http/openapi')), 'utf8'),
   );
   const statuses = Object.keys(document.paths['/api/interviews'].get.responses).sort();
   expect(Object.keys(interviewResponseValidators).sort()).toEqual(statuses);

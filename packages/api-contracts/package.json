@@ -1,0 +1,29 @@
+{
+  "name": "@korekaite/api-contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./http": "./generated/http/api.d.ts",
+    "./http/validators": "./generated/http/validators.mjs",
+    "./http/openapi": "./generated/http/openapi.json"
+  },
+  "scripts": {
+    "generate": "tsp compile http/main.tsp --config tspconfig.yaml && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts",
+    "typecheck": "pnpm generate && tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@typespec/compiler": "1.17.0",
+    "@typespec/http": "1.17.0",
+    "@typespec/openapi": "1.17.0",
+    "@typespec/openapi3": "1.17.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=26.12.1 <27"
+  }
+}

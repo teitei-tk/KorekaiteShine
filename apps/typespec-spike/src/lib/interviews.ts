@@ -1,6 +1,6 @@
 import createClient from 'openapi-fetch';
-import type { components, paths } from '../../generated/api';
-import { validateList } from '../../generated/validators.mjs';
+import type { components, paths } from '@korekaite/api-contracts/http';
+import { validateList } from '@korekaite/api-contracts/http/validators';
 
 export async function getInterviews(
   baseUrl: string,

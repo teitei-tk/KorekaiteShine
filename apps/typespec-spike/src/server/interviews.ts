@@ -1,5 +1,5 @@
-import type { components } from '../../generated/api';
-import { validateQuery } from '../../generated/validators.mjs';
+import type { components } from '@korekaite/api-contracts/http';
+import { validateQuery } from '@korekaite/api-contracts/http/validators';
 
 const interviews: components['schemas']['Interview'][] = [
   {

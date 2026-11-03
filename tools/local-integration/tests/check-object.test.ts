@@ -451,7 +451,7 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
   }
 }, 60_000);
 
-test('予定時刻前には通知せず、送信前に停止しても期限到来後のscheduledで配送する', async () => {
+test('遅延上限より先の通知は保留し、送信前の停止から期限到来後に回復する', async () => {
   const config = resolveRuntime({
     repositoryRoot,
     appEnv: 'test',
@@ -473,7 +473,7 @@ test('予定時刻前には通知せず、送信前に停止しても期限到�
     const accepted = await response.json();
     await runDatabaseCommand(config, [
       'execute',
-      `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Date.now() + 60_000} WHERE id = NEW.id; END;`,
+      `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Date.now() + 172_800_000} WHERE id = NEW.id; END;`,
     ]);
     const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',

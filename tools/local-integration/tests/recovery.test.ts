@@ -120,3 +120,57 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('送信済みで未実行の期限到来通知を並行scheduledで回復し、評価は一度だけ実行する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
+  let succeeded = false;
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ scenario: 'success' }),
+    });
+    expect(response.status).toBe(202);
+    const { jobId } = await response.json();
+    await expect
+      .poll(
+        async () => (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)).json(),
+        { timeout: 8_000, interval: 100 },
+      )
+      .toMatchObject({ message: { jobId } });
+    await runtime.stop();
+    await runDatabaseCommand(config, [
+      'execute',
+      `UPDATE job_outbox SET scheduled_at = 0, sent_at = 0 WHERE job_id = '${jobId}' AND operation = 'notify';`,
+    ]);
+    runtime = await startRuntime(config, 'dev');
+    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
+    const status = async () =>
+      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+    await expect
+      .poll(status, { timeout: 10_000, interval: 100 })
+      .toMatchObject({ status: 'completed', attemptCount: 1 });
+    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
+      INSERT INTO one SELECT COUNT(*) FROM job_attempts WHERE job_id = '${jobId}' AND finished_at IS NOT NULL;
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify' AND generation = 0 AND sent_at > 0;
+      INSERT INTO one SELECT COUNT(*) FROM jobs WHERE job_id = '${jobId}' AND status = 'completed' AND attempt_count = 1;
+      CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
+      INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

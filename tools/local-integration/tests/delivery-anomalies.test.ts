@@ -384,3 +384,90 @@ test('隔離済み配送は用途が後から一致しても評価を自動実�
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('実ローカルQueueとDLQは同じ異常分類で隔離し、元ジョブと正常な通知を維持する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const missingId = randomUUID();
+    const deletedId = randomUUID();
+    const mismatchId = randomUUID();
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      INSERT INTO deleted_jobs (job_id, deleted_at) VALUES ('${deletedId}', 1000);
+      INSERT INTO jobs (job_id, actor_id, purpose, status, accepted_at, updated_at) VALUES ('${mismatchId}', 'normal-owner', 'evaluation', 'pending', 1000, 1000);
+      INSERT INTO job_outbox (id, job_id, purpose, operation, generation, scheduled_at) VALUES ('${randomUUID()}', '${mismatchId}', 'evaluation', 'notify', 0, 1000);
+    `,
+    ]);
+    const bodies = [
+      { schemaVersion: 1, jobId: missingId },
+      { schemaVersion: 1, jobId: deletedId },
+      { schemaVersion: 1, jobId: mismatchId },
+      { schemaVersion: 1, jobId: mismatchId, extra: true },
+      { schemaVersion: 2, jobId: mismatchId },
+    ];
+    for (const kind of ['normal', 'dlq']) {
+      for (const body of bodies) {
+        const response = await fetch(
+          `${runtime.baseUrl}/api/evaluation-test?transport=queue&kind=${kind}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        expect(response.status).toBe(202);
+        expect(await response.json()).toEqual({ enqueued: true });
+      }
+    }
+    await expect
+      .poll(
+        async () => {
+          try {
+            await runDatabaseCommand(config, [
+              'execute',
+              `CREATE TEMP TABLE ten (count INTEGER CHECK (count = 10)); INSERT INTO ten SELECT COUNT(*) FROM delivery_anomalies;`,
+            ]);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 15_000, interval: 250 },
+      )
+      .toBe(true);
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE two (count INTEGER CHECK (count = 2));
+      INSERT INTO two SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'JOB_NOT_FOUND' AND job_id = '${missingId}';
+      INSERT INTO two SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'JOB_DELETED' AND job_id = '${deletedId}';
+      INSERT INTO two SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'JOB_PURPOSE_MISMATCH' AND job_id = '${mismatchId}' AND expected_purpose = 'diagnostics' AND observed_purpose = 'evaluation';
+      INSERT INTO two SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'INVALID_NOTIFICATION' AND job_id IS NULL;
+      INSERT INTO two SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'UNSUPPORTED_SCHEMA_VERSION' AND job_id IS NULL;
+      CREATE TEMP TABLE five (count INTEGER CHECK (count = 5));
+      INSERT INTO five SELECT COUNT(*) FROM delivery_anomalies WHERE queue_name = '${config.queues.diagnostics?.queue}';
+      INSERT INTO five SELECT COUNT(*) FROM delivery_anomalies WHERE queue_name = '${config.queues.diagnostics?.dlq}';
+      CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
+      INSERT INTO one SELECT COUNT(*) FROM jobs WHERE job_id = '${mismatchId}' AND purpose = 'evaluation' AND status = 'pending' AND attempt_count = 0 AND updated_at = 1000;
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE job_id = '${mismatchId}' AND purpose = 'evaluation' AND sent_at IS NULL;
+      CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
+      INSERT INTO zero SELECT COUNT(*) FROM job_attempts;
+      INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
+      INSERT INTO zero SELECT COUNT(*) FROM dlq_receipts;
+      INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

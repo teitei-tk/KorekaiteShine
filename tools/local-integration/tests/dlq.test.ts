@@ -282,3 +282,133 @@ test('DLQ保存失敗は受信記録とpassedを巻き戻してretryし、復旧
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
 }, 60_000);
+
+test('DLQが保存した回復通知を即時に通常Queueへ送り、scheduledなしで評価を再開する', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
+  let succeeded = false;
+  try {
+    const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ scenario: 'success' }),
+    });
+    expect(acceptedResponse.status).toBe(202);
+    const { jobId } = await acceptedResponse.json();
+    await expect
+      .poll(
+        async () => (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)).json(),
+        { timeout: 8_000, interval: 100 },
+      )
+      .toMatchObject({ message: { jobId } });
+    await runtime.stop();
+    // 最初の配送はprobeだけが受信。DO保存済み・未評価の状態から本Consumerへ引き継ぐ。
+    runtime = await startRuntime(config, 'dev');
+    const status = async () =>
+      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+    expect(await status()).toMatchObject({
+      status: 'pending',
+      attemptCount: 0,
+      checks: { doPersistence: 'passed' },
+    });
+    const response = await fetch(
+      `${runtime.baseUrl}/api/evaluation-test?transport=queue&kind=dlq`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemaVersion: 1, jobId }),
+      },
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ enqueued: true });
+    await expect.poll(status, { timeout: 10_000, interval: 100 }).toMatchObject({
+      status: 'completed',
+      attemptCount: 1,
+      checks: { doPersistence: 'passed', consumerCompletion: 'passed' },
+    });
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
+      INSERT INTO one SELECT COUNT(*) FROM dlq_receipts WHERE job_id = '${jobId}' AND observed_status = 'pending';
+      INSERT INTO one SELECT COUNT(*) FROM job_attempts WHERE job_id = '${jobId}';
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify' AND sent_at IS NOT NULL;
+      CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
+      INSERT INTO zero SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify_dlq';
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
+test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知保存後にackする', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ scenario: 'success' }),
+    });
+    expect(acceptedResponse.status).toBe(202);
+    const { jobId } = await acceptedResponse.json();
+    const notification = { schemaVersion: 1, jobId };
+    const start = Date.now();
+    const lease = async (operation: 'acquire' | 'recover', now: number) =>
+      (
+        await fetch(`${runtime.baseUrl}/api/lease-test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operation, notification, now }),
+        })
+      ).json();
+    expect(await lease('acquire', start)).toMatchObject({ attemptNumber: 1 });
+    const deliver = async (now: number) =>
+      (
+        await fetch(`${runtime.baseUrl}/api/evaluation-test?kind=dlq&now=${now}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(notification),
+        })
+      ).json();
+    expect(await deliver(start + 179_999)).toEqual({ action: 'ack' });
+    expect(await deliver(start + 180_000)).toEqual({ action: 'retry', delaySeconds: 30 });
+    expect(await deliver(start + 209_999)).toEqual({ action: 'retry', delaySeconds: 30 });
+    expect(await lease('recover', start + 209_999)).toBe(false);
+    expect(await lease('recover', start + 210_000)).toBe(true);
+    expect(await deliver(start + 210_000)).toEqual({ action: 'ack' });
+    await runDatabaseCommand(config, [
+      'execute',
+      `
+      CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
+      INSERT INTO one SELECT COUNT(*) FROM jobs WHERE job_id = '${jobId}' AND status = 'retry_wait' AND attempt_count = 1 AND next_attempt_at = ${start + 240_000} AND owner_token IS NULL;
+      INSERT INTO one SELECT COUNT(*) FROM dlq_receipts WHERE job_id = '${jobId}' AND observed_status = 'running';
+      INSERT INTO one SELECT COUNT(*) FROM dlq_receipts WHERE job_id = '${jobId}' AND observed_status = 'retry_wait';
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify' AND scheduled_at = ${start + 240_000};
+      CREATE TEMP TABLE two (count INTEGER CHECK (count = 2));
+      INSERT INTO two SELECT COUNT(*) FROM dlq_receipts;
+      CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
+      INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
+      INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
+    `,
+    ]);
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);

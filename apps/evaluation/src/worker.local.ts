@@ -52,7 +52,7 @@ export default {
         env.DB,
       );
       if (decision.action === 'ack') {
-        if (kind === 'normal' && validateJobNotification(message.body)) {
+        if (validateJobNotification(message.body)) {
           try {
             if (
               !(await isQuarantinedDelivery(createPrimaryDb(env.DB), {
@@ -64,6 +64,7 @@ export default {
                 jobId: message.body.jobId,
                 includeFuture: true,
                 expectedPurpose: 'diagnostics',
+                operation: kind === 'dlq' ? 'notify' : undefined,
               });
             }
           } catch {

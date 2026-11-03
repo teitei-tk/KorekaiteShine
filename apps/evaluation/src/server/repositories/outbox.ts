@@ -1,4 +1,17 @@
-import { and, asc, eq, inArray, isNull, isNotNull, lt, lte, notExists, or, sql } from 'void/db';
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  isNotNull,
+  lt,
+  lte,
+  notExists,
+  or,
+  sql,
+} from 'void/db';
 import { jobs, jobOutbox, deletedJobs } from '@korekaite/database';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { runnableJobStates } from '../../domain/job-state';
@@ -81,4 +94,38 @@ export async function ensureRecoveryNotification(
         lte(jobOutbox.scheduledAt, now),
       ),
     });
+}
+
+const notificationRecoveryGraceMs = 30_000;
+
+/** 配送直後の猶予を置き、実行されていない現世代の通知だけを再送待ちへ戻す。 */
+export async function recoverOverdueNotifications(db: Database, now: number): Promise<void> {
+  const threshold = now - notificationRecoveryGraceMs;
+  await db
+    .update(jobOutbox)
+    .set({ sentAt: null })
+    .where(
+      and(
+        eq(jobOutbox.operation, 'notify'),
+        isNotNull(jobOutbox.sentAt),
+        lte(jobOutbox.sentAt, threshold),
+        lte(jobOutbox.scheduledAt, threshold),
+        exists(
+          db
+            .select()
+            .from(jobs)
+            .where(
+              and(
+                eq(jobs.jobId, jobOutbox.jobId),
+                eq(jobs.purpose, jobOutbox.purpose),
+                eq(jobs.generation, jobOutbox.generation),
+                inArray(jobs.status, runnableJobStates),
+                lt(jobs.attemptCount, 4),
+                or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, threshold)),
+                notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
+              ),
+            ),
+        ),
+      ),
+    );
 }

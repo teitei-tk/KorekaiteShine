@@ -6,6 +6,15 @@ export const Route = createFileRoute('/api/evaluation-test')({
     handlers: {
       POST: async ({ request }) => {
         const query = new URL(request.url).searchParams;
+        if (query.get('transport') === 'queue') {
+          return Response.json(
+            await env.EVALUATION_PROBE.enqueueForTest(
+              await request.json(),
+              query.get('kind') === 'dlq' ? 'dlq' : 'normal',
+            ),
+            { status: 202 },
+          );
+        }
         const now = query.has('now') ? Number(query.get('now')) : undefined;
         if (now !== undefined && !Number.isSafeInteger(now))
           return new Response(null, { status: 400 });

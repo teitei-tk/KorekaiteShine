@@ -23,7 +23,12 @@ export interface RecoverySummary {
 }
 export async function dispatchNotifications(
   deps: NotificationDependencies,
-  options: { jobId?: string; includeFuture?: boolean; expectedPurpose?: JobPurpose } = {},
+  options: {
+    jobId?: string;
+    includeFuture?: boolean;
+    expectedPurpose?: JobPurpose;
+    operation?: 'notify' | 'notify_dlq';
+  } = {},
 ): Promise<RecoverySummary> {
   const db = createPrimaryDb(deps.database);
   const summary = { outboxSent: 0, outboxDeferred: 0 };
@@ -35,6 +40,7 @@ export async function dispatchNotifications(
   )) {
     if (options.expectedPurpose !== undefined && row.purpose !== options.expectedPurpose) continue;
     if (row.operation !== 'notify' && row.operation !== 'notify_dlq') continue;
+    if (options.operation !== undefined && row.operation !== options.operation) continue;
     try {
       const notification = { schemaVersion: 1, jobId: row.jobId };
       if (!validateJobNotification(notification)) throw new Error('通知契約が不正です。');

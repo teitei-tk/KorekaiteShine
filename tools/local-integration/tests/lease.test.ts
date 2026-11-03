@@ -311,7 +311,7 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     `,
     ]);
     runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-    await runtime.runScheduled();
+    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
     const status = await (
       await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
     ).json();
@@ -328,15 +328,28 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       'execute',
       `
       CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
-      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NULL;
+      INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
       INSERT INTO one SELECT COUNT(*) FROM job_attempts WHERE error_code = 'EXECUTION_LEASE_EXPIRED' AND finished_at IS NOT NULL;
       CREATE TEMP TABLE zero (count INTEGER CHECK (count = 0));
       INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
     `,
     ]);
+    await expect
+      .poll(
+        async () =>
+          (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json(),
+        { timeout: 40_000, interval: 250 },
+      )
+      .toMatchObject({ status: 'completed', attemptCount: 2 });
+    const completed = await (
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
+    ).json();
+    expect(Date.parse(completed.finishedAt)).toBeGreaterThanOrEqual(
+      Date.parse(status.nextAttemptAt),
+    );
     succeeded = true;
   } finally {
     await runtime.stop();
     if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
   }
-}, 60_000);
+}, 90_000);

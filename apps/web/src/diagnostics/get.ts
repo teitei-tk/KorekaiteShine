@@ -23,7 +23,9 @@ export async function getCheck(
   }
   try {
     const status = await findDiagnosticJob(deps, jobId);
-    if (!status) return errorResponse(requestId, 'JOB_NOT_FOUND', '対象ジョブが見つかりません。');
+    if (!status) {
+      return errorResponse(requestId, 'JOB_NOT_FOUND', '対象ジョブが見つかりません。');
+    }
     return Response.json(status, { headers });
   } catch (error) {
     if (!(error instanceof DiagnosticDatabaseError)) {

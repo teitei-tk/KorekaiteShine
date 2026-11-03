@@ -8,7 +8,9 @@ import { lockEnvironment } from './lock.ts';
 import { readDevelopmentSnapshot } from './development-snapshot.ts';
 
 async function main() {
-  if (process.argv.length !== 2) throw new Error('追加引数は受け付けません。');
+  if (process.argv.length !== 2) {
+    throw new Error('追加引数は受け付けません。');
+  }
   const config = resolveRuntime({
     repositoryRoot: fileURLToPath(new URL('../../../', import.meta.url)),
     appEnv: 'development',
@@ -24,7 +26,9 @@ async function main() {
     try {
       await writeFile(output, 'development-retained-v1', { flag: 'wx' });
     } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+      if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+        throw error;
+      }
     }
     assert.ok(
       (await readFile(output, 'utf8')) === 'development-retained-v1',

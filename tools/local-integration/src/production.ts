@@ -19,8 +19,9 @@ export async function buildProductionArtifacts(directory: string): Promise<strin
     recursive: true,
     filter: (source) => !source.endsWith('routeTree.gen.ts'),
   });
-  for (const name of ['package.json', 'tsconfig.json'])
+  for (const name of ['package.json', 'tsconfig.json']) {
     await cp(join(repositoryRoot, 'apps/web', name), join(project, name));
+  }
   await symlink(
     join(repositoryRoot, 'apps/web/node_modules'),
     join(project, 'node_modules'),
@@ -213,37 +214,47 @@ export async function verifyProductionArtifacts(
       audit.outputDirectory !== outputDirectory ||
       !audit.modules.length ||
       !audit.outputs.length
-    )
+    ) {
       throw new Error(`ビルド監査情報が不足しています: ${environment}`);
+    }
     for (const module of audit.modules) {
-      for (const id of [module.id, ...module.imports, ...module.dynamicImports])
-        if (forbiddenModule.test(id))
+      for (const id of [module.id, ...module.imports, ...module.dynamicImports]) {
+        if (forbiddenModule.test(id)) {
           throw new Error(`本番モジュールへ診断・検証コードが混入: ${id}`);
+        }
+      }
     }
     if (environment === 'interview' || environment === 'evaluation') {
       const entry = join(repositoryRoot, `apps/${environment}/src/worker.ts`);
-      if (!audit.modules.some((module) => module.id === entry))
+      if (!audit.modules.some((module) => module.id === entry)) {
         throw new Error(`本番入口を確認できません: ${environment}`);
+      }
     }
     const recorded = new Set(audit.outputs.map((output) => output.fileName));
     for (const entry of await readdir(outputDirectory, { recursive: true, withFileTypes: true })) {
-      if (entry.isDirectory()) continue;
+      if (entry.isDirectory()) {
+        continue;
+      }
       const fileName = relative(outputDirectory, join(entry.parentPath, entry.name));
-      if (!entry.isFile() || !recorded.has(fileName))
+      if (!entry.isFile() || !recorded.has(fileName)) {
         throw new Error(`未記録の本番配信物: ${fileName}`);
+      }
     }
     for (const output of audit.outputs) {
       const path = resolve(outputDirectory, output.fileName);
-      if (!path.startsWith(`${outputDirectory}/`))
+      if (!path.startsWith(`${outputDirectory}/`)) {
         throw new Error('出力先がビルドディレクトリ外です。');
+      }
       const content = await readFile(path);
-      if (createHash('sha256').update(content).digest('hex') !== output.sha256)
+      if (createHash('sha256').update(content).digest('hex') !== output.sha256) {
         throw new Error(`モジュール監査後に配信物が変更されています: ${path}`);
+      }
       if (
         output.modules.some((id) => forbiddenModule.test(id)) ||
         forbiddenContent.test(content.toString())
-      )
+      ) {
         throw new Error(`本番配信物へ診断コードが混入: ${path}`);
+      }
     }
     if (environment !== 'client') {
       const worker = environment === 'ssr' ? 'web' : environment;
@@ -256,30 +267,39 @@ export async function verifyProductionArtifacts(
         config.workers_dev !== false ||
         config.preview_urls !== false ||
         forbiddenContent.test(JSON.stringify(config))
-      )
+      ) {
         throw new Error(`本番Worker設定に不整合があります: ${environment}`);
+      }
       if (
         config.d1_databases.length !== 1 ||
         config.d1_databases[0]?.binding !== 'DB' ||
         config.d1_databases[0]?.database_id !== production.d1.id
-      )
+      ) {
         throw new Error(`本番共有D1設定に不整合があります: ${environment}`);
+      }
       const queueNames = new Set(Object.values(production.queues.evaluation));
-      for (const queue of [...config.queues.producers, ...config.queues.consumers])
-        if (!queueNames.has(queue.queue))
+      for (const queue of [...config.queues.producers, ...config.queues.consumers]) {
+        if (!queueNames.has(queue.queue)) {
           throw new Error(`本番以外のQueueが設定されています: ${environment}`);
-      if (config.durable_objects.bindings.length || config.services.length)
+        }
+      }
+      if (config.durable_objects.bindings.length || config.services.length) {
         throw new Error(`未実装の本番入口に検証用bindingがあります: ${environment}`);
+      }
     }
   }
   const routes = (await readdir(join(project, 'src/routes'))).sort();
-  if (JSON.stringify(routes) !== JSON.stringify(['__root.tsx', 'api.interviews.ts', 'index.tsx']))
+  if (JSON.stringify(routes) !== JSON.stringify(['__root.tsx', 'api.interviews.ts', 'index.tsx'])) {
     throw new Error('本番ルート走査対象に未確認のルートがあります。');
+  }
   const tree = await readFile(join(project, 'src/routeTree.gen.ts'), 'utf8');
-  if (forbiddenContent.test(tree) || tree.includes('diagnostics'))
+  if (forbiddenContent.test(tree) || tree.includes('diagnostics')) {
     throw new Error('本番ルートツリーに診断が混入しています。');
-  for (const route of routes)
-    if (!tree.includes(`'./routes/${route.replace(/\.tsx?$/u, '')}'`))
+  }
+  for (const route of routes) {
+    if (!tree.includes(`'./routes/${route.replace(/\.tsx?$/u, '')}'`)) {
       throw new Error(`生成ルートに不足があります: ${route}`);
+    }
+  }
   return { environments: [...environments], routes };
 }

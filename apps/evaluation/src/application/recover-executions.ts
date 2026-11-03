@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database } from '@cloudflare/workers-types';
 import { and, asc, eq, lte, notExists } from 'void/db';
 import { jobs, deletedJobs } from '@korekaite/database';
@@ -7,7 +8,7 @@ import { recoverExpiredExecution } from '../server/repositories/job-execution';
 
 export async function recoverExecutions(
   binding: D1Database,
-  now: () => number = Date.now,
+  now: () => number = () => Temporal.Now.instant().epochMilliseconds,
 ): Promise<void> {
   const db = createPrimaryDb(binding);
   const expired = await db

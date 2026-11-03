@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { diagnosticChecks } from '@korekaite/database';
@@ -14,16 +15,22 @@ export async function consumeDiagnostic(
   const db = createPrimaryDb(binding);
   return consumeJob(notification, context, {
     db,
-    now: () => Date.now(),
+    now: () => Temporal.Now.instant().epochMilliseconds,
     newId: () => crypto.randomUUID(),
     evaluate: async (jobId, attemptNumber, signal) => {
-      if (signal.aborted) throw new Error('評価は中止されました。');
+      if (signal.aborted) {
+        throw new Error('評価は中止されました。');
+      }
       const [check] = await db
         .select()
         .from(diagnosticChecks)
         .where(eq(diagnosticChecks.jobId, jobId));
-      if (!check) throw new Error('診断条件がありません。');
-      if (signal.aborted) throw new Error('評価は中止されました。');
+      if (!check) {
+        throw new Error('診断条件がありません。');
+      }
+      if (signal.aborted) {
+        throw new Error('評価は中止されました。');
+      }
       return evaluateDiagnostic(check.scenario, attemptNumber);
     },
   });

@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database, MessageBatch } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { createPrimaryDb } from '@korekaite/database/connection';
@@ -12,9 +13,12 @@ export async function consumeFormalForTest(
     EVALUATION_DLQ_NAME: string;
   },
 ): Promise<void> {
-  if (env.APP_ENV !== 'test') throw new Error('正式経路の架空評価はtest環境専用です。');
-  if (batch.queue !== env.EVALUATION_QUEUE_NAME && batch.queue !== env.EVALUATION_DLQ_NAME)
+  if (env.APP_ENV !== 'test') {
+    throw new Error('正式経路の架空評価はtest環境専用です。');
+  }
+  if (batch.queue !== env.EVALUATION_QUEUE_NAME && batch.queue !== env.EVALUATION_DLQ_NAME) {
     throw new Error('正式経路のQueueではありません。');
+  }
   for (const message of batch.messages) {
     const decision = await consumeJob(
       message.body,
@@ -26,12 +30,15 @@ export async function consumeFormalForTest(
       },
       {
         db: createPrimaryDb(env.DB),
-        now: () => Date.now(),
+        now: () => Temporal.Now.instant().epochMilliseconds,
         newId: () => crypto.randomUUID(),
         evaluate: async () => ({ ok: true, value: { summary: '正式経路の接続検証用の架空評価' } }),
       },
     );
-    if (decision.action === 'ack') message.ack();
-    else message.retry({ delaySeconds: decision.delaySeconds });
+    if (decision.action === 'ack') {
+      message.ack();
+    } else {
+      message.retry({ delaySeconds: decision.delaySeconds });
+    }
   }
 }

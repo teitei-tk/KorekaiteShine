@@ -10,7 +10,9 @@ export interface AttemptDependencies {
 }
 
 export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<boolean> {
-  if (deps.now() >= deps.deadline) return false;
+  if (deps.now() >= deps.deadline) {
+    return false;
+  }
   const controller = new AbortController();
   let stopped = false;
   let stop = () => controller.abort();
@@ -25,14 +27,22 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
   let saveRetryTimer: ReturnType<typeof setTimeout> | undefined;
   let endSaveWait: (() => void) | undefined;
   const renew = async () => {
-    if (stopped) return;
-    if (deps.now() >= deps.deadline) return stop();
+    if (stopped) {
+      return;
+    }
+    if (deps.now() >= deps.deadline) {
+      return stop();
+    }
     try {
-      if (!(await deps.renew())) return stop();
+      if (!(await deps.renew())) {
+        return stop();
+      }
     } catch {
       return stop();
     }
-    if (!stopped) heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+    if (!stopped) {
+      heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+    }
   };
   heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
   const deadlineTimer = setTimeout(stop, deps.deadline - deps.now());
@@ -50,7 +60,9 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
       try {
         return await deps.save(result);
       } catch {
-        if (stopped || deps.now() >= deps.deadline) return false;
+        if (stopped || deps.now() >= deps.deadline) {
+          return false;
+        }
         await new Promise<void>((resolve) => {
           endSaveWait = resolve;
           saveRetryTimer = setTimeout(

@@ -16,8 +16,9 @@ export const Route = createFileRoute('/api/evaluation-test')({
           );
         }
         const now = query.has('now') ? Number(query.get('now')) : undefined;
-        if (now !== undefined && !Number.isSafeInteger(now))
+        if (now !== undefined && !Number.isSafeInteger(now)) {
           return new Response(null, { status: 400 });
+        }
         return Response.json(
           await env.EVALUATION_PROBE.evaluate(
             await request.json(),

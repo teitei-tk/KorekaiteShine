@@ -51,8 +51,9 @@ async function prepareRuntime(
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck) &&
     config.environment !== 'test'
-  )
+  ) {
     throw new Error('初期化の保留は独立test環境だけで利用できます。');
+  }
   if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカル環境だけを起動できます。');
   }
@@ -72,9 +73,12 @@ async function prepareRuntime(
   try {
     await symlink(modulesSource, modulesTarget, 'dir');
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
-    if ((await readlink(modulesTarget)) !== modulesSource)
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+      throw error;
+    }
+    if ((await readlink(modulesTarget)) !== modulesSource) {
       throw new Error('Web依存の参照先が一致しません。');
+    }
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
   await writeFile(
@@ -89,10 +93,11 @@ export const Route = createFileRoute('/diagnostics')({ component: DiagnosticPage
 import { env, waitUntil } from 'cloudflare:workers';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { acceptCheck } from '../diagnostics/accept';
+import { Temporal } from '@js-temporal/polyfill';
 export const Route = createFileRoute('/api/diagnostics/check-jobs')({
   server: { handlers: { POST: ({ request }) => acceptCheck(request, {
     db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
-    actorId: 'local-developer', now: () => Date.now(), newId: () => crypto.randomUUID(),
+    actorId: 'local-developer', now: () => Temporal.Now.instant().epochMilliseconds, newId: () => crypto.randomUUID(),
     scheduleInitialization: ${options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
   }) } },
 });\n`,
@@ -103,10 +108,11 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs')({
 import { env } from 'cloudflare:workers';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { getCheck } from '../diagnostics/get';
+import { Temporal } from '@js-temporal/polyfill';
 export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   server: { handlers: { GET: ({ request, params }) => getCheck(request, params.jobId, {
     db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
-    actorId: 'local-developer', now: () => Date.now(), newId: () => crypto.randomUUID(),
+    actorId: 'local-developer', now: () => Temporal.Now.instant().epochMilliseconds, newId: () => crypto.randomUUID(),
   }) } },
 });\n`,
   );
@@ -158,7 +164,9 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     `export { default, CheckObject } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
   );
   const diagnostics = config.queues.diagnostics;
-  if (!diagnostics) throw new Error('ローカル診断Queueが未設定です。');
+  if (!diagnostics) {
+    throw new Error('ローカル診断Queueが未設定です。');
+  }
   const interview = {
     ...common,
     name: config.workers.interview,
@@ -363,7 +371,9 @@ async function startUnlockedRuntime(
         reject(new Error('ローカル起動を中断しました。'));
       };
       signal?.addEventListener('abort', onAbort, { once: true });
-      if (signal?.aborted) onAbort();
+      if (signal?.aborted) {
+        onAbort();
+      }
       const collect = (chunk: Buffer) => {
         output += chunk.toString();
         const found = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
@@ -390,8 +400,9 @@ async function startUnlockedRuntime(
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
     signal?.throwIfAborted();
-    if (child.exitCode !== null || child.signalCode !== null)
+    if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error('ローカルランタイムが起動確認中に終了しました。');
+    }
     return connectLocalRuntime(baseUrl, stop, config.workers.evaluation, closed);
   } catch (error) {
     try {
@@ -425,8 +436,9 @@ export async function startRuntimeInProcess(
       options.probeOnlyEvaluation ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck)
-  )
+  ) {
     throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
+  }
   const release = await lockEnvironment(config);
   try {
     const runtime = await startUnlockedRuntime(config, mode, options, signal);
@@ -444,7 +456,9 @@ export async function startRuntimeInProcess(
         await retry();
         release();
       };
-    } else release();
+    } else {
+      release();
+    }
     throw error;
   }
 }

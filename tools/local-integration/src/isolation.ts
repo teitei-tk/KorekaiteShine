@@ -76,7 +76,9 @@ export async function runIsolationIntegration(): Promise<string> {
     },
     async (evidence) => {
       evidence.cleanup(async (passed) => {
-        if (!passed) return;
+        if (!passed) {
+          return;
+        }
         for (const config of configs) {
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
@@ -98,7 +100,9 @@ export async function runIsolationIntegration(): Promise<string> {
         }),
       );
       const runtimes = started.map((result) => {
-        if (result.status === 'rejected') throw result.reason;
+        if (result.status === 'rejected') {
+          throw result.reason;
+        }
         return result.value;
       });
       const markers = [randomUUID(), randomUUID()];
@@ -133,7 +137,7 @@ export async function runIsolationIntegration(): Promise<string> {
       evidence.observe({ outputMarkersIsolated });
       assert.equal(outputMarkersIsolated, true);
       const jobId = randomUUID();
-      const now = Date.now();
+      const now = Temporal.Now.instant().epochMilliseconds;
       await Promise.all(
         configs.map((config, slot) =>
           runDatabaseCommand(config, [

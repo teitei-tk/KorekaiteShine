@@ -26,7 +26,9 @@ test('Webから別WorkerのDOを呼び、DOの保存値を読み戻せる', asyn
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -55,7 +57,9 @@ test('DB管理CLIと3 Workersが同じD1を読み書きできる', async () => {
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -76,7 +80,9 @@ test('ローカルランタイムからEvaluationのscheduledイベントを起�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -102,10 +108,14 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
   let succeeded = false;
   try {
     for (const result of started) {
-      if (result.status === 'rejected') throw result.reason;
+      if (result.status === 'rejected') {
+        throw result.reason;
+      }
     }
     for (const [index, result] of started.entries()) {
-      if (result.status !== 'fulfilled') throw new Error('起動に失敗しました。');
+      if (result.status !== 'fulfilled') {
+        throw new Error('起動に失敗しました。');
+      }
       await runDatabaseCommand(configs[index]!, [
         'execute',
         `INSERT INTO connection_checks (writer, value) VALUES ('isolated', '${index}')`,
@@ -132,7 +142,9 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
     await Promise.all(
       started.map((result) => (result.status === 'fulfilled' ? result.value.stop() : undefined)),
     );
-    if (succeeded) await rm(isolatedRoot, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(isolatedRoot, { recursive: true, force: true });
+    }
   }
 }, 120_000);
 
@@ -152,7 +164,9 @@ test('D1 batchの途中で一意制約違反が起きると全体がロールバ
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -175,7 +189,9 @@ test('VoidのDB接続でfirst-primaryを指定し、保存後の値を読み戻�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -201,7 +217,9 @@ test('停止後に同じ環境を再起動するとD1の保存値を維持する
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 120_000);
 
@@ -229,7 +247,9 @@ test('3 Workersのビルド済み成果物でもWeb・DO・共有D1が接続で�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 120_000);
 
@@ -267,7 +287,9 @@ test('明示したreset-seedだけが既存データを消して固定データ�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 120_000);
 
@@ -295,7 +317,9 @@ test('起動中の環境では別プロセスのreset-seedを拒否しデータ�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -330,6 +354,8 @@ test('生成したQueue検証コードを実Workerへimportし、入力を変換
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

@@ -19,7 +19,9 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
     parallelIndex: 0,
   });
   const queues = config.queues.diagnostics;
-  if (!queues) throw new Error('診断Queueがありません。');
+  if (!queues) {
+    throw new Error('診断Queueがありません。');
+  }
   await runWithEvidence(
     {
       resultPath: join(dirname(config.artifactDirectory), 'results.json'),
@@ -41,7 +43,9 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
     },
     async (evidence) => {
       evidence.cleanup(async (passed) => {
-        if (!passed) return;
+        if (!passed) {
+          return;
+        }
         await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });

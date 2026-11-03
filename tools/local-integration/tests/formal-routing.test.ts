@@ -36,14 +36,16 @@ test.each(['web', 'interview'] as const)(
       },
       async (evidence) => {
         evidence.cleanup(async (passed) => {
-          if (!passed) return;
+          if (!passed) {
+            return;
+          }
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
         const runtime = await startRuntime(config);
         evidence.cleanup(() => runtime.stop());
         const jobId = randomUUID();
-        const now = Date.now();
+        const now = Temporal.Now.instant().epochMilliseconds;
         await runDatabaseCommand(config, [
           'execute',
           `
@@ -133,14 +135,16 @@ test('正式DLQの受信をD1へ記録し、失敗済みの架空ジョブを再
     },
     async (evidence) => {
       evidence.cleanup(async (passed) => {
-        if (!passed) return;
+        if (!passed) {
+          return;
+        }
         await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
       const runtime = await startRuntime(config);
       evidence.cleanup(() => runtime.stop());
       const jobId = randomUUID();
-      const now = Date.now();
+      const now = Temporal.Now.instant().epochMilliseconds;
       await runDatabaseCommand(config, [
         'execute',
         `

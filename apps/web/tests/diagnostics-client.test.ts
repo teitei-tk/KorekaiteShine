@@ -43,8 +43,12 @@ test('202応答が失われても同じ冪等キーと入力で再送し、別�
     const idempotencyKey = request.headers.get('Idempotency-Key');
     keys.push(idempotencyKey);
     bodies.push(await request.json());
-    if (idempotencyKey) acceptedKeys.add(idempotencyKey);
-    if (++requests === 1) throw new TypeError('受付後に応答が失われました。');
+    if (idempotencyKey) {
+      acceptedKeys.add(idempotencyKey);
+    }
+    if (++requests === 1) {
+      throw new TypeError('受付後に応答が失われました。');
+    }
     return Response.json(accepted, { status: 202 });
   });
   const newId = vi.fn(() => key);

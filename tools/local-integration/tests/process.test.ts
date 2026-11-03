@@ -105,7 +105,9 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
     try {
       process.kill(-pid, 0);
     } catch (error) {
-      if (error instanceof Error && 'code' in error) code = String(error.code);
+      if (error instanceof Error && 'code' in error) {
+        code = String(error.code);
+      }
     }
     expect(code).toBe('ESRCH');
   } finally {

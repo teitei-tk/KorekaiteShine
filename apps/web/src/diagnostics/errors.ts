@@ -59,11 +59,18 @@ export function bodyValidationDetails(
         : error.keyword === 'additionalProperties'
           ? error.params.additionalProperty
           : undefined;
-    if (typeof property === 'string')
+    if (typeof property === 'string') {
       path += `/${property.replaceAll('~', '~0').replaceAll('/', '~1')}`;
-    if (error.keyword === 'required') code = 'REQUIRED';
-    if (error.keyword === 'additionalProperties') code = 'UNRECOGNIZED_FIELD';
-    if (error.keyword === 'pattern' || error.keyword === 'format') code = 'INVALID_FORMAT';
+    }
+    if (error.keyword === 'required') {
+      code = 'REQUIRED';
+    }
+    if (error.keyword === 'additionalProperties') {
+      code = 'UNRECOGNIZED_FIELD';
+    }
+    if (error.keyword === 'pattern' || error.keyword === 'format') {
+      code = 'INVALID_FORMAT';
+    }
     return { location: 'body', path, code, message: '入力項目を確認してください。' };
   });
 }

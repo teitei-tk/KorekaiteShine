@@ -39,7 +39,9 @@ test('同じ冪等キーの同時要求はローカルD1のジョブと初期化
         return body;
       }),
     );
-    for (const body of bodies) expect(body).toEqual(bodies[0]);
+    for (const body of bodies) {
+      expect(body).toEqual(bodies[0]);
+    }
     // 不成立時はCLIが失敗するCHECK制約で、HTTP応答だけでなく保存件数も検証する。
     await runDatabaseCommand(config, [
       'execute',
@@ -53,7 +55,9 @@ test('同じ冪等キーの同時要求はローカルD1のジョブと初期化
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -107,7 +111,9 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -152,7 +158,9 @@ test('受付済みジョブの状態を必須null項目と観測結果付きで�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -205,7 +213,9 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -238,7 +248,9 @@ test('同じキーと入力の逐次再送はJSONの空白によらず元の受�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -285,7 +297,9 @@ test('同じキーで異なるscenarioを送ると409となり元のジョブを
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -342,7 +356,9 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -396,7 +412,9 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -429,6 +447,8 @@ test('ヘッダー不正で本文を拒否した後も、次の要求へ契約�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

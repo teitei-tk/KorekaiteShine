@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { readAckStopHistoryForTest } from './ack-stop';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
@@ -32,15 +33,17 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   EVALUATION_DLQ: Queue<JobNotification>;
 }> {
   async enqueueFormalDlqForTest(notification: JobNotification) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification)) {
       throw new Error('テスト要求が不正です。');
+    }
     await this.env.EVALUATION_DLQ.send(notification);
     return { enqueued: true };
   }
 
   async readFormalDlq(jobId: string) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId }))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
+    }
     return createPrimaryDb(this.env.DB)
       .select({
         jobId: dlqReceipts.jobId,
@@ -53,13 +56,16 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   }
 
   async enqueueForTest(notification: JobNotification, kind: 'normal' | 'dlq') {
-    if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
+    if (this.env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
     await (kind === 'dlq' ? this.env.DIAGNOSTIC_DLQ : this.env.DIAGNOSTIC_QUEUE).send(notification);
     return { enqueued: true };
   }
   async acquireForTest(notification: JobNotification, now: number) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification)) {
       throw new Error('テスト要求が不正です。');
+    }
     return acquireExecution(
       createPrimaryDb(this.env.DB),
       notification.jobId,
@@ -69,8 +75,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     );
   }
   async recoverForTest(notification: JobNotification, now: number) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification)) {
       throw new Error('テスト要求が不正です。');
+    }
     return recoverExpiredExecution(
       createPrimaryDb(this.env.DB),
       notification.jobId,
@@ -80,11 +87,15 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     );
   }
   async renewForTest(lease: ExecutionLease, now: number) {
-    if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
+    if (this.env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
     return renewExecution(createPrimaryDb(this.env.DB), lease, now);
   }
   async completeForTest(lease: ExecutionLease, now: number) {
-    if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
+    if (this.env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
     return completeExecution(createPrimaryDb(this.env.DB), lease, { summary: '期限検証' }, now);
   }
   async evaluate(
@@ -94,7 +105,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     messageId?: string,
     kind: 'normal' | 'dlq' = 'normal',
   ) {
-    if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
+    if (this.env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
     const primary = createPrimaryDb(this.env.DB);
     return consumeJob(
       notification,
@@ -106,7 +119,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       },
       {
         db: primary,
-        now: () => now ?? Date.now(),
+        now: () => now ?? Temporal.Now.instant().epochMilliseconds,
         newId: () => crypto.randomUUID(),
         evaluate: async (jobId, attemptNumber) => {
           try {
@@ -115,15 +128,18 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
               value: String(attemptNumber),
             });
             if (hold) {
-              const deadline = Date.now() + 15_000;
+              const deadline = Temporal.Now.instant().epochMilliseconds + 15_000;
               for (;;) {
                 const [released] = await primary
                   .select()
                   .from(connectionChecks)
                   .where(eq(connectionChecks.writer, `release:${jobId}`));
-                if (released) break;
-                if (Date.now() >= deadline)
+                if (released) {
+                  break;
+                }
+                if (Temporal.Now.instant().epochMilliseconds >= deadline) {
                   throw new Error('テストの評価待機がタイムアウトしました。');
+                }
                 await new Promise((resolve) => setTimeout(resolve, 50));
               }
             }
@@ -131,7 +147,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
               .select()
               .from(diagnosticChecks)
               .where(eq(diagnosticChecks.jobId, jobId));
-            if (!check) throw new Error('診断条件がありません。');
+            if (!check) {
+              throw new Error('診断条件がありません。');
+            }
             return evaluateDiagnostic(check.scenario, attemptNumber);
           } catch (error) {
             console.error(
@@ -159,8 +177,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   }
 
   async readFormalJob(jobId: string) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId }))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
+    }
     const [job] = await createPrimaryDb(this.env.DB)
       .select({
         jobId: jobs.jobId,
@@ -178,8 +197,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   }
 
   async readDispatchState(jobId: string) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId }))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
+    }
     const primary = createPrimaryDb(this.env.DB);
     const rows = await primary.select().from(jobOutbox).where(eq(jobOutbox.jobId, jobId));
     const notifications = rows.filter((row) => row.operation === 'notify');
@@ -196,8 +216,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   }
 
   async readInitializationPersistence(jobId: string) {
-    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId }))
+    if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
+    }
     const [row] = await createPrimaryDb(this.env.DB)
       .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
       .from(diagnosticChecks)
@@ -206,7 +227,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   }
 
   async readAcceptanceCounts() {
-    if (this.env.APP_ENV !== 'test') throw new Error('テスト環境専用です。');
+    if (this.env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
     const primary = createPrimaryDb(this.env.DB);
     const jobRows = await primary.select({ id: jobs.jobId }).from(jobs);
     const requestRows = await primary
@@ -220,8 +243,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       this.env.APP_ENV !== 'test' ||
       typeof jobId !== 'string' ||
       !validateJobNotification({ schemaVersion: 1, jobId })
-    )
+    ) {
       throw new Error('テスト要求が不正です。');
+    }
     return createPrimaryDb(this.env.DB)
       .select({
         attemptNumber: jobAttempts.attemptNumber,
@@ -247,7 +271,9 @@ export async function recordQueueDelivery(batch: {
 }) {
   for (const message of batch.messages) {
     // 不正通知の判断は業務Consumerへ委ね、probeは本文を保存しない。
-    if (!validateJobNotification(message.body)) continue;
+    if (!validateJobNotification(message.body)) {
+      continue;
+    }
     if (message.attempts !== undefined) {
       await db
         .insert(connectionChecks)
@@ -256,7 +282,7 @@ export async function recordQueueDelivery(batch: {
           value: JSON.stringify({
             messageId: message.id,
             attempt: message.attempts,
-            receivedAt: Date.now(),
+            receivedAt: Temporal.Now.instant().epochMilliseconds,
           }),
         })
         .onConflictDoNothing();
@@ -280,7 +306,9 @@ export default {
     messages: { id: string; body: JobNotification; ack(): void }[];
   }) {
     await recordQueueDelivery(batch);
-    for (const message of batch.messages) message.ack();
+    for (const message of batch.messages) {
+      message.ack();
+    }
   },
   async scheduled(controller: { cron: string }) {
     await db
@@ -291,6 +319,10 @@ export default {
 };
 
 export async function holdBeforeEvaluationForTest(env: { APP_ENV: string }): Promise<never> {
-  if (env.APP_ENV !== 'test') throw new Error('評価前の停止はtest環境専用です。');
-  for (;;) await new Promise((resolve) => setTimeout(resolve, 60_000));
+  if (env.APP_ENV !== 'test') {
+    throw new Error('評価前の停止はtest環境専用です。');
+  }
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, 60_000));
+  }
 }

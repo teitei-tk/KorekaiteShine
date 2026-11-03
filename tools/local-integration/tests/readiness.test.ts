@@ -16,7 +16,9 @@ test('起動確認のHTTP本文が終わらない場合も期限内に失敗し�
   await once(server, 'listening');
   try {
     const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('TCPポートがありません。');
+    if (!address || typeof address === 'string') {
+      throw new Error('TCPポートがありません。');
+    }
     const started = performance.now();
     await expect(confirmHttpReady(`http://127.0.0.1:${address.port}`, 100)).rejects.toThrow();
     expect(performance.now() - started).toBeLessThan(2000);

@@ -48,7 +48,9 @@ test('評価枠・試行履歴・配送異常・削除記録を保存し、各�
     ]);
     succeeded = true;
   } finally {
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -91,7 +93,9 @@ test('ジョブの試行回数と履歴番号は規定範囲の整数だけを�
     ]);
     succeeded = true;
   } finally {
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -138,6 +142,8 @@ test('CHECK制約を加えるテーブル置換SQLは既存ジョブと関連行
     ]);
     succeeded = true;
   } finally {
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

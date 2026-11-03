@@ -24,6 +24,8 @@ export async function lockEnvironment(config: RuntimeConfig): Promise<() => void
   }
   // 接続終了・プロセス終了でロックが解放される。PIDファイルの手動削除は不要。
   return () => {
-    if (lock?.isOpen) lock.close();
+    if (lock?.isOpen) {
+      lock.close();
+    }
   };
 }

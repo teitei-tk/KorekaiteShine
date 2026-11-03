@@ -64,7 +64,9 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -108,16 +110,20 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
       .toBe(true);
     const waiting = await status();
     expect(waiting).toMatchObject({ status: 'retry_wait', attemptCount: 1 });
-    const nextAttemptAt = Date.parse(waiting.nextAttemptAt);
+    const nextAttemptAt = Temporal.Instant.from(waiting.nextAttemptAt).epochMilliseconds;
     await expect
       .poll(status, { timeout: 40_000, interval: 250 })
       .toMatchObject({ status: 'completed', attemptCount: 2 });
     const completed = await status();
-    expect(Date.parse(completed.finishedAt)).toBeGreaterThanOrEqual(nextAttemptAt);
+    expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
+      nextAttemptAt,
+    );
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -171,6 +177,8 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

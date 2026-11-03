@@ -17,7 +17,9 @@ export async function classifyDelivery(
     .select()
     .from(deletedJobs)
     .where(eq(deletedJobs.jobId, notification.jobId));
-  if (deleted) return { kind: 'deleted' };
+  if (deleted) {
+    return { kind: 'deleted' };
+  }
   const [job] = await db.select().from(jobs).where(eq(jobs.jobId, notification.jobId));
   return job ? { kind: 'job', job } : { kind: 'missing' };
 }

@@ -12,11 +12,12 @@ export const Route = createFileRoute('/api/primary-topology')({
         // 実bindingに渡る制約を観測する。セッションやDB実行は置き換えない。
         const observed = new Proxy(env.DB, {
           get(target, property, receiver) {
-            if (property === 'withSession')
+            if (property === 'withSession') {
               return (constraint: string) => {
                 constraints.push(constraint);
                 return target.withSession(constraint);
               };
+            }
             return Reflect.get(target, property, receiver);
           },
         });

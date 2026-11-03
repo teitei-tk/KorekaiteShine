@@ -26,7 +26,9 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     expect(config.name).toBe('korekaite-web-prod');
     succeeded = true;
   } finally {
-    if (succeeded) await rm(directory, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }, 90_000);
 
@@ -41,7 +43,9 @@ test('監査記録にない配信ファイルを後から追加した場合も�
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('未記録の本番配信物');
     succeeded = true;
   } finally {
-    if (succeeded) await rm(directory, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }, 90_000);
 
@@ -113,7 +117,9 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
     }
     succeeded = true;
   } finally {
-    if (succeeded) await rm(directory, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }, 90_000);
 
@@ -145,6 +151,8 @@ test('3 Workersの本番入口へ診断importを混入させると、未使用�
     }
     succeeded = true;
   } finally {
-    if (succeeded) await rm(directory, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
   }
 }, 90_000);

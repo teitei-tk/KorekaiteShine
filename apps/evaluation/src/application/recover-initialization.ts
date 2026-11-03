@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { and, asc, eq, isNull, lte, notExists, or } from 'void/db';
 import { jobs, jobOutbox, deletedJobs } from '@korekaite/database';
 import { createPrimaryDb } from '@korekaite/database/connection';
@@ -6,7 +7,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 export async function recoverInitializations(
   binding: D1Database,
   initialize: (jobId: string) => Promise<void>,
-  now: () => number = Date.now,
+  now: () => number = () => Temporal.Now.instant().epochMilliseconds,
 ): Promise<void> {
   const db = createPrimaryDb(binding);
   const pending = await db

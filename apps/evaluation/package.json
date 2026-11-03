@@ -6,6 +6,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",
     "void": "1.4.0"

@@ -25,7 +25,7 @@ test('DLQ確認の初回変更と公開更新日時を一体保存し、保存�
     });
     expect(response.status).toBe(202);
     const { jobId } = await response.json();
-    const failedAt = Date.now();
+    const failedAt = Temporal.Now.instant().epochMilliseconds;
     const receivedAt = failedAt + 1000;
     const messageId = randomUUID();
     await runDatabaseCommand(config, [
@@ -48,25 +48,35 @@ test('DLQ確認の初回変更と公開更新日時を一体保存し、保存�
       (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
     expect(await deliver(receivedAt)).toEqual({ action: 'retry', delaySeconds: 30 });
     expect(await status()).toMatchObject({
-      updatedAt: new Date(failedAt).toISOString(),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(failedAt).toString({
+        fractionalSecondDigits: 3,
+      }),
       checks: { dlqReceipt: 'pending' },
     });
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_confirmation;']);
     expect(await deliver(receivedAt)).toEqual({ action: 'ack' });
     expect(await status()).toMatchObject({
-      updatedAt: new Date(receivedAt).toISOString(),
-      finishedAt: new Date(failedAt).toISOString(),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(receivedAt).toString({
+        fractionalSecondDigits: 3,
+      }),
+      finishedAt: Temporal.Instant.fromEpochMilliseconds(failedAt).toString({
+        fractionalSecondDigits: 3,
+      }),
       checks: { dlqReceipt: 'passed' },
     });
     expect(await deliver(receivedAt + 1000)).toEqual({ action: 'ack' });
     expect(await status()).toMatchObject({
-      updatedAt: new Date(receivedAt).toISOString(),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(receivedAt).toString({
+        fractionalSecondDigits: 3,
+      }),
       checks: { dlqReceipt: 'passed' },
     });
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -87,7 +97,7 @@ test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受�
     });
     expect(acceptedResponse.status).toBe(202);
     const { jobId } = await acceptedResponse.json();
-    const start = Date.now();
+    const start = Temporal.Now.instant().epochMilliseconds;
     for (const offset of [0, 30_000, 150_000, 450_000]) {
       const response = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${start + offset}`, {
         method: 'POST',
@@ -128,7 +138,9 @@ test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -170,7 +182,9 @@ test('完了・取消済みのDLQ通知は状態を変えず受信記録を保�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -225,7 +239,9 @@ test('DLQは有効な実行権と未来の通知を維持し、受信だけ記�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -277,7 +293,9 @@ test('回復経路のない未完了ジョブのDLQは通知待ちを保存し�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -341,7 +359,9 @@ test('DLQ保存失敗は受信記録とpassedを巻き戻してretryし、復旧
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -407,7 +427,9 @@ test('DLQが保存した回復通知を即時に通常Queueへ送り、scheduled
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -429,7 +451,7 @@ test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知�
     expect(acceptedResponse.status).toBe(202);
     const { jobId } = await acceptedResponse.json();
     const notification = { schemaVersion: 1, jobId };
-    const start = Date.now();
+    const start = Temporal.Now.instant().epochMilliseconds;
     const lease = async (operation: 'acquire' | 'recover', now: number) =>
       (
         await fetch(`${runtime.baseUrl}/api/lease-test`, {
@@ -471,6 +493,8 @@ test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

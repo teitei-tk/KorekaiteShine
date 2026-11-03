@@ -52,7 +52,9 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -95,7 +97,9 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -127,7 +131,7 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
       });
       expect(initialized.status).toBe(200);
       const stored = await initialized.json();
-      const firstReceivedAt = Date.parse(stored.firstReceivedAt);
+      const firstReceivedAt = Temporal.Instant.from(stored.firstReceivedAt).epochMilliseconds;
       expect(Number.isFinite(firstReceivedAt)).toBe(true);
       const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
       expect((await status.json()).checks.doPersistence).toBe('passed');
@@ -144,7 +148,9 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -179,7 +185,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
       "CREATE TRIGGER reject_notification BEFORE INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_outbox_failure'); END;",
     ]);
     expect((await initialize()).status).toBe(500);
-    const failureObservedAt = Date.now();
+    const failureObservedAt = Temporal.Now.instant().epochMilliseconds;
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -201,9 +207,11 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     expect(recovered.status).toBe(200);
     const saved = await recovered.json();
     expect(saved.jobId).toBe(accepted.jobId);
-    expect(Date.parse(saved.firstReceivedAt)).toBeLessThanOrEqual(failureObservedAt);
-    expect(Date.parse(saved.firstReceivedAt)).toBeGreaterThanOrEqual(
-      Date.parse(accepted.acceptedAt),
+    expect(Temporal.Instant.from(saved.firstReceivedAt).epochMilliseconds).toBeLessThanOrEqual(
+      failureObservedAt,
+    );
+    expect(Temporal.Instant.from(saved.firstReceivedAt).epochMilliseconds).toBeGreaterThanOrEqual(
+      Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds,
     );
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     expect((await status.json()).checks.doPersistence).toBe('passed');
@@ -214,7 +222,9 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -245,14 +255,16 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     });
     expect(initialized.status).toBe(200);
     let receipt = null;
-    const deadline = Date.now() + 5_000;
-    while (Date.now() < deadline) {
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
       receipt = await observed.json();
-      if (receipt !== null) break;
+      if (receipt !== null) {
+        break;
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     expect(receipt).toEqual({
@@ -269,7 +281,9 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -291,14 +305,16 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
     expect(response.status).toBe(202);
     const accepted = await response.json();
     let receipt = null;
-    const deadline = Date.now() + 5_000;
-    while (Date.now() < deadline) {
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
       receipt = await observed.json();
-      if (receipt !== null) break;
+      if (receipt !== null) {
+        break;
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     expect(receipt).toEqual({
@@ -310,7 +326,9 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -338,12 +356,14 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtime.runScheduled();
     let receipt = null;
-    const deadline = Date.now() + 5_000;
-    while (Date.now() < deadline) {
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    while (Temporal.Now.instant().epochMilliseconds < deadline) {
       receipt = await (
         await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`)
       ).json();
-      if (receipt !== null) break;
+      if (receipt !== null) {
+        break;
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     expect(receipt).toEqual({
@@ -365,7 +385,9 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -447,7 +469,9 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -473,7 +497,7 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
     const accepted = await response.json();
     await runDatabaseCommand(config, [
       'execute',
-      `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Date.now() + 172_800_000} WHERE id = NEW.id; END;`,
+      `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Temporal.Now.instant().epochMilliseconds + 172_800_000} WHERE id = NEW.id; END;`,
     ]);
     const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
@@ -528,6 +552,8 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

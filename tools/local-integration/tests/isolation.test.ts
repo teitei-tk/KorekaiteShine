@@ -17,7 +17,9 @@ test('開発DBを保持しながら並列test二環境のD1・DO・Queue・出�
             )
           ).mtimeMs;
         } catch (error) {
-          if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
+          if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+            return null;
+          }
           throw error;
         }
       }),

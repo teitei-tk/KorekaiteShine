@@ -33,7 +33,9 @@ export const Route = createFileRoute('/api/obsolete-test')({
   server: { handlers: { GET: () => new Response('obsolete-route') } },
 });\n`,
       );
-      if (mode === 'preview') await buildRuntime(config);
+      if (mode === 'preview') {
+        await buildRuntime(config);
+      }
       runtime = await startRuntime(config, mode);
       const response = await fetch(`${runtime.baseUrl}/api/obsolete-test`);
       expect(response.status, mode).toBe(404);
@@ -47,6 +49,8 @@ export const Route = createFileRoute('/api/obsolete-test')({
     succeeded = true;
   } finally {
     await runtime?.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 120_000);

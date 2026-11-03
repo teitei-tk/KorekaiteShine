@@ -38,17 +38,27 @@ export async function dispatchNotifications(
     horizon,
     options.jobId,
   )) {
-    if (options.expectedPurpose !== undefined && row.purpose !== options.expectedPurpose) continue;
-    if (row.operation !== 'notify' && row.operation !== 'notify_dlq') continue;
-    if (options.operation !== undefined && row.operation !== options.operation) continue;
+    if (options.expectedPurpose !== undefined && row.purpose !== options.expectedPurpose) {
+      continue;
+    }
+    if (row.operation !== 'notify' && row.operation !== 'notify_dlq') {
+      continue;
+    }
+    if (options.operation !== undefined && row.operation !== options.operation) {
+      continue;
+    }
     try {
       const notification = { schemaVersion: 1, jobId: row.jobId };
-      if (!validateJobNotification(notification)) throw new Error('通知契約が不正です。');
+      if (!validateJobNotification(notification)) {
+        throw new Error('通知契約が不正です。');
+      }
       const delaySeconds = Math.max(
         0,
         Math.ceil((Math.max(row.scheduledAt, nextAttemptAt ?? 0) - deps.now()) / 1_000),
       );
-      if (delaySeconds > maximumQueueDelaySeconds) continue;
+      if (delaySeconds > maximumQueueDelaySeconds) {
+        continue;
+      }
       await deps.sendNotification(row.purpose, row.operation, notification, delaySeconds);
       await markNotificationSent(db, row.id, deps.now());
       summary.outboxSent++;

@@ -11,10 +11,13 @@ async function dependency(name: string, from: string): Promise<{ path: string; v
     try {
       const path = await realpath(join(directory, name, 'package.json'));
       const manifest = JSON.parse(await readFile(path, 'utf8'));
-      if (manifest.name === name && typeof manifest.version === 'string')
+      if (manifest.name === name && typeof manifest.version === 'string') {
         return { path, version: manifest.version };
+      }
     } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
     }
   }
   throw new Error('DEPENDENCY_VERSION_NOT_FOUND');

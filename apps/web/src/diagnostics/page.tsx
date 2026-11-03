@@ -23,7 +23,9 @@ export function DiagnosticPage() {
   const inFlight = useRef(false);
 
   async function submit(newRun: boolean) {
-    if (!ready || inFlight.current) return;
+    if (!ready || inFlight.current) {
+      return;
+    }
     inFlight.current = true;
     setBusy(true);
     setError('');
@@ -33,7 +35,9 @@ export function DiagnosticPage() {
         setAccepted(null);
         setResult(null);
       }
-      if (!run.current) return;
+      if (!run.current) {
+        return;
+      }
       setAccepted(await run.current.start());
     } catch (cause) {
       if (cause instanceof DiagnosticValidationError && cause.code === 'VALIDATION_ERROR') {
@@ -51,7 +55,9 @@ export function DiagnosticPage() {
   }
 
   async function refresh() {
-    if (!ready || inFlight.current || !accepted) return;
+    if (!ready || inFlight.current || !accepted) {
+      return;
+    }
     inFlight.current = true;
     setBusy(true);
     setError('');
@@ -85,8 +91,13 @@ export function DiagnosticPage() {
         disabled={!ready || busy}
         onChange={(event) => {
           const value = event.target.value;
-          if (value === 'success' || value === 'retry_then_success' || value === 'exhaust_retries')
+          if (
+            value === 'success' ||
+            value === 'retry_then_success' ||
+            value === 'exhaust_retries'
+          ) {
             setScenario(value);
+          }
         }}
       >
         <option value="success">{scenarioLabels.success}</option>

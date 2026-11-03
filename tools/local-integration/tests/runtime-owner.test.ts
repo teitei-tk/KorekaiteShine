@@ -28,7 +28,9 @@ function killOwned(pid: number): void {
   try {
     process.kill(pid, 'SIGKILL');
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+    if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) {
+      throw error;
+    }
   }
 }
 
@@ -70,12 +72,20 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
     const tree = new Set([launcher.pid!]);
     for (let previous = -1; previous !== tree.size;) {
       previous = tree.size;
-      for (const row of rows) if (tree.has(row.parent)) tree.add(row.pid);
+      for (const row of rows) {
+        if (tree.has(row.parent)) {
+          tree.add(row.pid);
+        }
+      }
     }
     for (const row of rows) {
-      if (row.pid === launcher.pid || !tree.has(row.pid)) continue;
+      if (row.pid === launcher.pid || !tree.has(row.pid)) {
+        continue;
+      }
       descendants.add(row.pid);
-      if (row.pid === row.group) groups.add(row.group);
+      if (row.pid === row.group) {
+        groups.add(row.group);
+      }
     }
     expect(groups.size).toBeGreaterThan(0);
     await expect(lockEnvironment(config)).rejects.toThrow('環境は使用中です');
@@ -87,7 +97,9 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
       try {
         release = await lockEnvironment(config);
       } catch (error) {
-        if (!(error instanceof Error && error.message.includes('環境は使用中です'))) throw error;
+        if (!(error instanceof Error && error.message.includes('環境は使用中です'))) {
+          throw error;
+        }
       }
       if (release) {
         try {
@@ -114,7 +126,9 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
       .toEqual([]);
     succeeded = true;
   } finally {
-    if (launcher.exitCode === null && launcher.signalCode === null) launcher.kill('SIGKILL');
+    if (launcher.exitCode === null && launcher.signalCode === null) {
+      launcher.kill('SIGKILL');
+    }
     await exited;
     for (const group of groups) {
       killOwned(-group);
@@ -124,7 +138,9 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
         killOwned(row.pid);
       }
     }
-    if (succeeded) await rm(repositoryRoot, { recursive: true, force: true });
+    if (succeeded) {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
   }
 }, 90_000);
 
@@ -162,12 +178,20 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
     const tree = new Set([launcher.pid!]);
     for (let previous = -1; previous !== tree.size;) {
       previous = tree.size;
-      for (const row of rows) if (tree.has(row.parent)) tree.add(row.pid);
+      for (const row of rows) {
+        if (tree.has(row.parent)) {
+          tree.add(row.pid);
+        }
+      }
     }
     for (const row of rows) {
-      if (row.pid === launcher.pid || !tree.has(row.pid)) continue;
+      if (row.pid === launcher.pid || !tree.has(row.pid)) {
+        continue;
+      }
       descendants.add(row.pid);
-      if (row.pid === row.group) groups.add(row.group);
+      if (row.pid === row.group) {
+        groups.add(row.group);
+      }
     }
     expect(groups.size).toBeGreaterThan(0);
     await expect(lockEnvironment(config)).rejects.toThrow('環境は使用中です');
@@ -189,12 +213,20 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
     release();
     succeeded = true;
   } finally {
-    if (launcher.exitCode === null && launcher.signalCode === null) launcher.kill('SIGKILL');
-    await exited;
-    for (const group of groups) killOwned(-group);
-    for (const row of await processTable()) {
-      if (descendants.has(row.pid) && !row.state.startsWith('Z')) killOwned(row.pid);
+    if (launcher.exitCode === null && launcher.signalCode === null) {
+      launcher.kill('SIGKILL');
     }
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    await exited;
+    for (const group of groups) {
+      killOwned(-group);
+    }
+    for (const row of await processTable()) {
+      if (descendants.has(row.pid) && !row.state.startsWith('Z')) {
+        killOwned(row.pid);
+      }
+    }
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 90_000);

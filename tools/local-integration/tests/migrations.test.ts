@@ -60,7 +60,9 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
     }
     succeeded = true;
   } finally {
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -135,6 +137,8 @@ test('失敗したmigrationは変更と履歴を残さず、修正後に再適�
     );
     succeeded = true;
   } finally {
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

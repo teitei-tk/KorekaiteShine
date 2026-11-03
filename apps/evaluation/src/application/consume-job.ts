@@ -40,7 +40,9 @@ export async function consumeJob(
 ): Promise<DeliveryDecision> {
   const retry = { action: 'retry', delaySeconds: 30 } as const;
   try {
-    if (await refreshRecordedAnomaly(deps.db, context, deps.now())) return { action: 'ack' };
+    if (await refreshRecordedAnomaly(deps.db, context, deps.now())) {
+      return { action: 'ack' };
+    }
     if (!validateJobNotification(notification)) {
       const unsupportedVersion = validateJobNotification.errors?.some(
         (error) => error.instancePath === '/schemaVersion' && error.keyword === 'const',
@@ -87,7 +89,9 @@ export async function consumeJob(
       );
       return { action: 'ack' };
     }
-    if (context.kind === 'dlq') return await consumeDlq(notification, context, deps);
+    if (context.kind === 'dlq') {
+      return await consumeDlq(notification, context, deps);
+    }
     const lease = await acquireExecution(
       deps.db,
       notification.jobId,
@@ -95,7 +99,7 @@ export async function consumeJob(
       deps.newId(),
       deps.now(),
     );
-    if (!lease)
+    if (!lease) {
       return (await isTerminalJob(deps.db, notification.jobId, context.expectedPurpose)) ||
         (await hasActiveExecution(
           deps.db,
@@ -112,6 +116,7 @@ export async function consumeJob(
         ))
         ? { action: 'ack' }
         : retry;
+    }
     const saved = await runEvaluationAttempt({
       now: deps.now,
       deadline: lease.deadline,

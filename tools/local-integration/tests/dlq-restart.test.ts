@@ -39,7 +39,9 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
     },
     async (evidence) => {
       evidence.cleanup(async (passed) => {
-        if (!passed) return;
+        if (!passed) {
+          return;
+        }
         await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
@@ -59,7 +61,7 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
       expect(accepted.status).toBe(202);
       const { jobId } = await accepted.json();
       const formalId = randomUUID();
-      const now = Date.now();
+      const now = Temporal.Now.instant().epochMilliseconds;
       const oldSentAt = now - 60_000;
       const protectedIds = Array.from({ length: 5 }, () => randomUUID());
       const [received, wrongPurpose, staleGeneration, deleted, future] = protectedIds;
@@ -117,7 +119,7 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
       evidence.observe({
         beforeRestart: { queues: [diagnosticQueue, formalQueue], sentWithoutReceiptVerified: true },
       });
-      const stoppedAt = Date.now();
+      const stoppedAt = Temporal.Now.instant().epochMilliseconds;
       await runtime.stop();
       runtime = undefined;
       runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });

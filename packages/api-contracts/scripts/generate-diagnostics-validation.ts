@@ -54,7 +54,9 @@ for (const [name, operationId, location, parameter] of [
     (candidate: { in: string; name: string }) =>
       candidate.in === location && candidate.name === parameter,
   );
-  if (!entry) throw new Error(`契約に${parameter}がありません。`);
+  if (!entry) {
+    throw new Error(`契約に${parameter}がありません。`);
+  }
   add(
     name,
     entry.schema,

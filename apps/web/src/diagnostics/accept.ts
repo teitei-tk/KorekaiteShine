@@ -36,7 +36,9 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   }
   let input;
   try {
-    if (body === null) throw new Error('本文を読み取れませんでした。');
+    if (body === null) {
+      throw new Error('本文を読み取れませんでした。');
+    }
     input = JSON.parse(body);
   } catch {
     return validationResponse(requestId, [
@@ -53,12 +55,13 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   }
   try {
     const accepted = await acceptDiagnosticJob(deps, key, input);
-    if (accepted === 'conflict')
+    if (accepted === 'conflict') {
       return errorResponse(
         requestId,
         'IDEMPOTENCY_KEY_CONFLICT',
         '同じ冪等キーが異なる入力で使用されています。',
       );
+    }
     try {
       deps.scheduleInitialization?.(accepted.jobId);
     } catch {

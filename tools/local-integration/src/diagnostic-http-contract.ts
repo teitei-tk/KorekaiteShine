@@ -55,11 +55,15 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
       },
       async (evidence) => {
         evidence.cleanup(async (passed) => {
-          if (!passed) return;
+          if (!passed) {
+            return;
+          }
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
-        if (mode === 'preview') await buildRuntime(config);
+        if (mode === 'preview') {
+          await buildRuntime(config);
+        }
         const runtime = await startRuntime(config, mode);
         evidence.cleanup(() => runtime.stop());
         const cases: { name: string; status: number; noStore: boolean; contractValid: boolean }[] =
@@ -188,7 +192,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
           assert.ok(!JSON.stringify(failure.body).includes('Invalid time value'));
           failure.row.contractValid = true;
         }
-        const acceptedAt = Date.parse(accepted.body.acceptedAt);
+        const acceptedAt = Temporal.Instant.from(accepted.body.acceptedAt).epochMilliseconds;
         assert.ok(Number.isFinite(acceptedAt));
         await runDatabaseCommand(config, [
           'execute',

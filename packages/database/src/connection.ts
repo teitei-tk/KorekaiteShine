@@ -8,7 +8,9 @@ export function createPrimaryDb(binding: D1Database): ReturnType<typeof createDb
   return createDb(
     new Proxy(binding, {
       get(target, property, receiver) {
-        if (property === 'withSession') return () => target.withSession('first-primary');
+        if (property === 'withSession') {
+          return () => target.withSession('first-primary');
+        }
         return Reflect.get(target, property, receiver);
       },
     }),

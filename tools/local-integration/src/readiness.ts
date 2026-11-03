@@ -9,5 +9,7 @@ export async function confirmHttpReady(
     signal: signal ? AbortSignal.any([timeout, signal]) : timeout,
   });
   await response.arrayBuffer();
-  if (!response.ok) throw new Error(`Web起動確認が${response.status}で失敗しました。`);
+  if (!response.ok) {
+    throw new Error(`Web起動確認が${response.status}で失敗しました。`);
+  }
 }

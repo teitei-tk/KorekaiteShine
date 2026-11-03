@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { isQuarantinedDelivery } from './server/repositories/delivery-anomalies';
 import {
@@ -33,8 +34,9 @@ interface RecoveryEnvironment {
 
 export default {
   async queue(batch: MessageBatch<JobNotification>, env: RecoveryEnvironment): Promise<void> {
-    if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test')
+    if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test') {
       throw new Error('診断評価を利用できない環境です。');
+    }
     for (const message of batch.messages) {
       const kind = batch.queue === env.DIAGNOSTIC_QUEUE_NAME ? 'normal' : 'dlq';
       if (batch.queue !== env.DIAGNOSTIC_QUEUE_NAME && batch.queue !== env.DIAGNOSTIC_DLQ_NAME) {
@@ -77,12 +79,15 @@ export default {
           }
         }
         message.ack();
-      } else message.retry({ delaySeconds: decision.delaySeconds });
+      } else {
+        message.retry({ delaySeconds: decision.delaySeconds });
+      }
     }
   },
   async scheduled(_controller: ScheduledController, env: RecoveryEnvironment): Promise<void> {
-    if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test')
+    if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test') {
       throw new Error('診断回復を利用できない環境です。');
+    }
     await recoverJobs({
       ...notificationDependencies(env),
       initialize: async (jobId) => {
@@ -97,7 +102,7 @@ export default {
 function notificationDependencies(env: RecoveryEnvironment): NotificationDependencies {
   return {
     database: env.DB,
-    now: () => Date.now(),
+    now: () => Temporal.Now.instant().epochMilliseconds,
     sendNotification: async (purpose, operation, notification, delaySeconds) => {
       const target =
         purpose === 'diagnostics'

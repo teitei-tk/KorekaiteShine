@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { databaseOperation } from './database-error';
 import { and, eq } from 'void/db';
 import { jobs, jobOutbox, diagnosticRequests, diagnosticChecks } from '@korekaite/database';
@@ -72,15 +73,27 @@ export async function acceptDiagnosticJob(
     const [existing] = await databaseOperation(async () =>
       db.select().from(diagnosticRequests).where(scope),
     );
-    if (!existing) throw error;
-    if (existing.scenario !== input.scenario) return 'conflict';
+    if (!existing) {
+      throw error;
+    }
+    if (existing.scenario !== input.scenario) {
+      return 'conflict';
+    }
     return {
       jobId: existing.jobId,
       scenario: existing.scenario,
-      acceptedAt: new Date(existing.acceptedAt).toISOString(),
+      acceptedAt: Temporal.Instant.fromEpochMilliseconds(existing.acceptedAt).toString({
+        fractionalSecondDigits: 3,
+      }),
     };
   }
-  return { jobId, scenario: input.scenario, acceptedAt: new Date(acceptedAt).toISOString() };
+  return {
+    jobId,
+    scenario: input.scenario,
+    acceptedAt: Temporal.Instant.fromEpochMilliseconds(acceptedAt).toString({
+      fractionalSecondDigits: 3,
+    }),
+  };
 }
 
 type CheckStatus = operations['getCheckJob']['responses'][200]['content']['application/json'];
@@ -102,17 +115,33 @@ export async function findDiagnosticJob(
         ),
       ),
   );
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
   const { job, check } = row;
   return {
     jobId: job.jobId,
     scenario: check.scenario,
     status: job.status,
     attemptCount: job.attemptCount,
-    acceptedAt: new Date(job.acceptedAt).toISOString(),
-    updatedAt: new Date(job.updatedAt).toISOString(),
-    finishedAt: job.finishedAt === null ? null : new Date(job.finishedAt).toISOString(),
-    nextAttemptAt: job.nextAttemptAt === null ? null : new Date(job.nextAttemptAt).toISOString(),
+    acceptedAt: Temporal.Instant.fromEpochMilliseconds(job.acceptedAt).toString({
+      fractionalSecondDigits: 3,
+    }),
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(job.updatedAt).toString({
+      fractionalSecondDigits: 3,
+    }),
+    finishedAt:
+      job.finishedAt === null
+        ? null
+        : Temporal.Instant.fromEpochMilliseconds(job.finishedAt).toString({
+            fractionalSecondDigits: 3,
+          }),
+    nextAttemptAt:
+      job.nextAttemptAt === null
+        ? null
+        : Temporal.Instant.fromEpochMilliseconds(job.nextAttemptAt).toString({
+            fractionalSecondDigits: 3,
+          }),
     lastErrorCode: job.lastErrorCode,
     checks: {
       doPersistence: check.doPersistence,

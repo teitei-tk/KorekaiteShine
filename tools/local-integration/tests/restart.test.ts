@@ -86,7 +86,9 @@ test('DO保存後に停止しても初回保存時刻を維持し、再起動後
       checks: { doPersistence: 'passed', consumerCompletion: 'passed', dlqReceipt: 'not_expected' },
     },
   });
-  expect(report.actual.doFirstReceivedAt).toBeGreaterThanOrEqual(Date.parse(report.startedAt));
+  expect(report.actual.doFirstReceivedAt).toBeGreaterThanOrEqual(
+    Temporal.Instant.from(report.startedAt).epochMilliseconds,
+  );
   expect(report.actual.doFirstReceivedAt).toBeLessThanOrEqual(report.actual.faultObservedAt!);
   expect(report.actual.faultObservedAt).toBeLessThanOrEqual(report.restart!.stoppedAt);
   expect(

@@ -17,7 +17,9 @@ export async function readDevelopmentSnapshot(config: RuntimeConfig) {
     throw new Error('保持確認用DBが未準備です。pnpm prepare:integrationを実行してください。');
   });
   for (const file of files) {
-    if (!file.isFile() || !file.name.endsWith('.sqlite')) continue;
+    if (!file.isFile() || !file.name.endsWith('.sqlite')) {
+      continue;
+    }
     const path = join(file.parentPath, file.name);
     const database = new DatabaseSync(path, { readOnly: true });
     try {
@@ -26,7 +28,9 @@ export async function readDevelopmentSnapshot(config: RuntimeConfig) {
           "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name IN ('jobs', 'diagnostic_requests', 'connection_checks')",
         )
         .get();
-      if (row?.count === 3) candidates.push(path);
+      if (row?.count === 3) {
+        candidates.push(path);
+      }
     } finally {
       database.close();
     }
@@ -90,8 +94,9 @@ export async function readDevelopmentArtifactState(config: RuntimeConfig) {
         const result = await stat(join(config.artifactDirectory, path));
         return { path, mtimeMs: result.mtimeMs, size: result.size };
       } catch (error) {
-        if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
           return { path, mtimeMs: null, size: null };
+        }
         throw error;
       }
     }),

@@ -102,9 +102,11 @@ async function discardAcceptanceResponse(url: string, key: string, body: string)
       (response) => {
         // 本文を一度も読み取らず、クライアント側の接続を破棄する。
         response.destroy();
-        if (response.statusCode === undefined)
+        if (response.statusCode === undefined) {
           reject(new IntegrationFailure('ACCEPTANCE_CONTRACT'));
-        else resolve(response.statusCode);
+        } else {
+          resolve(response.statusCode);
+        }
       },
     );
     request.on('error', reject);
@@ -122,8 +124,9 @@ async function acceptanceCounts(baseUrl: string): Promise<AcceptanceCounts> {
     !body ||
     !Number.isSafeInteger(body.jobs) ||
     !Number.isSafeInteger(body.requests)
-  )
+  ) {
     throw new IntegrationFailure('ACCEPTANCE_COUNTS_CONTRACT');
+  }
   return { jobs: body.jobs, requests: body.requests };
 }
 
@@ -136,8 +139,9 @@ async function firstReceivedAt(baseUrl: string, jobId: string): Promise<number |
     response.status !== 200 ||
     !body ||
     !(body.firstReceivedAt === null || Number.isSafeInteger(body.firstReceivedAt))
-  )
+  ) {
     throw new IntegrationFailure('PERSISTENCE_CONTRACT');
+  }
   return body.firstReceivedAt;
 }
 
@@ -150,8 +154,9 @@ async function dispatchState(baseUrl: string, jobId: string): Promise<DispatchSt
     response.status !== 200 ||
     !body ||
     ![body.notifications, body.unsent, body.deliveries].every(Number.isSafeInteger)
-  )
+  ) {
     throw new IntegrationFailure('DISPATCH_CONTRACT');
+  }
   return { notifications: body.notifications, unsent: body.unsent, deliveries: body.deliveries };
 }
 
@@ -180,8 +185,9 @@ async function waitForNativeRetry(
           !Number.isSafeInteger(entry.attempt) ||
           !Number.isSafeInteger(entry.receivedAt),
       )
-    )
+    ) {
       throw new IntegrationFailure('NATIVE_RETRY_CONTRACT');
+    }
     const stop = body.stop;
     if (
       stop !== null &&
@@ -191,8 +197,9 @@ async function waitForNativeRetry(
         !stop.messageId ||
         stop.queue !== queue ||
         !Number.isSafeInteger(stop.occurredAt))
-    )
+    ) {
       throw new IntegrationFailure('NATIVE_RETRY_CONTRACT');
+    }
     if (stop && body.acknowledgedMessageId === stop.messageId && body.deliveries.length >= 2) {
       const deliveries: NativeDeliveryAttempt[] = body.deliveries.map(
         (entry: NativeDeliveryAttempt) => ({
@@ -208,14 +215,17 @@ async function waitForNativeRetry(
         ) ||
         deliveries[1]!.receivedAt - deliveries[0]!.receivedAt < 30_000 ||
         stop.occurredAt > deliveries[1]!.receivedAt
-      )
+      ) {
         throw new IntegrationFailure('NATIVE_RETRY_MISMATCH');
+      }
       return {
         stop: { kind: 'exception', messageId: stop.messageId, occurredAt: stop.occurredAt },
         deliveries,
       };
     }
-    if (performance.now() >= deadline) throw new IntegrationFailure('NATIVE_RETRY_TIMEOUT');
+    if (performance.now() >= deadline) {
+      throw new IntegrationFailure('NATIVE_RETRY_TIMEOUT');
+    }
     await delay(250);
   }
 }
@@ -247,7 +257,7 @@ export async function runDiagnosticScenario(input: {
     mode: 'dev',
     clock: 'real',
     versions: { node: process.version },
-    startedAt: new Date().toISOString(),
+    startedAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
     finishedAt: null,
     durationMs: null,
     expected: {
@@ -282,9 +292,11 @@ export async function runDiagnosticScenario(input: {
   let scheduledFailed = false;
   function startScheduled(activeRuntime: LocalRuntime): void {
     scheduledTimer = setInterval(() => {
-      if (scheduledPending || scheduledFailed) return;
+      if (scheduledPending || scheduledFailed) {
+        return;
+      }
       const invocation: IntegrationReport['scheduled']['invocations'][number] = {
-        startedAt: Date.now(),
+        startedAt: Temporal.Now.instant().epochMilliseconds,
         completedAt: null,
         outcome: 'pending',
       };
@@ -299,7 +311,7 @@ export async function runDiagnosticScenario(input: {
           scheduledFailed = true;
         })
         .finally(() => {
-          invocation.completedAt = Date.now();
+          invocation.completedAt = Temporal.Now.instant().epochMilliseconds;
           scheduledPending = undefined;
         });
     }, report.scheduled.intervalMs);
@@ -311,7 +323,9 @@ export async function runDiagnosticScenario(input: {
       holdEvaluationBeforeConsume: input.fault === 'after_queue_send',
       stopAfterResultBeforeAck: input.fault === 'after_result_before_ack',
     });
-    if (!restarts) startScheduled(runtime);
+    if (!restarts) {
+      startScheduled(runtime);
+    }
     const acceptanceUrl = `${runtime.baseUrl}/api/diagnostics/check-jobs`;
     const idempotencyKey = randomUUID();
     const requestBody = JSON.stringify({ scenario: input.scenario });
@@ -322,11 +336,15 @@ export async function runDiagnosticScenario(input: {
         requestBody,
       );
       report.actual.responseDiscarded = true;
-      if (report.actual.startHttpStatus !== 202)
+      if (report.actual.startHttpStatus !== 202) {
         throw new IntegrationFailure('ACCEPTANCE_CONTRACT');
+      }
       report.actual.acceptanceBeforeRetry = await acceptanceCounts(runtime.baseUrl);
-      if (!isDeepStrictEqual(report.actual.acceptanceBeforeRetry, report.expected.acceptanceCounts))
+      if (
+        !isDeepStrictEqual(report.actual.acceptanceBeforeRetry, report.expected.acceptanceCounts)
+      ) {
         throw new IntegrationFailure('ACCEPTANCE_COUNTS_MISMATCH');
+      }
     }
     const acceptedResponse = await fetch(acceptanceUrl, {
       method: 'POST',
@@ -334,15 +352,19 @@ export async function runDiagnosticScenario(input: {
       body: requestBody,
       signal: AbortSignal.timeout(10_000),
     });
-    if (input.fault === 'response_loss') report.actual.retryHttpStatus = acceptedResponse.status;
-    else report.actual.startHttpStatus = acceptedResponse.status;
+    if (input.fault === 'response_loss') {
+      report.actual.retryHttpStatus = acceptedResponse.status;
+    } else {
+      report.actual.startHttpStatus = acceptedResponse.status;
+    }
     const accepted = await acceptedResponse.json();
     if (
       acceptedResponse.status !== 202 ||
       !validateCheckAccepted(accepted) ||
       accepted.scenario !== input.scenario
-    )
+    ) {
       throw new IntegrationFailure('ACCEPTANCE_CONTRACT');
+    }
     report.actual.jobId = accepted.jobId;
     if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
       await runDatabaseCommand(config, [
@@ -359,14 +381,17 @@ export async function runDiagnosticScenario(input: {
       });
       report.actual.initializationHttpStatus = initialization.status;
       await initialization.text();
-      report.actual.faultObservedAt = Date.now();
-      if (initialization.status !== 500) throw new IntegrationFailure('FAULT_NOT_OBSERVED');
+      report.actual.faultObservedAt = Temporal.Now.instant().epochMilliseconds;
+      if (initialization.status !== 500) {
+        throw new IntegrationFailure('FAULT_NOT_OBSERVED');
+      }
       report.actual.beforeRestartFirstReceivedAt = await firstReceivedAt(
         runtime.baseUrl,
         accepted.jobId,
       );
-      if (input.fault === 'after_do_save' && report.actual.beforeRestartFirstReceivedAt !== null)
+      if (input.fault === 'after_do_save' && report.actual.beforeRestartFirstReceivedAt !== null) {
         throw new IntegrationFailure('RESTART_BOUNDARY_MISMATCH');
+      }
     }
     if (input.fault === 'after_queue_send') {
       const receivedBy = performance.now() + 10_000;
@@ -382,9 +407,12 @@ export async function runDiagnosticScenario(input: {
           validateJobNotification(body.message) &&
           body.message.jobId === accepted.jobId &&
           body.queue === config.queues.diagnostics?.queue
-        )
+        ) {
           break;
-        if (performance.now() >= receivedBy) throw new IntegrationFailure('QUEUE_RECEIPT_TIMEOUT');
+        }
+        if (performance.now() >= receivedBy) {
+          throw new IntegrationFailure('QUEUE_RECEIPT_TIMEOUT');
+        }
         await delay(100);
       }
       report.actual.queueBeforeRestart = true;
@@ -395,8 +423,9 @@ export async function runDiagnosticScenario(input: {
           unsent: 1,
           deliveries: 1,
         })
-      )
+      ) {
         throw new IntegrationFailure('RESTART_BOUNDARY_MISMATCH');
+      }
     }
     if (restarts) {
       const beforeResponse = await fetch(
@@ -415,20 +444,22 @@ export async function runDiagnosticScenario(input: {
         before.checks.doPersistence !==
           (input.fault === 'after_queue_send' ? 'passed' : 'pending') ||
         before.checks.consumerCompletion !== 'pending'
-      )
+      ) {
         throw new IntegrationFailure('RESTART_BOUNDARY_MISMATCH');
+      }
       report.actual.beforeRestartStatus = before.status;
       report.actual.beforeRestartChecks = before.checks;
       await runtime.stop();
       runtime = undefined;
-      const stoppedAt = Date.now();
-      if (input.fault === 'after_do_save' || input.fault === 'after_queue_send')
+      const stoppedAt = Temporal.Now.instant().epochMilliseconds;
+      if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
         await runDatabaseCommand(config, [
           'execute',
           'DROP TRIGGER reject_integration_notification;',
         ]);
+      }
       runtime = await startRuntime(config);
-      report.restart = { stoppedAt, restartedAt: Date.now() };
+      report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
       report.actual.restartCount = 1;
       startScheduled(runtime);
     }
@@ -436,7 +467,9 @@ export async function runDiagnosticScenario(input: {
       performance.now() +
       (input.scenario === 'exhaust_retries' ? 600_000 : restarts ? 120_000 : 60_000);
     for (;;) {
-      if (scheduledFailed) throw new IntegrationFailure('SCHEDULED_FAILED');
+      if (scheduledFailed) {
+        throw new IntegrationFailure('SCHEDULED_FAILED');
+      }
       const response = await fetch(
         `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
         { signal: AbortSignal.timeout(10_000) },
@@ -448,8 +481,9 @@ export async function runDiagnosticScenario(input: {
         !validateCheckStatus(status) ||
         status.jobId !== accepted.jobId ||
         status.scenario !== input.scenario
-      )
+      ) {
         throw new IntegrationFailure('STATUS_CONTRACT');
+      }
       report.actual.status = status.status;
       report.actual.attemptCount = status.attemptCount;
       report.actual.checks = status.checks;
@@ -458,17 +492,21 @@ export async function runDiagnosticScenario(input: {
         (status.status === 'failed' &&
           (input.scenario !== 'exhaust_retries' || status.checks.dlqReceipt === 'passed')) ||
         status.status === 'cancelled'
-      )
+      ) {
         break;
-      if (performance.now() >= deadline) throw new IntegrationFailure('TIMEOUT');
+      }
+      if (performance.now() >= deadline) {
+        throw new IntegrationFailure('TIMEOUT');
+      }
       await delay(250);
     }
     if (
       report.actual.status !== report.expected.status ||
       report.actual.attemptCount !== report.expected.attemptCount ||
       !isDeepStrictEqual(report.actual.checks, report.expected.checks)
-    )
+    ) {
       throw new IntegrationFailure('OUTCOME_MISMATCH');
+    }
     if (input.fault === 'after_result_before_ack') {
       const retried = await waitForNativeRetry(
         runtime.baseUrl,
@@ -483,12 +521,14 @@ export async function runDiagnosticScenario(input: {
       report.actual.beforeRestartChecks = report.actual.checks;
       clearInterval(scheduledTimer);
       await scheduledPending;
-      if (scheduledFailed) throw new IntegrationFailure('SCHEDULED_FAILED');
+      if (scheduledFailed) {
+        throw new IntegrationFailure('SCHEDULED_FAILED');
+      }
       await runtime.stop();
       runtime = undefined;
-      const stoppedAt = Date.now();
+      const stoppedAt = Temporal.Now.instant().epochMilliseconds;
       runtime = await startRuntime(config);
-      report.restart = { stoppedAt, restartedAt: Date.now() };
+      report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
       report.actual.restartCount = 1;
       const afterResponse = await fetch(
         `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
@@ -503,8 +543,9 @@ export async function runDiagnosticScenario(input: {
         after.status !== report.expected.status ||
         after.attemptCount !== report.expected.attemptCount ||
         !isDeepStrictEqual(after.checks, report.expected.checks)
-      )
+      ) {
         throw new IntegrationFailure('RESTART_RESULT_MISMATCH');
+      }
       report.actual.statusHttpStatus = afterResponse.status;
       report.actual.status = after.status;
       report.actual.attemptCount = after.attemptCount;
@@ -525,8 +566,9 @@ export async function runDiagnosticScenario(input: {
         (input.scenario === 'exhaust_retries'
           ? config.queues.diagnostics?.dlq
           : config.queues.diagnostics?.queue)
-    )
+    ) {
       throw new IntegrationFailure('QUEUE_RECEIPT_MISMATCH');
+    }
     report.actual.queue = receipt.queue;
     report.actual.queueObserved = true;
     const attemptsResponse = await fetch(
@@ -548,11 +590,12 @@ export async function runDiagnosticScenario(input: {
           attempt.attemptNumber !== index + 1 ||
           !Number.isSafeInteger(attempt.startedAt) ||
           !Number.isSafeInteger(attempt.finishedAt) ||
-          attempt.startedAt < Date.parse(accepted.acceptedAt) ||
+          attempt.startedAt < Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds ||
           attempt.finishedAt < attempt.startedAt,
       )
-    )
+    ) {
       throw new IntegrationFailure('ATTEMPT_HISTORY');
+    }
     report.attempts = attempts.map((attempt) => ({
       attemptNumber: attempt.attemptNumber,
       startedAt: attempt.startedAt,
@@ -560,13 +603,17 @@ export async function runDiagnosticScenario(input: {
     }));
     for (let index = 1; index < report.attempts.length; index++) {
       const elapsed = report.attempts[index]!.startedAt - report.attempts[index - 1]!.finishedAt;
-      if (elapsed < report.expected.retryDelaysMs[index - 1]!)
+      if (elapsed < report.expected.retryDelaysMs[index - 1]!) {
         throw new IntegrationFailure('RETRY_TOO_EARLY');
+      }
     }
     if (input.fault === 'response_loss') {
       report.actual.acceptanceAfterRetry = await acceptanceCounts(runtime.baseUrl);
-      if (!isDeepStrictEqual(report.actual.acceptanceAfterRetry, report.expected.acceptanceCounts))
+      if (
+        !isDeepStrictEqual(report.actual.acceptanceAfterRetry, report.expected.acceptanceCounts)
+      ) {
         throw new IntegrationFailure('ACCEPTANCE_COUNTS_MISMATCH');
+      }
     }
     if (restarts) {
       const first = report.scheduled.invocations[0];
@@ -575,31 +622,35 @@ export async function runDiagnosticScenario(input: {
         !first ||
         first.startedAt - report.restart.restartedAt < 60_000 ||
         report.attempts[0]!.startedAt < first.startedAt
-      )
+      ) {
         throw new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH');
+      }
     }
     if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
       const persisted = await firstReceivedAt(runtime.baseUrl, accepted.jobId);
       if (
         persisted === null ||
-        persisted < Date.parse(accepted.acceptedAt) ||
+        persisted < Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds ||
         persisted > report.actual.faultObservedAt!
-      )
+      ) {
         throw new IntegrationFailure('DO_STATE_NOT_PRESERVED');
+      }
       report.actual.doFirstReceivedAt = persisted;
     }
     if (input.fault === 'after_queue_send') {
       report.actual.dispatchAfterRestart = await dispatchState(runtime.baseUrl, accepted.jobId);
       const dispatched = report.actual.dispatchAfterRestart;
-      if (dispatched.notifications !== 1 || dispatched.unsent !== 0 || dispatched.deliveries < 2)
+      if (dispatched.notifications !== 1 || dispatched.unsent !== 0 || dispatched.deliveries < 2) {
         throw new IntegrationFailure('OUTBOX_RECOVERY_MISMATCH');
+      }
       report.actual.queueRecovery = 'd1_outbox';
     }
     if (
       input.fault === 'after_result_before_ack' &&
       report.attempts.at(-1)!.finishedAt > report.actual.consumerStop!.occurredAt
-    )
+    ) {
       throw new IntegrationFailure('STOP_BEFORE_RESULT');
+    }
     report.exitCode = 0;
   } catch (error) {
     failure = error instanceof Error ? error : new Error('統合検証に失敗しました。');
@@ -616,8 +667,9 @@ export async function runDiagnosticScenario(input: {
     try {
       await runtime?.stop();
       if (report.exitCode === 0) {
-        if (config.stateDirectory)
+        if (config.stateDirectory) {
           await rm(config.stateDirectory, { recursive: true, force: true });
+        }
         await rm(config.artifactDirectory, { recursive: true, force: true });
       }
     } catch (error) {
@@ -625,11 +677,13 @@ export async function runDiagnosticScenario(input: {
       report.exitCode = 1;
       report.failureCode = 'CLEANUP_FAILED';
     }
-    report.finishedAt = new Date().toISOString();
+    report.finishedAt = Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
     report.durationMs = Math.round(performance.now() - started);
     // 応答全体、要求本文、冪等キー、例外メッセージは記録しない。
     await writeFile(resultPath, `${JSON.stringify(report, null, 2)}\n`);
   }
-  if (failure) throw failure;
+  if (failure) {
+    throw failure;
+  }
   return { report, resultPath };
 }

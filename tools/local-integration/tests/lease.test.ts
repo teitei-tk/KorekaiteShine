@@ -25,7 +25,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
     });
     expect(acceptedResponse.status).toBe(202);
     const accepted = await acceptedResponse.json();
-    const startedAt = Date.parse(accepted.acceptedAt);
+    const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -63,7 +63,9 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -84,7 +86,7 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
     });
     expect(acceptedResponse.status).toBe(202);
     const accepted = await acceptedResponse.json();
-    const startedAt = Date.parse(accepted.acceptedAt);
+    const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,7 +123,9 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -142,7 +146,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
     });
     expect(acceptedResponse.status).toBe(202);
     const accepted = await acceptedResponse.json();
-    const startedAt = Date.parse(accepted.acceptedAt);
+    const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -198,7 +202,9 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -219,7 +225,7 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     });
     expect(acceptedResponse.status).toBe(202);
     const accepted = await acceptedResponse.json();
-    const startedAt = Date.parse(accepted.acceptedAt);
+    const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const notification = { schemaVersion: 1, jobId: accepted.jobId };
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
@@ -247,7 +253,9 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
       status: 'retry_wait',
       attemptCount: 1,
       lastErrorCode: 'EXECUTION_LEASE_EXPIRED',
-      nextAttemptAt: new Date(startedAt + 240_000).toISOString(),
+      nextAttemptAt: Temporal.Instant.fromEpochMilliseconds(startedAt + 240_000).toString({
+        fractionalSecondDigits: 3,
+      }),
     });
     await runDatabaseCommand(config, [
       'execute',
@@ -268,7 +276,9 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -295,14 +305,14 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       body: JSON.stringify({
         operation: 'acquire',
         notification: { schemaVersion: 1, jobId: accepted.jobId },
-        now: Date.parse(accepted.acceptedAt),
+        now: Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds,
       }),
     });
     expect(acquire.status).toBe(200);
     expect(await acquire.json()).toMatchObject({ attemptNumber: 1 });
     await runtime.stop();
     // 待機時間を短縮し、停止中に期限と猶予が経過した状態を作る。
-    const expiredAt = Date.now() - 31_000;
+    const expiredAt = Temporal.Now.instant().epochMilliseconds - 31_000;
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -344,12 +354,14 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     const completed = await (
       await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
     ).json();
-    expect(Date.parse(completed.finishedAt)).toBeGreaterThanOrEqual(
-      Date.parse(status.nextAttemptAt),
+    expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
+      Temporal.Instant.from(status.nextAttemptAt).epochMilliseconds,
     );
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 90_000);

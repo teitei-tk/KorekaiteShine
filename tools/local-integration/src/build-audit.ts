@@ -21,7 +21,9 @@ export function buildAudit(directory: string): Plugin {
       const modules: BuildAudit['modules'] = [];
       for (const id of this.getModuleIds()) {
         const info = this.getModuleInfo(id);
-        if (!info) throw new Error(`モジュール情報がありません: ${id}`);
+        if (!info) {
+          throw new Error(`モジュール情報がありません: ${id}`);
+        }
         modules.push({
           id,
           imports: info.importedIds,

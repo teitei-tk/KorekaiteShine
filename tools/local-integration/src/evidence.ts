@@ -20,7 +20,7 @@ export async function runWithEvidence(
   const cleanups: ((passed: boolean) => Promise<void>)[] = [];
   const report = {
     ...input.metadata,
-    startedAt: new Date().toISOString(),
+    startedAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
     finishedAt: null as string | null,
     durationMs: null as number | null,
     actual,
@@ -52,9 +52,11 @@ export async function runWithEvidence(
       }
     }
     report.exitCode = failure ? 1 : 0;
-    report.finishedAt = new Date().toISOString();
+    report.finishedAt = Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
     report.durationMs = Math.round(performance.now() - started);
     await writeFile(input.resultPath, JSON.stringify(report, null, 2));
   }
-  if (failure) throw failure;
+  if (failure) {
+    throw failure;
+  }
 }

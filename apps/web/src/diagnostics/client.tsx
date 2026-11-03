@@ -16,8 +16,12 @@ export async function getDiagnosticStatus(
   const { data, response } = await client.GET('/api/diagnostics/check-jobs/{jobId}', {
     params: { path: { jobId } },
   });
-  if (!response.ok) throw new Error('診断の状態を取得できませんでした。');
-  if (!validateCheckStatus(data)) throw new Error('診断の状態応答が契約と一致しません。');
+  if (!response.ok) {
+    throw new Error('診断の状態を取得できませんでした。');
+  }
+  if (!validateCheckStatus(data)) {
+    throw new Error('診断の状態応答が契約と一致しません。');
+  }
   return data;
 }
 
@@ -52,11 +56,14 @@ export function createDiagnosticRun(
         body: { scenario },
       });
       if (!response.ok) {
-        if (response.status === 400 && validateCheckValidationError(error))
+        if (response.status === 400 && validateCheckValidationError(error)) {
           throw new DiagnosticValidationError(error.error);
+        }
         throw new Error('診断の受付を確認できませんでした。');
       }
-      if (!validateCheckAccepted(data)) throw new Error('診断の受付応答が契約と一致しません。');
+      if (!validateCheckAccepted(data)) {
+        throw new Error('診断の受付応答が契約と一致しません。');
+      }
       return data;
     },
   };

@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database, MessageBatch } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
@@ -15,7 +16,9 @@ export async function stopAfterResultBeforeAckForTest(
   env: TestEnvironment,
   consume: (batch: MessageBatch<JobNotification>) => Promise<void>,
 ): Promise<void> {
-  if (env.APP_ENV !== 'test') throw new Error('ack前の停止はtest環境専用です。');
+  if (env.APP_ENV !== 'test') {
+    throw new Error('ack前の停止はtest環境専用です。');
+  }
   const acknowledgements = new Set<(typeof batch.messages)[number]>();
   await consume({
     queue: batch.queue,
@@ -32,7 +35,9 @@ export async function stopAfterResultBeforeAckForTest(
     })),
     retryAll: batch.retryAll.bind(batch),
     ackAll: () => {
-      for (const message of batch.messages) acknowledgements.add(message);
+      for (const message of batch.messages) {
+        acknowledgements.add(message);
+      }
     },
   });
   const primary = createPrimaryDb(env.DB);
@@ -49,12 +54,14 @@ export async function stopAfterResultBeforeAckForTest(
               kind: 'exception',
               queue: batch.queue,
               messageId: message.id,
-              occurredAt: Date.now(),
+              occurredAt: Temporal.Now.instant().epochMilliseconds,
             }),
           })
           .onConflictDoNothing()
           .returning({ writer: connectionChecks.writer });
-        if (claimed.length) throw new Error('simulated_consumer_stop_before_ack');
+        if (claimed.length) {
+          throw new Error('simulated_consumer_stop_before_ack');
+        }
         message.ack();
         await primary
           .insert(connectionChecks)
@@ -71,11 +78,14 @@ export async function stopAfterResultBeforeAckForTest(
 }
 
 export async function readAckStopHistoryForTest(env: TestEnvironment, jobId: string) {
-  if (env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId }))
+  if (env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
     throw new Error('テスト要求が不正です。');
+  }
   const rows = await createPrimaryDb(env.DB).select().from(connectionChecks);
   const stopped = rows.find((row) => row.writer === `fault-before-ack:${jobId}`);
-  if (!stopped) return { stop: null, acknowledgedMessageId: null, deliveries: [] };
+  if (!stopped) {
+    return { stop: null, acknowledgedMessageId: null, deliveries: [] };
+  }
   const stop = JSON.parse(stopped.value);
   const deliveries = rows
     .filter((row) => row.writer.startsWith(`queue-attempt:${stop.queue}:${stop.messageId}:`))

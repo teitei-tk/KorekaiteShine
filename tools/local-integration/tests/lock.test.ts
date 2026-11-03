@@ -46,7 +46,9 @@ test('保持プロセスを強制終了すると環境ロックを再取得で�
     const release = await lockEnvironment(config);
     release();
   } finally {
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGKILL');
+    }
     await stopped;
     await rm(repositoryRoot, { recursive: true, force: true });
   }

@@ -16,7 +16,7 @@ function deferredEvaluation() {
 
 test('AIが120秒で完了しなければ通信を中止し、再呼出しせず失敗を保存する', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+  vi.setSystemTime(1_793_577_600_000);
   const aborted = vi.fn();
   const evaluate = vi.fn((signal: AbortSignal) => {
     signal.addEventListener('abort', aborted);
@@ -24,8 +24,8 @@ test('AIが120秒で完了しなければ通信を中止し、再呼出しせず
   });
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
-    deadline: Date.now() + 180_000,
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
     evaluate,
     renew: async () => true,
     save,
@@ -46,13 +46,13 @@ test('AIが120秒で完了しなければ通信を中止し、再呼出しせず
 
 test('評価中は30秒ごとに実行権を更新し、成功保存後に更新タイマーを解放する', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+  vi.setSystemTime(1_793_577_600_000);
   const evaluated = deferredEvaluation();
   const renew = vi.fn(async () => true);
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
-    deadline: Date.now() + 180_000,
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
     evaluate: async () => evaluated.promise,
     renew,
     save,
@@ -74,14 +74,14 @@ test('評価中は30秒ごとに実行権を更新し、成功保存後に更新
 
 test('実行権更新で所有権を失ったら評価を中止し、遅れて返った結果も保存しない', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+  vi.setSystemTime(1_793_577_600_000);
   const evaluated = deferredEvaluation();
   const aborted = vi.fn();
   const renew = vi.fn(async () => false);
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
-    deadline: Date.now() + 180_000,
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
     evaluate: async (signal) => {
       signal.addEventListener('abort', aborted);
       return evaluated.promise;
@@ -102,15 +102,15 @@ test('実行権更新で所有権を失ったら評価を中止し、遅れて�
 
 test('保存だけが一時失敗した場合は同じ評価結果を再保存し、AIを呼び直さない', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+  vi.setSystemTime(1_793_577_600_000);
   const value: EvaluationResult = { ok: true, value: { summary: '保存を再試行する結果' } };
   const evaluate = vi.fn(async () => value);
   const save = vi
     .fn(async (_result: EvaluationResult) => true)
     .mockRejectedValueOnce(new Error('一時的な保存障害'));
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
-    deadline: Date.now() + 180_000,
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
     evaluate,
     renew: async () => true,
     save,
@@ -128,8 +128,8 @@ test('保存だけが一時失敗した場合は同じ評価結果を再保存�
 
 test('保存失敗が続き更新処理も応答しなくても、180秒で試行と保存再試行を打ち切る', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
-  const deadline = Date.now() + 180_000;
+  vi.setSystemTime(1_793_577_600_000);
+  const deadline = vi.getMockedSystemTime()!.getTime() + 180_000;
   const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
     ok: true,
     value: { summary: '未保存の結果' },
@@ -137,12 +137,12 @@ test('保存失敗が続き更新処理も応答しなくても、180秒で試�
   const renew = vi.fn(() => new Promise<boolean>(() => {}));
   const savedAt: number[] = [];
   const save = vi.fn(async (_result: EvaluationResult): Promise<boolean> => {
-    savedAt.push(Date.now());
+    savedAt.push(vi.getMockedSystemTime()!.getTime());
     throw new Error('保存先が応答できません。');
   });
   let settled = false;
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
+    now: () => vi.getMockedSystemTime()!.getTime(),
     deadline,
     evaluate,
     renew,
@@ -167,7 +167,7 @@ test('保存失敗が続き更新処理も応答しなくても、180秒で試�
 
 test('実行権更新が例外で失敗したら評価を中止し、結果保存を開始しない', async () => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-11-02T00:00:00.000Z'));
+  vi.setSystemTime(1_793_577_600_000);
   const evaluated = deferredEvaluation();
   const aborted = vi.fn();
   const renew = vi.fn(async (): Promise<boolean> => {
@@ -175,8 +175,8 @@ test('実行権更新が例外で失敗したら評価を中止し、結果保�
   });
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => Date.now(),
-    deadline: Date.now() + 180_000,
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
     evaluate: async (signal) => {
       signal.addEventListener('abort', aborted);
       return evaluated.promise;

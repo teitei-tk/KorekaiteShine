@@ -43,8 +43,9 @@ export function connectLocalRuntime(
         body: JSON.stringify({ cron: '* * * * *' }),
       });
       const body = await response.json();
-      if (!response.ok || body.result?.outcome !== 'ok')
+      if (!response.ok || body.result?.outcome !== 'ok') {
         throw new Error(`scheduledイベント失敗: ${JSON.stringify(body)}`);
+      }
     },
   };
 }
@@ -66,8 +67,9 @@ export async function startOwnedRuntime(
   );
   const ready = new Promise<string>((resolve, reject) => {
     owner.on('message', (message: RuntimeOwnerMessage) => {
-      if (message.type === 'ready') resolve(message.baseUrl);
-      else if (message.type === 'error') {
+      if (message.type === 'ready') {
+        resolve(message.baseUrl);
+      } else if (message.type === 'error') {
         failure = message.message;
         reject(new Error(message.message));
       }
@@ -78,7 +80,9 @@ export async function startOwnedRuntime(
     );
     const request: RuntimeOwnerRequest = { type: 'start', config, mode, options };
     owner.send(request, (error) => {
-      if (error) reject(error);
+      if (error) {
+        reject(error);
+      }
     });
   });
   let stopping: Promise<void> | undefined;
@@ -93,8 +97,9 @@ export async function startOwnedRuntime(
         15_000,
         'ランタイムの停止確認が期限を超えました。管理プロセスで後処理を継続しています。',
       );
-      if (code !== 0)
+      if (code !== 0) {
         throw new Error(failure ?? `ランタイム管理プロセスが異常終了しました（${code}）。`);
+      }
     })());
   }
   try {

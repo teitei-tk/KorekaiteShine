@@ -1,3 +1,4 @@
+import { Temporal } from '@js-temporal/polyfill';
 import { and, eq, exists, inArray, isNull, lte, notExists, sql } from 'void/db';
 import { jobs, jobOutbox, diagnosticChecks, deletedJobs } from '@korekaite/database';
 import { createPrimaryDb } from '@korekaite/database/connection';
@@ -23,7 +24,9 @@ export async function requireDiagnosticInitialization(
       ),
     )
     .limit(1);
-  if (!job) throw new Error('診断の初期化対象を確認できません。');
+  if (!job) {
+    throw new Error('診断の初期化対象を確認できません。');
+  }
 }
 
 export async function confirmDiagnosticInitialization(
@@ -32,7 +35,7 @@ export async function confirmDiagnosticInitialization(
   firstReceivedAt: number,
 ): Promise<void> {
   const db = createPrimaryDb(binding);
-  const now = Date.now();
+  const now = Temporal.Now.instant().epochMilliseconds;
   const active = and(
     eq(jobs.jobId, jobId),
     eq(jobs.actorId, 'local-developer'),
@@ -125,7 +128,9 @@ export async function confirmDiagnosticInitialization(
       ),
   ]);
   const [confirmation] = await confirmed;
-  if (!confirmation) throw new Error('DO保存の観測結果を確定できません。');
+  if (!confirmation) {
+    throw new Error('DO保存の観測結果を確定できません。');
+  }
 }
 
 export async function pendingCheckNotification(binding: D1Database, jobId: string) {
@@ -141,7 +146,7 @@ export async function pendingCheckNotification(binding: D1Database, jobId: strin
         eq(jobOutbox.purpose, 'diagnostics'),
         eq(jobOutbox.generation, 0),
         isNull(jobOutbox.sentAt),
-        lte(jobOutbox.scheduledAt, Date.now()),
+        lte(jobOutbox.scheduledAt, Temporal.Now.instant().epochMilliseconds),
         eq(jobs.purpose, 'diagnostics'),
         eq(jobs.actorId, 'local-developer'),
         eq(jobs.status, 'pending'),
@@ -156,7 +161,7 @@ export async function markCheckNotificationSent(binding: D1Database, id: string)
   const db = createPrimaryDb(binding);
   await db
     .update(jobOutbox)
-    .set({ sentAt: Date.now() })
+    .set({ sentAt: Temporal.Now.instant().epochMilliseconds })
     .where(
       and(
         eq(jobOutbox.id, id),

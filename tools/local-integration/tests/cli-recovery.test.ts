@@ -51,7 +51,9 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
       return baseUrl!;
     },
     async stop(): Promise<number> {
-      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGTERM');
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         return await Promise.race([
@@ -91,7 +93,9 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
       },
       async (evidence) => {
         evidence.cleanup(async (passed) => {
-          if (!passed) return;
+          if (!passed) {
+            return;
+          }
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
@@ -99,7 +103,9 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         evidence.cleanup(async () => {
           await cli?.stop();
         });
-        if (mode === 'preview') await buildRuntime(config);
+        if (mode === 'preview') {
+          await buildRuntime(config);
+        }
         cli = launchCli(config, runId, slot, mode);
         let baseUrl = await cli.ready();
         const accepted = await fetch(`${baseUrl}/api/diagnostics/check-jobs`, {
@@ -130,9 +136,10 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         ]);
         expect(await cli.stop()).toBe(0);
         cli = undefined;
-        expect(Date.now(), '予約済み再試行の配送前に停止する').toBeLessThan(
-          Date.parse(before.nextAttemptAt),
-        );
+        expect(
+          Temporal.Now.instant().epochMilliseconds,
+          '予約済み再試行の配送前に停止する',
+        ).toBeLessThan(Temporal.Instant.from(before.nextAttemptAt).epochMilliseconds);
         evidence.observe({
           beforeRestart: {
             status: before.status,

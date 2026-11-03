@@ -16,8 +16,9 @@ export const Route = createFileRoute('/api/batch-topology')({
           if (
             !(error instanceof Error) ||
             !String(error.cause ?? error).includes('UNIQUE constraint failed')
-          )
+          ) {
             throw error;
+          }
           rejected = true;
         }
         const rows = await db

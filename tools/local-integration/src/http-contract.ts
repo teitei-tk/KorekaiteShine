@@ -45,11 +45,15 @@ export async function runHttpContractIntegration(): Promise<
       },
       async (evidence) => {
         evidence.cleanup(async (passed) => {
-          if (!passed) return;
+          if (!passed) {
+            return;
+          }
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
-        if (mode === 'preview') await buildRuntime(config);
+        if (mode === 'preview') {
+          await buildRuntime(config);
+        }
         const runtime = await startRuntime(config, mode);
         evidence.cleanup(() => runtime.stop());
         const cases: {
@@ -71,7 +75,9 @@ export async function runHttpContractIntegration(): Promise<
           };
           cases.push(observation);
           const body = await response.clone().json();
-          if (Array.isArray(body.items)) observation.itemCount = body.items.length;
+          if (Array.isArray(body.items)) {
+            observation.itemCount = body.items.length;
+          }
           await assertInterviewResponse(response, example);
           observation.contractValid = true;
         }

@@ -8,6 +8,7 @@
     "test:integration": "vitest run tests/end-to-end.test.ts tests/queue-retry.test.ts tests/formal-routing.test.ts tests/restart.test.ts tests/http-contract.test.ts tests/isolation.test.ts tests/dlq-restart.test.ts tests/cli-recovery.test.ts"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@korekaite/database": "workspace:*",
     "@korekaite/runtime-config": "workspace:*",
     "void": "1.4.0"

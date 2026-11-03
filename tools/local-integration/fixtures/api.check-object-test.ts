@@ -6,16 +6,20 @@ export const Route = createFileRoute('/api/check-object-test')({
     handlers: {
       GET: async ({ request }) => {
         const query = new URL(request.url).searchParams;
-        if (query.get('view') === 'ack-stop')
+        if (query.get('view') === 'ack-stop') {
           return Response.json(await env.EVALUATION_PROBE.readAckStopHistory(query.get('jobId')));
-        if (query.get('view') === 'dispatch')
+        }
+        if (query.get('view') === 'dispatch') {
           return Response.json(await env.EVALUATION_PROBE.readDispatchState(query.get('jobId')));
-        if (query.get('view') === 'persistence')
+        }
+        if (query.get('view') === 'persistence') {
           return Response.json(
             await env.EVALUATION_PROBE.readInitializationPersistence(query.get('jobId')),
           );
-        if (query.get('view') === 'acceptance-counts')
+        }
+        if (query.get('view') === 'acceptance-counts') {
           return Response.json(await env.EVALUATION_PROBE.readAcceptanceCounts());
+        }
         return Response.json(
           query.get('view') === 'attempts'
             ? await env.EVALUATION_PROBE.readJobAttempts(query.get('jobId'))

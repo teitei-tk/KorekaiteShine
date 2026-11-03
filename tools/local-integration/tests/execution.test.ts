@@ -54,7 +54,9 @@ test('成功評価は実行権を取得し、試行1回の結果と完了を一�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -100,7 +102,9 @@ test('完了後の再配送は評価を再実行せずackする', async () => {
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -162,7 +166,9 @@ test('同じジョブの同時配送は一つだけが評価し、有効な実�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -206,13 +212,15 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
           { timeout: 5_000, interval: 50 },
         )
         .toBe('running');
-      const before = Date.now();
+      const before = Temporal.Now.instant().epochMilliseconds;
       expect(await (await deliver(waitingJob.jobId)).json()).toEqual({ action: 'ack' });
       const waiting = await (
         await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${waitingJob.jobId}`)
       ).json();
       expect(waiting).toMatchObject({ status: 'pending', attemptCount: 0 });
-      expect(Date.parse(waiting.nextAttemptAt)).toBeGreaterThanOrEqual(before + 30_000);
+      expect(Temporal.Instant.from(waiting.nextAttemptAt).epochMilliseconds).toBeGreaterThanOrEqual(
+        before + 30_000,
+      );
       expect(await (await deliver(waitingJob.jobId)).json()).toEqual({ action: 'ack' });
       await runDatabaseCommand(config, [
         'execute',
@@ -234,7 +242,9 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -255,7 +265,7 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    const now = Date.parse(accepted.acceptedAt);
+    const now = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const deliver = async (time: number) => {
       const delivered = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${time}`, {
         method: 'POST',
@@ -272,7 +282,9 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
     expect(waiting).toMatchObject({
       status: 'retry_wait',
       attemptCount: 1,
-      nextAttemptAt: new Date(now + 30_000).toISOString(),
+      nextAttemptAt: Temporal.Instant.fromEpochMilliseconds(now + 30_000).toString({
+        fractionalSecondDigits: 3,
+      }),
       lastErrorCode: 'SIMULATED_AI_FAILURE',
       checks: { consumerCompletion: 'pending', dlqReceipt: 'not_expected' },
     });
@@ -307,7 +319,9 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -328,7 +342,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    let now = Date.parse(accepted.acceptedAt);
+    let now = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const delays = [30_000, 120_000, 300_000];
     const deliver = async () => {
       const delivered = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${now}`, {
@@ -355,7 +369,9 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
         expect(status).toMatchObject({
           status: 'retry_wait',
           finishedAt: null,
-          nextAttemptAt: new Date(next).toISOString(),
+          nextAttemptAt: Temporal.Instant.fromEpochMilliseconds(next).toString({
+            fractionalSecondDigits: 3,
+          }),
         });
         now = next - 1;
         await deliver();
@@ -365,7 +381,9 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
         expect(status).toMatchObject({
           status: 'failed',
           nextAttemptAt: null,
-          finishedAt: new Date(now).toISOString(),
+          finishedAt: Temporal.Instant.fromEpochMilliseconds(now).toString({
+            fractionalSecondDigits: 3,
+          }),
         });
         now += 1_000;
         await deliver();
@@ -389,7 +407,9 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);
 
@@ -438,6 +458,8 @@ test('Web受付からDO・ローカルQueue・評価Consumerを経てD1の成功
     succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    if (succeeded) {
+      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+    }
   }
 }, 60_000);

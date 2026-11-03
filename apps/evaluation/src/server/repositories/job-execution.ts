@@ -98,12 +98,16 @@ export async function acquireExecution(
       )
       .returning({ attemptNumber: jobAttempts.attemptNumber }),
   ]);
-  if (!attempts[0]) return null;
+  if (!attempts[0]) {
+    return null;
+  }
   const [job] = await db
     .select({ generation: jobs.generation })
     .from(jobs)
     .where(and(eq(jobs.jobId, jobId), eq(jobs.ownerToken, ownerToken)));
-  if (!job) return null;
+  if (!job) {
+    return null;
+  }
   return {
     jobId,
     ownerToken,
@@ -466,8 +470,9 @@ export async function recoverExpiredExecution(
     ),
   );
   const [job] = await db.select().from(jobs).where(expired);
-  if (!job || job.ownerToken === null || job.leaseUntil === null || job.attemptDeadline === null)
+  if (!job || job.ownerToken === null || job.leaseUntil === null || job.attemptDeadline === null) {
     return false;
+  }
   const lease: ExecutionLease = {
     jobId,
     ownerToken: job.ownerToken,

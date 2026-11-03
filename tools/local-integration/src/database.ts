@@ -13,8 +13,12 @@ async function linkDirectory(source: string, target: string): Promise<void> {
   try {
     await symlink(source, target, 'dir');
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
-    if ((await readlink(target)) !== source) throw new Error('DB管理用の参照先が一致しません。');
+    if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+      throw error;
+    }
+    if ((await readlink(target)) !== source) {
+      throw new Error('DB管理用の参照先が一致しません。');
+    }
   }
 }
 
@@ -29,8 +33,9 @@ async function executeDatabaseCommand(
   options: DatabaseOptions = {},
 ): Promise<void> {
   options.signal?.throwIfAborted();
-  if (config.environment === 'production' || !config.stateDirectory)
+  if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカルDBだけを操作できます。');
+  }
   if (
     !(
       (args.length === 1 &&
@@ -117,7 +122,9 @@ export async function runDatabaseCommand(
   args: DatabaseCommand,
   options: DatabaseOptions = {},
 ): Promise<void> {
-  if (args[0] !== 'reset-seed') return executeDatabaseCommand(config, args, options);
+  if (args[0] !== 'reset-seed') {
+    return executeDatabaseCommand(config, args, options);
+  }
   const release = await lockEnvironment(config);
   try {
     await executeDatabaseCommand(config, args, options);

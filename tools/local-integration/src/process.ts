@@ -14,7 +14,9 @@ export async function runNodeCommand(input: {
 }): Promise<void> {
   const aborted = () =>
     new Error(`${input.label}を中断しました。${input.logPath}を確認してください。`);
-  if (input.signal?.aborted) throw aborted();
+  if (input.signal?.aborted) {
+    throw aborted();
+  }
   const child = spawn(process.execPath, input.args, {
     cwd: input.cwd,
     env: input.env,
@@ -40,7 +42,9 @@ export async function runNodeCommand(input: {
       new Promise<never>((_resolve, reject) => {
         onAbort = () => reject(aborted());
         input.signal?.addEventListener('abort', onAbort, { once: true });
-        if (input.signal?.aborted) onAbort();
+        if (input.signal?.aborted) {
+          onAbort();
+        }
       }),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
@@ -54,8 +58,9 @@ export async function runNodeCommand(input: {
         );
       }),
     ]);
-    if (code !== 0)
+    if (code !== 0) {
       throw new Error(`${input.label}失敗（${code}）。${input.logPath}を確認してください。`);
+    }
   } finally {
     clearTimeout(timer);
     input.signal?.removeEventListener('abort', onAbort);
@@ -73,29 +78,40 @@ export async function stopProcessGroup(
   child: ChildProcess,
   { graceMs = 5000, killMs = 5000 }: { graceMs?: number; killMs?: number } = {},
 ): Promise<void> {
-  if (!child.pid) return;
+  if (!child.pid) {
+    return;
+  }
   const group = -child.pid;
   function signal(value: NodeJS.Signals | 0): boolean {
     try {
       process.kill(group, value);
       return true;
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ESRCH') return false;
+      if (error instanceof Error && 'code' in error && error.code === 'ESRCH') {
+        return false;
+      }
       // 生存確認の拒否では終了済みと判定できない。期限まで確認を続ける。
-      if (value === 0 && error instanceof Error && 'code' in error && error.code === 'EPERM')
+      if (value === 0 && error instanceof Error && 'code' in error && error.code === 'EPERM') {
         return true;
+      }
       throw error;
     }
   }
   async function waitUntilGone(timeoutMs: number): Promise<boolean> {
     const deadline = performance.now() + timeoutMs;
     while (signal(0)) {
-      if (performance.now() >= deadline) return false;
+      if (performance.now() >= deadline) {
+        return false;
+      }
       await delay(25);
     }
     return true;
   }
-  if (!signal('SIGTERM') || (await waitUntilGone(graceMs))) return;
-  if (!signal('SIGKILL') || (await waitUntilGone(killMs))) return;
+  if (!signal('SIGTERM') || (await waitUntilGone(graceMs))) {
+    return;
+  }
+  if (!signal('SIGKILL') || (await waitUntilGone(killMs))) {
+    return;
+  }
   throw new Error('ローカルプロセスを期限内に停止できませんでした。');
 }

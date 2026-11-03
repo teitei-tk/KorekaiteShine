@@ -95,7 +95,9 @@ test('開始本文の不正値を変換・補完・削除せず拒否する', as
     'success',
   ]) {
     const before = JSON.stringify(input);
-    if (input !== null && typeof input === 'object') Object.freeze(input);
+    if (input !== null && typeof input === 'object') {
+      Object.freeze(input);
+    }
     expect(validateCheckStart(input), before).toBe(false);
     expect(JSON.stringify(input)).toBe(before);
   }

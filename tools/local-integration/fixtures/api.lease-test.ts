@@ -6,7 +6,9 @@ export const Route = createFileRoute('/api/lease-test')({
     handlers: {
       POST: async ({ request }) => {
         const body = await request.json();
-        if (!Number.isSafeInteger(body.now)) return new Response(null, { status: 400 });
+        if (!Number.isSafeInteger(body.now)) {
+          return new Response(null, { status: 400 });
+        }
         switch (body.operation) {
           case 'acquire':
             return Response.json(

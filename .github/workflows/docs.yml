@@ -112,12 +112,10 @@ jobs:
         run: pnpm lint
       - name: Check repository formatting with oxfmt
         run: pnpm format:check
-      - name: Check AI review tooling types
-        run: pnpm --dir tools/ai-review typecheck
+      - name: Build and typecheck repository
+        run: pnpm typecheck
       - name: Test units, contracts, and local D1 boundaries
         run: pnpm test
-      - name: Build and typecheck TypeSpec integration
-        run: pnpm --dir apps/typespec-spike typecheck
   local-integration:
     name: Local Worker integration
     runs-on: ubuntu-latest

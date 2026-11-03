@@ -12,7 +12,7 @@ test('予期しない内部例外は詳細を公開せず500と追跡ログを�
   repository.findDiagnosticJob.mockRejectedValue(new TypeError('private_internal_failure'));
   const log = vi.spyOn(console, 'info').mockImplementation(() => {});
   const deps: CheckDependencies = {
-    // repositoryを置き換えるこの例外境界テストではDBを呼ばない。実D1障害は統合テストで検証する。
+    // repositoryを置き換えるこの例外境界テストではDBを呼ばない。ローカルD1障害は統合テストで検証する。
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',

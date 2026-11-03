@@ -12,6 +12,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",
     "@tanstack/react-router": "1.170.46",

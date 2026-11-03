@@ -9,7 +9,7 @@ import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-test('同じ冪等キーの同時要求は実D1のジョブと初期化outbox各1件へ集約する', async () => {
+test('同じ冪等キーの同時要求はローカルD1のジョブと初期化outbox各1件へ集約する', async () => {
   const config = resolveRuntime({
     repositoryRoot,
     appEnv: 'test',
@@ -310,7 +310,7 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
     expect(first.status).toBe(202);
     const accepted = await first.json();
     for (const state of ['completed', 'failed', 'cancelled']) {
-      // Consumerは後続タスク。ここでは実D1上の終端状態に対する受付の保証を検証する。
+      // ここではローカルD1上の終端状態に対する受付の保証を検証する。
       await runDatabaseCommand(config, [
         'execute',
         `UPDATE jobs SET status = '${state}', attempt_count = 1, finished_at = 1793577600000;`,

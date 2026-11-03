@@ -15,7 +15,7 @@
 | shadcn/uiにTanStack Router向けの導入案内がある                                                   | [shadcn/ui](https://ui.shadcn.com/docs/installation/tanstack-router)                                                                                                                      |
 | TanStack StartにCloudflareへの配置とカスタムエントリの案内がある                                 | [ホスティング](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)、[サーバーエントリ](https://tanstack.com/start/latest/docs/framework/react/guide/server-entry-point) |
 
-2026年10月30日、[面接一覧APIのローカル試作](../../apps/typespec-spike/README.md)でTypeSpecからOpenAPI・型・検証コードを生成し、React・TanStack Start・Voidを接続しました。開発サーバーとビルド済みWorkerのHTTP応答、ブラウザでの一覧表示・再取得を確認しています。固定版と互換性の調整、再現手順は同記録を参照してください。
+2026年10月30日、[面接一覧APIのローカル試作](local-worker-integration.md)でTypeSpecからOpenAPI・型・検証コードを生成し、React・TanStack Start・Voidを接続しました。開発サーバーとビルド済みWorkerのHTTP応答、ブラウザでの一覧表示・再取得を確認しています。固定版と互換性の調整、再現手順は同記録を参照してください。
 
 この結果を根拠に[ADR 0006](../adr/0006-typespec-api-contracts.md)でTypeSpecを正式採用しました。採用構成全体の互換性は未検証です。音声中継・D1・Queue・DLQ・認可・クラウド配置が一体で動くとは判断しません。現在の依存制約と残る検証は[MVP仕様書](../spec/mvp.md#依存バージョンの制約)を正とします。
 

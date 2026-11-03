@@ -12,6 +12,6 @@
 
 [ADR 0004](0004-tanstack-start-with-void.md)の責務分担は維持します。TypeSpecは契約の原本、TanStack Startは画面とHTTP APIの実装、VoidはCloudflare連携・配置を担います。契約の二重管理を避け、生成後の型検査と実行時検証を組み合わせます。認可・状態遷移・再試行・削除の振る舞いは引き続き実装とテストで保証します。
 
-検証では、型生成用TypeScriptの5系への固定、Cloudflare Viteプラグインの固定、Babelのsemver依存の限定的な置換、検証コードのES Modules出力が必要でした。この保守負担を採用判断に含めます。現行の固定版・更新時の検証条件は[MVP仕様書の依存バージョンの制約](../spec/mvp.md#依存バージョンの制約)を正とし、再現手順と観測した失敗は[ローカル検証記録](../../apps/typespec-spike/README.md)に残します。
+検証では、型生成用TypeScriptの5系への固定、Cloudflare Viteプラグインの固定、Babelのsemver依存の限定的な置換、検証コードのES Modules出力が必要でした。この保守負担を採用判断に含めます。現行の固定版・更新時の検証条件は[MVP仕様書の依存バージョンの制約](../spec/mvp.md#依存バージョンの制約)を正とし、再現手順と観測した失敗は[ローカル検証記録](../research/local-worker-integration.md)に残します。
 
 採用は本番構成の検証完了を意味しません。試作の履歴API契約も製品仕様としては確定していません。HTTP以外への適用や本番連携など、残る判断・検証は[MVP仕様書の補足事項](../spec/mvp.md#補足事項)で管理します。

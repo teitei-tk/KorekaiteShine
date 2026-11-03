@@ -148,16 +148,6 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
-# TypeSpec・TanStack Startのローカル連携検証の生成物
-apps/typespec-spike/generated/
-apps/typespec-spike/src/routeTree.gen.ts
-apps/typespec-spike/.void/
-apps/typespec-spike/.wrangler/
-apps/typespec-spike/.tanstack/
-apps/typespec-spike/.void-wrangler.jsonc
-apps/typespec-spike/void.lock.json
-apps/typespec-spike/.cloudflare/
-
 # アプリ移行後の生成物とローカル状態
 packages/*/generated/
 apps/web/src/routeTree.gen.ts
@@ -168,3 +158,5 @@ apps/web/.void-wrangler.jsonc
 apps/web/void.lock.json
 .local/
 .playwright-mcp/
+
+apps/*/.cloudflare/

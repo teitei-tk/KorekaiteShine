@@ -1,3 +1,5 @@
+import { confirmHttpReady } from './readiness.ts';
+import { stopProcessGroup, runNodeCommand } from './process.ts';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
@@ -96,34 +98,20 @@ export async function runProductionBuild(project: string): Promise<void> {
   // 前回の監査情報や出力を今回のビルドの証拠として再利用させない。
   await rm(join(project, 'build-audit'), { recursive: true, force: true });
   await rm(join(project, 'dist'), { recursive: true, force: true });
-  const child = spawn(
-    process.execPath,
-    [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
-    {
-      cwd: project,
-      env: {
-        ...process.env,
-        APP_ENV: 'production',
-        NO_COLOR: '1',
-        VOID_INSPECTOR_PORT: 'false',
-        WRANGLER_LOG_PATH: join(project, 'wrangler.log'),
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
+  await runNodeCommand({
+    args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
+    cwd: project,
+    env: {
+      ...process.env,
+      APP_ENV: 'production',
+      NO_COLOR: '1',
+      VOID_INSPECTOR_PORT: 'false',
+      WRANGLER_LOG_PATH: join(project, 'wrangler.log'),
     },
-  );
-  let output = '';
-  child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
+    logPath: join(project, 'build.log'),
+    label: '本番モードのローカルビルド',
+    timeoutMs: 120_000,
   });
-  child.stderr.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  const code = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('exit', resolve);
-  });
-  await writeFile(join(project, 'build.log'), output);
-  if (code !== 0) throw new Error(`本番モードのローカルビルド失敗: ${join(project, 'build.log')}`);
 }
 
 export async function startProductionPreview(
@@ -154,11 +142,8 @@ export async function startProductionPreview(
     },
   );
   let output = '';
-  const stopped = new Promise<void>((resolve) => child.once('close', () => resolve()));
   async function stop() {
-    if (child.pid && child.exitCode === null && child.signalCode === null)
-      process.kill(-child.pid, 'SIGTERM');
-    await stopped;
+    await stopProcessGroup(child);
     await writeFile(join(project, 'preview.log'), output);
   }
   try {
@@ -186,10 +171,7 @@ export async function startProductionPreview(
         reject(new Error(`本番プレビュー起動失敗（${code}）: ${join(project, 'preview.log')}`));
       });
     });
-    const response = await fetch(baseUrl);
-    await response.text();
-    if (!response.ok)
-      throw new Error(`本番プレビューのHTTP起動確認に失敗しました: ${response.status}`);
+    await confirmHttpReady(baseUrl);
     return { baseUrl, stop };
   } catch (error) {
     await stop();

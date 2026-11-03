@@ -1,50 +1,87 @@
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { runWithEvidence } from '../src/evidence.ts';
+import { runtimeVersions } from '../src/versions.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔離して終了する', async () => {
+  const runId = randomUUID();
   const config = resolveRuntime({
     repositoryRoot,
     appEnv: 'test',
-    runId: randomUUID(),
+    runId,
     parallelIndex: 0,
   });
   const queues = config.queues.diagnostics;
   if (!queues) throw new Error('診断Queueがありません。');
-  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
-  try {
-    // 通常Queueだけ記録不能にし、DLQでは同じ異常を保存できる状態にする。
-    await runDatabaseCommand(config, [
-      'execute',
-      `CREATE TRIGGER reject_normal_quarantine BEFORE INSERT ON delivery_anomalies WHEN NEW.queue_name = '${queues.queue}' BEGIN SELECT RAISE(FAIL, 'simulated_delivery_storage_failure'); END;`,
-    ]);
-    const jobId = randomUUID();
-    const response = await fetch(`${runtime.baseUrl}/api/evaluation-test?transport=queue`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schemaVersion: 1, jobId }),
-    });
-    expect(response.status).toBe(202);
-    expect(await response.json()).toEqual({ enqueued: true });
-    await expect
-      .poll(
-        async () => (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)).json(),
-        { timeout: 125_000, interval: 500 },
-      )
-      .toEqual({
-        queue: queues.dlq,
-        message: { schemaVersion: 1, jobId },
+  await runWithEvidence(
+    {
+      resultPath: join(dirname(config.artifactDirectory), 'results.json'),
+      metadata: {
+        environment: 'test',
+        runId,
+        parallelIndex: 0,
+        case: 'native-queue-retry',
+        mode: 'dev',
+        clock: 'real',
+        versions: await runtimeVersions(),
+        expected: {
+          normalDeliveries: 4,
+          dlqDeliveries: 1,
+          minimumRetryIntervalMs: 30000,
+          queue: queues.dlq,
+        },
+      },
+    },
+    async (evidence) => {
+      evidence.cleanup(async (passed) => {
+        if (!passed) return;
+        await rm(config.stateDirectory!, { recursive: true, force: true });
+        await rm(config.artifactDirectory, { recursive: true, force: true });
       });
-    await runDatabaseCommand(config, [
-      'execute',
-      `
+      const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+      evidence.cleanup(() => runtime.stop());
+      // 通常Queueだけ記録不能にし、DLQでは同じ異常を保存できる状態にする。
+      await runDatabaseCommand(config, [
+        'execute',
+        `CREATE TRIGGER reject_normal_quarantine BEFORE INSERT ON delivery_anomalies WHEN NEW.queue_name = '${queues.queue}' BEGIN SELECT RAISE(FAIL, 'simulated_delivery_storage_failure'); END;`,
+      ]);
+      const jobId = randomUUID();
+      const response = await fetch(`${runtime.baseUrl}/api/evaluation-test?transport=queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schemaVersion: 1, jobId }),
+      });
+      evidence.observe({ startHttpStatus: response.status });
+      expect(response.status).toBe(202);
+      expect(await response.json()).toEqual({ enqueued: true });
+      await expect
+        .poll(
+          async () => {
+            const result = await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`);
+            const receipt = await result.json();
+            evidence.observe({
+              receiptHttpStatus: result.status,
+              queue: receipt?.queue ?? null,
+              deliveredJobId: receipt?.message?.jobId ?? null,
+            });
+            return receipt;
+          },
+          { timeout: 125_000, interval: 500 },
+        )
+        .toEqual({
+          queue: queues.dlq,
+          message: { schemaVersion: 1, jobId },
+        });
+      await runDatabaseCommand(config, [
+        'execute',
+        `
       CREATE TEMP TABLE four (count INTEGER CHECK (count = 4));
       INSERT INTO four SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'queue-attempt:${queues.queue}:%';
       CREATE TEMP TABLE one (count INTEGER CHECK (count = 1));
@@ -63,10 +100,13 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
       INSERT INTO zero SELECT COUNT(*) FROM job_attempts;
       INSERT INTO zero SELECT COUNT(*) FROM job_outbox;
     `,
-    ]);
-    succeeded = true;
-  } finally {
-    await runtime.stop();
-    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-  }
+      ]);
+      evidence.observe({
+        deliveryCountAssertionsPassed: true,
+        retryIntervalAssertionPassed: true,
+        quarantineAssertionPassed: true,
+        noJobMutationAssertionsPassed: true,
+      });
+    },
+  );
 }, 180_000);

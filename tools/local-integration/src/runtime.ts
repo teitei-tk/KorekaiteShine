@@ -1,3 +1,6 @@
+import { confirmHttpReady } from './readiness.ts';
+import { startOwnedRuntime, connectLocalRuntime } from './runtime-owner.ts';
+import { stopProcessGroup, runNodeCommand } from './process.ts';
 import { lockEnvironment } from './lock.ts';
 import { runDatabaseCommand } from './database.ts';
 export { runDatabaseCommand } from './database.ts';
@@ -12,8 +15,9 @@ const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 export interface LocalRuntime {
   baseUrl: string;
+  closed: Promise<{ exitCode: 0 | 1 }>;
   stop(): Promise<void>;
-  runScheduled(): Promise<void>;
+  runScheduled(signal?: AbortSignal): Promise<void>;
 }
 
 export interface LocalRuntimeOptions {
@@ -21,19 +25,39 @@ export interface LocalRuntimeOptions {
   manualDiagnostics?: boolean;
   /** DO・送信境界のテストだけで評価の業務処理を保留する。 */
   probeOnlyEvaluation?: boolean;
+  /** 実Queue受信後、評価前の停止位置をtest環境で固定する。 */
+  holdEvaluationBeforeConsume?: boolean;
+  /** 保存後ack前のConsumer例外終了をtest環境で一度だけ起こす。 */
+  stopAfterResultBeforeAck?: boolean;
+}
+
+export class PendingRuntimeCleanup extends Error {
+  cleanup: () => Promise<void>;
+  constructor(cleanup: () => Promise<void>) {
+    super('起動失敗後のランタイム停止を確認できません。管理プロセスで後処理を継続します。');
+    this.cleanup = cleanup;
+  }
 }
 
 async function prepareRuntime(
   config: RuntimeConfig,
   options: LocalRuntimeOptions = {},
+  signal?: AbortSignal,
 ): Promise<string> {
-  if ((options.manualDiagnostics || options.probeOnlyEvaluation) && config.environment !== 'test')
+  signal?.throwIfAborted();
+  if (
+    (options.manualDiagnostics ||
+      options.probeOnlyEvaluation ||
+      options.holdEvaluationBeforeConsume ||
+      options.stopAfterResultBeforeAck) &&
+    config.environment !== 'test'
+  )
     throw new Error('初期化の保留は独立test環境だけで利用できます。');
   if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカル環境だけを起動できます。');
   }
   await claimArtifactDirectory(config);
-  await runDatabaseCommand(config, ['migrate']);
+  await runDatabaseCommand(config, ['migrate'], { signal });
   const project = join(config.artifactDirectory, 'web');
   await mkdir(project, { recursive: true });
   await cp(join(repositoryRoot, 'apps/web/src'), join(project, 'src'), {
@@ -86,6 +110,10 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
 });\n`,
   );
   if (config.environment === 'test') {
+    await cp(
+      join(fixtures, 'api.formal-queue-test.ts'),
+      join(project, 'src/routes/api.formal-queue-test.ts'),
+    );
     await cp(join(fixtures, 'api.lease-test.ts'), join(project, 'src/routes/api.lease-test.ts'));
     await cp(
       join(fixtures, 'api.evaluation-test.ts'),
@@ -97,6 +125,10 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     );
   }
   await cp(join(fixtures, 'api.topology.ts'), join(project, 'src/routes/api.topology.ts'));
+  await cp(
+    join(fixtures, 'api.isolation-test.ts'),
+    join(project, 'src/routes/api.isolation-test.ts'),
+  );
   await cp(
     join(fixtures, 'api.database-topology.ts'),
     join(project, 'src/routes/api.database-topology.ts'),
@@ -130,7 +162,12 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     ...common,
     name: config.workers.interview,
     main: interviewEntry,
-    queues: { producers: [{ binding: 'DIAGNOSTIC_QUEUE', queue: diagnostics.queue }] },
+    queues: {
+      producers: [
+        { binding: 'DIAGNOSTIC_QUEUE', queue: diagnostics.queue },
+        { binding: 'EVALUATION_QUEUE', queue: config.queues.evaluation.queue },
+      ],
+    },
     durable_objects: {
       bindings: [
         { name: 'INTERVIEW', class_name: 'TopologyObject' },
@@ -146,10 +183,12 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   await writeFile(
     evaluationEntry,
     `import application from ${JSON.stringify(join(repositoryRoot, 'apps/evaluation/src/worker.local.ts'))};
-import probe, { recordQueueDelivery } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
+import probe, { recordQueueDelivery, holdBeforeEvaluationForTest } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
+${config.environment === 'test' ? `import { consumeFormalForTest } from ${JSON.stringify(join(fixtures, 'formal-evaluation.ts'))};` : ''}
+${options.stopAfterResultBeforeAck ? `import { stopAfterResultBeforeAckForTest } from ${JSON.stringify(join(fixtures, 'ack-stop.ts'))};` : ''}
 export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export default {
-  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : 'async (batch, env) => { await recordQueueDelivery(batch); await application.queue(batch, env); }'},
+  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : `async (batch, env) => { await recordQueueDelivery(batch); ${options.holdEvaluationBeforeConsume ? 'await holdBeforeEvaluationForTest(env);' : ''} ${config.environment === 'test' ? 'if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) { await consumeFormalForTest(batch, env); return; }' : ''} ${options.stopAfterResultBeforeAck ? 'await stopAfterResultBeforeAckForTest(batch, env, controlled => application.queue(controlled, env));' : 'await application.queue(batch, env);'} }`},
   async scheduled(controller, env) { await application.scheduled(controller, env); await probe.scheduled(controller); },
 };\n`,
   );
@@ -160,6 +199,8 @@ export default {
       ...common.vars,
       DIAGNOSTIC_QUEUE_NAME: diagnostics.queue,
       DIAGNOSTIC_DLQ_NAME: diagnostics.dlq,
+      EVALUATION_QUEUE_NAME: config.queues.evaluation.queue,
+      EVALUATION_DLQ_NAME: config.queues.evaluation.dlq,
     },
     main: evaluationEntry,
     durable_objects: {
@@ -173,6 +214,25 @@ export default {
         { binding: 'EVALUATION_DLQ', queue: config.queues.evaluation.dlq },
       ],
       consumers: [
+        ...(config.environment === 'test'
+          ? [
+              {
+                queue: config.queues.evaluation.queue,
+                max_batch_size: 1,
+                max_batch_timeout: 1,
+                max_retries: 3,
+                retry_delay: 30,
+                dead_letter_queue: config.queues.evaluation.dlq,
+              },
+              {
+                queue: config.queues.evaluation.dlq,
+                max_batch_size: 1,
+                max_batch_timeout: 1,
+                max_retries: 3,
+                retry_delay: 30,
+              },
+            ]
+          : []),
         {
           queue: diagnostics.queue,
           max_batch_size: 1,
@@ -195,6 +255,7 @@ export default {
   const web = {
     ...common,
     name: config.workers.web,
+    queues: { producers: [{ binding: 'EVALUATION_QUEUE', queue: config.queues.evaluation.queue }] },
     services: [
       {
         binding: 'EVALUATION_PROBE',
@@ -243,37 +304,24 @@ function runtimeEnvironment(config: RuntimeConfig) {
 
 async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
   const project = await prepareRuntime(config);
-  const child = spawn(
-    process.execPath,
-    [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
-    {
-      cwd: project,
-      env: runtimeEnvironment(config),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  let output = '';
-  child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
+  await runNodeCommand({
+    args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
+    cwd: project,
+    env: runtimeEnvironment(config),
+    logPath: join(config.artifactDirectory, 'build.log'),
+    label: 'ローカルビルド',
+    timeoutMs: 120_000,
   });
-  child.stderr.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
-  });
-  const code = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('exit', resolve);
-  });
-  const logPath = join(config.artifactDirectory, 'build.log');
-  await writeFile(logPath, output);
-  if (code !== 0) throw new Error(`ローカルビルド失敗（${code}）。${logPath}を確認してください。`);
 }
 
 async function startUnlockedRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
   options: LocalRuntimeOptions = {},
+  signal?: AbortSignal,
 ): Promise<LocalRuntime> {
-  const project = await prepareRuntime(config, options);
+  const project = await prepareRuntime(config, options, signal);
+  signal?.throwIfAborted();
   const child = spawn(
     process.execPath,
     [
@@ -292,19 +340,29 @@ async function startUnlockedRuntime(
     },
   );
   let output = '';
-  const stopped = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  let stopping = false;
+  const closed = new Promise<{ exitCode: 0 | 1 }>((resolve) => {
+    child.once('exit', () => resolve({ exitCode: stopping ? 0 : 1 }));
+    child.once('error', () => resolve({ exitCode: 1 }));
+  });
   async function stop(): Promise<void> {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    if (child.pid) process.kill(-child.pid, 'SIGTERM');
-    await stopped;
+    stopping = true;
+    await stopProcessGroup(child);
     await writeFile(join(config.artifactDirectory, 'runtime.log'), output);
   }
   try {
+    let onAbort = () => {};
     const baseUrl = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(
         () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
         45_000,
       );
+      onAbort = () => {
+        clearTimeout(timeout);
+        reject(new Error('ローカル起動を中断しました。'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
       const collect = (chunk: Buffer) => {
         output += chunk.toString();
         const found = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
@@ -327,30 +385,19 @@ async function startUnlockedRuntime(
           ),
         );
       });
-    });
+    }).finally(() => signal?.removeEventListener('abort', onAbort));
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
-    const response = await fetch(baseUrl);
-    if (!response.ok) throw new Error(`Web起動確認が${response.status}で失敗しました。`);
-    return {
-      baseUrl,
-      stop,
-      async runScheduled() {
-        const url = new URL('/cdn-cgi/local/explorer/api/local/scheduled', baseUrl);
-        url.searchParams.set('worker', config.workers.evaluation);
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cron: '* * * * *' }),
-        });
-        const body = await response.json();
-        if (!response.ok || body.result?.outcome !== 'ok') {
-          throw new Error(`scheduledイベント失敗: ${JSON.stringify(body)}`);
-        }
-      },
-    };
+    await confirmHttpReady(baseUrl, 45_000, signal);
+    signal?.throwIfAborted();
+    if (child.exitCode !== null || child.signalCode !== null)
+      throw new Error('ローカルランタイムが起動確認中に終了しました。');
+    return connectLocalRuntime(baseUrl, stop, config.workers.evaluation, closed);
   } catch (error) {
-    await stop();
-    await writeFile(join(config.artifactDirectory, 'runtime.log'), output);
+    try {
+      await stop();
+    } catch {
+      throw new PendingRuntimeCleanup(stop);
+    }
     throw error;
   }
 }
@@ -364,28 +411,47 @@ export async function buildRuntime(config: RuntimeConfig): Promise<void> {
   }
 }
 
+export async function startRuntimeInProcess(
+  config: RuntimeConfig,
+  mode: 'dev' | 'preview' = 'dev',
+  options: LocalRuntimeOptions = {},
+  signal?: AbortSignal,
+): Promise<LocalRuntime> {
+  signal?.throwIfAborted();
+  if (
+    mode === 'preview' &&
+    (options.manualDiagnostics ||
+      options.probeOnlyEvaluation ||
+      options.holdEvaluationBeforeConsume ||
+      options.stopAfterResultBeforeAck)
+  )
+    throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
+  const release = await lockEnvironment(config);
+  try {
+    const runtime = await startUnlockedRuntime(config, mode, options, signal);
+    return {
+      ...runtime,
+      async stop() {
+        await runtime.stop();
+        release();
+      },
+    };
+  } catch (error) {
+    if (error instanceof PendingRuntimeCleanup) {
+      const retry = error.cleanup;
+      error.cleanup = async () => {
+        await retry();
+        release();
+      };
+    } else release();
+    throw error;
+  }
+}
+
 export async function startRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
   options: LocalRuntimeOptions = {},
 ): Promise<LocalRuntime> {
-  if (mode === 'preview' && (options.manualDiagnostics || options.probeOnlyEvaluation))
-    throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
-  const release = await lockEnvironment(config);
-  try {
-    const runtime = await startUnlockedRuntime(config, mode, options);
-    return {
-      ...runtime,
-      async stop() {
-        try {
-          await runtime.stop();
-        } finally {
-          release();
-        }
-      },
-    };
-  } catch (error) {
-    release();
-    throw error;
-  }
+  return startOwnedRuntime(config, mode, options);
 }

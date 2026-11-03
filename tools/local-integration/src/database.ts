@@ -1,5 +1,5 @@
 import { lockEnvironment } from './lock.ts';
-import { spawn } from 'node:child_process';
+import { runNodeCommand } from './process.ts';
 import { cp, mkdir, readlink, symlink, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,7 @@ async function linkDirectory(source: string, target: string): Promise<void> {
 
 interface DatabaseOptions {
   schemaDirectory?: string;
+  signal?: AbortSignal;
 }
 
 async function executeDatabaseCommand(
@@ -27,6 +28,7 @@ async function executeDatabaseCommand(
   args: DatabaseCommand,
   options: DatabaseOptions = {},
 ): Promise<void> {
+  options.signal?.throwIfAborted();
   if (config.environment === 'production' || !config.stateDirectory)
     throw new Error('ローカルDBだけを操作できます。');
   if (
@@ -98,27 +100,15 @@ async function executeDatabaseCommand(
       ...(args[0] === 'reset-seed' ? ['seed', '--yes'] : args),
     ],
   ]) {
-    const child = spawn(process.execPath, command, {
+    await runNodeCommand({
+      args: command,
       cwd: project,
       env,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      logPath: join(config.artifactDirectory, `db-${args[0]}.log`),
+      label: `DB ${args[0]}`,
+      timeoutMs: 30_000,
+      signal: options.signal,
     });
-    let output = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      output += chunk.toString();
-    });
-    const code = await new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('exit', resolve);
-    });
-    await writeFile(join(config.artifactDirectory, `db-${args[0]}.log`), output);
-    if (code !== 0)
-      throw new Error(
-        `DB ${args[0]}失敗（${code}）。${join(config.artifactDirectory, `db-${args[0]}.log`)}を確認してください。`,
-      );
   }
 }
 

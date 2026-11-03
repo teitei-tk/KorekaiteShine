@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run --exclude tests/end-to-end.test.ts --exclude tests/queue-retry.test.ts --exclude tests/formal-routing.test.ts --exclude tests/restart.test.ts --exclude tests/isolation.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test:integration": "vitest run tests/end-to-end.test.ts tests/queue-retry.test.ts tests/formal-routing.test.ts tests/restart.test.ts tests/http-contract.test.ts tests/isolation.test.ts"
   },
   "dependencies": {
     "@korekaite/database": "workspace:*",

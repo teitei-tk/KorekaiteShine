@@ -41,6 +41,10 @@ async function main(): Promise<void> {
     };
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
+    console.log(`生成物とログ: ${config.artifactDirectory}`);
+    if ((await runtime.closed).exitCode !== 0)
+      throw new Error('ローカルランタイムが予期せず終了しました。');
+    return;
   }
   console.log(`生成物とログ: ${config.artifactDirectory}`);
 }

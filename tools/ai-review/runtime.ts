@@ -49,11 +49,19 @@ type State = {
 };
 export function protectTree(path: string): void {
   const stat = lstatSync(path);
-  if (stat.isSymbolicLink()) return;
+  if (stat.isSymbolicLink()) {
+    return;
+  }
   chownSync(path, 0, 0);
-  if (lstatSync(path).uid !== 0) throw new Error('準備ファイルの所有者不一致');
+  if (lstatSync(path).uid !== 0) {
+    throw new Error('準備ファイルの所有者不一致');
+  }
   chmodSync(path, stat.isDirectory() || stat.mode & 0o111 ? 0o755 : 0o644);
-  if (stat.isDirectory()) for (const name of readdirSync(path)) protectTree(join(path, name));
+  if (stat.isDirectory()) {
+    for (const name of readdirSync(path)) {
+      protectTree(join(path, name));
+    }
+  }
 }
 function setup(directory: string, workspace: string, mark: Mark): void {
   mark('setup/metadata');
@@ -68,10 +76,12 @@ function setup(directory: string, workspace: string, mark: Mark): void {
   mark('setup/pr-owner');
   protectTree(worktree);
   mark('setup/context-copy');
-  for (const name of ['request.json', 'history.json'])
+  for (const name of ['request.json', 'history.json']) {
     cpSync(join(directory, name), join(context, name));
-  for (const name of ['schema.json', 'prompt.md'])
+  }
+  for (const name of ['schema.json', 'prompt.md']) {
     cpSync(join(workspace, 'tools/ai-review', name), join(context, name));
+  }
   mark('setup/context-owner');
   protectTree(context);
   mark('setup/config');
@@ -87,10 +97,13 @@ async function verify(state: State): Promise<void> {
     !alive(state.proxy) ||
     configHash() !== state.configHash ||
     metadataHash() !== state.metadataHash
-  )
+  ) {
     throw new Error('プロキシまたは信頼設定が変わりました');
+  }
   const info = await readInfo(state.infoPath);
-  if (info.pid !== state.proxy.pid) throw new Error('プロキシPID不一致');
+  if (info.pid !== state.proxy.pid) {
+    throw new Error('プロキシPID不一致');
+  }
   const processes = readdirSync('/proc')
     .filter((n) => /^\d+$/.test(n))
     .map(Number)
@@ -101,7 +114,9 @@ async function verify(state: State): Promise<void> {
         return false;
       }
     });
-  if (!processes.length) throw new Error('実runnerを確認できません');
+  if (!processes.length) {
+    throw new Error('実runnerを確認できません');
+  }
   const input: IsolationInput = {
     expectedUid: 2001,
     parentPid: state.proxy.pid,
@@ -129,7 +144,9 @@ async function verify(state: State): Promise<void> {
     encoding: 'utf8',
     timeout: 15000,
   });
-  if (outside.error || outside.status === null) throw new Error('UID隔離検査が失敗しました');
+  if (outside.error || outside.status === null) {
+    throw new Error('UID隔離検査が失敗しました');
+  }
   const report: IsolationReport = JSON.parse(outside.stdout);
   if (
     report.pidNamespace !== input.parentPidNamespace ||
@@ -139,8 +156,9 @@ async function verify(state: State): Promise<void> {
         !['read-only-directory-3', 'read-only-directory-4'].includes(c.name) &&
         !c.passed,
     )
-  )
+  ) {
     throw new Error('資格情報・信頼設定を隔離できません');
+  }
   const inside = spawnSync(
     '/usr/bin/sudo',
     [
@@ -158,7 +176,9 @@ async function verify(state: State): Promise<void> {
     ],
     { encoding: 'utf8', timeout: 15000 },
   );
-  if (inside.error || inside.status !== 0) throw new Error('読み取り専用隔離を確認できません');
+  if (inside.error || inside.status !== 0) {
+    throw new Error('読み取り専用隔離を確認できません');
+  }
   requireIsolationReport(
     inside.stdout,
     report.checks.map((c) => c.name),
@@ -167,8 +187,9 @@ async function verify(state: State): Promise<void> {
     redirect: 'error',
     signal: AbortSignal.timeout(3000),
   });
-  if (response.status !== 403 || !alive(state.proxy))
+  if (response.status !== 403 || !alive(state.proxy)) {
     throw new Error('検査中にプロキシが停止しました');
+  }
 }
 async function begin(mark: Mark): Promise<void> {
   mark('start/claims');
@@ -177,8 +198,9 @@ async function begin(mark: Mark): Promise<void> {
   const run = process.env.GITHUB_RUN_ID!,
     attempt = process.env.GITHUB_RUN_ATTEMPT!,
     sha = process.env.GITHUB_SHA!;
-  if (!/^[1-9]\d*$/.test(run) || !/^[1-9]\d*$/.test(attempt) || !/^[a-f0-9]{40}$/.test(sha))
+  if (!/^[1-9]\d*$/.test(run) || !/^[1-9]\d*$/.test(attempt) || !/^[a-f0-9]{40}$/.test(sha)) {
     throw new Error('生成元が不正です');
+  }
   mark('start/proxy');
   const infoPath = `${home}/${run}.json`;
   rmSync(infoPath, { force: true });
@@ -190,7 +212,9 @@ async function begin(mark: Mark): Promise<void> {
   const proxy = identity(pid);
   try {
     const info = await readInfo(infoPath, 60000);
-    if (info.pid !== pid) throw new Error('初期交換失敗');
+    if (info.pid !== pid) {
+      throw new Error('初期交換失敗');
+    }
     mark('start/config');
     chmodSync(infoPath, 0o444);
     writeFileSync(
@@ -211,7 +235,9 @@ async function begin(mark: Mark): Promise<void> {
     console.log('Official WIF proxy and PR isolation: passed');
   } catch (error) {
     const failed = mark('start/cleanup');
-    if (alive(proxy)) process.kill(proxy.pid, 'SIGKILL');
+    if (alive(proxy)) {
+      process.kill(proxy.pid, 'SIGKILL');
+    }
     rmSync(infoPath, { force: true });
     mark(failed);
     throw error;
@@ -219,12 +245,16 @@ async function begin(mark: Mark): Promise<void> {
 }
 async function shutdown(state: State): Promise<boolean> {
   const info = await readInfo(state.infoPath);
-  if (info.pid !== state.proxy.pid || !alive(state.proxy)) return false;
+  if (info.pid !== state.proxy.pid || !alive(state.proxy)) {
+    return false;
+  }
   const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
     redirect: 'error',
     signal: AbortSignal.timeout(3000),
   });
-  for (let i = 0; i < 60 && alive(state.proxy); i++) await delay(50);
+  for (let i = 0; i < 60 && alive(state.proxy); i++) {
+    await delay(50);
+  }
   const stopped = response.ok && !alive(state.proxy);
   console.log(`Official WIF shutdown: ${stopped ? 'passed' : 'failed'}`);
   return stopped;
@@ -236,12 +266,16 @@ async function finish(directory: string, outcome: string, mark: Mark): Promise<v
   try {
     try {
       mark('finish/action');
-      if (outcome !== 'success') throw new Error('公式Action未完了');
+      if (outcome !== 'success') {
+        throw new Error('公式Action未完了');
+      }
       mark('finish/isolation');
       await verify(state);
       mark('finish/output');
       const file = `${home}/tmp/review.json`;
-      if (!lstatSync(file).isFile()) throw new Error('結果ファイル不正');
+      if (!lstatSync(file).isFile()) {
+        throw new Error('結果ファイル不正');
+      }
       const review: ReviewInput = JSON.parse(readFileSync(file, 'utf8'));
       const metadata: Metadata = JSON.parse(readFileSync(`${privateDir}/metadata.json`, 'utf8'));
       mark('finish/artifact');
@@ -257,15 +291,21 @@ async function finish(directory: string, outcome: string, mark: Mark): Promise<v
     } finally {
       const previous = mark('finish/shutdown');
       stopped = await shutdown(state);
-      if (stopped) mark(previous);
+      if (stopped) {
+        mark(previous);
+      }
     }
   } finally {
     const previous = mark('finish/cleanup');
-    if (alive(state.proxy)) process.kill(state.proxy.pid, 'SIGKILL');
+    if (alive(state.proxy)) {
+      process.kill(state.proxy.pid, 'SIGKILL');
+    }
     rmSync(state.infoPath, { force: true });
     mark(previous);
   }
-  if (!stopped) throw new Error('公式終了API失敗');
+  if (!stopped) {
+    throw new Error('公式終了API失敗');
+  }
 }
 export async function executeRuntime(
   command: string,
@@ -276,23 +316,33 @@ export async function executeRuntime(
   let target: RuntimeTarget = 'runtime/preflight';
   const mark: Mark = (next) => {
     const previous = target;
-    if (next) target = next;
+    if (next) {
+      target = next;
+    }
     return previous;
   };
   try {
-    if (process.platform !== 'linux' || process.getuid?.() !== 0)
+    if (process.platform !== 'linux' || process.getuid?.() !== 0) {
       throw new Error('Linux rootが必要です');
-    if (command === 'setup') setup(directory, extra, mark);
-    else if (command === 'start') await begin(mark);
-    else if (command === 'finish') await finish(directory, extra, mark);
-    else throw new Error('コマンド不正');
+    }
+    if (command === 'setup') {
+      setup(directory, extra, mark);
+    } else if (command === 'start') {
+      await begin(mark);
+    } else if (command === 'finish') {
+      await finish(directory, extra, mark);
+    } else {
+      throw new Error('コマンド不正');
+    }
     return true;
   } catch {
     const message = `公式レビュー未完了: ${target}。`;
     console.error(message);
     try {
       writeStatusReport(env, 'failure', target, 'EXECUTION_FAILED');
-      if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, message + '\n');
+      if (env.GITHUB_STEP_SUMMARY) {
+        appendFileSync(env.GITHUB_STEP_SUMMARY, message + '\n');
+      }
     } catch {
       console.error('固定診断の保存に失敗しました。');
     }
@@ -301,5 +351,7 @@ export async function executeRuntime(
 }
 if (import.meta.main) {
   const [command, directory, extra] = process.argv.slice(2);
-  if (!(await executeRuntime(command, directory, extra))) process.exitCode = 1;
+  if (!(await executeRuntime(command, directory, extra))) {
+    process.exitCode = 1;
+  }
 }

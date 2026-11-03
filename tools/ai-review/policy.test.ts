@@ -19,12 +19,24 @@ describe('認証前のPR制限', () => {
     '%sを拒否する',
     (kind) => {
       const pr = prFixture();
-      if (kind === 'other') pr.user.id = 123;
-      if (kind === 'fork') pr.head.repo.id = 456;
-      if (kind === 'bot') pr.user.type = 'Bot';
-      if (kind === 'draft') pr.draft = true;
-      if (kind === 'closed') pr.state = 'closed';
-      if (kind === 'base') pr.base.ref = 'dev';
+      if (kind === 'other') {
+        pr.user.id = 123;
+      }
+      if (kind === 'fork') {
+        pr.head.repo.id = 456;
+      }
+      if (kind === 'bot') {
+        pr.user.type = 'Bot';
+      }
+      if (kind === 'draft') {
+        pr.draft = true;
+      }
+      if (kind === 'closed') {
+        pr.state = 'closed';
+      }
+      if (kind === 'base') {
+        pr.base.ref = 'dev';
+      }
       expect(eligible(kind === 'missing' ? {} : pr)).toBe(false);
     },
   );
@@ -51,11 +63,21 @@ describe('モデル出力の境界', () => {
   it('変更行にある指摘を受け入れる', () => expect(validReview(result, lines)).toEqual(result));
   it.each(['line', 'path', 'count', 'status', 'empty'])('%sが不正なら投稿しない', (kind) => {
     const r = structuredClone(result);
-    if (kind === 'line') r.findings[0].line = 80;
-    if (kind === 'path') r.findings[0].path = '../secret';
-    if (kind === 'count') r.findings = Array(4).fill(r.findings[0]);
-    if (kind === 'status') r.status = 'anything';
-    if (kind === 'empty') r.findings[0].impact = '';
+    if (kind === 'line') {
+      r.findings[0].line = 80;
+    }
+    if (kind === 'path') {
+      r.findings[0].path = '../secret';
+    }
+    if (kind === 'count') {
+      r.findings = Array(4).fill(r.findings[0]);
+    }
+    if (kind === 'status') {
+      r.status = 'anything';
+    }
+    if (kind === 'empty') {
+      r.findings[0].impact = '';
+    }
     expect(() => validReview(r, lines)).toThrow();
   });
   it('メンションとHTMLを投稿用テキストから無害化する', () => {

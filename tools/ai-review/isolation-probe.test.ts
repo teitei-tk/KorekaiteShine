@@ -26,8 +26,9 @@ it.each([
   },
 );
 afterEach(() => {
-  for (const directory of directories.splice(0))
+  for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 it('隔離されていない環境の資格情報・読取・書込を成功扱いせず、値を報告しない', async () => {
@@ -75,7 +76,9 @@ it('通信先へ到達できる場合にネットワーク隔離成功と表示�
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   try {
     const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('listener not ready');
+    if (!address || typeof address === 'string') {
+      throw new Error('listener not ready');
+    }
     const report = await probeIsolation({
       expectedUid: process.getuid?.() ?? 0,
       protectedFiles: [],

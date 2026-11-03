@@ -34,8 +34,9 @@ it('Dateのグローバル参照を拒否し、Temporalと同名のローカル�
       'export const value = Temporal.Now.instant();',
       'export function local(Date: string) { return Date; }',
       '// Dateの説明\nexport const label = "Date";',
-    ])
+    ]) {
       expect(lint(source).status).toBe(0);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

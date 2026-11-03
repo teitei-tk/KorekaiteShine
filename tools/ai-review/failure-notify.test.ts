@@ -58,8 +58,12 @@ function fixture(reason = 'OUTPUT_INVALID') {
     if (method) {
       expect(path).toBe('issues/7/comments');
       expect(method).toBe('POST');
-      if (failPost) throw new Error('SECRET_EXTERNAL_ERROR');
-      if (!body || !('body' in body)) throw new Error('missing body');
+      if (failPost) {
+        throw new Error('SECRET_EXTERNAL_ERROR');
+      }
+      if (!body || !('body' in body)) {
+        throw new Error('missing body');
+      }
       posted.push(body.body);
       const comment = {
         id: 100,
@@ -69,14 +73,23 @@ function fixture(reason = 'OUTPUT_INVALID') {
       prior.push(comment);
       return comment as T;
     }
-    if (path === 'actions/runs/20' || path === 'actions/runs/20/attempts/1') return run as T;
-    if (path === 'actions/runs/10') return source as T;
-    if (path.startsWith('actions/runs/20/attempts/1/jobs'))
+    if (path === 'actions/runs/20' || path === 'actions/runs/20/attempts/1') {
+      return run as T;
+    }
+    if (path === 'actions/runs/10') {
+      return source as T;
+    }
+    if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
-    if (path === 'pulls/7') return pr as T;
+    }
+    if (path === 'pulls/7') {
+      return pr as T;
+    }
     if (path.startsWith('issues/7/comments')) {
       commentReads++;
-      if (changeOnComments && commentReads === 2) pr.head.sha = 'c'.repeat(40);
+      if (changeOnComments && commentReads === 2) {
+        pr.head.sha = 'c'.repeat(40);
+      }
       return prior as T;
     }
     throw new Error('Unexpected path: ' + path);
@@ -138,12 +151,24 @@ it.each(['source', 'repo', 'branch', 'attempt', 'head', 'draft'])(
   '対象不一致には投稿しない: %s',
   async (scenario) => {
     const f = fixture();
-    if (scenario === 'source') f.source.path = '.github/workflows/other.yml';
-    if (scenario === 'repo') f.run.repository.id = 1;
-    if (scenario === 'branch') f.run.head_branch = 'feature';
-    if (scenario === 'attempt') f.run.run_attempt = 2;
-    if (scenario === 'head') f.pr.head.sha = 'c'.repeat(40);
-    if (scenario === 'draft') f.pr.draft = true;
+    if (scenario === 'source') {
+      f.source.path = '.github/workflows/other.yml';
+    }
+    if (scenario === 'repo') {
+      f.run.repository.id = 1;
+    }
+    if (scenario === 'branch') {
+      f.run.head_branch = 'feature';
+    }
+    if (scenario === 'attempt') {
+      f.run.run_attempt = 2;
+    }
+    if (scenario === 'head') {
+      f.pr.head.sha = 'c'.repeat(40);
+    }
+    if (scenario === 'draft') {
+      f.pr.draft = true;
+    }
     expect(await notifyFailure(f.api, 20, 1, f.directory)).toMatchObject({ status: 'skipped' });
     expect(f.posted).toHaveLength(0);
   },
@@ -283,13 +308,14 @@ it.each(['failure', 'cancelled', 'timed_out'])(
       method?: string,
       body?: import('./github.ts').ApiBody,
     ) => {
-      if (path.startsWith('actions/runs/20/attempts/1/jobs'))
+      if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },
             { name: 'publish', conclusion },
           ],
         } as T;
+      }
       return f.api<T>(path, method, body);
     };
     expect(await notifyFailure(api, 20, 1, f.directory)).toEqual({ status: 'skipped' });

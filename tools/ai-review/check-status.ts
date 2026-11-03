@@ -26,10 +26,12 @@ export async function completedOutcome(
   run: ReviewRun,
   directory?: string,
 ): Promise<Outcome> {
-  if (run.conclusion === 'cancelled')
+  if (run.conclusion === 'cancelled') {
     return { conclusion: 'cancelled', target: 'workflow', reason: 'CANCELLED' };
-  if (run.conclusion === 'timed_out')
+  }
+  if (run.conclusion === 'timed_out') {
     return { conclusion: 'timed_out', target: 'workflow', reason: 'TIMED_OUT' };
+  }
   let reports;
   try {
     reports = readStatusReports(directory, run.id, run.run_attempt);
@@ -37,13 +39,14 @@ export async function completedOutcome(
     return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_INVALID' };
   }
   const failure = reports.find((r) => r.status === 'failure');
-  if (failure)
+  if (failure) {
     return {
       conclusion: 'failure',
       target: failure.target,
       reason: failure.reason,
       ...(failure.diagnostic ? { diagnostic: failure.diagnostic } : {}),
     };
+  }
   if (run.conclusion !== 'success') {
     // 記録前の失敗（checkout、依存導入、Artifact取得など）にも安全な固定理由を付ける。
     let target = 'workflow';
@@ -56,7 +59,9 @@ export async function completedOutcome(
           ['failure', 'timed_out', 'cancelled'].includes(j.conclusion ?? '') &&
           ['gate', 'generate', 'publish'].includes(j.name),
       );
-      if (job) target = job.name;
+      if (job) {
+        target = job.name;
+      }
     } catch {
       /* 詳細取得失敗でも元実行の失敗を閉じる。 */
     }
@@ -69,14 +74,17 @@ export async function completedOutcome(
   const skipped = reports.find(
     (r) => r.status === 'neutral' && r.reason !== 'COST_BUDGET_EXCEEDED',
   );
-  if (skipped) return { conclusion: 'neutral', target: skipped.target, reason: skipped.reason };
+  if (skipped) {
+    return { conclusion: 'neutral', target: skipped.target, reason: skipped.reason };
+  }
   const posted = reports.find((r) => r.status === 'success');
-  if (posted)
+  if (posted) {
     return {
       conclusion: 'success',
       target: posted.target,
       reason: posted.reason,
       ...(posted.commentId ? { commentId: posted.commentId } : {}),
     };
+  }
   return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_MISSING' };
 }

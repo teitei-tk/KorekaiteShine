@@ -11,10 +11,13 @@ if (
   Object.values(networkInterfaces())
     .flat()
     .some((entry) => entry && !entry.internal)
-)
+) {
   throw new Error('requires root in an offline Linux network namespace');
+}
 const action = process.argv[2];
-if (!action) throw new Error('official Action path required');
+if (!action) {
+  throw new Error('official Action path required');
+}
 const pr = '/opt/ai-review-probe/pr';
 const home = '/home/ai-review/.codex';
 const original = readFileSync(`${home}/config.toml`, 'utf8');
@@ -33,7 +36,9 @@ const server = createServer((req, res) => {
 await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
 try {
   const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('local receiver unavailable');
+  if (!address || typeof address === 'string') {
+    throw new Error('local receiver unavailable');
+  }
   const provider = (name: string) => `
 [model_providers.${name}]
 name = "${name}"
@@ -81,7 +86,9 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
     );
     const extra = ['--ephemeral', '--json'];
     // 負の対照のみ。無害なcanaryが実際に起動することを確認し、通常検証では使わない。
-    if (trusted) extra.push('--dangerously-bypass-hook-trust');
+    if (trusted) {
+      extra.push('--dangerously-bypass-hook-trust');
+    }
     const args = [
       action,
       'run-codex-exec',
@@ -146,7 +153,9 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
         diagnostic += data.toString();
       });
       const timer = setTimeout(() => {
-        if (child.pid) process.kill(-child.pid, 'SIGKILL');
+        if (child.pid) {
+          process.kill(-child.pid, 'SIGKILL');
+        }
         reject(new Error('offline startup timed out'));
       }, 30000);
       child.once('error', (error) => {
@@ -155,7 +164,9 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
       });
       child.once('close', (code) => {
         clearTimeout(timer);
-        if (requests.length === 0) console.error(diagnostic);
+        if (requests.length === 0) {
+          console.error(diagnostic);
+        }
         resolve(code);
       });
     });
@@ -176,7 +187,9 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
         canaries: observed,
       }),
     );
-    if (!passed) throw new Error('offline startup boundary failed');
+    if (!passed) {
+      throw new Error('offline startup boundary failed');
+    }
   }
 } finally {
   writeFileSync(`${home}/config.toml`, original);

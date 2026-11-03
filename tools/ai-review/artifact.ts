@@ -71,8 +71,9 @@ export function validateMetadata(m: Metadata): Metadata {
       ([p, lines]) =>
         !p || !Array.isArray(lines) || lines.some((n) => !Number.isSafeInteger(n) || n < 1),
     )
-  )
+  ) {
     throw new Error('成果物の対象が不正です');
+  }
   return { ...m, history: normalizeSnapshot(m.history) };
 }
 export function createArtifact(
@@ -82,17 +83,22 @@ export function createArtifact(
   usage: ReviewArtifact['usage'],
 ): ReviewArtifact {
   const m = validateMetadata(metadata);
-  if (!validOrigin(origin)) throw new Error('生成元が不正です');
+  if (!validOrigin(origin)) {
+    throw new Error('生成元が不正です');
+  }
   const prior = reviewHistory(m.history.issues, m.history.inline, m.head, m.base);
   const review = validReview(input, m.lines, prior);
-  if (review.status !== 'complete') throw new Error('未完了の結果は投稿できません');
+  if (review.status !== 'complete') {
+    throw new Error('未完了の結果は投稿できません');
+  }
   if (
     usage !== null &&
     (!usage ||
       ![usage.input, usage.output, usage.total].every((n) => Number.isSafeInteger(n) && n >= 0) ||
       usage.total !== usage.input + usage.output)
-  )
+  ) {
     throw new Error('利用量が不正です');
+  }
   const resultHash = digest(JSON.stringify(review));
   const operations: Operation[] = [];
   function add(
@@ -103,10 +109,12 @@ export function createArtifact(
   ) {
     const id = digest(JSON.stringify([origin, resultHash, kind, target]));
     const text = [body, generationMarker(m, origin), operationMarker(id)].join('\n\n');
-    if (text.length > 60000) throw new Error('GitHubコメント上限を超えました');
+    if (text.length > 60000) {
+      throw new Error('GitHubコメント上限を超えました');
+    }
     operations.push({ id, kind, body: text, bodyHash: digest(text), ...extra });
   }
-  for (const [index, f] of review.findings.entries())
+  for (const [index, f] of review.findings.entries()) {
     add(
       'finding',
       String(index),
@@ -116,13 +124,15 @@ export function createArtifact(
       ].join('\n\n'),
       { path: f.path, line: f.line },
     );
+  }
   for (const check of review.checks ?? []) {
     const original = prior.find((f) => f.id === check.id)!;
     if (
       (latestFollowupStatus(original, m.history.issues, m.history.inline) ?? 'unfixed') ===
       check.status
-    )
+    ) {
       continue;
+    }
     const label = check.status === 'fixed' ? '☑️: 修正を確認しました' : '修正が確認できません';
     const reason =
       check.status === 'fixed' ? '修正済み' : check.status === 'unfixed' ? '未修正' : '確認不能';
@@ -176,11 +186,13 @@ export function validateArtifact(
     value.version !== 2 ||
     !validOrigin(expected) ||
     JSON.stringify(value.origin) !== JSON.stringify(expected)
-  )
+  ) {
     throw new Error('旧形式・生成元不一致のArtifactです');
+  }
   const rebuilt = createArtifact(value.metadata, value.review, expected, value.usage);
-  if (JSON.stringify(value) !== JSON.stringify(rebuilt))
+  if (JSON.stringify(value) !== JSON.stringify(rebuilt)) {
     throw new Error('Artifactの改訂値・結果・投稿操作が不正です');
+  }
   return rebuilt;
 }
 export function readArtifact(directory: string, expected: GenerationOrigin): ReviewArtifact {

@@ -58,7 +58,9 @@ export function lifecyclePassed(
 export function identity(pid: number): Identity {
   const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
   const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-  if (!/^\d+$/.test(start ?? '')) throw new Error('process identity unavailable');
+  if (!/^\d+$/.test(start ?? '')) {
+    throw new Error('process identity unavailable');
+  }
   return { pid, start };
 }
 export function alive(process: Identity): boolean {
@@ -88,8 +90,9 @@ export async function readInfo(path: string, timeoutMs = 5000): Promise<Info> {
         info.port! < 65536 &&
         Number.isInteger(info.pid) &&
         info.pid! > 0
-      )
+      ) {
         return info as Info;
+      }
     } catch {
       /* 書込み途中だけ再試行。成功は有効なJSONを読めた場合のみ。 */
     }
@@ -111,7 +114,9 @@ export function start(program: string, args: string[], input?: string): number {
   });
   child.stdin.end(input);
   child.unref();
-  if (!child.pid) throw new Error('failed to start fixture process');
+  if (!child.pid) {
+    throw new Error('failed to start fixture process');
+  }
   return child.pid;
 }
 
@@ -162,7 +167,9 @@ async function serve(mode: string): Promise<void> {
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('fixture receiver unavailable');
+  if (!address || typeof address === 'string') {
+    throw new Error('fixture receiver unavailable');
+  }
   writeFileSync(
     `${privateDir}/backend.json`,
     JSON.stringify({ port: address.port, pid: process.pid }),
@@ -220,7 +227,9 @@ export function verifyProxyIsolation(
     ['-u', 'ai-review', '--', '/usr/local/bin/node', '/opt/ai-review-probe/pr/probe-child.js'],
     { encoding: 'utf8', timeout: 10000 },
   );
-  if (outside.error || outside.status === null) throw new Error('proxy boundary probe failed');
+  if (outside.error || outside.status === null) {
+    throw new Error('proxy boundary probe failed');
+  }
   const report: IsolationReport = JSON.parse(outside.stdout);
   const required = [
     'uid',
@@ -240,8 +249,9 @@ export function verifyProxyIsolation(
   if (
     report.pidNamespace !== input.parentPidNamespace ||
     !required.every((name) => report.checks.some((check) => check.name === name && check.passed))
-  )
+  ) {
     throw new Error('proxy credentials or configuration are accessible');
+  }
   const inside = spawnSync(
     '/usr/bin/sudo',
     [
@@ -260,7 +270,9 @@ export function verifyProxyIsolation(
     ],
     { encoding: 'utf8', timeout: 10000 },
   );
-  if (inside.error || inside.status !== 0) throw new Error('proxy sandbox probe failed');
+  if (inside.error || inside.status !== 0) {
+    throw new Error('proxy sandbox probe failed');
+  }
   requireIsolationReport(
     inside.stdout,
     report.checks.map((check) => check.name),
@@ -278,7 +290,9 @@ async function prepare(mode: string, runId: string): Promise<void> {
     ]);
     started.push(identity(backendPid));
     const backend = await readInfo(`${privateDir}/backend.json`);
-    if (backend.pid !== backendPid) throw new Error('backend identity mismatch');
+    if (backend.pid !== backendPid) {
+      throw new Error('backend identity mismatch');
+    }
     const proxyPid = start(
       '/usr/local/bin/codex-responses-api-proxy',
       [
@@ -292,7 +306,9 @@ async function prepare(mode: string, runId: string): Promise<void> {
     );
     started.push(identity(proxyPid));
     const proxy = await readInfo(infoPath);
-    if (proxy.pid !== proxyPid) throw new Error('proxy identity mismatch');
+    if (proxy.pid !== proxyPid) {
+      throw new Error('proxy identity mismatch');
+    }
     chmodSync(infoPath, 0o444);
     configureProxy(proxy.port, 'isolation-fixture');
     const state: State = {
@@ -304,10 +320,16 @@ async function prepare(mode: string, runId: string): Promise<void> {
     };
     writeFileSync(`${privateDir}/lifecycle.json`, JSON.stringify(state), { mode: 0o600 });
     verifyProxyIsolation(proxy, infoPath);
-    if (!alive(state.proxy)) throw new Error('proxy exited during probe');
+    if (!alive(state.proxy)) {
+      throw new Error('proxy exited during probe');
+    }
     console.log('official proxy memory, config and server-info isolation: passed');
   } catch (error) {
-    for (const child of started) if (alive(child)) process.kill(child.pid, 'SIGTERM');
+    for (const child of started) {
+      if (alive(child)) {
+        process.kill(child.pid, 'SIGTERM');
+      }
+    }
     rmSync(infoPath, { force: true });
     throw error;
   }
@@ -341,27 +363,42 @@ async function finish(mode: string, outcome: string): Promise<void> {
     const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
       signal: AbortSignal.timeout(3000),
     });
-    for (let attempt = 0; attempt < 60 && alive(state.proxy); attempt++) await delay(50);
+    for (let attempt = 0; attempt < 60 && alive(state.proxy); attempt++) {
+      await delay(50);
+    }
     stopped = response.ok && !alive(state.proxy);
   } finally {
     // 異常時も自分が開始した同一プロセスだけを停止する。公式shutdownの失敗は合格にしない。
-    for (const child of [state.proxy, state.backend])
-      if (alive(child)) process.kill(child.pid, 'SIGTERM');
+    for (const child of [state.proxy, state.backend]) {
+      if (alive(child)) {
+        process.kill(child.pid, 'SIGTERM');
+      }
+    }
     rmSync(state.infoPath, { force: true });
   }
   console.log(
     JSON.stringify({ stage: 'official-action-lifecycle', mode, result: valid, shutdown: stopped }),
   );
-  if (!valid || !stopped) throw new Error('official Action/proxy lifecycle failed');
+  if (!valid || !stopped) {
+    throw new Error('official Action/proxy lifecycle failed');
+  }
 }
 
 if (import.meta.main) {
-  if (process.platform !== 'linux' || process.getuid?.() !== 0)
+  if (process.platform !== 'linux' || process.getuid?.() !== 0) {
     throw new Error('requires disposable Linux root');
+  }
   const [command, mode, extra] = process.argv.slice(2);
-  if (!['complete', 'reject'].includes(mode ?? '')) throw new Error('invalid fixture mode');
-  if (command === 'serve') await serve(mode);
-  else if (command === 'prepare' && /^\d+$/.test(extra ?? '')) await prepare(mode, extra);
-  else if (command === 'finish') await finish(mode, extra ?? '');
-  else throw new Error('invalid fixture command');
+  if (!['complete', 'reject'].includes(mode ?? '')) {
+    throw new Error('invalid fixture mode');
+  }
+  if (command === 'serve') {
+    await serve(mode);
+  } else if (command === 'prepare' && /^\d+$/.test(extra ?? '')) {
+    await prepare(mode, extra);
+  } else if (command === 'finish') {
+    await finish(mode, extra ?? '');
+  } else {
+    throw new Error('invalid fixture command');
+  }
 }

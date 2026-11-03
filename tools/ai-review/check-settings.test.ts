@@ -42,7 +42,9 @@ it('CLI経由でもghの標準出力・エラー出力を漏らさず、終了�
       expect(result.status).toBe(Number(code));
       expect(result.stderr).toBe('');
       expect(result.stdout).not.toMatch(/fixture|https:\/\/api/);
-      if (code === '0') expect(result.stdout).toContain('OPENAI_SERVICE_ACCOUNT_ID: 一致');
+      if (code === '0') {
+        expect(result.stdout).toContain('OPENAI_SERVICE_ACCOUNT_ID: 一致');
+      }
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -53,7 +55,9 @@ it('正しい形式でも実値を出さず、期待値未指定のIDを確認�
   const result = checkSettings(read(variables));
   expect(result.ok).toBe(true);
   expect(result.output).toContain('OPENAI_SERVICE_ACCOUNT_ID: 形式OK・期待値未指定');
-  for (const item of variables) expect(result.output).not.toContain(item.value);
+  for (const item of variables) {
+    expect(result.output).not.toContain(item.value);
+  }
 });
 
 it('期待値との一致と不一致を、どちらの値も出さずに報告する', () => {
@@ -91,8 +95,9 @@ it('欠落・空値・重複・不正なAudience・モードを拒否する', ()
     variables.map((item) =>
       item.name === 'AI_REVIEW_MODE' ? { ...item, value: 'unexpected-mode' } : item,
     ),
-  ])
+  ]) {
     expect(checkSettings(read(input)).ok).toBe(false);
+  }
 });
 
 it('取得失敗や壊れたJSONを、stdout・stderr・例外を漏らさず報告する', () => {

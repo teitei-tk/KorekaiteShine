@@ -119,7 +119,9 @@ export function writeStatusReport(
   const path =
     env.AI_REVIEW_REPORT ??
     (env.RUNNER_TEMP && env.AI_REVIEW_JOB ? join(env.RUNNER_TEMP, 'status.json') : undefined);
-  if (!path) return;
+  if (!path) {
+    return;
+  }
   const value = {
     version: 1,
     run: env.GITHUB_RUN_ID,
@@ -131,7 +133,9 @@ export function writeStatusReport(
     ...(diagnostic ? { diagnostic } : {}),
     ...(commentId !== undefined ? { commentId } : {}),
   };
-  if (!validReport(value as Partial<StatusReport>)) throw new Error('実行結果の形式が不正です');
+  if (!validReport(value as Partial<StatusReport>)) {
+    throw new Error('実行結果の形式が不正です');
+  }
   const json = JSON.stringify(value);
   writeFileSync(path, json);
 }
@@ -140,30 +144,39 @@ export function readStatusReports(
   run: number,
   attempt: number,
 ): StatusReport[] {
-  if (!directory) return [];
+  if (!directory) {
+    return [];
+  }
   const reports: StatusReport[] = [];
   const readReport = (path: string, job?: ReportJob): StatusReport => {
     const stat = statSync(path);
-    if (!stat.isFile()) throw new Error('実行結果が大きすぎます');
+    if (!stat.isFile()) {
+      throw new Error('実行結果が大きすぎます');
+    }
     const value = JSON.parse(readFileSync(path, 'utf8')) as Partial<StatusReport> | null;
     if (
       !validReport(value) ||
       value.run !== String(run) ||
       value.attempt !== String(attempt) ||
       (job !== undefined && value.job !== job)
-    )
+    ) {
       throw new Error('実行結果の生成元が不正です');
+    }
     return value;
   };
   for (const job of ['gate', 'generate', 'publish'] as const) {
     const path = join(directory, `ai-review-status-${run}-${attempt}-${job}`, 'status.json');
-    if (!existsSync(path)) continue;
+    if (!existsSync(path)) {
+      continue;
+    }
     reports.push(readReport(path, job));
   }
   // download-artifact v8は取得対象が1件なら指定先の直下へ展開する。
   const single = join(directory, 'status.json');
   if (existsSync(single)) {
-    if (reports.length) throw new Error('単一・複数Artifactの展開結果が混在しています');
+    if (reports.length) {
+      throw new Error('単一・複数Artifactの展開結果が混在しています');
+    }
     reports.push(readReport(single));
   }
   return reports;
@@ -182,8 +195,9 @@ export function recordExecutionFailure(env: Record<string, string | undefined>):
         value.attempt === env.GITHUB_RUN_ATTEMPT &&
         value.job === env.AI_REVIEW_JOB &&
         value.status === 'failure'
-      )
+      ) {
         return;
+      }
     } catch {
       /* 欠落・旧試行・不正な記録を信用しない。 */
     }

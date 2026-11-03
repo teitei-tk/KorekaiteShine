@@ -14,7 +14,9 @@ export function changedLines(patch: string): number[] {
       line = Number(hunk[1]);
       continue;
     }
-    if (!line) continue;
+    if (!line) {
+      continue;
+    }
     if (text.startsWith('+')) {
       result.push(line++);
     } else if (text.startsWith(' ')) {
@@ -72,12 +74,14 @@ export function collectFromGit(
   sourceRun: string,
 ): Metadata {
   const ancestor = git('merge-base', pr.base.sha, pr.head.sha).trim();
-  if (!/^[a-f0-9]{40}$/.test(ancestor)) throw new Error('比較元を確定できません');
+  if (!/^[a-f0-9]{40}$/.test(ancestor)) {
+    throw new Error('比較元を確定できません');
+  }
   const paths = git('diff', '--name-only', '-z', '--no-renames', ancestor, pr.head.sha)
     .split('\0')
     .filter(Boolean);
   const lines: Record<string, number[]> = Object.create(null);
-  for (const path of paths)
+  for (const path of paths) {
     lines[path] = changedLines(
       git(
         'diff',
@@ -91,6 +95,7 @@ export function collectFromGit(
         path,
       ),
     );
+  }
   const metadata = validateMetadata({
     version: 2,
     repository: REPOSITORY,

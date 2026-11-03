@@ -11,7 +11,9 @@ const workflow: { jobs: { docs: { steps: { id?: string; run?: string }[] } } } =
 );
 const script = (() => {
   const run = workflow.jobs.docs.steps.find((step) => step.id === 'changes')?.run;
-  if (!run) throw new Error('文書の変更判定ステップが見つかりません');
+  if (!run) {
+    throw new Error('文書の変更判定ステップが見つかりません');
+  }
   return run;
 })();
 
@@ -103,8 +105,11 @@ test.each([
 test.each(['削除', '移動'])('Markdown以外のファイルの%sでもリンクを検査する', async (operation) => {
   const f = await fixture();
   const image = path.join(f.root, 'image.png');
-  if (operation === '削除') await rm(image);
-  else await rename(image, path.join(f.root, 'renamed.png'));
+  if (operation === '削除') {
+    await rm(image);
+  } else {
+    await rename(image, path.join(f.root, 'renamed.png'));
+  }
   f.commit();
   expect(await f.detect('push')).toBe('required=true');
 });

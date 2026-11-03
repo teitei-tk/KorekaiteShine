@@ -67,7 +67,9 @@ it('失敗箇所は固定ラベルで示し未知の名前・外部エラーを�
   expect(output.join('\n')).not.toContain('SECRET');
 });
 it('不正な状態・応答・IDを拒否する', async () => {
-  for (const value of ['not json', '{}', raw('SECRET')]) expect(() => runSnapshot(value)).toThrow();
+  for (const value of ['not json', '{}', raw('SECRET')]) {
+    expect(() => runSnapshot(value)).toThrow();
+  }
   let called = false;
   const output: string[] = [];
   expect(
@@ -185,6 +187,7 @@ it('CLIは期待SHAと監視指定の順序を許容し、不正・重複オプ�
     ['--expect-commit', 'abc'],
     ['--watch', '--watch'],
     ['--SECRET'],
-  ])
+  ]) {
     expect(() => parseRunArgs(['123', ...options])).toThrow();
+  }
 });

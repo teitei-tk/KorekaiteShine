@@ -251,3 +251,9 @@ it('監視開始日時が不正なら実行一覧を照合しない', async () =
   await expect(inspectReview(f.api, f.revision)).rejects.toThrow('監視対象が不正です');
   expect(f.calls).toEqual([]);
 });
+it('存在しない暦日を監視開始日時として受け付けない', async () => {
+  const f = fixture();
+  f.revision.since = '2026-02-30T00:00:00Z';
+  await expect(inspectReview(f.api, f.revision)).rejects.toThrow('監視対象が不正です');
+  expect(f.calls).toEqual([]);
+});

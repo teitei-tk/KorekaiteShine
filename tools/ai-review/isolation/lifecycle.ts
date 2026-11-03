@@ -78,8 +78,8 @@ export function configHash(): string {
     .digest('hex');
 }
 export async function readInfo(path: string, timeoutMs = 5000): Promise<Info> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+  const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
+  while (Temporal.Now.instant().epochMilliseconds < deadline) {
     try {
       const info: Partial<Info> = JSON.parse(readFileSync(path, 'utf8'));
       if (

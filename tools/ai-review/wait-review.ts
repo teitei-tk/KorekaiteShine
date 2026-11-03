@@ -31,9 +31,16 @@ type Inspection =
 function positive(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }
+function epochMilliseconds(value: string): number {
+  try {
+    return Temporal.Instant.from(value).epochMilliseconds;
+  } catch {
+    return Number.NaN;
+  }
+}
 function validRevision(revision: Revision): boolean {
   return (
-    Number.isFinite(Date.parse(revision.since)) &&
+    Number.isFinite(epochMilliseconds(revision.since)) &&
     positive(revision.number) &&
     /^[a-f0-9]{40}$/.test(revision.head) &&
     /^[a-f0-9]{40}$/.test(revision.base)
@@ -75,7 +82,7 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
     'docs.yml',
     'pull_request',
     (run) =>
-      Date.parse(run.created_at) >= Date.parse(revision.since) &&
+      epochMilliseconds(run.created_at) >= epochMilliseconds(revision.since) &&
       run.event === 'pull_request' &&
       run.path === '.github/workflows/docs.yml' &&
       run.repository?.id === REPOSITORY_ID &&
@@ -117,7 +124,7 @@ export async function waitReview(
   api: ReadApi,
   revision: Revision,
   clock = {
-    now: Date.now,
+    now: () => Temporal.Now.instant().epochMilliseconds,
     sleep: async () => {
       await setTimeout(15_000);
     },

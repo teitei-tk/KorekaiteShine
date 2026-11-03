@@ -58,8 +58,8 @@ export async function authenticateProxy(
   let stopped = false;
   try {
     child.stdin!.end(`${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}\n`);
-    const deadline = Date.now() + timeoutMs;
-    while (running() && Date.now() < deadline) {
+    const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
+    while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
       let candidate: Partial<Info> | undefined;
       try {
         candidate = JSON.parse(readFileSync(infoPath, 'utf8'));
@@ -91,8 +91,8 @@ export async function authenticateProxy(
           redirect: 'error',
           signal: AbortSignal.timeout(3000),
         });
-        const deadline = Date.now() + Math.min(timeoutMs, 3000);
-        while (running() && Date.now() < deadline) await delay(25);
+        const deadline = Temporal.Now.instant().epochMilliseconds + Math.min(timeoutMs, 3000);
+        while (running() && Temporal.Now.instant().epochMilliseconds < deadline) await delay(25);
         stopped = response.ok && child.exitCode === 0;
       }
     } finally {

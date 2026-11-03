@@ -53,6 +53,12 @@ async function prepareRuntime(
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
   await writeFile(
+    join(project, 'src/routes/diagnostics.tsx'),
+    `import { createFileRoute } from '@tanstack/react-router';
+import { DiagnosticPage } from '../diagnostics/page';
+export const Route = createFileRoute('/diagnostics')({ component: DiagnosticPage });\n`,
+  );
+  await writeFile(
     join(project, 'src/routes/api.diagnostics.check-jobs.ts'),
     `import { createFileRoute } from '@tanstack/react-router';
 import { env, waitUntil } from 'cloudflare:workers';

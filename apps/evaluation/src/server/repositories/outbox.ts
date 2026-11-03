@@ -12,7 +12,7 @@ import {
   or,
   sql,
 } from 'void/db';
-import { jobs, jobOutbox, deletedJobs } from '@korekaite/database';
+import { jobs, jobOutbox, deletedJobs, dlqReceipts } from '@korekaite/database';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { runnableJobStates } from '../../domain/job-state';
 
@@ -98,7 +98,7 @@ export async function ensureRecoveryNotification(
 
 const notificationRecoveryGraceMs = 30_000;
 
-/** 配送直後の猶予を置き、実行されていない現世代の通知だけを再送待ちへ戻す。 */
+/** 配送直後の猶予を置き、未実行またはDLQ未受信の現世代通知を再送待ちへ戻す。 */
 export async function recoverOverdueNotifications(db: Database, now: number): Promise<void> {
   const threshold = now - notificationRecoveryGraceMs;
   await db
@@ -106,7 +106,6 @@ export async function recoverOverdueNotifications(db: Database, now: number): Pr
     .set({ sentAt: null })
     .where(
       and(
-        eq(jobOutbox.operation, 'notify'),
         isNotNull(jobOutbox.sentAt),
         lte(jobOutbox.sentAt, threshold),
         lte(jobOutbox.scheduledAt, threshold),
@@ -119,10 +118,31 @@ export async function recoverOverdueNotifications(db: Database, now: number): Pr
                 eq(jobs.jobId, jobOutbox.jobId),
                 eq(jobs.purpose, jobOutbox.purpose),
                 eq(jobs.generation, jobOutbox.generation),
-                inArray(jobs.status, runnableJobStates),
-                lt(jobs.attemptCount, 4),
-                or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, threshold)),
                 notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
+                or(
+                  and(
+                    eq(jobOutbox.operation, 'notify'),
+                    inArray(jobs.status, runnableJobStates),
+                    lt(jobs.attemptCount, 4),
+                    or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, threshold)),
+                  ),
+                  and(
+                    eq(jobOutbox.operation, 'notify_dlq'),
+                    eq(jobs.status, 'failed'),
+                    notExists(
+                      db
+                        .select()
+                        .from(dlqReceipts)
+                        .where(
+                          and(
+                            eq(dlqReceipts.jobId, jobs.jobId),
+                            eq(dlqReceipts.purpose, jobs.purpose),
+                            eq(dlqReceipts.observedStatus, 'failed'),
+                          ),
+                        ),
+                    ),
+                  ),
+                ),
               ),
             ),
         ),

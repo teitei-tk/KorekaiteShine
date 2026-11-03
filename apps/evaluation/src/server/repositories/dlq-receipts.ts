@@ -97,6 +97,26 @@ export async function recordDlqReceipt(
       })
       .returning({ jobId: dlqReceipts.jobId }),
     db
+      .update(jobs)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          matchingJob,
+          exists(receipt),
+          exists(
+            db
+              .select()
+              .from(diagnosticChecks)
+              .where(
+                and(
+                  eq(diagnosticChecks.jobId, jobs.jobId),
+                  eq(diagnosticChecks.dlqReceipt, 'pending'),
+                ),
+              ),
+          ),
+        ),
+      ),
+    db
       .update(diagnosticChecks)
       .set({ dlqReceipt: 'passed' })
       .where(

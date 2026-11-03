@@ -8,6 +8,68 @@ import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
+test('DLQ確認の初回変更と公開更新日時を一体保存し、保存失敗と重複受信では日時を変えない', async () => {
+  const config = resolveRuntime({
+    repositoryRoot,
+    appEnv: 'test',
+    runId: randomUUID(),
+    parallelIndex: 0,
+  });
+  const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+  let succeeded = false;
+  try {
+    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ scenario: 'exhaust_retries' }),
+    });
+    expect(response.status).toBe(202);
+    const { jobId } = await response.json();
+    const failedAt = Date.now();
+    const receivedAt = failedAt + 1000;
+    const messageId = randomUUID();
+    await runDatabaseCommand(config, [
+      'execute',
+      `UPDATE jobs SET status = 'failed', finished_at = ${failedAt}, updated_at = ${failedAt} WHERE job_id = '${jobId}';
+      CREATE TRIGGER reject_confirmation BEFORE UPDATE ON diagnostic_checks WHEN NEW.dlq_receipt = 'passed' BEGIN SELECT RAISE(FAIL, 'simulated_confirmation_failure'); END;`,
+    ]);
+    const deliver = async (now: number) =>
+      (
+        await fetch(
+          `${runtime.baseUrl}/api/evaluation-test?kind=dlq&messageId=${messageId}&now=${now}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schemaVersion: 1, jobId }),
+          },
+        )
+      ).json();
+    const status = async () =>
+      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+    expect(await deliver(receivedAt)).toEqual({ action: 'retry', delaySeconds: 30 });
+    expect(await status()).toMatchObject({
+      updatedAt: new Date(failedAt).toISOString(),
+      checks: { dlqReceipt: 'pending' },
+    });
+    await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_confirmation;']);
+    expect(await deliver(receivedAt)).toEqual({ action: 'ack' });
+    expect(await status()).toMatchObject({
+      updatedAt: new Date(receivedAt).toISOString(),
+      finishedAt: new Date(failedAt).toISOString(),
+      checks: { dlqReceipt: 'passed' },
+    });
+    expect(await deliver(receivedAt + 1000)).toEqual({ action: 'ack' });
+    expect(await status()).toMatchObject({
+      updatedAt: new Date(receivedAt).toISOString(),
+      checks: { dlqReceipt: 'passed' },
+    });
+    succeeded = true;
+  } finally {
+    await runtime.stop();
+    if (succeeded) await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
+  }
+}, 60_000);
+
 test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受信保存後にpassedにする', async () => {
   const config = resolveRuntime({
     repositoryRoot,

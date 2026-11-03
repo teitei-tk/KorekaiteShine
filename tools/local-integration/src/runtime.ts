@@ -5,7 +5,7 @@ import { lockEnvironment } from './lock.ts';
 import { runDatabaseCommand } from './database.ts';
 export { runDatabaseCommand } from './database.ts';
 import { spawn } from 'node:child_process';
-import { cp, mkdir, readlink, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
@@ -60,6 +60,7 @@ async function prepareRuntime(
   await runDatabaseCommand(config, ['migrate'], { signal });
   const project = join(config.artifactDirectory, 'web');
   await mkdir(project, { recursive: true });
+  await rm(join(project, 'src'), { recursive: true, force: true });
   await cp(join(repositoryRoot, 'apps/web/src'), join(project, 'src'), {
     recursive: true,
     filter: (source) => !source.endsWith('routeTree.gen.ts'),

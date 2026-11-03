@@ -4,6 +4,13 @@
     "correctness": "error"
   },
   "rules": {
+    "no-restricted-globals": [
+      "error",
+      {
+        "globals": [{ "name": "Date", "message": "DateではなくTemporalを使用してください。" }],
+        "checkGlobalObject": true
+      }
+    ],
     "typescript/no-restricted-types": [
       "error",
       {

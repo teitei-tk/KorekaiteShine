@@ -14,3 +14,18 @@ test('型定義だけを信用せず、契約に違反するAPI応答を拒否�
     '面接一覧の形式が契約と一致しません。',
   );
 });
+
+test('一覧取得のHTTP500を成功結果として返さない', async () => {
+  await expect(
+    getInterviews('http://localhost', async () => Response.json({ items: [] }, { status: 500 })),
+  ).rejects.toThrow('面接一覧を取得できませんでした。');
+});
+
+test('一覧取得の通信例外を呼び出し元へ伝える', async () => {
+  const cause = new TypeError('network');
+  await expect(
+    getInterviews('http://localhost', async () => {
+      throw cause;
+    }),
+  ).rejects.toBe(cause);
+});

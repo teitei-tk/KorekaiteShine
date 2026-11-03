@@ -95,11 +95,11 @@
 
 **インターフェース：** `getInterviews(baseUrl, fetcher)`、`createDiagnosticRun(scenario, options).start()`、`getDiagnosticStatus(jobId, options)`、`bodyValidationDetails(errors)`を直接検査する。公開シグネチャは変更しない。
 
-- [ ] 一覧取得のHTTP 500と通信例外、診断開始のHTTP 409・503と契約外202本文、状態取得のHTTP 404・503を1ケースずつ追加する。エラー本文を成功結果へ返さないことをassertする。
-- [ ] 別の`createDiagnosticRun`には異なる固定UUIDを返すnewIdを注入し、各要求のキーが異なることを確認する。同じ実行の再送テストは既存のものを維持する。
-- [ ] 入力エラー以外の400本文を`DiagnosticValidationError`として扱わないことを検査する。説明文を変更してもcodeに基づく分類が変わらないことを確認する。
-- [ ] エラー整形は、未定義errorsで空配列、requiredで`REQUIRED`、追加項目で`UNRECOGNIZED_FIELD`、formatで`INVALID_FORMAT`を検査する。項目名`a~/b`が`/a~0~1b`になることをassertする。
-- [ ] 各ケースの`pnpm test`と最終`pnpm check`が成功したら、`test: Webクライアントと入力エラーの境界を補強`としてcommitする。
+- [x] 一覧取得のHTTP 500と通信例外、診断開始のHTTP 409・503と契約外202本文、状態取得のHTTP 404・503を1ケースずつ追加する。エラー本文を成功結果へ返さないことをassertする。
+- [x] 別の`createDiagnosticRun`には異なる固定UUIDを返すnewIdを注入し、各要求のキーが異なることを確認する。同じ実行の再送テストは既存のものを維持する。
+- [x] 入力エラー以外の400本文を`DiagnosticValidationError`として扱わないことを検査する。説明文を変更してもcodeに基づく分類が変わらないことを確認する。
+- [x] エラー整形は、未定義errorsで空配列、requiredで`REQUIRED`、追加項目で`UNRECOGNIZED_FIELD`、formatで`INVALID_FORMAT`を検査する。項目名`a~/b`が`/a~0~1b`になることをassertする。
+- [x] 各ケースの`pnpm test`と最終`pnpm check`が成功したら、`test: Webクライアントと入力エラーの境界を補強`としてcommitする。
 
 ## タスク4：Evaluationの単体テストを所有アプリへ置く
 

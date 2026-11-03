@@ -99,3 +99,141 @@ test('入力エラーを説明文ではなくcodeと型付きdetailsで扱う', 
     requestId: '7e318b72-f255-4f17-845b-714d487ae621',
   });
 });
+
+test('診断開始のHTTP409を受付結果として返さない', async () => {
+  const run = createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher: async () =>
+      Response.json(
+        {
+          error: {
+            code: 'IDEMPOTENCY_KEY_CONFLICT',
+            message: '説明',
+            requestId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+          },
+        },
+        { status: 409 },
+      ),
+  });
+  await expect(run.start()).rejects.toThrow('診断の受付を確認できませんでした。');
+});
+
+test('診断開始のHTTP503を受付結果として返さない', async () => {
+  const run = createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher: async () =>
+      Response.json(
+        {
+          error: {
+            code: 'SERVICE_UNAVAILABLE',
+            message: '説明',
+            requestId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+          },
+        },
+        { status: 503 },
+      ),
+  });
+  await expect(run.start()).rejects.toThrow('診断の受付を確認できませんでした。');
+});
+
+test('202でも契約外の本文を受付結果として返さない', async () => {
+  const run = createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher: async () => Response.json({ jobId: 'invalid' }, { status: 202 }),
+  });
+  await expect(run.start()).rejects.toThrow('契約');
+});
+
+test('状態取得のHTTP404を診断結果として返さない', async () => {
+  await expect(
+    getDiagnosticStatus('de82593e-01ef-4871-80e2-a8b8ba46ae95', {
+      baseUrl: 'http://localhost',
+      fetcher: async () =>
+        Response.json(
+          {
+            error: {
+              code: 'JOB_NOT_FOUND',
+              message: '説明',
+              requestId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+            },
+          },
+          { status: 404 },
+        ),
+    }),
+  ).rejects.toThrow('診断の状態を取得できませんでした。');
+});
+
+test('状態取得のHTTP503を診断結果として返さない', async () => {
+  await expect(
+    getDiagnosticStatus('de82593e-01ef-4871-80e2-a8b8ba46ae95', {
+      baseUrl: 'http://localhost',
+      fetcher: async () =>
+        Response.json(
+          {
+            error: {
+              code: 'SERVICE_UNAVAILABLE',
+              message: '説明',
+              requestId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+            },
+          },
+          { status: 503 },
+        ),
+    }),
+  ).rejects.toThrow('診断の状態を取得できませんでした。');
+});
+
+test('別の診断実行はそれぞれの冪等キーを送信する', async () => {
+  const keys: (string | null)[] = [];
+  const fetcher: typeof fetch = async (input) => {
+    keys.push(new Request(input).headers.get('Idempotency-Key'));
+    return Response.json(
+      {
+        jobId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+        scenario: 'success',
+        acceptedAt: '2026-11-03T00:00:00.000Z',
+      },
+      { status: 202 },
+    );
+  };
+  await createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher,
+    newId: () => '7e318b72-f255-4f17-845b-714d487ae621',
+  }).start();
+  await createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher,
+    newId: () => 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+  }).start();
+  expect(keys).toEqual([
+    '7e318b72-f255-4f17-845b-714d487ae621',
+    'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+  ]);
+});
+
+test('400の別codeを型付き入力エラーとして扱わない', async () => {
+  const run = createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher: async () =>
+      Response.json(
+        {
+          error: {
+            code: 'OTHER_ERROR',
+            message: 'VALIDATION_ERROR',
+            requestId: 'de82593e-01ef-4871-80e2-a8b8ba46ae95',
+            details: [],
+          },
+        },
+        { status: 400 },
+      ),
+  });
+  await expect(run.start()).rejects.toThrow('診断の受付を確認できませんでした。');
+});
+
+test('400の不完全な本文を型付き入力エラーとして扱わない', async () => {
+  const run = createDiagnosticRun('success', {
+    baseUrl: 'http://localhost',
+    fetcher: async () => Response.json({ error: { code: 'VALIDATION_ERROR' } }, { status: 400 }),
+  });
+  await expect(run.start()).rejects.toThrow('診断の受付を確認できませんでした。');
+});

@@ -6,7 +6,7 @@ import { formatStartedAt } from '../lib/date-time';
 
 export const Route = createFileRoute('/')({ component: InterviewPage });
 
-function InterviewPage() {
+export function InterviewPage() {
   const [result, setResult] = useState<components['schemas']['InterviewList'] | null>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);

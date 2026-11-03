@@ -14,19 +14,30 @@ export function latestFollowupStatus(
     : issues;
   const latest = replies
     .filter((c) => {
-      if (!ownComment(c) || !Number.isSafeInteger(c.id)) return false;
+      if (!ownComment(c) || !Number.isSafeInteger(c.id)) {
+        return false;
+      }
       const marker = /^<!-- followup:(.+):([a-f0-9]{40}):([a-f0-9]{40}) -->$/m.exec(c.body);
       return marker?.[1] === original.id;
     })
     .sort((a, b) => b.id - a.id)[0];
-  if (!latest) return;
+  if (!latest) {
+    return;
+  }
   const state = /^<!-- followup-state:v1:(fixed|unfixed|unverified) -->$/m.exec(latest.body)?.[1];
-  if (state === 'fixed' || state === 'unfixed' || state === 'unverified') return state;
+  if (state === 'fixed' || state === 'unfixed' || state === 'unverified') {
+    return state;
+  }
   // 投稿済みの旧形式も読めるように、固定見出し・固定ラベルを読む。
-  if (/^### ☑️: 修正を確認しました$/m.test(latest.body) && /^修正済み: /m.test(latest.body))
+  if (/^### ☑️: 修正を確認しました$/m.test(latest.body) && /^修正済み: /m.test(latest.body)) {
     return 'fixed';
+  }
   if (/^### 修正が確認できません$/m.test(latest.body)) {
-    if (/^未修正: /m.test(latest.body)) return 'unfixed';
-    if (/^確認不能: /m.test(latest.body)) return 'unverified';
+    if (/^未修正: /m.test(latest.body)) {
+      return 'unfixed';
+    }
+    if (/^確認不能: /m.test(latest.body)) {
+      return 'unverified';
+    }
   }
 }

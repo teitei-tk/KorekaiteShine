@@ -29,7 +29,9 @@ it.each([1000, 1001])('通常・行コメント%s件を打ち切らない', asyn
 });
 it('末尾API失敗は部分履歴にしない', async () => {
   const api: Api = async <T>(path: string) => {
-    if (path.endsWith('page=12')) throw new Error('tail failed');
+    if (path.endsWith('page=12')) {
+      throw new Error('tail failed');
+    }
     return Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })) as T;
   };
   await expect(comments(api, 1)).rejects.toThrow('tail failed');
@@ -41,10 +43,18 @@ it('取得順だけでは改訂にならない', () => {
 });
 it.each(['body', 'reply', 'resolved', 'deleted'])('変更%sを検出する', (kind) => {
   const changed = structuredClone(input);
-  if (kind === 'body') changed.inline[0].body = 'edited';
-  if (kind === 'reply') changed.inline[1].body = 'edited reply';
-  if (kind === 'resolved') changed.threads[0].resolved = true;
-  if (kind === 'deleted') changed.issues = [];
+  if (kind === 'body') {
+    changed.inline[0].body = 'edited';
+  }
+  if (kind === 'reply') {
+    changed.inline[1].body = 'edited reply';
+  }
+  if (kind === 'resolved') {
+    changed.threads[0].resolved = true;
+  }
+  if (kind === 'deleted') {
+    changed.issues = [];
+  }
   expect(snapshotRevision(normalizeSnapshot(changed))).not.toBe(
     snapshotRevision(normalizeSnapshot(input)),
   );
@@ -65,7 +75,9 @@ it('21返信・16KiB本文・128KiB履歴を切り捨てない', () => {
 });
 it('Resolve状態が取得できない時は停止する', async () => {
   const api: Api = async <T>(path: string) => {
-    if (path === 'graphql') return { errors: [{ message: 'failed' }] } as T;
+    if (path === 'graphql') {
+      return { errors: [{ message: 'failed' }] } as T;
+    }
     return [] as T;
   };
   await expect(loadSnapshot(api, 1)).rejects.toThrow();

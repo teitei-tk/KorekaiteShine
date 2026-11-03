@@ -17,7 +17,9 @@ export async function prepareReview(
   let targetId = 'gate';
   let fallback: FailureReason = 'TARGET_FAILED';
   try {
-    if (!api && !env.GH_TOKEN) throw new ReviewFailure('AUTH_FAILED', 'GitHub認証がありません');
+    if (!api && !env.GH_TOKEN) {
+      throw new ReviewFailure('AUTH_FAILED', 'GitHub認証がありません');
+    }
     const client = api ?? githubApi(env.GH_TOKEN!);
     const result = await target(client, Number(env.SOURCE_RUN_ID));
     if (result.status !== 'ready') {
@@ -35,7 +37,9 @@ export async function prepareReview(
       targetId = 'collect';
       fallback = 'INPUT_INVALID';
       const directory = env.REVIEW_DIRECTORY;
-      if (!directory) throw new Error('資料ディレクトリがありません');
+      if (!directory) {
+        throw new Error('資料ディレクトリがありません');
+      }
       mkdirSync(directory, { recursive: true });
       targetId = 'history';
       fallback = 'HISTORY_FAILED';
@@ -50,8 +54,9 @@ export async function prepareReview(
             /<!-- generation:v2:\d+:\d+:/.test(c.body) &&
             c.body.includes(`:${pr.head.sha}:${pr.base.sha} -->`),
         )
-      )
+      ) {
         throw new Error('途中投稿があります。同じArtifactで投稿を再開してください');
+      }
       targetId = 'collect';
       fallback = 'COLLECTION_FAILED';
       collectMaterial(pr, directory, history, env.SOURCE_RUN_ID!);
@@ -64,12 +69,15 @@ export async function prepareReview(
     // 外部API・gitのメッセージでは分類せず、信頼済み処理の固定コードだけを表示する。
     const reason = error instanceof ReviewFailure ? error.reason : fallback;
     writeStatusReport(env, 'failure', targetId, reason);
-    if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, 'allowed=false\n');
-    if (env.GITHUB_STEP_SUMMARY)
+    if (env.GITHUB_OUTPUT) {
+      appendFileSync(env.GITHUB_OUTPUT, 'allowed=false\n');
+    }
+    if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
         `AIレビュー準備未完了: 完了0件。対象: ${targetId}、理由: ${reason}。WIF認証・レビュー生成・投稿へ進みません。\n`,
       );
+    }
     throw new ReviewFailure(
       reason,
       `AIレビュー準備が未完了です。対象: ${targetId}、理由: ${reason}。`,

@@ -50,15 +50,24 @@ function fixture() {
   const api: Api = async <T>(path: string, method = 'GET') => {
     expect(method).toBe('GET');
     calls.push(path);
-    if (path === 'pulls/7') return pr as T;
-    if (path.startsWith('actions/workflows/docs.yml/runs?')) return { workflow_runs: sources } as T;
-    if (path.startsWith('actions/workflows/ai-review.yml/runs?'))
+    if (path === 'pulls/7') {
+      return pr as T;
+    }
+    if (path.startsWith('actions/workflows/docs.yml/runs?')) {
+      return { workflow_runs: sources } as T;
+    }
+    if (path.startsWith('actions/workflows/ai-review.yml/runs?')) {
       return { workflow_runs: reviews } as T;
-    if (path === 'actions/runs/20/attempts/1') return review as T;
-    if (path.startsWith('git/commits/'))
+    }
+    if (path === 'actions/runs/20/attempts/1') {
+      return review as T;
+    }
+    if (path.startsWith('git/commits/')) {
       return { parents: [{ sha: revision.base }, { sha: revision.head }] } as T;
-    if (path.endsWith('/jobs?per_page=100'))
+    }
+    if (path.endsWith('/jobs?per_page=100')) {
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
+    }
     throw new Error(`Unexpected request ${path}`);
   };
   return { api, revision, pr, source, review, reviews, sources, calls };

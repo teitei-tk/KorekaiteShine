@@ -14,10 +14,14 @@ function InterviewPage() {
     let active = true;
     getInterviews(window.location.origin).then(
       (data) => {
-        if (active) setResult(data);
+        if (active) {
+          setResult(data);
+        }
       },
       () => {
-        if (active) setError('面接一覧を取得できませんでした。');
+        if (active) {
+          setError('面接一覧を取得できませんでした。');
+        }
       },
     );
     return () => {

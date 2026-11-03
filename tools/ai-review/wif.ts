@@ -21,25 +21,34 @@ export async function authenticate(
   request: typeof fetch = fetch,
   mask: (secret: string) => void = () => {},
 ): Promise<{ claims: Partial<OidcClaims> }> {
-  if (mode !== 'claims') throw new Error('WIFモードが不正です');
+  if (mode !== 'claims') {
+    throw new Error('WIFモードが不正です');
+  }
   const required = [
     'ACTIONS_ID_TOKEN_REQUEST_URL',
     'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
     'OPENAI_WIF_AUDIENCE',
   ];
-  if (required.some((key) => !env[key])) throw new Error('WIF設定が不足しています');
+  if (required.some((key) => !env[key])) {
+    throw new Error('WIF設定が不足しています');
+  }
   const url = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL!);
-  if (url.protocol !== 'https:') throw new Error('OIDC URLが不正です');
+  if (url.protocol !== 'https:') {
+    throw new Error('OIDC URLが不正です');
+  }
   url.searchParams.set('audience', env.OPENAI_WIF_AUDIENCE!);
   const oidc = await request(url, {
     headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
     signal: AbortSignal.timeout(15_000),
     redirect: 'error',
   });
-  if (!oidc.ok) throw new Error(`OIDC HTTP ${oidc.status}`);
+  if (!oidc.ok) {
+    throw new Error(`OIDC HTTP ${oidc.status}`);
+  }
   const token = ((await oidc.json()) as { value?: string }).value;
-  if (typeof token !== 'string' || token.split('.').length !== 3)
+  if (typeof token !== 'string' || token.split('.').length !== 3) {
     throw new Error('OIDC応答が不正です');
+  }
   mask(token);
   const claims = JSON.parse(
     Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
@@ -55,7 +64,9 @@ export async function authenticate(
     event_name: 'workflow_run',
   };
   for (const [key, value] of Object.entries(expected) as [keyof typeof expected, string][]) {
-    if (claims[key] !== value) throw new Error(`OIDCクレーム不一致: ${key}`);
+    if (claims[key] !== value) {
+      throw new Error(`OIDCクレーム不一致: ${key}`);
+    }
   }
   const selected = Object.fromEntries(
     ([...Object.keys(expected), 'sub', 'iat', 'exp'] as (keyof OidcClaims)[]).map((key) => [

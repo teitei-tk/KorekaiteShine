@@ -18,8 +18,9 @@ if (
 const input: IsolationInput = JSON.parse(readFileSync('/opt/ai-review-probe/input.json', 'utf8'));
 input.env = process.env;
 const outside = await probeIsolation(input);
-if (!input.parentPidNamespace || outside.pidNamespace !== input.parentPidNamespace)
+if (!input.parentPidNamespace || outside.pidNamespace !== input.parentPidNamespace) {
   throw new Error('Action boundary must share the live parent PID namespace');
+}
 // 外側では読取り・ネットワークはOS権限に従う。資格情報・UID・昇格だけをAction境界で検査。
 const boundaryChecks = outside.checks.filter(
   (check) =>
@@ -54,7 +55,9 @@ const result = spawnSync(
 );
 process.stdout.write(result.stdout ?? '');
 process.stderr.write(result.stderr ?? '');
-if (result.error || result.status !== 0) process.exit(1);
+if (result.error || result.status !== 0) {
+  process.exit(1);
+}
 requireIsolationReport(
   result.stdout,
   outside.checks.map((check) => check.name),

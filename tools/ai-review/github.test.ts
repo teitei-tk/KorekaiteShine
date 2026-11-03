@@ -31,11 +31,18 @@ function setup(kind = 'owner') {
   };
   const api: Api = async <T>(path: string) => {
     requests.push(path);
-    if (path.startsWith('actions/')) return run as T;
-    if (path === 'pulls/7') return pr as T;
-    if (path.startsWith('git/commits/'))
+    if (path.startsWith('actions/')) {
+      return run as T;
+    }
+    if (path === 'pulls/7') {
+      return pr as T;
+    }
+    if (path.startsWith('git/commits/')) {
       return { parents: [{ sha: base }, { sha: 'd'.repeat(40) }] } as T;
-    if (path.startsWith('issues/')) return [] as T;
+    }
+    if (path.startsWith('issues/')) {
+      return [] as T;
+    }
     throw new Error('予期しない呼び出し');
   };
   return { api, requests };

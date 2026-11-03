@@ -49,26 +49,37 @@ function record(value: object | null | undefined): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 function state(value: string | null | undefined): string {
-  if (value === '' || value === null) return '未確定';
-  if (typeof value !== 'string' || !states.has(value)) throw new Error('Invalid state');
+  if (value === '' || value === null) {
+    return '未確定';
+  }
+  if (typeof value !== 'string' || !states.has(value)) {
+    throw new Error('Invalid state');
+  }
   return value;
 }
 export function runSnapshot(raw: string): { output: string; done: boolean; ok: boolean } {
   const data: RunInput = JSON.parse(raw);
-  if (!record(data) || !Array.isArray(data.jobs)) throw new Error('Invalid response');
+  if (!record(data) || !Array.isArray(data.jobs)) {
+    throw new Error('Invalid response');
+  }
   const status = state(data.status),
     conclusion = state(data.conclusion);
   const lines = [`実行: ${status} / ${conclusion}`];
   for (const [i, job] of data.jobs.entries()) {
-    if (!record(job) || !Array.isArray(job.steps)) throw new Error('Invalid job');
+    if (!record(job) || !Array.isArray(job.steps)) {
+      throw new Error('Invalid job');
+    }
     const name = typeof job.name === 'string' ? labels.get(job.name) : undefined;
     lines.push(`${name ?? `job ${i + 1}`}: ${state(job.status)} / ${state(job.conclusion)}`);
     for (const [j, step] of job.steps.entries()) {
-      if (!record(step)) throw new Error('Invalid step');
+      if (!record(step)) {
+        throw new Error('Invalid step');
+      }
       const result = state(step.conclusion);
       const label = typeof step.name === 'string' ? labels.get(step.name) : undefined;
-      if (label || (result !== '未確定' && !['success', 'skipped'].includes(result)))
+      if (label || (result !== '未確定' && !['success', 'skipped'].includes(result))) {
         lines.push(`  ${label ?? `step ${j + 1}`}: ${state(step.status)} / ${result}`);
+      }
     }
   }
   return { output: lines.join('\n'), done: status === 'completed', ok: conclusion === 'success' };
@@ -108,9 +119,15 @@ export async function checkRun(
         emit(snapshot.output);
         previous = snapshot.output;
       }
-      if (snapshot.done) return snapshot.ok ? 0 : 1;
-      if (!watch) return 0;
-      if (attempt < 39) await pause();
+      if (snapshot.done) {
+        return snapshot.ok ? 0 : 1;
+      }
+      if (!watch) {
+        return 0;
+      }
+      if (attempt < 39) {
+        await pause();
+      }
     }
     emit('監視の上限に達しました。実行は停止していません。');
     return 2;
@@ -121,15 +138,22 @@ export async function checkRun(
 }
 export function parseRunArgs(args: string[]): { id: string; watch: boolean; expected?: string } {
   const [id, ...options] = args;
-  if (!id || !/^[1-9][0-9]{0,17}$/.test(id)) throw new Error('Invalid arguments');
+  if (!id || !/^[1-9][0-9]{0,17}$/.test(id)) {
+    throw new Error('Invalid arguments');
+  }
   let watch = false;
   let expected: string | undefined;
   for (let i = 0; i < options.length; i++) {
-    if (options[i] === '--watch' && !watch) watch = true;
-    else if (options[i] === '--expect-commit' && expected === undefined) {
+    if (options[i] === '--watch' && !watch) {
+      watch = true;
+    } else if (options[i] === '--expect-commit' && expected === undefined) {
       expected = options[++i];
-      if (!expected || !/^[a-f0-9]{40}$/.test(expected)) throw new Error('Invalid arguments');
-    } else throw new Error('Invalid arguments');
+      if (!expected || !/^[a-f0-9]{40}$/.test(expected)) {
+        throw new Error('Invalid arguments');
+      }
+    } else {
+      throw new Error('Invalid arguments');
+    }
   }
   return { id, watch, expected };
 }
@@ -149,7 +173,9 @@ export async function checkRunCommand(
   try {
     const result = version(options.id, options.expected);
     emit(result.output);
-    if (!result.eligible) return 3;
+    if (!result.eligible) {
+      return 3;
+    }
   } catch {
     emit(
       '実行状態を取得・解析できませんでした。実行版・期待コミット・権限・接続を確認してください。',
@@ -158,4 +184,6 @@ export async function checkRunCommand(
   }
   return check(options.id, options.watch, undefined, emit);
 }
-if (import.meta.main) process.exitCode = await checkRunCommand(process.argv.slice(2));
+if (import.meta.main) {
+  process.exitCode = await checkRunCommand(process.argv.slice(2));
+}

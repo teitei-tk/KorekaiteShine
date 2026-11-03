@@ -8,8 +8,10 @@ function fixture(status = 'ahead') {
   const paths: string[] = [];
   const read = (path: string) => {
     paths.push(path);
-    if (path.includes('/compare/')) return JSON.stringify({ status });
-    if (path.endsWith('/10/attempts/2'))
+    if (path.includes('/compare/')) {
+      return JSON.stringify({ status });
+    }
+    if (path.endsWith('/10/attempts/2')) {
       return JSON.stringify({
         id: 10,
         run_attempt: 2,
@@ -17,6 +19,7 @@ function fixture(status = 'ahead') {
         path: '.github/workflows/docs.yml',
         pull_requests: [{ number: 26, head: { sha: head }, base: { sha: base } }],
       });
+    }
     return JSON.stringify({
       id: 20,
       event: 'workflow_run',
@@ -55,7 +58,9 @@ it('元CIのPR情報が消えても実行版の包含判定を表示し、対象
   const f = fixture();
   const result = runVersion('20', expected, (path) => {
     const body = f.read(path);
-    if (!path.endsWith('/10/attempts/2')) return body;
+    if (!path.endsWith('/10/attempts/2')) {
+      return body;
+    }
     return JSON.stringify({
       id: 10,
       run_attempt: 2,

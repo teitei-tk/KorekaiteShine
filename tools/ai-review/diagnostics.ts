@@ -104,7 +104,9 @@ export function detail(
   coverage?: CoverageDiagnostic,
 ): FailureDetail {
   const value = { subcode, missing: [...missing], ...(coverage ? { coverage } : {}) };
-  if (!validDetail(value)) throw new Error('診断分類が不正です');
+  if (!validDetail(value)) {
+    throw new Error('診断分類が不正です');
+  }
   return value;
 }
 export function validDiagnostic(value: DiagnosticInput | null | undefined): value is Diagnostic {
@@ -113,10 +115,13 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
     typeof value !== 'object' ||
     !only(value, ['subcode', 'missing', 'scope', 'coverage']) ||
     !classification(value)
-  )
+  ) {
     return false;
+  }
   const scope = value.scope;
-  if (scope === undefined) return true;
+  if (scope === undefined) {
+    return true;
+  }
   if (
     !scope ||
     typeof scope !== 'object' ||
@@ -133,8 +138,9 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
     ) ||
     new Set(scope.obligations).size !== scope.obligations.length ||
     new Set(scope.sources.map((s) => s?.id)).size !== scope.sources.length
-  )
+  ) {
     return false;
+  }
   return scope.sources.every(
     (s) =>
       !!s &&
@@ -153,11 +159,15 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
   );
 }
 export function renderDiagnostic(value: DiagnosticInput): string {
-  if (!validDiagnostic(value)) throw new Error('診断の形式が不正です');
+  if (!validDiagnostic(value)) {
+    throw new Error('診断の形式が不正です');
+  }
   const lines = [
     `サブコード: ${value.subcode}。不足情報: ${value.missing.join(', ') || '申告なし'}。`,
   ];
-  if (value.coverage) lines.push(renderCoverage(value.coverage));
+  if (value.coverage) {
+    lines.push(renderCoverage(value.coverage));
+  }
   if (value.scope) {
     const s = value.scope;
     lines.push(

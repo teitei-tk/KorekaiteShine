@@ -45,7 +45,9 @@ export function coverageDiagnostic(expected: string[], received: string[]): Cove
 export function validCoverage(
   value: Partial<CoverageDiagnostic> | null | undefined,
 ): value is CoverageDiagnostic {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
   const keys = [
     'arrayValid',
     'expected',
@@ -58,8 +60,9 @@ export function validCoverage(
     'duplicateIds',
     'foreignHashes',
   ];
-  if (Object.keys(value).some((k) => !keys.includes(k)) || typeof value.arrayValid !== 'boolean')
+  if (Object.keys(value).some((k) => !keys.includes(k)) || typeof value.arrayValid !== 'boolean') {
     return false;
+  }
   const counts = [
     value.expected,
     value.received,
@@ -72,8 +75,9 @@ export function validCoverage(
     !counts.every(
       (n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 1_000_000_000,
     )
-  )
+  ) {
     return false;
+  }
   const ids = (values: string[] | undefined, pattern: RegExp, limit: number) =>
     Array.isArray(values) &&
     values.length <= limit &&
@@ -99,7 +103,9 @@ export function validCoverage(
   );
 }
 export function renderCoverage(value: CoverageDiagnostic): string {
-  if (!validCoverage(value)) throw new Error('確認範囲の診断が不正です');
+  if (!validCoverage(value)) {
+    throw new Error('確認範囲の診断が不正です');
+  }
   return [
     `確認対象の照合: 期待${value.expected}件、回答${value.received}件。欠落${value.missing}件、重複${value.duplicates}件（余分な出現数）、担当外${value.foreign}件（異なる値）、文字列以外${value.invalid}件。`,
     ...(value.arrayValid ? [] : ['回答の確認済み一覧が配列ではありません。']),

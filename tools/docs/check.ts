@@ -13,9 +13,15 @@ const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 function plainText(tokens: Token[] | null | undefined = []): string {
   return (tokens ?? [])
     .map((token) => {
-      if (token.type === 'image') return plainText(token.children);
-      if (token.type === 'text' || token.type === 'code_inline') return token.content;
-      if (token.type === 'softbreak' || token.type === 'hardbreak') return ' ';
+      if (token.type === 'image') {
+        return plainText(token.children);
+      }
+      if (token.type === 'text' || token.type === 'code_inline') {
+        return token.content;
+      }
+      if (token.type === 'softbreak' || token.type === 'hardbreak') {
+        return ' ';
+      }
       return '';
     })
     .join('');
@@ -30,7 +36,9 @@ function parse(source: string) {
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index];
     // 表のセルにはmapがないため、直近の行トークンの位置を使う。
-    if (token.map) line = token.map[0] + 1;
+    if (token.map) {
+      line = token.map[0] + 1;
+    }
     if (token.type === 'heading_open') {
       anchors.add(slugger.slug(plainText(tokens[index + 1]?.children)));
     }
@@ -42,7 +50,9 @@ function parse(source: string) {
             : child.type === 'image'
               ? child.attrGet('src')
               : null;
-        if (typeof url === 'string' && url) links.push({ url, line });
+        if (typeof url === 'string' && url) {
+          links.push({ url, line });
+        }
       }
     }
   }
@@ -60,7 +70,9 @@ export async function checkLinks(root: string, files: string[]) {
   const errors: string[] = [];
   async function document(file: string) {
     const cached = documents.get(file);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
     const parsed = parse(await readFile(file, 'utf8'));
     documents.set(file, parsed);
     return parsed;
@@ -68,9 +80,13 @@ export async function checkLinks(root: string, files: string[]) {
   for (const file of files) {
     const source = path.resolve(root, file);
     for (const { url, line } of (await document(source)).links) {
-      if (/^(?:https?:|mailto:|tel:|\/\/)/i.test(url)) continue;
+      if (/^(?:https?:|mailto:|tel:|\/\/)/i.test(url)) {
+        continue;
+      }
       try {
-        if (/^[a-z][a-z\d+.-]*:/i.test(url)) throw new Error('未対応のリンク形式');
+        if (/^[a-z][a-z\d+.-]*:/i.test(url)) {
+          throw new Error('未対応のリンク形式');
+        }
         const hash = url.indexOf('#');
         const location = hash < 0 ? url : url.slice(0, hash);
         const fragment = hash < 0 ? '' : decodeURIComponent(url.slice(hash + 1));
@@ -81,18 +97,27 @@ export async function checkLinks(root: string, files: string[]) {
               filename.replace(/^\//, ''),
             )
           : source;
-        if (!within(root, target)) throw new Error('リポジトリ外へのリンク');
+        if (!within(root, target)) {
+          throw new Error('リポジトリ外へのリンク');
+        }
         target = await realpath(target);
-        if (!within(root, target)) throw new Error('リポジトリ外を指すシンボリックリンク');
+        if (!within(root, target)) {
+          throw new Error('リポジトリ外を指すシンボリックリンク');
+        }
         const info = await stat(target);
         if (info.isDirectory()) {
-          if (fragment) throw new Error('ディレクトリへの見出しリンクは未対応');
+          if (fragment) {
+            throw new Error('ディレクトリへの見出しリンクは未対応');
+          }
           continue;
         }
         if (fragment) {
-          if (!/\.md$/i.test(target)) throw new Error('Markdown以外の見出しリンクは未対応');
-          if (!(await document(target)).anchors.has(fragment))
+          if (!/\.md$/i.test(target)) {
+            throw new Error('Markdown以外の見出しリンクは未対応');
+          }
+          if (!(await document(target)).anchors.has(fragment)) {
             throw new Error('見出しが存在しない');
+          }
         }
       } catch (error) {
         const reason =
@@ -246,10 +271,14 @@ export async function checkCommands(root: string, files: string[]) {
     const commands: { text: string; line: number }[] = [];
     let line = 1;
     for (const token of tokens) {
-      if (token.map) line = token.map[0] + 1;
+      if (token.map) {
+        line = token.map[0] + 1;
+      }
       if (token.type === 'inline') {
         for (const child of token.children ?? []) {
-          if (child.type === 'code_inline') commands.push({ text: child.content, line });
+          if (child.type === 'code_inline') {
+            commands.push({ text: child.content, line });
+          }
         }
       }
       if (token.type === 'fence' && /^(sh|shell|bash|zsh)$/.test(token.info.trim())) {
@@ -260,26 +289,42 @@ export async function checkCommands(root: string, files: string[]) {
     }
     for (const { text, line } of commands) {
       const words = text.trim().split(/\s+/);
-      if (words.shift() !== 'pnpm') continue;
+      if (words.shift() !== 'pnpm') {
+        continue;
+      }
       let directory = '.';
       if (words[0] === '--dir') {
         words.shift();
         const value = words.shift();
-        if (!value || !/^[\w./-]+$/.test(value) || value.startsWith('-')) continue;
+        if (!value || !/^[\w./-]+$/.test(value) || value.startsWith('-')) {
+          continue;
+        }
         directory = value;
       }
       const explicitRun = words[0] === 'run' || words[0] === 'run-script';
-      if (explicitRun) words.shift();
+      if (explicitRun) {
+        words.shift();
+      }
       let script = words.shift();
-      if (!explicitRun && (script === 't' || script === 'tst')) script = 'test';
+      if (!explicitRun && (script === 't' || script === 'tst')) {
+        script = 'test';
+      }
       // 未対応オプション・シェル構文・説明用プレースホルダーは照合しない。
-      if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/.test(script)) continue;
-      if (!explicitRun && builtins.has(script)) continue;
+      if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/.test(script)) {
+        continue;
+      }
+      if (!explicitRun && builtins.has(script)) {
+        continue;
+      }
       const manifest = path.resolve(root, directory, 'package.json');
       try {
-        if (!within(root, manifest)) throw new Error('リポジトリ外のpackage.json');
+        if (!within(root, manifest)) {
+          throw new Error('リポジトリ外のpackage.json');
+        }
         const resolved = await realpath(manifest);
-        if (!within(root, resolved)) throw new Error('リポジトリ外のpackage.json');
+        if (!within(root, resolved)) {
+          throw new Error('リポジトリ外のpackage.json');
+        }
         const data = JSON.parse(await readFile(resolved, 'utf8'));
         if (
           !data?.scripts ||
@@ -322,7 +367,9 @@ async function main() {
       await stat(path.join(repository, file));
       existing.push(file);
     } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+        throw error;
+      }
     }
   }
   const config = JSON.parse(await readFile(path.join(repository, '.markdownlint.json'), 'utf8'));
@@ -337,14 +384,22 @@ async function main() {
     .join('\n');
   const links = await checkLinks(repository, existing);
   const commands = await checkCommands(repository, existing);
-  if (formatting) console.error(formatting);
-  if (links.length) console.error(links.join('\n'));
-  if (commands.length) console.error(commands.join('\n'));
-  if (formatting || links.length || commands.length) process.exitCode = 1;
-  else
+  if (formatting) {
+    console.error(formatting);
+  }
+  if (links.length) {
+    console.error(links.join('\n'));
+  }
+  if (commands.length) {
+    console.error(commands.join('\n'));
+  }
+  if (formatting || links.length || commands.length) {
+    process.exitCode = 1;
+  } else {
     console.log(
       `文書検査成功: Markdown ${existing.length}件（書式・相対リンク・見出しアンカー・pnpmスクリプト）`,
     );
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

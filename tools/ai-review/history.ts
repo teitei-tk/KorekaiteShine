@@ -23,14 +23,19 @@ function unescape(value: string): string {
 export function readHistory(comments: Comment[]): PriorFinding[] {
   const history: PriorFinding[] = [];
   for (const comment of comments.filter(ownComment)) {
-    if (/^<!-- followup:[^\n]+ -->$/m.test(comment.body)) continue;
+    if (/^<!-- followup:[^\n]+ -->$/m.test(comment.body)) {
+      continue;
+    }
     const revision = /^<!-- revision:([a-f0-9]{40}):([a-f0-9]{40}) -->$/m.exec(comment.body);
-    if (!revision || !Number.isSafeInteger(comment.id) || comment.id < 1)
+    if (!revision || !Number.isSafeInteger(comment.id) || comment.id < 1) {
       throw new Error('過去のレビュー対象が不正です');
+    }
     const marker = /^<!-- findings:v1:([A-Za-z0-9+/=]+) -->$/m.exec(comment.body);
     let rawFindings: FindingInput[];
     if (comment.body.includes('<!-- findings:')) {
-      if (!marker) throw new Error('指摘履歴が不正です');
+      if (!marker) {
+        throw new Error('指摘履歴が不正です');
+      }
       const value: FindingInput[] = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
       rawFindings = value;
     } else {
@@ -45,8 +50,9 @@ export function readHistory(comments: Comment[]): PriorFinding[] {
         impact: unescape(m[5]),
         fix: unescape(m[6]),
       }));
-      if ((comment.body.match(/^\*\*P[12] — /gm) ?? []).length !== findings.length)
+      if ((comment.body.match(/^\*\*P[12] — /gm) ?? []).length !== findings.length) {
         throw new Error('旧指摘の読み取りに失敗しました');
+      }
       rawFindings = findings;
     }
     const findings = validFindings(rawFindings);
@@ -58,7 +64,9 @@ export function readHistory(comments: Comment[]): PriorFinding[] {
         base: revision[2],
       }),
     );
-    if (history.length > 30) throw new Error('修正確認対象が30件を超えました');
+    if (history.length > 30) {
+      throw new Error('修正確認対象が30件を超えました');
+    }
   }
   return history;
 }
@@ -67,14 +75,17 @@ export function readInlineHistory(comments: ReviewComment[]): PriorFinding[] {
   const result: PriorFinding[] = [];
   for (const comment of comments.filter((c) => ownComment(c) && !c.in_reply_to_id)) {
     const findings = readHistory([comment]);
-    if (findings.length !== 1) throw new Error('行コメントの指摘履歴が不正です');
+    if (findings.length !== 1) {
+      throw new Error('行コメントの指摘履歴が不正です');
+    }
     const finding = findings[0];
     if (
       finding.path !== comment.path ||
       finding.line !== comment.original_line ||
       finding.head !== comment.original_commit_id
-    )
+    ) {
       throw new Error('行コメントの対象が一致しません');
+    }
     result.push({ ...finding, id: `review:${comment.id}`, replyTo: comment.id });
   }
   return result;
@@ -90,6 +101,8 @@ export function reviewHistory(
     ...readHistory(legacy),
     ...readInlineHistory(inline).filter((f) => f.head !== head || f.base !== base),
   ];
-  if (result.length > 30) throw new Error('修正確認対象が30件を超えました');
+  if (result.length > 30) {
+    throw new Error('修正確認対象が30件を超えました');
+  }
   return result;
 }

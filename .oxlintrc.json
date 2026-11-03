@@ -4,6 +4,7 @@
     "correctness": "error"
   },
   "rules": {
+    "curly": ["error", "all"],
     "no-restricted-globals": [
       "error",
       {

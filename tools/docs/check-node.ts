@@ -32,7 +32,9 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
     if (path.basename(file) === 'package.json') {
       const manifest: Manifest = JSON.parse(await readFile(path.join(root, file), 'utf8'));
       const engine = manifest.engines?.node;
-      if (file === 'package.json' && !engine) errors.push(`${file}: engines.nodeが必要です`);
+      if (file === 'package.json' && !engine) {
+        errors.push(`${file}: engines.nodeが必要です`);
+      }
       if (
         engine !== undefined &&
         (!semver.validRange(engine) || !semver.satisfies(version, engine))
@@ -55,7 +57,9 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
       const workflow: Workflow = parse(await readFile(path.join(root, file), 'utf8'));
       for (const [job, config] of Object.entries(workflow.jobs ?? {})) {
         for (const step of config.steps ?? []) {
-          if (!step.uses?.startsWith('actions/setup-node@')) continue;
+          if (!step.uses?.startsWith('actions/setup-node@')) {
+            continue;
+          }
           if (
             step.with?.['node-version-file'] !== '.node-version' ||
             'node-version' in (step.with ?? {})

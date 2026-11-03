@@ -53,7 +53,9 @@ function denied(action: () => void): boolean {
 }
 
 async function networkDenied(port: number): Promise<boolean> {
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) return false;
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    return false;
+  }
   return new Promise((resolve) => {
     const socket = createConnection({ host: '127.0.0.1', port });
     const finish = (passed: boolean) => {
@@ -89,7 +91,9 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   let pidNamespace: string | undefined;
   try {
     const value = readlinkSync('/proc/self/ns/pid');
-    if (/^pid:\[\d+\]$/.test(value)) pidNamespace = value;
+    if (/^pid:\[\d+\]$/.test(value)) {
+      pidNamespace = value;
+    }
   } catch {
     /* 非Linuxや不可視の場合も、隔離成功の根拠にはしない。 */
   }
@@ -142,7 +146,7 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
       label: `runner-process-${index}`,
     })),
   ];
-  for (const { pid, label } of processes)
+  for (const { pid, label } of processes) {
     for (const name of ['environ', 'mem']) {
       let observation = 'readable';
       let passed = false;
@@ -157,8 +161,10 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
       }
       checks.push({ name: `${label}-${name}`, passed, observation });
     }
-  for (const [index, path] of (input.protectedSockets ?? []).entries())
+  }
+  for (const [index, path] of (input.protectedSockets ?? []).entries()) {
     checks.push({ name: `protected-socket-${index}`, passed: await socketDenied(path) });
+  }
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
   checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
   checks.push({ name: 'network', passed: await networkDenied(input.port) });

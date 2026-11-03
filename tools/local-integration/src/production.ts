@@ -1,0 +1,303 @@
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { resolveRuntime } from '@korekaite/runtime-config';
+import type { BuildAudit } from './build-audit.ts';
+
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const production = resolveRuntime({ repositoryRoot, appEnv: 'production' });
+
+/** 本番用入口をビルドするだけで、配置・リソース作成・DB操作は行わない。 */
+export async function buildProductionArtifacts(directory: string): Promise<string> {
+  const project = join(directory, 'web');
+  await mkdir(project, { recursive: true });
+  await cp(join(repositoryRoot, 'apps/web/src'), join(project, 'src'), {
+    recursive: true,
+    filter: (source) => !source.endsWith('routeTree.gen.ts'),
+  });
+  for (const name of ['package.json', 'tsconfig.json'])
+    await cp(join(repositoryRoot, 'apps/web', name), join(project, name));
+  await symlink(
+    join(repositoryRoot, 'apps/web/node_modules'),
+    join(project, 'node_modules'),
+    'dir',
+  );
+  const common = {
+    compatibility_date: '2026-10-19',
+    compatibility_flags: ['nodejs_compat'],
+    vars: { APP_ENV: 'production' },
+    workers_dev: false,
+    preview_urls: false,
+    d1_databases: [
+      { binding: 'DB', database_name: production.d1.name, database_id: production.d1.id },
+    ],
+  };
+  const workers = ['interview', 'evaluation'] as const;
+  for (const worker of workers) {
+    await writeFile(
+      join(project, `${worker}.production.ts`),
+      `export { default } from ${JSON.stringify(join(repositoryRoot, `apps/${worker}/src/worker.ts`))};\n`,
+    );
+  }
+  const interview = {
+    ...common,
+    name: production.workers.interview,
+    main: join(project, 'interview.production.ts'),
+    queues: {
+      producers: [{ binding: 'EVALUATION_QUEUE', queue: production.queues.evaluation.queue }],
+    },
+  };
+  const evaluation = {
+    ...common,
+    name: production.workers.evaluation,
+    main: join(project, 'evaluation.production.ts'),
+    queues: {
+      producers: [
+        { binding: 'EVALUATION_QUEUE', queue: production.queues.evaluation.queue },
+        { binding: 'EVALUATION_DLQ', queue: production.queues.evaluation.dlq },
+      ],
+      consumers: [
+        {
+          queue: production.queues.evaluation.queue,
+          max_retries: 3,
+          retry_delay: 30,
+          dead_letter_queue: production.queues.evaluation.dlq,
+        },
+        { queue: production.queues.evaluation.dlq },
+      ],
+    },
+  };
+  await writeFile(
+    join(project, 'void.config.ts'),
+    `export default ${JSON.stringify({ worker: { compatibility_date: common.compatibility_date }, cloudflare: { ...common, name: production.workers.web } })};\n`,
+  );
+  await writeFile(
+    join(project, 'vite.config.ts'),
+    `
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import react from '@vitejs/plugin-react';
+import { buildAudit } from ${JSON.stringify(join(repositoryRoot, 'tools/local-integration/src/build-audit.ts'))};
+export default defineConfig({ cacheDir: ${JSON.stringify(join(directory, 'vite-cache'))}, plugins: [
+  voidPlugin({ persistTo: ${JSON.stringify(join(directory, 'preview-state'))}, auxiliaryWorkers: [
+    { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
+    { config: ${JSON.stringify(evaluation)}, viteEnvironment: { name: 'evaluation' } },
+  ] }), tanstackStart(), react(), buildAudit(${JSON.stringify(join(project, 'build-audit'))}),
+] });\n`,
+  );
+  await runProductionBuild(project);
+  return project;
+}
+
+export async function runProductionBuild(project: string): Promise<void> {
+  // 前回の監査情報や出力を今回のビルドの証拠として再利用させない。
+  await rm(join(project, 'build-audit'), { recursive: true, force: true });
+  await rm(join(project, 'dist'), { recursive: true, force: true });
+  const child = spawn(
+    process.execPath,
+    [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
+    {
+      cwd: project,
+      env: {
+        ...process.env,
+        APP_ENV: 'production',
+        NO_COLOR: '1',
+        VOID_INSPECTOR_PORT: 'false',
+        WRANGLER_LOG_PATH: join(project, 'wrangler.log'),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  let output = '';
+  child.stdout.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    output += chunk.toString();
+  });
+  const code = await new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', resolve);
+  });
+  await writeFile(join(project, 'build.log'), output);
+  if (code !== 0) throw new Error(`本番モードのローカルビルド失敗: ${join(project, 'build.log')}`);
+}
+
+export async function startProductionPreview(
+  project: string,
+): Promise<{ baseUrl: string; stop(): Promise<void> }> {
+  await verifyProductionArtifacts(project);
+  const child = spawn(
+    process.execPath,
+    [
+      join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'),
+      'preview',
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '0',
+    ],
+    {
+      cwd: project,
+      env: {
+        ...process.env,
+        APP_ENV: 'production',
+        NO_COLOR: '1',
+        VOID_INSPECTOR_PORT: 'false',
+        WRANGLER_LOG_PATH: join(project, 'preview-wrangler.log'),
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    },
+  );
+  let output = '';
+  const stopped = new Promise<void>((resolve) => child.once('close', () => resolve()));
+  async function stop() {
+    if (child.pid && child.exitCode === null && child.signalCode === null)
+      process.kill(-child.pid, 'SIGTERM');
+    await stopped;
+    await writeFile(join(project, 'preview.log'), output);
+  }
+  try {
+    const baseUrl = await new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error('本番プレビューが45秒以内に起動しませんでした。')),
+        45_000,
+      );
+      const collect = (chunk: Buffer) => {
+        output += chunk.toString();
+        const match = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+        if (match) {
+          clearTimeout(timeout);
+          resolve(match[0]);
+        }
+      };
+      child.stdout.on('data', collect);
+      child.stderr.on('data', collect);
+      child.once('error', (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.once('exit', (code) => {
+        clearTimeout(timeout);
+        reject(new Error(`本番プレビュー起動失敗（${code}）: ${join(project, 'preview.log')}`));
+      });
+    });
+    const response = await fetch(baseUrl);
+    await response.text();
+    if (!response.ok)
+      throw new Error(`本番プレビューのHTTP起動確認に失敗しました: ${response.status}`);
+    return { baseUrl, stop };
+  } catch (error) {
+    await stop();
+    throw error;
+  }
+}
+
+interface WorkerConfig {
+  name: string;
+  vars: Record<string, string>;
+  workers_dev: boolean;
+  preview_urls: boolean;
+  d1_databases: { binding: string; database_name: string; database_id: string }[];
+  queues: {
+    producers: { binding: string; queue: string }[];
+    consumers: { queue: string; dead_letter_queue?: string }[];
+  };
+  durable_objects: { bindings: { name: string; class_name: string }[] };
+  services: { binding: string }[];
+}
+
+const forbiddenModule =
+  /\/diagnostics\/|\/worker\.local\.ts|\/fixtures\/|\/diagnostics-validators\.mjs/u;
+const forbiddenContent =
+  /\/api\/diagnostics|exhaust_retries|SIMULATED_AI_FAILURE|DIAGNOSTIC_(?:QUEUE|DLQ)|CHECK_OBJECT/u;
+
+export async function verifyProductionArtifacts(
+  project: string,
+): Promise<{ environments: string[]; routes: string[] }> {
+  project = await realpath(project);
+  const environments = ['client', 'ssr', 'interview', 'evaluation'] as const;
+  for (const environment of environments) {
+    const audit: BuildAudit = JSON.parse(
+      await readFile(join(project, 'build-audit', `${environment}.json`), 'utf8'),
+    );
+    const outputDirectory = join(project, 'dist', environment === 'ssr' ? 'server' : environment);
+    if (
+      audit.environment !== environment ||
+      audit.outputDirectory !== outputDirectory ||
+      !audit.modules.length ||
+      !audit.outputs.length
+    )
+      throw new Error(`ビルド監査情報が不足しています: ${environment}`);
+    for (const module of audit.modules) {
+      for (const id of [module.id, ...module.imports, ...module.dynamicImports])
+        if (forbiddenModule.test(id))
+          throw new Error(`本番モジュールへ診断・検証コードが混入: ${id}`);
+    }
+    if (environment === 'interview' || environment === 'evaluation') {
+      const entry = join(repositoryRoot, `apps/${environment}/src/worker.ts`);
+      if (!audit.modules.some((module) => module.id === entry))
+        throw new Error(`本番入口を確認できません: ${environment}`);
+    }
+    const recorded = new Set(audit.outputs.map((output) => output.fileName));
+    for (const entry of await readdir(outputDirectory, { recursive: true, withFileTypes: true })) {
+      if (entry.isDirectory()) continue;
+      const fileName = relative(outputDirectory, join(entry.parentPath, entry.name));
+      if (!entry.isFile() || !recorded.has(fileName))
+        throw new Error(`未記録の本番配信物: ${fileName}`);
+    }
+    for (const output of audit.outputs) {
+      const path = resolve(outputDirectory, output.fileName);
+      if (!path.startsWith(`${outputDirectory}/`))
+        throw new Error('出力先がビルドディレクトリ外です。');
+      const content = await readFile(path);
+      if (createHash('sha256').update(content).digest('hex') !== output.sha256)
+        throw new Error(`モジュール監査後に配信物が変更されています: ${path}`);
+      if (
+        output.modules.some((id) => forbiddenModule.test(id)) ||
+        forbiddenContent.test(content.toString())
+      )
+        throw new Error(`本番配信物へ診断コードが混入: ${path}`);
+    }
+    if (environment !== 'client') {
+      const worker = environment === 'ssr' ? 'web' : environment;
+      const config: WorkerConfig = JSON.parse(
+        await readFile(join(outputDirectory, 'wrangler.json'), 'utf8'),
+      );
+      if (
+        config.name !== production.workers[worker] ||
+        config.vars.APP_ENV !== 'production' ||
+        config.workers_dev !== false ||
+        config.preview_urls !== false ||
+        forbiddenContent.test(JSON.stringify(config))
+      )
+        throw new Error(`本番Worker設定に不整合があります: ${environment}`);
+      if (
+        config.d1_databases.length !== 1 ||
+        config.d1_databases[0]?.binding !== 'DB' ||
+        config.d1_databases[0]?.database_id !== production.d1.id
+      )
+        throw new Error(`本番共有D1設定に不整合があります: ${environment}`);
+      const queueNames = new Set(Object.values(production.queues.evaluation));
+      for (const queue of [...config.queues.producers, ...config.queues.consumers])
+        if (!queueNames.has(queue.queue))
+          throw new Error(`本番以外のQueueが設定されています: ${environment}`);
+      if (config.durable_objects.bindings.length || config.services.length)
+        throw new Error(`未実装の本番入口に検証用bindingがあります: ${environment}`);
+    }
+  }
+  const routes = (await readdir(join(project, 'src/routes'))).sort();
+  if (JSON.stringify(routes) !== JSON.stringify(['__root.tsx', 'api.interviews.ts', 'index.tsx']))
+    throw new Error('本番ルート走査対象に未確認のルートがあります。');
+  const tree = await readFile(join(project, 'src/routeTree.gen.ts'), 'utf8');
+  if (forbiddenContent.test(tree) || tree.includes('diagnostics'))
+    throw new Error('本番ルートツリーに診断が混入しています。');
+  for (const route of routes)
+    if (!tree.includes(`'./routes/${route.replace(/\.tsx?$/u, '')}'`))
+      throw new Error(`生成ルートに不足があります: ${route}`);
+  return { environments: [...environments], routes };
+}

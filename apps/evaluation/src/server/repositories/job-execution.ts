@@ -1,6 +1,6 @@
 import { runnableJobStates, terminalJobStates } from '../../domain/job-state';
 import type { EvaluationFailure } from '../../domain/evaluation-result';
-import { retryDelayMs } from '../../domain/retry-policy';
+import { maxEvaluationAttempts, retryDelayMs } from '../../domain/retry-policy';
 import { and, eq, exists, gt, inArray, isNull, lt, lte, ne, notExists, or, sql } from 'void/db';
 import {
   jobs,
@@ -34,7 +34,7 @@ export async function acquireExecution(
     eq(jobs.jobId, jobId),
     eq(jobs.purpose, purpose),
     inArray(jobs.status, runnableJobStates),
-    lt(jobs.attemptCount, 4),
+    lt(jobs.attemptCount, maxEvaluationAttempts),
     or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, now)),
     notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
   );

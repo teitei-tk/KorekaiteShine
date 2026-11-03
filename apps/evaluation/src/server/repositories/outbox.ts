@@ -15,6 +15,7 @@ import {
 import { jobs, jobOutbox, deletedJobs, dlqReceipts } from '@korekaite/database';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { runnableJobStates } from '../../domain/job-state';
+import { maxEvaluationAttempts } from '../../domain/retry-policy';
 
 import type { JobPurpose } from './job-execution';
 
@@ -80,7 +81,7 @@ export async function ensureRecoveryNotification(
             eq(jobs.jobId, jobId),
             eq(jobs.purpose, purpose),
             inArray(jobs.status, runnableJobStates),
-            lt(jobs.attemptCount, 4),
+            lt(jobs.attemptCount, maxEvaluationAttempts),
             notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
           ),
         ),
@@ -123,7 +124,7 @@ export async function recoverOverdueNotifications(db: Database, now: number): Pr
                   and(
                     eq(jobOutbox.operation, 'notify'),
                     inArray(jobs.status, runnableJobStates),
-                    lt(jobs.attemptCount, 4),
+                    lt(jobs.attemptCount, maxEvaluationAttempts),
                     or(isNull(jobs.nextAttemptAt), lte(jobs.nextAttemptAt, threshold)),
                   ),
                   and(

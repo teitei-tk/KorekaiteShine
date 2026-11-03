@@ -1,6 +1,7 @@
 import type { EvaluationFailure } from './evaluation-result';
 
 export const retryDelaysMs = [30_000, 120_000, 300_000] as const;
+export const maxEvaluationAttempts = retryDelaysMs.length + 1;
 
 export function retryDelayMs(attemptNumber: number, failure: EvaluationFailure): number | null {
   const delay = retryDelaysMs[attemptNumber - 1];

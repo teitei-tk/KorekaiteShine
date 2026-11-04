@@ -43,3 +43,18 @@ pnpm --dir apps/web verify:http http://127.0.0.1:4328
 ## 移行元の依存更新履歴
 
 移行元の試作では2026年11月4日、Void 1.5.0への更新に合わせてCloudflare Viteプラグインを、Voidが要求する2.0.0-beta.v.9へ固定し直しました。旧1.64.0固定ではBuild Outputの`config.json`が生成されずビルドが失敗しました。更新後は契約生成・ビルド・型検査、開発サーバーとビルド済みWorkerそれぞれのHTTP契約28件、ブラウザでの一覧2件表示・再取得を確認しました。開発とプレビューを同時に起動するとローカルSQLiteのロックが競合するため、検証は片方を終了してからもう片方を起動します。新しいビルド出力の`.cloudflare/`もGit管理から除外します。
+## テストの配置
+
+通常の検証はリポジトリルートの`pnpm test`、型・Lint・整形・文書を含む検証は`pnpm check`を使います。
+
+| 対象                                 | テスト                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| 一覧の表示・再取得・古い応答の無視   | [interviews-page.test.tsx](tests/interviews-page.test.tsx)                                             |
+| 診断の開始・再送・連打防止・状態取得 | [diagnostics-page-interactions.test.tsx](tests/diagnostics-page-interactions.test.tsx)                 |
+| 診断画面のSSR初期状態・結果表示      | [diagnostics-page.test.ts](tests/diagnostics-page.test.ts)                                             |
+| HTTPクライアントの応答検証           | [client.test.ts](tests/client.test.ts)、[diagnostics-client.test.ts](tests/diagnostics-client.test.ts) |
+| 入力エラーの分類・JSON Pointer整形   | [diagnostics-errors.test.ts](tests/diagnostics-errors.test.ts)                                         |
+
+画面テストはReact Testing Libraryで本物のコンポーネントを操作し、fetch境界で応答を制御します。HTTPクライアントと生成validatorも実装本体を使います。DOMを必要とするファイルだけjsdomで動かし、既存HTTPテストのNode環境を維持します。[DOM補助](tests/helpers/dom.ts)で各ケース後に画面と差し替えを片付けます。
+
+追加した開発依存はReact Testing Library 16.3.3、user-event 14.6.8、DOM Testing Library 10.4.2、jsdom 30.1.3です。DOM Testing LibraryはReact Testing Libraryのpeer依存です。固定版のNode.js 26.12.1・React 19.3.1・Vitest 5.0.5に合わせ、操作と応答順序を実ブラウザ起動なしで再現するために選びました。実ブラウザ全体のE2Eへケースを増やす方法より起動・応答制御の負担が少ない一方、DOM用の依存が増えます。CSS・実ブラウザ固有の挙動・クラウドの動作はこの検査だけでは確認できません。

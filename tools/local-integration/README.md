@@ -30,3 +30,24 @@ Web・Interview DO・Evaluationを一つのローカルランタイムで起動�
 テストはWeb→DO、3 WorkersとCLIのD1共有、scheduled、D1 batchのロールバック、primaryセッション指定、並列環境の分離、停止後のデータ保持、ビルド済み成果物での接続を確認します。統合検査は成功時も`results.json`を保持し、状態と生成物を削除します。失敗時はログと状態も残します。ローカル検証では本番のreplica遅延やクラウド認可を再現していません。
 
 `prepare:integration`は開発ランタイムを停止して実行します。その後の`test:integration`はtest環境だけを起動し、開発DBと生成物は読み取り専用で前後を照合します。ローカルQueueの未配送メッセージはランタイム全体の停止をまたいで保持されないため、停止境界ごとの検証方法を検証記録で区別しています。
+
+## テストの配置
+
+`pnpm test`はD1・DOの境界を含む通常検査、`pnpm test:integration`は実時間の配送・停止後回復・環境分離の検査です。実時間の統合検査は17ケースを維持しています。
+
+- [通知配送](tests/dispatch-notifications.test.ts)：ローカルD1と本物の配送処理で時刻境界と部分失敗を確認します。送信関数はtest専用probeで差し替えるため、実Queue配送の証拠とは区別します。
+- [DO入口](tests/check-object-guards.test.ts)：本物の初期化処理とDO storageで、不正UUID・別ジョブ・許可外環境の拒否と副作用を確認します。禁止環境は対象DOへの値だけを差し替え、リソースは独立test環境のままです。
+- Interviewの既存の保存・通知・停止回復は[check-object.test.ts](tests/check-object.test.ts)にあります。アプリ配下に空のtestスクリプトは追加していません。
+- 純粋な再試行・実行制御は[Evaluationのテスト](../../apps/evaluation/README.md)、画面操作は[Webのテスト](../../apps/web/README.md)で確認します。
+
+test専用probeは`fixtures/`に置き、本番成果物への非包含を既存検査で確認します。クラウドD1や実AIの資格情報は使いません。
+
+契約Schemaの参照抽出は[reachable-schema.test.ts](../../packages/api-contracts/tests/reachable-schema.test.ts)で、循環・欠落・外部URL・エスケープ・入力保持を確認します。
+
+## テスト追加時の検証記録
+
+2026年11月4日、[不足テストの追加計画](../../docs/superpowers/plans/2026-11-03-application-test-gaps.md)に沿って65ケースを追加し、既存の実行制御6ケースをEvaluationへ移しました。`pnpm check`で通常511件と文書65件、`pnpm test:integration`で17件が成功しました。本番成果物の診断除外検査、開発DBの保持確認行と10テーブルの件数・内容ハッシュの前後一致も確認しました。
+
+追加テストでアプリの動作修正を要する不具合は再現しませんでした。アプリ本体の変更は一覧コンポーネントの名前付きexportのみです。検査途中には既存DLQテストの起動タイムアウトが2回、既存の同時配送テストでローカルD1のsession commit token内部エラーが1回発生しました。対象ケースと全体検査はコード変更なしの再実行で成功しています。発生原因は未確定であり、修正済みとは扱いません。
+
+画面操作の追加検査はjsdomで実行しました。CSS・実ブラウザ固有の挙動・実AI・クラウドD1の動作、およびカバレッジ100%は今回の検証範囲に含みません。

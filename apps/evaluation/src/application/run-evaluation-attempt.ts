@@ -54,7 +54,12 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
     }, executionTiming.aiTimeoutMs);
   });
   const execute = async () => {
-    const result = await Promise.race([deps.evaluate(controller.signal), timeout]);
+    let result: EvaluationResult;
+    try {
+      result = await Promise.race([deps.evaluate(controller.signal), timeout]);
+    } catch {
+      result = { ok: false, error: { code: 'AI_EXCEPTION', retryable: true } };
+    }
     clearTimeout(aiTimer);
     while (!stopped && deps.now() < deps.deadline) {
       try {

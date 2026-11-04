@@ -135,6 +135,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     now?: number,
     messageId?: string,
     kind: 'normal' | 'dlq' = 'normal',
+    rejectEvaluation = false,
   ) {
     if (this.env.APP_ENV !== 'test') {
       throw new Error('テスト環境専用です。');
@@ -153,6 +154,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
         now: () => now ?? Temporal.Now.instant().epochMilliseconds,
         newId: () => crypto.randomUUID(),
         evaluate: async (jobId, attemptNumber) => {
+          if (rejectEvaluation) {
+            throw new Error('テスト専用の評価例外');
+          }
           try {
             await primary.insert(connectionChecks).values({
               writer: `evaluation-call:${jobId}:${crypto.randomUUID()}`,

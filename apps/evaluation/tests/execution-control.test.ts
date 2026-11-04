@@ -193,3 +193,62 @@ test('実行権更新が例外で失敗したら評価を中止し、結果保�
   expect(save).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+test.each(['throw', 'reject'] as const)(
+  '評価器の%sを再試行可能な失敗として保存し、試行を終了する',
+  async (mode) => {
+    vi.useFakeTimers();
+    const saved: EvaluationResult[] = [];
+    const evaluate = vi.fn((): Promise<EvaluationResult> => {
+      const error = new Error('保存してはいけない外部応答');
+      if (mode === 'throw') {
+        throw error;
+      }
+      return Promise.reject(error);
+    });
+    const result = await runEvaluationAttempt({
+      now: () => 1000,
+      deadline: 181_000,
+      evaluate,
+      renew: async () => true,
+      save: async (value) => {
+        saved.push(value);
+        return true;
+      },
+    });
+    expect(result).toBe(true);
+    expect(saved).toEqual([{ ok: false, error: { code: 'AI_EXCEPTION', retryable: true } }]);
+    expect(evaluate).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);
+
+test.each(['timeout', 'lease-loss'] as const)(
+  '評価器が%sの中断でrejectしても、中断理由と保存制約を維持する',
+  async (mode) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_793_577_600_000);
+    const saved: EvaluationResult[] = [];
+    const result = runEvaluationAttempt({
+      now: () => vi.getMockedSystemTime()!.getTime(),
+      deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+      evaluate: (signal) =>
+        new Promise<EvaluationResult>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(new Error('評価通信を中止しました。')), {
+            once: true,
+          });
+        }),
+      renew: async () => mode !== 'lease-loss',
+      save: async (value) => {
+        saved.push(value);
+        return true;
+      },
+    });
+    await vi.advanceTimersByTimeAsync(mode === 'timeout' ? 120_000 : 30_000);
+    expect(await result).toBe(mode === 'timeout');
+    expect(saved).toEqual(
+      mode === 'timeout' ? [{ ok: false, error: { code: 'AI_TIMEOUT', retryable: true } }] : [],
+    );
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);

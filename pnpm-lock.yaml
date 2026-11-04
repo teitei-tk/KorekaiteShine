@@ -284,8 +284,8 @@ importers:
         specifier: 0.42.0
         version: 0.42.0(supports-color@10.2.2)
       semver:
-        specifier: 7.8.5
-        version: 7.8.5
+        specifier: 7.8.6
+        version: 7.8.6
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -3315,6 +3315,11 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  semver@7.8.6:
+    resolution: {integrity: sha512-9lpSSU4Mly3mrtruwLs1eLK6+gzbzqeBFwRNjIjE+9LuDpWdYctrQlQ3ej1Ilgi7gknpsTRnPoLP8DpCHqHIJw==}
+    engines: {node: '>=10'}
+    hasBin: true
+
   seroval-plugins@1.7.3:
     resolution: {integrity: sha512-gKP1jak0eor3KVHRGAyCAFJ9xKXkf97eWruYK5lcDHimsjr23RJGDuO0B8iOU6rvgYvACHpW+krmn3j2+2vxpQ==}
     engines: {node: '>=20'}
@@ -5141,7 +5146,7 @@ snapshots:
       mustache: 4.2.0
       picocolors: 1.1.1
       prettier: 3.9.10
-      semver: 7.8.5
+      semver: 7.8.6
       tar: 7.5.22
       temporal-polyfill: 1.0.6
       vscode-languageserver: 10.1.2
@@ -6269,6 +6274,8 @@ snapshots:
 
   semver@7.8.5: {}
 
+  semver@7.8.6: {}
+
   seroval-plugins@1.7.3(seroval@1.7.3):
     dependencies:
       seroval: 1.7.3
@@ -6281,7 +6288,7 @@ snapshots:
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
-      semver: 7.8.5
+      semver: 7.8.6
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.35.5
       '@img/sharp-darwin-x64': 0.35.5

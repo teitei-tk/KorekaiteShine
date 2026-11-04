@@ -84,6 +84,8 @@ GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取�
 
 `apps/web`と`apps/evaluation`のテストは、ルートの`pnpm test`から各パッケージのtestスクリプトで実行します。`apps/interview`のDOテストは`tools/local-integration/tests`から実行します。Lint・整形は`apps/`を含むルート全体が対象です。これらの検査は変更パスで省略しないため、共有パッケージや設定の変更時も実行されます。
 
+通常検査ジョブの上限は15分です。PR #68の初回実行で、依存インストール・ビルド・型検査後の通常テスト中に従来の5分上限へ達したため、ローカルD1・DOを起動する検査の時間を確保しています。
+
 文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・型検査・通常テストは毎回実行します。
 
 有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。

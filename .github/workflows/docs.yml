@@ -93,7 +93,7 @@ jobs:
   ai-review-tooling:
     name: Lint, format and tests (apps, packages, tools)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
         with:

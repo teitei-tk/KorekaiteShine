@@ -4,7 +4,7 @@ const code = 'a'.repeat(40),
   head = 'b'.repeat(40),
   base = 'c'.repeat(40),
   expected = 'd'.repeat(40);
-function fixture(status = 'ahead') {
+function fixture(status = 'ahead', workflow = '.github/workflows/docs.yml') {
   const paths: string[] = [];
   const read = (path: string) => {
     paths.push(path);
@@ -16,7 +16,7 @@ function fixture(status = 'ahead') {
         id: 10,
         run_attempt: 2,
         event: 'pull_request',
-        path: '.github/workflows/docs.yml',
+        path: workflow,
         pull_requests: [{ number: 26, head: { sha: head }, base: { sha: base } }],
       });
     }
@@ -85,4 +85,11 @@ it('別Workflowでは期待版の確認を拒否し、期待版未指定の状�
     });
   expect(runVersion('20', expected, read).eligible).toBe(false);
   expect(runVersion('20', undefined, read).eligible).toBe(true);
+});
+
+it('改名後のCIからレビュー対象のheadとbaseを確認できる', () => {
+  const result = runVersion('20', expected, fixture('ahead', '.github/workflows/ci.yml').read);
+  expect(result.eligible).toBe(true);
+  expect(result.output).toContain(`レビュー対象head SHA: ${head}`);
+  expect(result.output).toContain(`レビュー対象base SHA: ${base}`);
 });

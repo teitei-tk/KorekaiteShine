@@ -1,3 +1,4 @@
+import { isSourceCi } from './source-ci.ts';
 import { REPOSITORY, MARKER, revisionMarker, eligible } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 
@@ -105,7 +106,7 @@ export async function target(api: Api, runId: number): Promise<TargetResult> {
   if (
     run.event !== 'pull_request' ||
     run.conclusion !== 'success' ||
-    run.path !== '.github/workflows/docs.yml' ||
+    !isSourceCi(run.path) ||
     run.repository?.id !== 1426899426 ||
     run.head_repository?.id !== 1426899426 ||
     run.pull_requests?.length !== 1

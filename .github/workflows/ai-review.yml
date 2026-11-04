@@ -3,7 +3,7 @@ run-name: AI review / source run ${{ github.event.workflow_run.id }} attempt ${{
 
 on:
   workflow_run:
-    workflows: [Documentation checks]
+    workflows: [Documentation checks, CI]
     types: [completed]
 
 permissions: {}

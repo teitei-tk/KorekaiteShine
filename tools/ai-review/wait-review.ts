@@ -1,3 +1,4 @@
+import { isSourceCi } from './source-ci.ts';
 import { renderDiagnostic } from './diagnostics.ts';
 import type { Diagnostic } from './diagnostics.ts';
 import { appendFileSync } from 'node:fs';
@@ -49,13 +50,13 @@ function validRevision(revision: Revision): boolean {
 // APIの降順一覧から最初に一致した実行を選ぶ。最新試行が進行中なら旧成功へ戻らない。
 async function latest<T extends { id: number; run_attempt: number }>(
   api: ReadApi,
-  workflow: string,
+  workflow: string | undefined,
   event: string,
   match: (run: T) => boolean,
 ): Promise<T | undefined> {
   for (let page = 1; page <= 10; page++) {
     const data = await api<{ workflow_runs: T[] }>(
-      `actions/workflows/${workflow}/runs?event=${event}&per_page=100&page=${page}`,
+      `${workflow ? `actions/workflows/${workflow}` : 'actions'}/runs?event=${event}&per_page=100&page=${page}`,
     );
     if (!Array.isArray(data?.workflow_runs)) {
       throw new Error('実行一覧が不正です');
@@ -89,12 +90,12 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
   }
   const source = await latest<SourceRun>(
     api,
-    'docs.yml',
+    undefined,
     'pull_request',
     (run) =>
       epochMilliseconds(run.created_at) >= epochMilliseconds(revision.since) &&
       run.event === 'pull_request' &&
-      run.path === '.github/workflows/docs.yml' &&
+      isSourceCi(run.path) &&
       run.repository?.id === REPOSITORY_ID &&
       run.head_repository?.id === REPOSITORY_ID &&
       run.pull_requests?.length === 1 &&

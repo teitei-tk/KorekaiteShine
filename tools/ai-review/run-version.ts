@@ -1,3 +1,4 @@
+import { isSourceCi } from './source-ci.ts';
 import { execFileSync } from 'node:child_process';
 import { REPOSITORY } from './policy.ts';
 interface RunInput {
@@ -60,7 +61,7 @@ export function runVersion(
     String(original.id) !== source[1] ||
     String(original.run_attempt) !== source[2] ||
     original.event !== 'pull_request' ||
-    original.path !== '.github/workflows/docs.yml'
+    !isSourceCi(original.path)
   ) {
     throw new Error('Invalid source');
   }

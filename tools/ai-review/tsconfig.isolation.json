@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": ".",
+    "outDir": "./dist/isolation",
+    "noEmitOnError": true
+  },
+  "include": [],
+  "files": [
+    "isolation-probe.ts",
+    "isolation/action-probe.ts",
+    "isolation/probe-child.ts",
+    "isolation/run.ts",
+    "isolation/startup.ts",
+    "isolation/lifecycle.ts",
+    "isolation/wif.ts",
+    "isolation/model.ts",
+    "runtime.ts"
+  ]
+}

@@ -156,3 +156,4 @@ apps/typespec-spike/.wrangler/
 apps/typespec-spike/.tanstack/
 apps/typespec-spike/.void-wrangler.jsonc
 apps/typespec-spike/void.lock.json
+apps/typespec-spike/.cloudflare/

@@ -178,8 +178,8 @@ jobs:
         run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run typecheck
       - name: Test tools
         run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run test
-  local-integration:
-    name: Local Worker boundaries and integration
+  local-boundaries:
+    name: Local Worker boundaries
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -202,6 +202,26 @@ jobs:
         run: pnpm --filter @korekaite/local-integration typecheck
       - name: Test Worker and D1 boundaries
         run: pnpm --filter @korekaite/local-integration test
+  local-integration:
+    name: Local Worker integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
       - name: Prepare development retention sentinel
         run: pnpm prepare:integration
       - name: Test real-time Queue delivery and recovery

@@ -72,3 +72,7 @@ pnpm test:integration
 固定版のローカルQueueは、ランタイム全体を終了すると未配送メッセージを保持しません。Queue送信直後の停止試験ではD1の送信待ち記録から回復します。送信済みDLQ通知も、30秒の猶予後に受信記録がなければ定期回復で再送待ちに戻します。受信済み・用途や世代の不一致・削除済みの通知は対象にしません。結果保存後ack前の試験ではConsumer呼び出しを例外で終了させて同じメッセージの再配送を確認し、ack後にランタイム再起動と結果保持を確認します。クラウドQueueの永続性を検証した結果ではありません。
 
 本番Access、実AI、クラウドD1・Queueへの接続は対象外です。採用構成と後続の検証範囲は[MVP仕様書](../spec/mvp.md)を参照してください。
+
+## 境界検査と実時間の結合検査
+
+HTTP契約（開発・ビルド済みWorker）は通常の`pnpm test`に含め、`pnpm test:integration`では重複実行しません。全体を検査する場合は`pnpm check`に加え、`pnpm prepare:integration`と`pnpm test:integration`を実行します。CIでは境界検査と結合検査を別runnerで並列実行します。

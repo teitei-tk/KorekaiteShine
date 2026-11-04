@@ -5,7 +5,7 @@
   "scripts": {
     "test": "vitest run --exclude tests/end-to-end.test.ts --exclude tests/queue-retry.test.ts --exclude tests/formal-routing.test.ts --exclude tests/restart.test.ts --exclude tests/isolation.test.ts --exclude tests/dlq-restart.test.ts --exclude tests/cli-recovery.test.ts",
     "typecheck": "tsc --noEmit",
-    "test:integration": "vitest run tests/end-to-end.test.ts tests/queue-retry.test.ts tests/formal-routing.test.ts tests/restart.test.ts tests/http-contract.test.ts tests/isolation.test.ts tests/dlq-restart.test.ts tests/cli-recovery.test.ts"
+    "test:integration": "vitest run tests/end-to-end.test.ts tests/queue-retry.test.ts tests/formal-routing.test.ts tests/restart.test.ts tests/isolation.test.ts tests/dlq-restart.test.ts tests/cli-recovery.test.ts"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",

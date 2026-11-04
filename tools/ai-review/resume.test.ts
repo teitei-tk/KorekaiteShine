@@ -41,10 +41,11 @@ function fixture() {
       count++;
       const id = 10 + count;
       const text = body && 'body' in body ? body.body : '';
-      if (path.endsWith('/replies'))
+      if (path.endsWith('/replies')) {
         snapshot.inline.push({ ...snapshot.inline[0], id, body: text, in_reply_to_id: 1 });
-      else if (path.startsWith('issues/')) snapshot.issues.push({ id, body: text, user: bot });
-      else {
+      } else if (path.startsWith('issues/')) {
+        snapshot.issues.push({ id, body: text, user: bot });
+      } else {
         snapshot.inline.push({
           ...snapshot.inline[0],
           id,
@@ -60,7 +61,7 @@ function fixture() {
       }
       return { id } as T;
     }
-    if (path === 'pulls/7')
+    if (path === 'pulls/7') {
       return {
         number: 7,
         user: { id: 1324680, type: 'User' },
@@ -69,9 +70,14 @@ function fixture() {
         head: { sha: head, repo: { id: 1426899426 } },
         base: { sha: base, ref: 'main', repo: { id: 1426899426 } },
       } as T;
-    if (path.startsWith('issues/')) return structuredClone(snapshot.issues) as T;
-    if (path.startsWith('pulls/7/comments?')) return structuredClone(snapshot.inline) as T;
-    if (path === 'graphql')
+    }
+    if (path.startsWith('issues/')) {
+      return structuredClone(snapshot.issues) as T;
+    }
+    if (path.startsWith('pulls/7/comments?')) {
+      return structuredClone(snapshot.inline) as T;
+    }
+    if (path === 'graphql') {
       return {
         data: {
           repository: {
@@ -88,6 +94,7 @@ function fixture() {
           },
         },
       } as T;
+    }
     throw new Error('unexpected path ' + path);
   };
   const metadata = {
@@ -132,15 +139,22 @@ it.each(['human', 'edit', 'resolve', 'wrong-body'])('再開前の%s変更を拒�
   const f = fixture();
   f.lose();
   await expect(publishArtifact(f.api, f.artifact)).rejects.toThrow();
-  if (kind === 'human')
+  if (kind === 'human') {
     f.snapshot.issues.push({
       id: 90,
       body: 'new human reply',
       user: { id: 2, login: 'human', type: 'User' },
     });
-  if (kind === 'edit') f.snapshot.inline[0].body += 'edited';
-  if (kind === 'resolve') f.snapshot.threads[0].resolved = true;
-  if (kind === 'wrong-body') f.snapshot.inline[1].body += 'edited';
+  }
+  if (kind === 'edit') {
+    f.snapshot.inline[0].body += 'edited';
+  }
+  if (kind === 'resolve') {
+    f.snapshot.threads[0].resolved = true;
+  }
+  if (kind === 'wrong-body') {
+    f.snapshot.inline[1].body += 'edited';
+  }
   await expect(publishArtifact(f.api, f.artifact)).rejects.toThrow();
   expect(f.count()).toBe(1);
 });
@@ -253,7 +267,7 @@ it.each(['failure', 'cancelled', 'timed_out'])(
     const f = fixture(),
       directory = mkdtempSync(join(tmpdir(), 'resume-flow-'));
     const api: Api = async <T>(path: string, method?: string, body?: ApiBody) => {
-      if (path === 'actions/runs/20')
+      if (path === 'actions/runs/20') {
         return {
           id: 20,
           run_attempt: 1,
@@ -266,7 +280,8 @@ it.each(['failure', 'cancelled', 'timed_out'])(
           repository: { id: 1426899426 },
           head_repository: { id: 1426899426 },
         } as T;
-      if (path === 'actions/runs/12')
+      }
+      if (path === 'actions/runs/12') {
         return {
           id: 12,
           run_attempt: 1,
@@ -278,13 +293,15 @@ it.each(['failure', 'cancelled', 'timed_out'])(
           head_repository: { id: 1426899426 },
           pull_requests: [{ number: 7, head: { sha: head }, base: { sha: base } }],
         } as T;
-      if (path === 'actions/runs/20/attempts/1/jobs?per_page=100')
+      }
+      if (path === 'actions/runs/20/attempts/1/jobs?per_page=100') {
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },
             { name: 'publish', conclusion },
           ],
         } as T;
+      }
       return f.api<T>(path, method, body);
     };
     try {

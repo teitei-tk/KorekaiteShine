@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import type { components } from '../../generated/api';
 import { getInterviews } from '../lib/interviews';
+import { formatStartedAt } from '../lib/date-time';
 
 export const Route = createFileRoute('/')({ component: InterviewPage });
 
@@ -13,10 +14,14 @@ function InterviewPage() {
     let active = true;
     getInterviews(window.location.origin).then(
       (data) => {
-        if (active) setResult(data);
+        if (active) {
+          setResult(data);
+        }
       },
       () => {
-        if (active) setError('面接一覧を取得できませんでした。');
+        if (active) {
+          setError('面接一覧を取得できませんでした。');
+        }
       },
     );
     return () => {
@@ -72,9 +77,7 @@ function InterviewPage() {
             <tbody>
               {result.items.map((item) => (
                 <tr key={item.id}>
-                  <td>
-                    {new Date(item.startedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}
-                  </td>
+                  <td>{formatStartedAt(item.startedAt)}</td>
                   <td>{item.theme}</td>
                   <td>{item.materialKind === 'code' ? 'コード' : '経験Markdown'}</td>
                   <td>{item.durationSeconds / 60}分</td>

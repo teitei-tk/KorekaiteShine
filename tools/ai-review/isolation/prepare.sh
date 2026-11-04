@@ -2,9 +2,7 @@
 # 廃棄可能なGitHub-hosted Linux runnerの共通準備。実WIF要求は行わない。
 set -euo pipefail
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts isolation/wif.ts isolation/model.ts runtime.ts \
-  --rewriteRelativeImportExtensions --module NodeNext --target ES2022 --skipLibCheck --outDir "$RUNNER_TEMP/isolation-compiled"
+pnpm --dir tools/ai-review build:isolation --outDir "$RUNNER_TEMP/isolation-compiled"
 curl --fail --location --proto '=https' --tlsv1.2 \
   https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-x86_64-unknown-linux-musl.tar.gz \
   -o "$RUNNER_TEMP/codex.tar.gz"

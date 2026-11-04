@@ -26,7 +26,7 @@ it('監視は信頼済みbaseのコードを使い、書き込み・OIDC権限�
 it('モデルと投稿をmainの後続Workflowに残す', () => {
   const backend = workflow('ai-review');
   expect(backend).toContain('workflow_run:');
-  expect(backend).toContain('workflows: [Documentation checks]');
+  expect(backend).toContain('workflows: [Documentation checks, CI]');
   const generate = backend.split('\n  generate:')[1].split('\n  publish:')[0];
   const publish = backend.split('\n  publish:')[1];
   expect(generate).toContain('id-token: write');
@@ -44,8 +44,9 @@ it('Artifactの取得を監視した実行・試行に固定する', () => {
   expect(monitor).toContain('REVIEW_REPORT_DOWNLOAD: ${{ steps.reports.outcome }}');
 });
 it('Draft解除時にも通常CIと監視を同時に起動する', () => {
-  for (const name of ['docs', 'ai-review-check'])
+  for (const name of ['docs', 'ai-review-check']) {
     expect(workflow(name)).toContain('types: [opened, synchronize, reopened, ready_for_review]');
+  }
 });
 it('通常生成も公式Actionと隔離境界を使い、同じ成果物を投稿再開する', () => {
   const backend = workflow('ai-review');

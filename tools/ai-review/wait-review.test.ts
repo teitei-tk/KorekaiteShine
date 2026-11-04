@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-function fixture() {
+function fixture(workflow = '.github/workflows/docs.yml') {
   const revision = {
     number: 7,
     head: 'a'.repeat(40),
@@ -25,7 +25,7 @@ function fixture() {
     id: 10,
     run_attempt: 2,
     event: 'pull_request',
-    path: '.github/workflows/docs.yml',
+    path: workflow,
     status: 'completed',
     conclusion: 'success',
     head_sha: revision.head,
@@ -50,15 +50,24 @@ function fixture() {
   const api: Api = async <T>(path: string, method = 'GET') => {
     expect(method).toBe('GET');
     calls.push(path);
-    if (path === 'pulls/7') return pr as T;
-    if (path.startsWith('actions/workflows/docs.yml/runs?')) return { workflow_runs: sources } as T;
-    if (path.startsWith('actions/workflows/ai-review.yml/runs?'))
+    if (path === 'pulls/7') {
+      return pr as T;
+    }
+    if (path.startsWith('actions/runs?')) {
+      return { workflow_runs: sources } as T;
+    }
+    if (path.startsWith('actions/workflows/ai-review.yml/runs?')) {
       return { workflow_runs: reviews } as T;
-    if (path === 'actions/runs/20/attempts/1') return review as T;
-    if (path.startsWith('git/commits/'))
+    }
+    if (path === 'actions/runs/20/attempts/1') {
+      return review as T;
+    }
+    if (path.startsWith('git/commits/')) {
       return { parents: [{ sha: revision.base }, { sha: revision.head }] } as T;
-    if (path.endsWith('/jobs?per_page=100'))
+    }
+    if (path.endsWith('/jobs?per_page=100')) {
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
+    }
     throw new Error(`Unexpected request ${path}`);
   };
   return { api, revision, pr, source, review, reviews, sources, calls };
@@ -250,4 +259,47 @@ it('監視開始日時が不正なら実行一覧を照合しない', async () =
   f.revision.since = 'invalid-date';
   await expect(inspectReview(f.api, f.revision)).rejects.toThrow('監視対象が不正です');
   expect(f.calls).toEqual([]);
+});
+it('存在しない暦日を監視開始日時として受け付けない', async () => {
+  const f = fixture();
+  f.revision.since = '2026-02-30T00:00:00Z';
+  await expect(inspectReview(f.api, f.revision)).rejects.toThrow('監視対象が不正です');
+  expect(f.calls).toEqual([]);
+});
+
+it('改名前のWorkflowが存在しなくても新CIのレビュー完了を検出する', async () => {
+  const f = fixture('.github/workflows/ci.yml');
+  expect(await inspectReview(f.api, f.revision)).toEqual({
+    status: 'complete',
+    run: 20,
+    attempt: 1,
+  });
+  expect(f.calls).toContain('actions/runs?event=pull_request&per_page=100&page=1');
+  expect(f.calls.some((path) => path.startsWith('actions/workflows/docs.yml/'))).toBe(false);
+});
+
+it.each([
+  ['.github/workflows/docs.yml', '.github/workflows/ci.yml'],
+  ['.github/workflows/ci.yml', '.github/workflows/docs.yml'],
+])('新旧CIが混在しても最新の進行中・失敗を旧成功で隠さない: %s → %s', async (older, newer) => {
+  const f = fixture(older);
+  f.sources.unshift({
+    ...f.source,
+    id: 11,
+    path: newer,
+    created_at: '2026-10-25T06:00:02Z',
+    status: 'in_progress',
+    conclusion: '',
+  });
+  expect(await inspectReview(f.api, f.revision)).toEqual({
+    status: 'pending',
+    target: 'source-ci',
+  });
+  f.sources[0].status = 'completed';
+  f.sources[0].conclusion = 'failure';
+  expect(await inspectReview(f.api, f.revision)).toEqual({
+    status: 'failure',
+    target: 'source-ci',
+    reason: 'EXECUTION_FAILED',
+  });
 });

@@ -31,14 +31,21 @@ function setup(kind = 'owner') {
   };
   const api: Api = async <T>(path: string) => {
     requests.push(path);
-    if (path.startsWith('actions/')) return run as T;
-    if (path === 'pulls/7') return pr as T;
-    if (path.startsWith('git/commits/'))
+    if (path.startsWith('actions/')) {
+      return run as T;
+    }
+    if (path === 'pulls/7') {
+      return pr as T;
+    }
+    if (path.startsWith('git/commits/')) {
       return { parents: [{ sha: base }, { sha: 'd'.repeat(40) }] } as T;
-    if (path.startsWith('issues/')) return [] as T;
+    }
+    if (path.startsWith('issues/')) {
+      return [] as T;
+    }
     throw new Error('予期しない呼び出し');
   };
-  return { api, requests };
+  return { api, requests, run };
 }
 it('他人のPRは再実行者に関係なく除外し資料取得へ進まない', async () => {
   const { api, requests } = setup('other');
@@ -78,4 +85,10 @@ it('レビューコメントも100件を超えたら次ページまで取得す�
     'pulls/7/comments?per_page=100&page=1',
     'pulls/7/comments?per_page=100&page=2',
   ]);
+});
+
+it('改名後のCI成功を本人PRのレビュー起点として受け付ける', async () => {
+  const f = setup();
+  f.run.path = '.github/workflows/ci.yml';
+  expect(await target(f.api, 1)).toMatchObject({ status: 'ready', pr: { number: 7 } });
 });

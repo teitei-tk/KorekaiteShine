@@ -1,3 +1,4 @@
+import { isSourceCi } from './source-ci.ts';
 import { renderDiagnostic } from './diagnostics.ts';
 import type { Diagnostic } from './diagnostics.ts';
 import { appendFileSync } from 'node:fs';
@@ -31,9 +32,16 @@ type Inspection =
 function positive(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }
+function epochMilliseconds(value: string): number {
+  try {
+    return Temporal.Instant.from(value).epochMilliseconds;
+  } catch {
+    return Number.NaN;
+  }
+}
 function validRevision(revision: Revision): boolean {
   return (
-    Number.isFinite(Date.parse(revision.since)) &&
+    Number.isFinite(epochMilliseconds(revision.since)) &&
     positive(revision.number) &&
     /^[a-f0-9]{40}$/.test(revision.head) &&
     /^[a-f0-9]{40}$/.test(revision.base)
@@ -42,42 +50,52 @@ function validRevision(revision: Revision): boolean {
 // APIの降順一覧から最初に一致した実行を選ぶ。最新試行が進行中なら旧成功へ戻らない。
 async function latest<T extends { id: number; run_attempt: number }>(
   api: ReadApi,
-  workflow: string,
+  workflow: string | undefined,
   event: string,
   match: (run: T) => boolean,
 ): Promise<T | undefined> {
   for (let page = 1; page <= 10; page++) {
     const data = await api<{ workflow_runs: T[] }>(
-      `actions/workflows/${workflow}/runs?event=${event}&per_page=100&page=${page}`,
+      `${workflow ? `actions/workflows/${workflow}` : 'actions'}/runs?event=${event}&per_page=100&page=${page}`,
     );
-    if (!Array.isArray(data?.workflow_runs)) throw new Error('実行一覧が不正です');
-    for (const run of data.workflow_runs) {
-      if (!run || !positive(run.id) || !positive(run.run_attempt))
-        throw new Error('実行IDが不正です');
-      if (match(run)) return run;
+    if (!Array.isArray(data?.workflow_runs)) {
+      throw new Error('実行一覧が不正です');
     }
-    if (data.workflow_runs.length < 100) return;
+    for (const run of data.workflow_runs) {
+      if (!run || !positive(run.id) || !positive(run.run_attempt)) {
+        throw new Error('実行IDが不正です');
+      }
+      if (match(run)) {
+        return run;
+      }
+    }
+    if (data.workflow_runs.length < 100) {
+      return;
+    }
   }
   throw new Error('実行一覧の取得上限に達しました');
 }
 export async function inspectReview(api: ReadApi, revision: Revision): Promise<Inspection> {
-  if (!validRevision(revision)) throw new Error('監視対象が不正です');
+  if (!validRevision(revision)) {
+    throw new Error('監視対象が不正です');
+  }
   const pr = await api<PullRequest>(`pulls/${revision.number}`);
   if (
     !eligible(pr) ||
     pr.number !== revision.number ||
     pr.head.sha !== revision.head ||
     pr.base.sha !== revision.base
-  )
+  ) {
     return { status: 'failure', target: 'gate', reason: 'TARGET_CHANGED' };
+  }
   const source = await latest<SourceRun>(
     api,
-    'docs.yml',
+    undefined,
     'pull_request',
     (run) =>
-      Date.parse(run.created_at) >= Date.parse(revision.since) &&
+      epochMilliseconds(run.created_at) >= epochMilliseconds(revision.since) &&
       run.event === 'pull_request' &&
-      run.path === '.github/workflows/docs.yml' &&
+      isSourceCi(run.path) &&
       run.repository?.id === REPOSITORY_ID &&
       run.head_repository?.id === REPOSITORY_ID &&
       run.pull_requests?.length === 1 &&
@@ -85,18 +103,24 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
       run.pull_requests[0]?.head?.sha === revision.head &&
       run.pull_requests[0]?.base?.sha === revision.base,
   );
-  if (!source || source.status !== 'completed') return { status: 'pending', target: 'source-ci' };
-  if (source.conclusion !== 'success')
+  if (!source || source.status !== 'completed') {
+    return { status: 'pending', target: 'source-ci' };
+  }
+  if (source.conclusion !== 'success') {
     return { status: 'failure', target: 'source-ci', reason: 'EXECUTION_FAILED' };
+  }
   if (source.head_sha !== revision.head) {
-    if (!/^[a-f0-9]{40}$/.test(source.head_sha)) throw new Error('起点SHAが不正です');
+    if (!/^[a-f0-9]{40}$/.test(source.head_sha)) {
+      throw new Error('起点SHAが不正です');
+    }
     const commit = await api<{ parents: { sha: string }[] }>(`git/commits/${source.head_sha}`);
     if (
       commit.parents?.length !== 2 ||
       commit.parents[0]?.sha !== revision.base ||
       commit.parents[1]?.sha !== revision.head
-    )
+    ) {
       return { status: 'failure', target: 'source-ci', reason: 'TARGET_CHANGED' };
+    }
   }
   const review = await latest<ReviewRun>(
     api,
@@ -110,14 +134,16 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
       run.display_title ===
         `AI review / source run ${source.id} attempt ${source.run_attempt} / review`,
   );
-  if (!review || review.status !== 'completed') return { status: 'pending', target: 'workflow' };
+  if (!review || review.status !== 'completed') {
+    return { status: 'pending', target: 'workflow' };
+  }
   return { status: 'complete', run: review.id, attempt: review.run_attempt };
 }
 export async function waitReview(
   api: ReadApi,
   revision: Revision,
   clock = {
-    now: Date.now,
+    now: () => Temporal.Now.instant().epochMilliseconds,
     sleep: async () => {
       await setTimeout(15_000);
     },
@@ -128,7 +154,9 @@ export async function waitReview(
   let target = 'workflow';
   while (clock.now() < deadline) {
     const result = await inspectReview(api, revision);
-    if (result.status !== 'pending') return result;
+    if (result.status !== 'pending') {
+      return result;
+    }
     target = result.target;
     await clock.sleep();
   }
@@ -141,12 +169,16 @@ export async function finishReview(
   attempt: number,
   directory?: string,
 ) {
-  if (!positive(id) || !positive(attempt)) throw new Error('監視結果が不正です');
+  if (!positive(id) || !positive(attempt)) {
+    throw new Error('監視結果が不正です');
+  }
   const current = await inspectReview(api, revision);
-  if (current.status === 'failure')
+  if (current.status === 'failure') {
     return { conclusion: 'failure' as const, target: current.target, reason: current.reason };
-  if (current.status !== 'complete' || current.run !== id || current.attempt !== attempt)
+  }
+  if (current.status !== 'complete' || current.run !== id || current.attempt !== attempt) {
     return { conclusion: 'failure' as const, target: 'workflow', reason: 'SUPERSEDED' as const };
+  }
   const run = await api<ReviewRun>(`actions/runs/${id}/attempts/${attempt}`);
   if (
     run.id !== id ||
@@ -156,14 +188,17 @@ export async function finishReview(
     run.path !== '.github/workflows/ai-review.yml' ||
     run.repository?.id !== REPOSITORY_ID ||
     run.head_repository?.id !== REPOSITORY_ID
-  )
+  ) {
     throw new Error('監視結果が不一致です');
+  }
   const result = await completedOutcome(api, run, directory);
   const after = await inspectReview(api, revision);
-  if (after.status === 'failure')
+  if (after.status === 'failure') {
     return { conclusion: 'failure' as const, target: after.target, reason: after.reason };
-  if (after.status !== 'complete' || after.run !== id || after.attempt !== attempt)
+  }
+  if (after.status !== 'complete' || after.run !== id || after.attempt !== attempt) {
     return { conclusion: 'failure' as const, target: 'workflow', reason: 'SUPERSEDED' as const };
+  }
   return result;
 }
 function summary(
@@ -175,11 +210,12 @@ function summary(
   commentId?: number,
 ): void {
   const message = `対象: ${target}、理由: ${reason}。${diagnostic ? '\n\n' + renderDiagnostic(diagnostic) : ''}`;
-  if (process.env.GITHUB_STEP_SUMMARY)
+  if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
       `${message}\n\n${run ? `[AIレビューの実行ログ](https://github.com/${REPOSITORY}/actions/runs/${run}/attempts/${attempt})\n\n` : ''}${reason === 'BUDGET_NOTIFIED' ? `予算不足・レビュー未完了・[PR通知済み](https://github.com/${REPOSITORY}/issues/${process.env.REVIEW_PR}#issuecomment-${commentId})。CI成功は通知処理の完了です。` : '成功はレビューと投稿の完了を表します。'}指摘のResolveは人間が行います。\n`,
     );
+  }
   console.log(message);
 }
 if (import.meta.main) {
@@ -194,7 +230,9 @@ if (import.meta.main) {
     if (process.argv[2] === 'wait') {
       const result = await waitReview(api, revision);
       if (result.status === 'complete') {
-        if (!process.env.GITHUB_OUTPUT) throw new Error('出力先がありません');
+        if (!process.env.GITHUB_OUTPUT) {
+          throw new Error('出力先がありません');
+        }
         appendFileSync(process.env.GITHUB_OUTPUT, `run=${result.run}\nattempt=${result.attempt}\n`);
       } else {
         summary(result.target, result.reason);
@@ -220,7 +258,9 @@ if (import.meta.main) {
         );
         process.exitCode = 1;
       }
-    } else throw new Error('監視操作が不正です');
+    } else {
+      throw new Error('監視操作が不正です');
+    }
   } catch {
     summary('monitor', 'EXECUTION_FAILED');
     console.error('::error::EXECUTION_FAILED (monitor)');

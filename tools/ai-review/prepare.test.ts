@@ -25,8 +25,10 @@ const run = {
   pull_requests: [{ number: 7, head: { sha: head }, base: { sha: base } }],
 };
 const api: Api = async <T>(path: string) => {
-  if (path === 'actions/runs/1') return run as T;
-  if (path === 'graphql')
+  if (path === 'actions/runs/1') {
+    return run as T;
+  }
+  if (path === 'graphql') {
     return {
       data: {
         repository: {
@@ -36,8 +38,13 @@ const api: Api = async <T>(path: string) => {
         },
       },
     } as T;
-  if (path === 'pulls/7') return pr as T;
-  if (path.includes('/comments?')) return [] as T;
+  }
+  if (path === 'pulls/7') {
+    return pr as T;
+  }
+  if (path.includes('/comments?')) {
+    return [] as T;
+  }
   throw new Error('Unexpected fixture path');
 };
 it('CLI失敗は非ゼロ終了し、生成器に到達しなくても概要を記録する', async () => {
@@ -83,9 +90,10 @@ it.each(['same', 'old-head', 'old-base', 'human', 'ineligible'])(
         GITHUB_OUTPUT: join(directory, 'output'),
       };
       const client: Api = async <T>(path: string) => {
-        if (path === 'pulls/7' && scenario === 'ineligible')
+        if (path === 'pulls/7' && scenario === 'ineligible') {
           return { ...pr, base: { ...pr.base, ref: 'other' } } as T;
-        if (path.startsWith('issues/7/comments?'))
+        }
+        if (path.startsWith('issues/7/comments?')) {
           return [
             {
               id: 1,
@@ -96,6 +104,7 @@ it.each(['same', 'old-head', 'old-base', 'human', 'ineligible'])(
               body: `<!-- korekaite-ai-review -->\n<!-- revision:${scenario === 'old-head' ? 'c'.repeat(40) : head}:${scenario === 'old-base' ? 'c'.repeat(40) : base} -->`,
             },
           ] as T;
+        }
         return api<T>(path);
       };
       await prepareReview('gate', env, client);

@@ -15,7 +15,9 @@ export function wifProxyArgs(env: NodeJS.ProcessEnv, infoPath: string): string[]
     'OPENAI_IDENTITY_PROVIDER_ID',
     'OPENAI_SERVICE_ACCOUNT_ID',
   ];
-  if (required.some((key) => !env[key])) throw new Error('missing WIF settings');
+  if (required.some((key) => !env[key])) {
+    throw new Error('missing WIF settings');
+  }
   return [
     '--github-oidc',
     '--http-shutdown',
@@ -58,8 +60,8 @@ export async function authenticateProxy(
   let stopped = false;
   try {
     child.stdin!.end(`${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}\n`);
-    const deadline = Date.now() + timeoutMs;
-    while (running() && Date.now() < deadline) {
+    const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
+    while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
       let candidate: Partial<Info> | undefined;
       try {
         candidate = JSON.parse(readFileSync(infoPath, 'utf8'));
@@ -72,16 +74,22 @@ export async function authenticateProxy(
         candidate.port! > 0 &&
         candidate.port! < 65536
       ) {
-        if (candidate.pid !== child.pid) throw new Error('proxy identity mismatch');
+        if (candidate.pid !== child.pid) {
+          throw new Error('proxy identity mismatch');
+        }
         info = { pid: candidate.pid!, port: candidate.port! };
         break;
       }
       await delay(25);
     }
-    if (!info || !running()) throw new Error('official WIF exchange did not become ready');
+    if (!info || !running()) {
+      throw new Error('official WIF exchange did not become ready');
+    }
     chmodSync(infoPath, 0o444);
     inspect(info);
-    if (!running()) throw new Error('proxy exited during isolation verification');
+    if (!running()) {
+      throw new Error('proxy exited during isolation verification');
+    }
   } finally {
     try {
       if (info && running()) {
@@ -91,8 +99,10 @@ export async function authenticateProxy(
           redirect: 'error',
           signal: AbortSignal.timeout(3000),
         });
-        const deadline = Date.now() + Math.min(timeoutMs, 3000);
-        while (running() && Date.now() < deadline) await delay(25);
+        const deadline = Temporal.Now.instant().epochMilliseconds + Math.min(timeoutMs, 3000);
+        while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
+          await delay(25);
+        }
         stopped = response.ok && child.exitCode === 0;
       }
     } finally {
@@ -103,13 +113,16 @@ export async function authenticateProxy(
       rmSync(infoPath, { force: true });
     }
   }
-  if (!stopped) throw new Error('official proxy shutdown failed');
+  if (!stopped) {
+    throw new Error('official proxy shutdown failed');
+  }
 }
 
 if (import.meta.main) {
   try {
-    if (process.platform !== 'linux' || process.getuid?.() !== 0)
+    if (process.platform !== 'linux' || process.getuid?.() !== 0) {
       throw new Error('requires disposable Linux root');
+    }
     await authenticate(process.env, 'claims');
     console.log('WIF exact claims: passed');
     const path = '/home/ai-review/.codex/wif-authentication.json';

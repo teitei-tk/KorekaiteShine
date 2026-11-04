@@ -12,6 +12,7 @@
     "test": "pnpm generate && vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@js-temporal/polyfill": "0.5.1",
     "@tanstack/react-router": "1.170.46",
     "@tanstack/react-start": "1.169.4",
     "ajv": "8.20.0",

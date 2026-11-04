@@ -73,7 +73,9 @@ export interface ReviewInput {
 }
 // 投稿済みの履歴にも使う形式検証。新規投稿の重複判定は含めない。
 export function validFindings(value: FindingInput[] | null | undefined): Finding[] {
-  if (!Array.isArray(value) || value.length > 3) throw new Error('指摘の形式が不正です');
+  if (!Array.isArray(value) || value.length > 3) {
+    throw new Error('指摘の形式が不正です');
+  }
   for (const f of value) {
     if (
       !f ||
@@ -84,8 +86,9 @@ export function validFindings(value: FindingInput[] | null | undefined): Finding
       !shortText(f.condition, 1000) ||
       !shortText(f.impact, 1000) ||
       !shortText(f.fix, 1000)
-    )
+    ) {
       throw new Error('指摘の形式が不正です');
+    }
   }
   return value as Finding[];
 }
@@ -102,20 +105,22 @@ export function validReview(
     !Array.isArray(r.uncertainties) ||
     r.uncertainties.length > 5 ||
     !r.uncertainties.every((x) => shortText(x, 500))
-  )
+  ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
       'レビュー形式が不正です',
       detail('REVIEW_FORMAT_INVALID'),
     );
+  }
   const findings = validFindings(r.findings);
   for (const f of findings) {
-    if (!Object.hasOwn(lines, f.path) || !lines[f.path]?.includes(f.line))
+    if (!Object.hasOwn(lines, f.path) || !lines[f.path]?.includes(f.line)) {
       throw new ReviewFailure(
         'OUTPUT_INVALID',
         '指摘の変更行が不正です',
         detail('FINDING_LOCATION_INVALID'),
       );
+    }
   }
   if (
     r.findings.some((f, index) =>
@@ -123,34 +128,37 @@ export function validReview(
         (p) => p.path === f.path && p.condition.trim() === f.condition.trim(),
       ),
     )
-  )
+  ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
       '既存または新規の指摘が重複しています',
       detail('FINDING_DUPLICATE'),
     );
+  }
   const checks = r.checks ?? [];
   if (
     !Array.isArray(checks) ||
     checks.length !== prior.length ||
     new Set(checks.map((c) => c?.id)).size !== checks.length ||
     checks.some((c) => !c || !prior.some((f) => f.id === c.id))
-  )
+  ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
       '修正確認の対象または根拠が不正です',
       detail('CHECK_TARGET_MISMATCH'),
     );
+  }
   if (
     checks.some(
       (c) => !['fixed', 'unfixed', 'unverified'].includes(c.status) || !shortText(c.evidence, 500),
     )
-  )
+  ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
       '修正確認の対象または根拠が不正です',
       detail('CHECK_RESULT_INVALID'),
     );
+  }
   return r;
 }
 // MarkdownをHTML化して挿入させず、@による通知も発生させない。
@@ -179,8 +187,9 @@ export function renderReview(r: Review, head: string, base: string): string {
       `**${f.priority} — ${safe(f.path)}:${f.line}**\n\n発生条件: ${safe(f.condition)}\n\n影響: ${safe(f.impact)}\n\n修正方針: ${safe(f.fix)}`,
     );
   }
-  if (r.uncertainties.length)
+  if (r.uncertainties.length) {
     parts.push('未確認事項:\n' + r.uncertainties.map((x) => `- ${safe(x)}`).join('\n'));
+  }
   parts.push('指摘がない場合も、不具合がないことを保証しません。');
   return parts.join('\n\n');
 }

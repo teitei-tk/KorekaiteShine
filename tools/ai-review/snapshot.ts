@@ -14,8 +14,9 @@ function comment(value: Comment): Comment {
     typeof value.user.type !== 'string' ||
     (value.user.id !== undefined && !idValid(value.user.id)) ||
     (value.updated_at !== undefined && typeof value.updated_at !== 'string')
-  )
+  ) {
     throw new Error('履歴コメントが不正です');
+  }
   return {
     id: value.id,
     body: value.body,
@@ -33,8 +34,9 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
     !Array.isArray(input.issues) ||
     !Array.isArray(input.inline) ||
     !Array.isArray(input.threads)
-  )
+  ) {
     throw new Error('履歴スナップショットが不正です');
+  }
   const issues = input.issues.map(comment).sort((a, b) => a.id - b.id);
   const inline = input.inline
     .map((c): ReviewComment => {
@@ -44,8 +46,9 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
         ![c.commit_id, c.original_commit_id].every((x) => /^[a-f0-9]{40}$/.test(x)) ||
         ![c.line, c.original_line].every((x) => x === null || idValid(x)) ||
         (c.in_reply_to_id !== undefined && !idValid(c.in_reply_to_id))
-      )
+      ) {
         throw new Error('行コメントが不正です');
+      }
       return {
         ...base,
         path: c.path,
@@ -66,8 +69,9 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
         !t.id ||
         !roots.includes(t.root) ||
         typeof t.resolved !== 'boolean'
-      )
+      ) {
         throw new Error('スレッド状態が不正です');
+      }
       return { id: t.id, root: t.root, resolved: t.resolved };
     })
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -78,8 +82,9 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
     new Set(threads.map((t) => t.root)).size !== roots.length ||
     threads.length !== roots.length ||
     inline.some((c) => c.in_reply_to_id && !roots.includes(c.in_reply_to_id))
-  )
+  ) {
     throw new Error('履歴の関連が欠落・重複しています');
+  }
   return { issues, inline, threads };
 }
 export function snapshotRevision(snapshot: Snapshot): string {
@@ -119,21 +124,26 @@ export async function loadSnapshot(api: Api, number: number): Promise<Snapshot> 
       !connection ||
       !Array.isArray(connection.nodes) ||
       typeof connection.pageInfo?.hasNextPage !== 'boolean'
-    )
+    ) {
       throw new Error('Resolve状態を取得できません');
+    }
     for (const node of connection.nodes) {
-      if (!node || !Array.isArray(node.comments?.nodes) || node.comments.nodes.length !== 1)
+      if (!node || !Array.isArray(node.comments?.nodes) || node.comments.nodes.length !== 1) {
         throw new Error('スレッド元が不明です');
+      }
       threads.push({
         id: node.id,
         root: node.comments.nodes[0].databaseId,
         resolved: node.isResolved,
       });
     }
-    if (!connection.pageInfo.hasNextPage) break;
+    if (!connection.pageInfo.hasNextPage) {
+      break;
+    }
     cursor = connection.pageInfo.endCursor;
-    if (typeof cursor !== 'string' || !cursor || seen.has(cursor))
+    if (typeof cursor !== 'string' || !cursor || seen.has(cursor)) {
       throw new Error('履歴ページが進みません');
+    }
     seen.add(cursor);
   }
   return normalizeSnapshot({ issues, inline, threads });

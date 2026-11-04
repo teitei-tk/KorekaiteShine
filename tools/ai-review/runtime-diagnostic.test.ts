@@ -8,7 +8,9 @@ vi.mock('node:fs', async (original) => ({
   readFileSync: vi.fn((await original<typeof import('node:fs')>()).readFileSync),
   mkdirSync: vi.fn(),
   cpSync: vi.fn(() => {
-    if (mock.stage === 'copy') throw new Error('SECRET /private/path Bearer token');
+    if (mock.stage === 'copy') {
+      throw new Error('SECRET /private/path Bearer token');
+    }
   }),
   lstatSync: vi.fn(() => ({
     uid: 1001,
@@ -30,7 +32,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   Object.defineProperty(process, 'platform', platformDescriptor);
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of dirs.splice(0)) {
+    rmSync(d, { recursive: true, force: true });
+  }
 });
 it.each([
   ['copy', 'setup/pr-copy'],
@@ -83,7 +87,7 @@ it.each(['missing', 'invalid', 'old-attempt'])('%s記録は汎用の固定失敗
     GITHUB_RUN_ID: '20',
     GITHUB_RUN_ATTEMPT: '2',
   };
-  if (kind !== 'missing')
+  if (kind !== 'missing') {
     writeFileSync(
       join(dir, 'status.json'),
       kind === 'invalid'
@@ -98,6 +102,7 @@ it.each(['missing', 'invalid', 'old-attempt'])('%s記録は汎用の固定失敗
             reason: 'EXECUTION_FAILED',
           }),
     );
+  }
   recordExecutionFailure(env);
   expect(readStatusReports(dir, 20, 2)[0]).toMatchObject({
     target: 'generate',
@@ -124,8 +129,9 @@ it.each([false, true])(
     vi.mocked(readFileSync).mockReturnValueOnce(
       JSON.stringify({ proxy: { pid: 123, start: '1' }, infoPath: join(dir, 'info.json') }),
     );
-    if (shutdownFails) vi.mocked(readInfo).mockRejectedValueOnce(new Error('SECRET upstream body'));
-    else {
+    if (shutdownFails) {
+      vi.mocked(readInfo).mockRejectedValueOnce(new Error('SECRET upstream body'));
+    } else {
       vi.mocked(readInfo).mockResolvedValueOnce({ pid: 123, port: 1234 });
       vi.mocked(alive).mockReturnValueOnce(true);
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 200 }));

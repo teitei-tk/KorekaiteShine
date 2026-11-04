@@ -46,7 +46,9 @@ export function checkSettings(
       } else if (expected[name] !== undefined) {
         const equal = matches[0].value === expected[name];
         status = equal ? '一致' : '不一致';
-        if (!equal) ok = false;
+        if (!equal) {
+          ok = false;
+        }
       } else {
         status = '形式OK・期待値未指定';
       }
@@ -65,7 +67,9 @@ if (import.meta.main) {
   const expected: Expected = {};
   for (const name of Object.keys(checks) as Name[]) {
     const value = process.env[`EXPECTED_${name}`];
-    if (value !== undefined) expected[name] = value;
+    if (value !== undefined) {
+      expected[name] = value;
+    }
   }
   const result = checkSettings(readVariables, expected);
   console.log(result.output);

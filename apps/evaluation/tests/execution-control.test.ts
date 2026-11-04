@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { runEvaluationAttempt } from '../../../apps/evaluation/src/application/run-evaluation-attempt.ts';
-import type { EvaluationResult } from '../../../apps/evaluation/src/domain/evaluation-result.ts';
+import { runEvaluationAttempt } from '../src/application/run-evaluation-attempt.ts';
+import type { EvaluationResult } from '../src/domain/evaluation-result.ts';
 
 afterEach(() => vi.useRealTimers());
 

@@ -16,6 +16,7 @@ import {
 import { createPrimaryDb } from '@korekaite/database/connection';
 import type { D1Database, Queue } from '@cloudflare/workers-types';
 import { consumeJob } from '../../../apps/evaluation/src/application/consume-job';
+import { dispatchNotifications } from '../../../apps/evaluation/src/application/dispatch-notifications';
 import { evaluateDiagnostic } from '../../../apps/evaluation/src/diagnostics/evaluator';
 import {
   acquireExecution,
@@ -32,6 +33,36 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
   DIAGNOSTIC_DLQ: Queue<JobNotification>;
   EVALUATION_DLQ: Queue<JobNotification>;
 }> {
+  async dispatchForTest(now: number, failJobId?: string) {
+    if (
+      this.env.APP_ENV !== 'test' ||
+      !Number.isSafeInteger(now) ||
+      (failJobId !== undefined && !validateJobNotification({ schemaVersion: 1, jobId: failJobId }))
+    ) {
+      throw new Error('テスト要求が不正です。');
+    }
+    const requests: {
+      purpose: 'evaluation' | 'diagnostics';
+      operation: 'notify' | 'notify_dlq';
+      jobId: string;
+      delaySeconds: number;
+    }[] = [];
+    const summary = await dispatchNotifications(
+      {
+        database: this.env.DB,
+        now: () => now,
+        async sendNotification(purpose, operation, notification, delaySeconds) {
+          requests.push({ purpose, operation, jobId: notification.jobId, delaySeconds });
+          if (notification.jobId === failJobId) {
+            throw new Error('送信失敗の注入');
+          }
+        },
+      },
+      { includeFuture: true },
+    );
+    return { ...summary, requests };
+  }
+
   async enqueueFormalDlqForTest(notification: JobNotification) {
     if (this.env.APP_ENV !== 'test' || !validateJobNotification(notification)) {
       throw new Error('テスト要求が不正です。');

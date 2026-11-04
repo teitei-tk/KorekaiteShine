@@ -140,11 +140,11 @@
 
 **インターフェース：** test専用probeに`dispatchForTest(now: number, failJobId?: string)`を用意する。実D1と本物の`dispatchNotifications`を使い、送信関数だけを要求記録・指定jobIdでの失敗へ差し替える。返すのは送信要求の用途・操作・jobId・delaySecondsと実際の集計。D1のsentAtも独立して照合する。
 
-- [ ] 固定nowから予定時刻が過去・一致・1ms後・1,001ms後のケースで、delaySecondsが0・0・1・2になることを一つずつ検査する。固定時計を用い、実時間で待たない。
-- [ ] 86,400秒ちょうどは送信し、上限より1ms先は未送信で残す。`nextAttemptAt`がoutbox予定時刻より遅い場合にも、早く通知しないことを確認する。
-- [ ] 予定時刻の異なる3ジョブを準備し、中央の送信だけを失敗させる。前後の2件が送信済み、中央は未送信、集計が`outboxSent: 2`・`outboxDeferred: 1`になることをassertする。復旧後は中央だけを送る。
-- [ ] test専用probeはtest以外で公開しない。送信関数の差し替えによる検査を実Queue配送成功とは表現せず、既存の実Queue結合テストを残す。
-- [ ] 各ケースの`pnpm test`と最終`pnpm check`を通す。本番成果物からprobeが除外される既存検査も成功させ、`test: 通知配送の時刻境界と部分失敗を検証`としてcommitする。
+- [x] 固定nowから予定時刻が過去・一致・1ms後・1,001ms後のケースで、delaySecondsが0・0・1・2になることを一つずつ検査する。固定時計を用い、実時間で待たない。
+- [x] 86,400秒ちょうどは送信し、上限より1ms先は未送信で残す。`nextAttemptAt`がoutbox予定時刻より遅い場合にも、早く通知しないことを確認する。
+- [x] 予定時刻の異なる3ジョブを準備し、中央の送信だけを失敗させる。前後の2件が送信済み、中央は未送信、集計が`outboxSent: 2`・`outboxDeferred: 1`になることをassertする。復旧後は中央だけを送る。
+- [x] test専用probeはtest以外で公開しない。送信関数の差し替えによる検査を実Queue配送成功とは表現せず、既存の実Queue結合テストを残す。
+- [x] 各ケースの`pnpm test`と最終`pnpm check`を通す。本番成果物からprobeが除外される既存検査も成功させ、`test: 通知配送の時刻境界と部分失敗を検証`としてcommitする。
 
 ## タスク6：InterviewのDO入口の拒否条件を検査する
 

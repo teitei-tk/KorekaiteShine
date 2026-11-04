@@ -19,6 +19,14 @@ export const Route = createFileRoute('/api/evaluation-test')({
         if (now !== undefined && !Number.isSafeInteger(now)) {
           return new Response(null, { status: 400 });
         }
+        if (query.get('action') === 'dispatch') {
+          if (now === undefined) {
+            return new Response(null, { status: 400 });
+          }
+          return Response.json(
+            await env.EVALUATION_PROBE.dispatchForTest(now, query.get('failJobId') ?? undefined),
+          );
+        }
         return Response.json(
           await env.EVALUATION_PROBE.evaluate(
             await request.json(),

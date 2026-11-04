@@ -26,7 +26,7 @@ it('監視は信頼済みbaseのコードを使い、書き込み・OIDC権限�
 it('モデルと投稿をmainの後続Workflowに残す', () => {
   const backend = workflow('ai-review');
   expect(backend).toContain('workflow_run:');
-  expect(backend).toContain('workflows: [Documentation checks]');
+  expect(backend).toContain('workflows: [Documentation checks, CI]');
   const generate = backend.split('\n  generate:')[1].split('\n  publish:')[0];
   const publish = backend.split('\n  publish:')[1];
   expect(generate).toContain('id-token: write');

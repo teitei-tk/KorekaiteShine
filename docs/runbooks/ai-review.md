@@ -301,3 +301,9 @@ Schema指定、APIの完了状態、`{"status":"ok"}`だけの出力、Actionの
 - PR #68の改名変更を取り込む際は、この互換対応を上書きしないよう競合を解決します。マージ後も旧実行履歴の確認に対応します。
 
 PR #68の旧監視実行41773819631は、`source-ci`待機が50分上限に達して終了しました。キャンセル要求時点では既に完了しており、継続中の待機はありません。この記録はAIレビュー本体が完了したことを示しません。
+
+### 隔離準備のTemporal型エラー
+
+`Prepare and verify trusted isolation before collecting PR code`で`Cannot find name 'Temporal'`が出る場合、旧`prepare.sh`が`--ignoreConfig`付きの独立した設定でコンパイルしていました。通常の型検査は成功しても、この経路は失敗します。隔離用ビルドは`pnpm --dir tools/ai-review build:isolation`へ統一し、通常の型設定を継承します。生成されたJavaScriptまで確認する回帰テストを通常CIに含めます。
+
+レビュー本体はmain上のコードを使うため、PR内の修正だけでは実際の失敗ジョブには適用されません。修正をmainへ反映した後、新しいmainをbaseにしたPRで、隔離準備以降の動作を確認します。ローカルのビルド成功を実WIF・モデル・投稿の成功として扱いません。

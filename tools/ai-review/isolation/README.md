@@ -84,12 +84,10 @@ PR #42のマージ後、[mainでの再実行](https://github.com/teitei-tk/Korek
 
 2026年10月28日、macOS上のDocker Linux/aarch64で、Node 26.12.1・公式Actionの固定コミット・Codex 0.164.0を用いて成功しました。Dockerの既定seccompではuser namespaceを作れなかったため、資格情報・ホストソケットを持たない一時コンテナに限り`--security-opt seccomp=unconfined`を指定しました。これはGitHub-hosted runnerでの実証ではありません。
 
-リポジトリの既存TypeScriptコンパイラで、検査コードを一時ディレクトリへ出力します。
+リポジトリの既存TypeScriptコンパイラで、検査コードを一時ディレクトリへ出力します。`tsconfig.isolation.json`は通常の`tsconfig.json`を継承し、Temporalを含む型設定を共有します。JavaScript出力と相対importの拡張子変換だけを隔離用に設定し、型エラー時は出力しません。
 
 ```sh
-pnpm --dir tools/ai-review exec tsc --ignoreConfig --types node \
-  isolation-probe.ts isolation/action-probe.ts isolation/probe-child.ts isolation/run.ts isolation/startup.ts isolation/lifecycle.ts \
-  --module NodeNext --target ES2022 --skipLibCheck --outDir /tmp/ai-review-isolation-compiled
+pnpm --dir tools/ai-review build:isolation --outDir /tmp/ai-review-isolation-compiled
 ```
 
 Node 26.12.1、sudo、bubblewrap、`/usr/local/bin/codex`、`/usr/local/bin/node`を持つ廃棄可能なLinux環境を用意します。Actionの固定コミットは`bdf19a4a223ec2549a3e2274a0cf61556bc07675`です。CLI配布物のSHA-256はaarch64版が`29a507a2a3fd8f6cd94b96b762d281d299d15d7902dee6132d314b78cf9108eb`、x86_64版がWorkflow記載の値です。検査コードと公式配布物だけを読み取り専用で持ち込みます。
@@ -113,3 +111,9 @@ bash /fixture/setup.sh /official-action/dist/main.js /compiled
 PR #43のマージ後、mainの`8287a94332cd60bde813d8f5c5baf5b0c1e3eada`で[隔離検証](https://github.com/teitei-tk/KorekaiteShine/actions/runs/40836689147)の2ケースが成功しました。
 
 実WIF用の`wif.ts`は、初期交換を公式プロキシに任せ、`lifecycle.ts`の隔離検査を共用します。`prepare.sh`は両Workflowの固定版導入・公式Action境界・sandbox検査を共用するものです。初期交換を模擬するHTTPサーバーや独自OAuth処理は追加しません。実行条件・停止手順・証明できる範囲は[運用手順](../../../docs/runbooks/ai-review.md#モデルを呼ばない公式wif接続検証)を参照してください。
+
+## 隔離用ビルドの回帰検査
+
+通常CIの`pnpm --dir tools/ai-review test`は、`isolation-build.test.ts`で`prepare.sh`の実際のビルド呼び出しを実行します。一時ディレクトリへ出力したJavaScriptをNode.jsで読み込み、Temporalを使う待機処理が保存済みのプロキシ情報を返すことを確認します。依存インストール・公式バイナリの取得・sudo・実WIF・モデル呼び出しは行いません。Linux上の隔離検証全体の代替ではありません。
+
+2026年11月4日、PR #69のAIレビュー実行41793595090で、旧ビルド経路の`--ignoreConfig`が通常設定の`ESNext.Temporal`を読み込まず、6件のTS2304で停止しました。同じ呼び出しで失敗を再現し、設定継承後のコンパイルと生成JavaScriptの動作をローカルで確認しました。修正版のレビュー本体はmain反映後に検証します。

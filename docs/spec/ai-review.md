@@ -29,7 +29,7 @@ PR更新後、通常CIの成功を受けて再レビューするときに、過�
 
 ## PRのチェック表示
 
-`pull_request`で起動する専用Workflowにより、PRのチェック一覧へ`AI review / Review result`を表示する。`Documentation checks`とは異なるCheck Suiteに所属する。通常CIとmain上のAIレビューを待つ間は実行中になり、詳細から監視結果と元のAI実行ログを確認できる。
+`pull_request`で起動する専用Workflowにより、PRのチェック一覧へ`AI review / Review result`を表示する。`CI`とは異なるCheck Suiteに所属する。通常CIとmain上のAIレビューを待つ間は実行中になり、詳細から監視結果と元のAI実行ログを確認できる。
 
 | 状況                                                          | 表示ジョブの結論            |
 | ------------------------------------------------------------- | --------------------------- |

@@ -7,7 +7,7 @@ import { parse } from 'yaml';
 
 // Workflowの実際のシェルを実行し、判定ロジックをテスト側へ複製しない。
 const workflow: { jobs: { docs: { steps: { id?: string; run?: string }[] } } } = parse(
-  await readFile(new URL('../../.github/workflows/docs.yml', import.meta.url), 'utf8'),
+  await readFile(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8'),
 );
 const script = (() => {
   const run = workflow.jobs.docs.steps.find((step) => step.id === 'changes')?.run;
@@ -84,7 +84,7 @@ test.each([
   'README.md',
   'docs/日本語 空白\n付き.md',
   'tools/docs/check.ts',
-  '.github/workflows/docs.yml',
+  '.github/workflows/ci.yml',
   'package.json',
   'apps/worker/package.json',
   'pnpm-lock.yaml',

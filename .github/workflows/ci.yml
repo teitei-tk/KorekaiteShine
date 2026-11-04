@@ -1,4 +1,4 @@
-name: Documentation checks
+name: CI
 
 on:
   pull_request:
@@ -81,17 +81,11 @@ jobs:
       - name: Check Node.js configuration
         if: steps.changes.outputs.required == 'true'
         run: pnpm check:node
-      - name: Check documentation tooling types
-        if: steps.changes.outputs.required == 'true'
-        run: pnpm --dir tools/docs typecheck
-      - name: Test documentation tooling
-        if: steps.changes.outputs.required == 'true'
-        run: pnpm --dir tools/docs test
       - name: Check documentation
         if: steps.changes.outputs.required == 'true'
         run: pnpm check:docs
-  ai-review-tooling:
-    name: Lint, format and tests (apps, packages, tools)
+  lint-format:
+    name: Repository lint and format
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -112,14 +106,10 @@ jobs:
         run: pnpm lint
       - name: Check repository formatting with oxfmt
         run: pnpm format:check
-      - name: Build and typecheck repository
-        run: pnpm typecheck
-      - name: Test units, contracts, and local D1 boundaries
-        run: pnpm test
-  local-integration:
-    name: Local Worker integration
+  apps:
+    name: Apps checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -134,6 +124,84 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
+      - name: Build and typecheck apps
+        run: pnpm --filter './apps/*' --workspace-concurrency=1 run typecheck
+      - name: Test apps
+        run: pnpm --filter './apps/*' --workspace-concurrency=1 run test
+  packages:
+    name: Packages checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
+      - name: Build and typecheck packages
+        run: pnpm --filter './packages/*' --workspace-concurrency=1 run typecheck
+      - name: Test packages
+        run: pnpm --filter './packages/*' --workspace-concurrency=1 run test
+  tools:
+    name: Tools checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
+      - name: Build and typecheck tools
+        run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run typecheck
+      - name: Test tools
+        run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run test
+  local-integration:
+    name: Local Worker boundaries and integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
+      - name: Typecheck local integration tooling
+        run: pnpm --filter @korekaite/local-integration typecheck
+      - name: Test Worker and D1 boundaries
+        run: pnpm --filter @korekaite/local-integration test
       - name: Prepare development retention sentinel
         run: pnpm prepare:integration
       - name: Test real-time Queue delivery and recovery

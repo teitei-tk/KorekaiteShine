@@ -10,7 +10,7 @@ it('AIレビュー表示を通常CIから独立したPR Workflowにする', () =
   expect(monitor).not.toContain('workflow_run:');
   expect(monitor).toContain('node tools/ai-review/wait-review.ts wait');
   expect(monitor).toContain('node tools/ai-review/wait-review.ts finish');
-  expect(workflow('docs')).toMatch(/^name: Documentation checks\n/);
+  expect(workflow('ci')).toMatch(/^name: CI\n/);
 });
 it('監視は信頼済みbaseのコードを使い、書き込み・OIDC権限を持たない', () => {
   const monitor = workflow('ai-review-check');
@@ -44,7 +44,7 @@ it('Artifactの取得を監視した実行・試行に固定する', () => {
   expect(monitor).toContain('REVIEW_REPORT_DOWNLOAD: ${{ steps.reports.outcome }}');
 });
 it('Draft解除時にも通常CIと監視を同時に起動する', () => {
-  for (const name of ['docs', 'ai-review-check']) {
+  for (const name of ['ci', 'ai-review-check']) {
     expect(workflow(name)).toContain('types: [opened, synchronize, reopened, ready_for_review]');
   }
 });

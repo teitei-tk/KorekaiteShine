@@ -80,15 +80,25 @@ Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。ローカルのgit-secretsによるpre-commit検査はLefthookから実行します。
 
-`Documentation checks`内で、文書検査・Actionsロック検証・`Lint, format and tests (apps, packages, tools)`・`Local Worker integration`を独立したジョブとして実行します。通常検査ではリポジトリ全体のLint・整形・型検査・単体／契約／ローカルD1境界テストを実行します。実時間の長い接続・回復検査は20分上限の統合ジョブで、`pnpm prepare:integration`の後に`pnpm test:integration`を実行します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの通常検査入口は`pnpm check`です。
+[ci.yml](../../.github/workflows/ci.yml)の`CI`内で、次のジョブを並列実行します。
 
-`apps/web`と`apps/evaluation`のテストは、ルートの`pnpm test`から各パッケージのtestスクリプトで実行します。`apps/interview`のDOテストは`tools/local-integration/tests`から実行します。Lint・整形は`apps/`を含むルート全体が対象です。これらの検査は変更パスで省略しないため、共有パッケージや設定の変更時も実行されます。
+| ジョブ              | 検査範囲                                             |
+| ------------------- | ---------------------------------------------------- |
+| `lint-format`       | ルート設定を含む全体のLint・整形チェック             |
+| `apps`              | アプリのビルド・型検査・単体テスト                   |
+| `packages`          | 共有パッケージの生成・型検査・テスト                 |
+| `tools`             | ローカル結合検証を除く開発ツールの型検査・単体テスト |
+| `local-integration` | DO・D1境界テストと実時間の接続・回復・環境分離テスト |
+| `docs`              | Node.js設定・文書・リンク・見出し検査                |
+| `verify-lockfile`   | Actionsロック検証                                    |
 
-通常検査ジョブの上限は15分です。PR #68の初回実行で、依存インストール・ビルド・型検査後の通常テスト中に従来の5分上限へ達したため、ローカルD1・DOを起動する検査の時間を確保しています。
+ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-integration`が担当します。同ジョブは通常の境界テスト後に`pnpm prepare:integration`と`pnpm test:integration`を実行します。
 
-文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・型検査・通常テストは毎回実行します。
+通常検査の上限は15分、境界テストを追加した結合検証は25分です。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。
 
-有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。
+文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合もジョブは起動し、検査ステップをスキップして成功します。他のジョブは変更パスで省略しません。文書検査ツール自体の型検査・テストは`tools`が担当します。
+
+有料のAIレビューを行う後続Workflowは、`CI`全体が成功した場合だけ対象PRを確認します。旧名からの切り替えと移行PRの制約は[AIレビュー運用手順](../../docs/runbooks/ai-review.md#ciの名称移行)を参照してください。
 
 ### Actionsのロック
 

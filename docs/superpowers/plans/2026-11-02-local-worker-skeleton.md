@@ -37,16 +37,16 @@
 
 次のファイル名とテーブル名は本計画で提案する実装名であり、作成済みではない。正式な面接の保存モデルを確定するものではない。
 
-| 配置                      | 作成・移行する主要ファイルと責務                                                                                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                | 試作の`src/router.tsx`、一覧画面・API・クライアント、`tests/`、`scripts/verify-http.ts`を移行。`src/diagnostics/`に診断画面・HTTPハンドラーを置く               |
-| `apps/interview`          | `src/worker.ts`と`src/worker.local.ts`で入口を分離。`src/diagnostics/check-object.ts`で診断DOの保存・読み戻し・通知を行う                                       |
-| `apps/evaluation`         | `src/worker.ts`と`src/worker.local.ts`、`src/domain/`の状態規則、`src/application/`の受信・回復、`src/server/repositories/`の条件付き保存                       |
-| `packages/api-contracts`  | `http/main.tsp`、`http/diagnostics.tsp`、`messages/main.tsp`、`scripts/generate-validation.ts`、`scripts/generate-messages.ts`。生成先は`generated/`            |
-| `packages/database`       | `db/schema.ts`、`db/schema/jobs.ts`、`db/schema/diagnostics.ts`、`db/migrations/`、`fixtures/`、`db/seed.ts`、`testing/`。業務処理を集約しない                  |
-| `packages/runtime-config` | `src/environment.ts`、`src/resources.ts`、`src/artifacts.ts`。環境検証と接続先・生成先の対応                                                                    |
-| `tools/local-integration` | `src/runtime.ts`、`src/run.ts`、`tests/`。独立した実ランタイムの起動・停止・接続検証・証拠保存                                                                  |
-| 既存設定                  | ルート`package.json`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`、`.gitignore`、`tools/api-codegen/package.json`、`.github/workflows/docs.yml`を移行に合わせて更新 |
+| 配置                      | 作成・移行する主要ファイルと責務                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                | 試作の`src/router.tsx`、一覧画面・API・クライアント、`tests/`、`scripts/verify-http.ts`を移行。`src/diagnostics/`に診断画面・HTTPハンドラーを置く             |
+| `apps/interview`          | `src/worker.ts`と`src/worker.local.ts`で入口を分離。`src/diagnostics/check-object.ts`で診断DOの保存・読み戻し・通知を行う                                     |
+| `apps/evaluation`         | `src/worker.ts`と`src/worker.local.ts`、`src/domain/`の状態規則、`src/application/`の受信・回復、`src/server/repositories/`の条件付き保存                     |
+| `packages/api-contracts`  | `http/main.tsp`、`http/diagnostics.tsp`、`messages/main.tsp`、`scripts/generate-validation.ts`、`scripts/generate-messages.ts`。生成先は`generated/`          |
+| `packages/database`       | `db/schema.ts`、`db/schema/jobs.ts`、`db/schema/diagnostics.ts`、`db/migrations/`、`fixtures/`、`db/seed.ts`、`testing/`。業務処理を集約しない                |
+| `packages/runtime-config` | `src/environment.ts`、`src/resources.ts`、`src/artifacts.ts`。環境検証と接続先・生成先の対応                                                                  |
+| `tools/local-integration` | `src/runtime.ts`、`src/run.ts`、`tests/`。独立した実ランタイムの起動・停止・接続検証・証拠保存                                                                |
+| 既存設定                  | ルート`package.json`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`、`.gitignore`、`tools/api-codegen/package.json`、`.github/workflows/ci.yml`を移行に合わせて更新 |
 
 各新規パッケージには`package.json`、`tsconfig.json`、必要な`vitest.config.ts`を置く。共通の型は契約または所有パッケージから公開し、アプリ同士をimportしない。現段階のジョブ制御はEvaluationが所有し、不要な共有ドメインパッケージを作らない。
 
@@ -230,7 +230,7 @@ D1の保存単位は次を基準とする。
 
 ### タスク9：統合検証を再現可能な操作入口にまとめる
 
-**変更先：** `tools/local-integration/src/{runtime,run}.ts`、`tests/{end-to-end,isolation,restart,formal-routing}.test.ts`、ルート`package.json`、`.github/workflows/docs.yml`。
+**変更先：** `tools/local-integration/src/{runtime,run}.ts`、`tests/{end-to-end,isolation,restart,formal-routing}.test.ts`、ルート`package.json`、`.github/workflows/ci.yml`。
 
 **境界：** ルートの`test:integration`は実行IDと並列番号を発行し、test環境のみを起動・準備・破棄する。証拠は`.local/tests/{実行ID}/{並列番号}/results.json`に環境、固定版、ケース、期待値、実測値、終了コードを保存する。秘密値や入力本文は保存しない。
 
@@ -240,7 +240,7 @@ D1の保存単位は次を基準とする。
 - [x] 開発DBに固定の保持確認行を置き、並列test環境二つの実行後も値・件数が変わらないことを確認する。テスト同士のD1・DO・Queue・出力も共有されないことを確認する。
 - [x] 通常Queueについて、WebとInterviewの送信先が同じ環境のEvaluationへ届き、通常DLQも受信できることを別に検査する。正式用途の架空ジョブとテスト専用評価器を使い、診断スタブを本番入口へ組み込まない。
 - [x] 開発・ビルド済みWorkerの両方でHTTP契約ケースを実行する。ローカルscheduledはタスク2で確認したランタイム入口を60秒周期で駆動し、手動でアプリの回復関数を呼ぶ試験と区別する。
-- [x] CIにローカル統合検証を追加する。現行5分のジョブとは分け、当初20分のタイムアウトを設定して実測後に調整する。Actionsの新規依存は原則増やさず、Workflow名`Documentation checks`を維持する。
+- [x] CIにローカル統合検証を追加する。現行5分のジョブとは分け、当初20分のタイムアウトを設定して実測後に調整する。Actionsの新規依存は原則増やさず、当初はWorkflow名`Documentation checks`を維持した。2026年11月4日の追加変更で`ci.yml`／`CI`へ改名し、通常検査を責務別に分割した。
 - [x] CIの通常テストと実時間の長い統合検証を分ける。ルート`pnpm test`には単体・契約・ローカルD1境界テストを含め、実時間の全経路試験は`test:integration`で明示実行する。起動失敗・timeoutも失敗終了し、起動したプロセスを確実に停止する。
 - [x] `pnpm check`と新しい統合検証入口を通してcommitする。
 

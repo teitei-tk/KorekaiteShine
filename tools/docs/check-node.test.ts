@@ -20,7 +20,7 @@ test('ルートと子パッケージの範囲・型定義・CIの参照が一致
     await inspect({
       'package.json': JSON.stringify({ engines: { node: '>=26.12.1 <27' } }),
       'apps/worker/package.json': JSON.stringify({ devDependencies: { '@types/node': '^26.6.5' } }),
-      '.github/workflows/docs.yml':
+      '.github/workflows/ci.yml':
         'jobs:\n  docs:\n    steps:\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: .node-version\n',
     }),
   ).toEqual([]);

@@ -4,6 +4,26 @@ import { validateJobNotification } from '@korekaite/api-contracts/messages/valid
 import { DurableObject } from 'cloudflare:workers';
 import { db } from 'void/db';
 import { connectionChecks } from '@korekaite/database';
+import {
+  CheckObject,
+  type CheckInitialized,
+} from '../../../apps/interview/src/diagnostics/check-object';
+
+export class InspectableCheckObject extends CheckObject {
+  constructor(
+    ctx: ConstructorParameters<typeof CheckObject>[0],
+    env: ConstructorParameters<typeof CheckObject>[1] & { CHECK_OBJECT_ENV?: string },
+  ) {
+    if (env.APP_ENV !== 'test') {
+      throw new Error('テスト環境専用です。');
+    }
+    super(ctx, { ...env, APP_ENV: env.CHECK_OBJECT_ENV ?? env.APP_ENV });
+  }
+
+  async readInitializationForTest(): Promise<CheckInitialized | null> {
+    return (await this.ctx.storage.get<CheckInitialized>('initialization')) ?? null;
+  }
+}
 
 export class TopologyObject extends DurableObject<{
   APP_ENV: string;

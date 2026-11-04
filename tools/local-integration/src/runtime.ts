@@ -25,6 +25,8 @@ export interface LocalRuntimeOptions {
   manualDiagnostics?: boolean;
   /** DO・送信境界のテストだけで評価の業務処理を保留する。 */
   probeOnlyEvaluation?: boolean;
+  /** DO入口の拒否条件を独立test環境で検査する。 */
+  checkObjectProbe?: 'normal' | 'forbidden-environment';
   /** 実Queue受信後、評価前の停止位置をtest環境で固定する。 */
   holdEvaluationBeforeConsume?: boolean;
   /** 保存後ack前のConsumer例外終了をtest環境で一度だけ起こす。 */
@@ -48,6 +50,7 @@ async function prepareRuntime(
   if (
     (options.manualDiagnostics ||
       options.probeOnlyEvaluation ||
+      options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck) &&
     config.environment !== 'test'
@@ -161,7 +164,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   const interviewEntry = join(project, 'interview.local.ts');
   await writeFile(
     interviewEntry,
-    `export { default, CheckObject } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
+    `export { default${options.checkObjectProbe ? '' : ', CheckObject'} } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject${options.checkObjectProbe ? ', InspectableCheckObject as CheckObject' : ''} } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
   );
   const diagnostics = config.queues.diagnostics;
   if (!diagnostics) {
@@ -169,6 +172,17 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   }
   const interview = {
     ...common,
+    vars: {
+      ...common.vars,
+      ...(options.checkObjectProbe
+        ? {
+            CHECK_OBJECT_ENV:
+              options.checkObjectProbe === 'forbidden-environment'
+                ? 'forbidden-test'
+                : config.environment,
+          }
+        : {}),
+    },
     name: config.workers.interview,
     main: interviewEntry,
     queues: {
@@ -434,6 +448,7 @@ export async function startRuntimeInProcess(
     mode === 'preview' &&
     (options.manualDiagnostics ||
       options.probeOnlyEvaluation ||
+      options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck)
   ) {

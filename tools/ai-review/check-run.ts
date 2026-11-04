@@ -29,6 +29,12 @@ const labels = new Map([
   ['Validate output before handing it to the posting job', '出力検証'],
   ['Recheck PR author and revision, then update the review comment', '投稿前確認・投稿'],
   ['Repository lint, format and AI review checks', 'Lint・整形・テスト'],
+  ['Lint, format and tests (apps, packages, tools)', 'Lint・整形・テスト'],
+  ['Repository lint and format', 'Lint・整形'],
+  ['Apps checks', 'アプリ検査'],
+  ['Packages checks', '共有パッケージ検査'],
+  ['Tools checks', '開発ツール検査'],
+  ['Local Worker boundaries and integration', 'Worker境界・結合検査'],
   ['Check formatting, links, and heading anchors', '文書検査'],
   ['Verify Actions lockfile', 'Actionsロック検証'],
 ]);

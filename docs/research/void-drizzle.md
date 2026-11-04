@@ -36,3 +36,15 @@ TanStack Start向け資料にも`void/db`の使用例があります。例はSer
 Drizzle自体もD1・Workersをサポートし、`drizzle-orm/d1`からD1バインディングを直接渡す方法があります。ただし、確認時点のDrizzle資料は`@rc`の導入例を含むため、Void内蔵版と同一のAPIだとは扱いません。直接初期化する構成を選ぶ場合も、Voidとの依存・マイグレーション管理を一つに揃える検討が必要です。[Drizzle Cloudflare D1](https://orm.drizzle.team/docs/sqlite/connect-cloudflare-d1)
 
 本調査は[ADR 0004](../adr/0004-tanstack-start-with-void.md)のStart・Voidの責務分担と、[MVPの設計基準](../spec/mvp.md#設計基準)を維持します。実装、依存追加、DB作成は行っていません。
+
+## 2026年11月2日のローカル実行確認
+
+上記の静的調査後、Void 1.4.0とCloudflare Viteプラグイン1.64.0で次を確認しました。[接続検証テスト](../../tools/local-integration/tests/topology.test.ts)と[実行環境](../../tools/local-integration/src/runtime.ts)で再現できます。クラウドへの配置は行っていません。
+
+- Void CLIで共有スキーマからSQLを生成・適用し、同じD1をWeb・Interview DO・Evaluationの3 WorkersとCLIから読み書きできました。
+- `db.batch`の2件目で一意制約違反を起こし、1件目も保存されないことを確認しました。[D1公式API](https://developers.cloudflare.com/d1/worker-api/d1-database/)のbatchの原子性と整合します。
+- 公開`createDb`は`first-unconstrained`を指定します。ジョブの不在判定・実行権判断用に[接続アダプター](../../packages/database/src/connection.ts)を設け、実bindingへ`first-primary`が渡ることと保存・読み戻しを確認しました。ローカル検証は指定方法の検証であり、本番のreplica遅延を再現したものではありません。
+
+DB CLIは環境別の作業先から実行し、スキーマとSQLは`packages/database`の原本へリンクします。Voidの公開Plugin APIで保存先情報を生成し、CLIとWorkerに同じD1識別子・状態保存先を渡します。CLIがcwdへ生成する設定・lock等を環境間で共有しないためです。
+
+既存データ・外部キーを伴う業務スキーマの変更、診断ジョブ全体、配置時の適用順序は引き続き未検証です。

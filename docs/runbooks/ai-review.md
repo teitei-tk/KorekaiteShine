@@ -20,7 +20,7 @@
 
 [AIレビューWorkflow](../../.github/workflows/ai-review.yml)と[検査コード](../../tools/ai-review/package.json)を通常のPRでレビューしてmainへ反映します。`workflow_run`はデフォルトブランチのWorkflowを使うため、実装PRのブランチに置いただけでは起動しません。
 
-通常の`Documentation checks`を成功させてください。AIレビューは必須チェックや自動マージ条件に設定しません。この手順自体はpush・マージが実施済みであることを意味しません。
+通常の`CI`を成功させてください。AIレビューは必須チェックや自動マージ条件に設定しません。この手順自体はpush・マージが実施済みであることを意味しません。
 
 ## 2. GitHubでOIDCクレームだけ確認する
 
@@ -102,7 +102,7 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 
 設定を確認後、`AI_REVIEW_MODE`を`claims`から`review`へ変更します。これ以降、対象PRの通常CI成功後に有料のモデル呼び出しが実行されます。モデルは`gpt-6-luna`、推論強度は`medium`です。
 
-小さなPRを更新するか、そのPRの`Documentation checks`を再実行します。`AI review`で以下を順に確認してください。
+小さなPRを更新するか、そのPRの`CI`を再実行します。`AI review`で以下を順に確認してください。
 
 - `gate`が本人のPRを許可する。
 - `generate`でWIF交換が成功する。期限が240秒未満ならモデルを呼ばず失敗する。
@@ -148,7 +148,7 @@ IDは画面で確認した`idp_`、`user-`形式を検査します。形式OKだ
 
 ## PRのチェック一覧
 
-PRのチェック一覧には専用Workflowの`AI review / Review result`を表示する。`Documentation checks`の一部にはしない。main上の`AI review execution`がモデル実行と投稿を担当し、表示用Workflowは読み取りだけでその完了を待つ。PR #13の上限引き上げはマージしない。
+PRのチェック一覧には専用Workflowの`AI review / Review result`を表示する。`CI`の一部にはしない。main上の`AI review execution`がモデル実行と投稿を担当し、表示用Workflowは読み取りだけでその完了を待つ。PR #13の上限引き上げはマージしない。
 
 表示側はbase SHAの信頼済みコードを使うため、監視コードを先にmainへ反映してからWorkflowを切り替える。`checks: write`は使わない。OIDCは生成ジョブ、PRコメントの書き込みは投稿ジョブだけに与える。AI実行名の`AI review / source run <CI実行ID> attempt <CI試行番号> / review`は照合に使うため、形式を変更する際は監視側も更新する。
 
@@ -223,7 +223,7 @@ gh actions-lock --verify
 
 `pnpm check`にはリポジトリ全体のoxlintとoxfmtによる検査も含まれます。整形を修正する場合は、ルートで`pnpm format`を実行してください。
 
-GitHub Actionsでは`Documentation checks`の`Repository lint, format and AI review checks`ジョブで、全体のLint・整形確認とAIレビューツールの型検査・テストを確認できます。このジョブはPRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
+GitHub Actionsの`CI`では、`Repository lint and format`・`Apps checks`・`Packages checks`・`Tools checks`・`Local Worker boundaries and integration`で検査を分担します。PRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
 
 認証・モデル・投稿の実検証はGitHubとOpenAIの設定後に別途行います。ローカルのテストは外部APIを模擬し、実際のアカウントへの接続成功を意味しません。
 
@@ -259,7 +259,7 @@ AIレビュー終了後のAI review failure notificationが、同じPRの現在�
 
 1. `AI_REVIEW_MODE`を`off`にし、`EXPECTED_AI_REVIEW_MODE=off pnpm check:ai-settings`で確認します。既存のProvider・サービスアカウント・audience・マッピング条件は変更しません。
 2. mainに反映済みの`ai-review-isolation.yml`を手動実行し、`complete`と`reject`の成功を確認します。
-3. 現在のmainのpushで開始された、成功済みの`Documentation checks`の実行IDを選びます。`AI_REVIEW_WIF_PROBE_RUN`へそのIDを設定し、そのCIを再実行します。
+3. 現在のmainのpushで開始された、成功済みの`CI`の実行IDを選びます。`AI_REVIEW_WIF_PROBE_RUN`へそのIDを設定し、そのCIを再実行します。
 4. 後続の`AI review execution`で`wif-validation`が実行され、クレーム一致・初期交換・資格情報隔離・公式終了の成功表示が揃うことを確認します。全体がskippedだった場合は成功扱いしません。
 5. 成否にかかわらず`AI_REVIEW_WIF_PROBE_RUN`を削除します。`AI_REVIEW_MODE`は`off`のままにし、有料呼び出しの別途承認を待ちます。
 
@@ -307,3 +307,9 @@ PR #68の旧監視実行41773819631は、`source-ci`待機が50分上限に達�
 `Prepare and verify trusted isolation before collecting PR code`で`Cannot find name 'Temporal'`が出る場合、旧`prepare.sh`が`--ignoreConfig`付きの独立した設定でコンパイルしていました。通常の型検査は成功しても、この経路は失敗します。隔離用ビルドは`pnpm --dir tools/ai-review build:isolation`へ統一し、通常の型設定を継承します。生成されたJavaScriptまで確認する回帰テストを通常CIに含めます。
 
 レビュー本体はmain上のコードを使うため、PR内の修正だけでは実際の失敗ジョブには適用されません。修正をmainへ反映した後、新しいmainをbaseにしたPRで、隔離準備以降の動作を確認します。ローカルのビルド成功を実WIF・モデル・投稿の成功として扱いません。
+
+### CIの名称移行
+
+2026年11月4日、通常CIを`docs.yml`／`Documentation checks`から`ci.yml`／`CI`へ変更し、検査を責務別のジョブに分割しました。PR #69で新旧CIの起動・監視互換対応と隔離用ビルド修正をmainへ先行反映し、PR #68をそのmainへrebaseしています。監視は新旧CIを含む実行一覧から対象の最新実行を選びます。
+
+後続Workflowはmain上、表示用監視はPRのbase上の信頼済みコードで動作します。更新後のpushで通常CIからレビュー生成・投稿・結果表示までの連動を確認します。旧baseで起動した監視の再実行だけでは、更新後の監視コードへ切り替わりません。

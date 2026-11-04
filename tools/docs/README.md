@@ -9,7 +9,7 @@ pnpm check
 
 pnpmはルートの[package.json](../../package.json)の`packageManager`で固定します。検査ツールとテストはTypeScriptで記述します。検査ツールはNode.jsの型除去機能で直接実行し、テストはVitestで実行します。`typecheck`で型検査を別途行います。
 
-`pnpm check`はNode.js設定の整合性・Lint・整形確認・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。型検査とVitestは`tools/docs`と`tools/ai-review`の両方を対象にします。AIレビューの設定は[専用手順](../../docs/runbooks/ai-review.md)を参照してください。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
+`pnpm check`はNode.js設定の整合性・Lint・整形確認・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。型検査とVitestはアプリ・共有パッケージ・ツールを依存順に直列検査します。固定版Vitestがロックファイル変更時に共有キャッシュを削除するため、パッケージ間の同時削除を避けます。AIレビューの設定は[専用手順](../../docs/runbooks/ai-review.md)を参照してください。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
 
 リポジトリ全体にoxlintとoxfmtを使用します。ルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。設定はルートの[.oxlintrc.json](../../.oxlintrc.json)と[.oxfmtrc.json](../../.oxfmtrc.json)、固定バージョンはルートの[package.json](../../package.json)で管理します。各ツールの対応ファイルを対象とし、依存・生成物などGitの除外対象は検査しません。自動生成の`pnpm-lock.yaml`と`.github/workflows/actions.lock`は整形対象から除外し、それぞれ専用ツールで管理します。oxlintはcorrectnessをエラーとして検査し、警告も終了コードを失敗にします。型検査は従来のTypeScriptを併用します。CIが呼ぶ`pnpm check`では整形の書き換えを行いません。
 
@@ -51,7 +51,7 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 ## 依存のサプライチェーン対策
 
-設定はルートの[pnpm-workspace.yaml](../../pnpm-workspace.yaml)で管理します。`packages`で`tools/*`と`apps/*`を対象にするため、将来追加するアプリにも共通の保護設定が適用されます。各パッケージには`package.json`を置き、入れ子の`pnpm-workspace.yaml`で別ワークスペースに分離しない方針です。現在は[TypeSpec連携のローカル試作](../../apps/typespec-spike/README.md)があり、本番アプリは未実装です。
+設定はルートの[pnpm-workspace.yaml](../../pnpm-workspace.yaml)で管理します。`packages`で`tools/*`・`apps/*`・`packages/*`を対象にするため、将来追加するアプリにも共通の保護設定が適用されます。各パッケージには`package.json`を置き、入れ子の`pnpm-workspace.yaml`で別ワークスペースに分離しない方針です。現在は[Webアプリ](../../apps/web/README.md)と3 Workersのローカル接続を実装しています。正式な面接・実AI・クラウド配置は後続範囲です。
 
 - `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
 - `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。
@@ -80,11 +80,25 @@ Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。ローカルのgit-secretsによるpre-commit検査はLefthookから実行します。
 
-`Documentation checks`内で、文書検査・Actionsロック検証・`Repository lint, format and AI review checks`を独立したジョブとして実行します。同ジョブでリポジトリ全体のLint・整形確認、`tools/ai-review`のTypeScript・Vitest、`apps/typespec-spike`の契約生成・ビルド・型検査・Vitestを個別ステップで実行します。CIでは整形を書き換えず、OpenAIへの通信も行いません。ローカルの`pnpm check`はこれらのコード・文書検査をまとめて実行する入口として維持します。
+[ci.yml](../../.github/workflows/ci.yml)の`CI`内で、次のジョブを並列実行します。
 
-文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・AIレビューツール検査は毎回実行します。
+| ジョブ              | 検査範囲                                             |
+| ------------------- | ---------------------------------------------------- |
+| `lint-format`       | ルート設定を含む全体のLint・整形チェック             |
+| `apps`              | アプリのビルド・型検査・単体テスト                   |
+| `packages`          | 共有パッケージの生成・型検査・テスト                 |
+| `tools`             | ローカル結合検証を除く開発ツールの型検査・単体テスト |
+| `local-integration` | DO・D1境界テストと実時間の接続・回復・環境分離テスト |
+| `docs`              | Node.js設定・文書・リンク・見出し検査                |
+| `verify-lockfile`   | Actionsロック検証                                    |
 
-有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。
+ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-integration`が担当します。同ジョブは通常の境界テスト後に`pnpm prepare:integration`と`pnpm test:integration`を実行します。
+
+通常検査の上限は15分、境界テストを追加した結合検証は25分です。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。
+
+文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合もジョブは起動し、検査ステップをスキップして成功します。他のジョブは変更パスで省略しません。文書検査ツール自体の型検査・テストは`tools`が担当します。
+
+有料のAIレビューを行う後続Workflowは、`CI`全体が成功した場合だけ対象PRを確認します。旧名からの切り替えと移行PRの制約は[AIレビュー運用手順](../../docs/runbooks/ai-review.md#ciの名称移行)を参照してください。
 
 ### Actionsのロック
 

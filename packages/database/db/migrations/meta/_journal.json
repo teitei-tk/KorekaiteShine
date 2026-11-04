@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793605397517,
+      "tag": "20261102074317_romantic_tony_stark",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793612613150,
+      "tag": "20261102094333_many_post",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793614174001,
+      "tag": "20261102100933_dashing_firebrand",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793614416141,
+      "tag": "20261102101336_wide_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793631156928,
+      "tag": "20261102145236_pale_mulholland_black",
+      "breakpoints": true
+    }
+  ]
+}

@@ -21,4 +21,4 @@
 
 AI待機、試行全体、実行権、再試行、定期回復を別の期限として管理します。実行権の更新でも試行全体の上限を延ばしません。初期値は実測した性能保証ではなく、モデル・入力上限・運用結果を踏まえて見直します。数値、状態遷移、ack・retry・DLQの正式な規則は[MVP仕様書](../spec/mvp.md#評価ジョブと再実行)へ集約します。
 
-固定版の生成・接続・定期実行は未検証です。時計を差し替えた境界テストと実際の配送検証を分けます。DLQ処理自身の失敗・保持期限・運用回復など、残る事項も仕様書で管理します。根拠となる公式資料は[TypeSpec JSON Schema](https://typespec.io/docs/emitters/json-schema/reference/)、[Queue配送保証](https://developers.cloudflare.com/queues/reference/delivery-guarantees/)、[再試行](https://developers.cloudflare.com/queues/configuration/batching-retries/)、[DLQ](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/)です。
+合意時点では固定版の生成・接続・定期実行は未検証でした。2026年11月3日にローカルで確認し、[検証記録](../research/local-worker-integration.md)へ結果とQueue永続性の制約を追記しました。時計を差し替えた境界テストと実際の配送検証を分けます。DLQ処理自身の失敗・保持期限・運用回復など、残る事項も仕様書で管理します。根拠となる公式資料は[TypeSpec JSON Schema](https://typespec.io/docs/emitters/json-schema/reference/)、[Queue配送保証](https://developers.cloudflare.com/queues/reference/delivery-guarantees/)、[再試行](https://developers.cloudflare.com/queues/configuration/batching-retries/)、[DLQ](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/)です。

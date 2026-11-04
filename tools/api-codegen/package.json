@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate": "openapi-typescript ../../apps/typespec-spike/generated/openapi.json -o ../../apps/typespec-spike/generated/api.d.ts"
+    "generate": "openapi-typescript ../../packages/api-contracts/generated/http/openapi.json -o ../../packages/api-contracts/generated/http/api.d.ts"
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0",

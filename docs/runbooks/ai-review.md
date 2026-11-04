@@ -223,7 +223,7 @@ gh actions-lock --verify
 
 `pnpm check`にはリポジトリ全体のoxlintとoxfmtによる検査も含まれます。整形を修正する場合は、ルートで`pnpm format`を実行してください。
 
-GitHub Actionsでは`Documentation checks`の`Repository lint, format and AI review checks`ジョブで、全体のLint・整形確認とAIレビューツールの型検査・テストを確認できます。このジョブはPRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
+GitHub Actionsでは`Documentation checks`の`Lint, format and tests (apps, packages, tools)`ジョブで、アプリ・共有パッケージ・AIレビューツールを含むリポジトリ全体のLint・整形・型検査・通常テストを確認できます。このジョブはPRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
 
 認証・モデル・投稿の実検証はGitHubとOpenAIの設定後に別途行います。ローカルのテストは外部APIを模擬し、実際のアカウントへの接続成功を意味しません。
 

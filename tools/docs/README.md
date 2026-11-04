@@ -80,9 +80,11 @@ Actions更新PRでは`uses:`と[Actionsのロック](#actionsのロック)を合
 
 GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取り、同じテストと検査を実行します。PRとmainへのpushを対象にし、ジョブの権限はリポジトリの読み取りだけです。実行にアプリのAPIキーは不要です。ローカルのgit-secretsによるpre-commit検査はLefthookから実行します。
 
-`Documentation checks`内で、文書検査・Actionsロック検証・`Repository lint, format and AI review checks`・`Local Worker integration`を独立したジョブとして実行します。通常検査ではリポジトリ全体のLint・整形・型検査・単体／契約／ローカルD1境界テストを実行します。実時間の長い接続・回復検査は20分上限の統合ジョブで、`pnpm prepare:integration`の後に`pnpm test:integration`を実行します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの通常検査入口は`pnpm check`です。
+`Documentation checks`内で、文書検査・Actionsロック検証・`Lint, format and tests (apps, packages, tools)`・`Local Worker integration`を独立したジョブとして実行します。通常検査ではリポジトリ全体のLint・整形・型検査・単体／契約／ローカルD1境界テストを実行します。実時間の長い接続・回復検査は20分上限の統合ジョブで、`pnpm prepare:integration`の後に`pnpm test:integration`を実行します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの通常検査入口は`pnpm check`です。
 
-文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・AIレビューツール検査は毎回実行します。
+`apps/web`と`apps/evaluation`のテストは、ルートの`pnpm test`から各パッケージのtestスクリプトで実行します。`apps/interview`のDOテストは`tools/local-integration/tests`から実行します。Lint・整形は`apps/`を含むルート全体が対象です。これらの検査は変更パスで省略しないため、共有パッケージや設定の変更時も実行されます。
+
+文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合も変更判定のためジョブ自体は起動し、検査ステップをスキップして成功します。Actionsロック検証とリポジトリ全体のLint・整形・型検査・通常テストは毎回実行します。
 
 有料のAIレビューを行う後続Workflowは、これらすべてが成功した場合だけ対象PRを確認します。起点のWorkflow名`Documentation checks`は維持します。
 

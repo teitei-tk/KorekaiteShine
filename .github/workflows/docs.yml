@@ -91,7 +91,7 @@ jobs:
         if: steps.changes.outputs.required == 'true'
         run: pnpm check:docs
   ai-review-tooling:
-    name: Repository lint, format and AI review checks
+    name: Lint, format and tests (apps, packages, tools)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

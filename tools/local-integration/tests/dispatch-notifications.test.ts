@@ -1,38 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
-import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
-const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+import type { RuntimeConfig } from '@korekaite/runtime-config';
+import { runDatabaseCommand, type LocalRuntime } from '../src/runtime.ts';
+import { withDiagnosticRuntime } from './helpers/diagnostic-runtime.ts';
+
 const now = 1_000_000;
-type Config = ReturnType<typeof resolveRuntime>;
-type Runtime = Awaited<ReturnType<typeof startRuntime>>;
-async function withRuntime(run: (config: Config, runtime: Runtime) => Promise<void>) {
-  const config = resolveRuntime({
-    repositoryRoot,
-    appEnv: 'test',
-    runId: randomUUID(),
-    parallelIndex: 0,
-  });
-  const runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-  });
-  let succeeded = false;
-  try {
-    await run(config, runtime);
-    succeeded = true;
-  } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
-  }
-}
+
 async function seedNotification(
-  config: Config,
+  config: RuntimeConfig,
   jobId: string,
   scheduledAt: number,
   nextAttemptAt: number | null = null,
@@ -47,7 +22,7 @@ async function seedNotification(
  `,
   ]);
 }
-async function dispatch(runtime: Runtime, failJobId?: string) {
+async function dispatch(runtime: LocalRuntime, failJobId?: string) {
   const query = new URLSearchParams({ action: 'dispatch', now: String(now) });
   if (failJobId) {
     query.set('failJobId', failJobId);
@@ -58,7 +33,7 @@ async function dispatch(runtime: Runtime, failJobId?: string) {
   expect(response.status).toBe(200);
   return response.json();
 }
-async function assertSent(config: Config, jobId: string, sent: boolean) {
+async function assertSent(config: RuntimeConfig, jobId: string, sent: boolean) {
   await runDatabaseCommand(config, [
     'execute',
     `
@@ -69,7 +44,7 @@ async function assertSent(config: Config, jobId: string, sent: boolean) {
 }
 
 test('予定時刻が現在から-1msなら遅延0秒で送信する', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + -1);
     expect(await dispatch(runtime)).toEqual({
@@ -82,7 +57,7 @@ test('予定時刻が現在から-1msなら遅延0秒で送信する', async () 
 }, 60_000);
 
 test('予定時刻が現在から0msなら遅延0秒で送信する', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + 0);
     expect(await dispatch(runtime)).toEqual({
@@ -95,7 +70,7 @@ test('予定時刻が現在から0msなら遅延0秒で送信する', async () =
 }, 60_000);
 
 test('予定時刻が現在から1msなら遅延1秒で送信する', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + 1);
     expect(await dispatch(runtime)).toEqual({
@@ -108,7 +83,7 @@ test('予定時刻が現在から1msなら遅延1秒で送信する', async () =
 }, 60_000);
 
 test('予定時刻が現在から1001msなら遅延2秒で送信する', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + 1001);
     expect(await dispatch(runtime)).toEqual({
@@ -121,7 +96,7 @@ test('予定時刻が現在から1001msなら遅延2秒で送信する', async (
 }, 60_000);
 
 test('予定時刻が現在から86400000msなら遅延86400秒で送信する', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + 86400000);
     expect(await dispatch(runtime)).toEqual({
@@ -134,7 +109,7 @@ test('予定時刻が現在から86400000msなら遅延86400秒で送信する',
 }, 60_000);
 
 test('24時間の上限を1ms越える予定は未送信のまま残す', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now + 86_400_001);
     expect(await dispatch(runtime)).toEqual({ outboxSent: 0, outboxDeferred: 0, requests: [] });
@@ -143,7 +118,7 @@ test('24時間の上限を1ms越える予定は未送信のまま残す', async 
 }, 60_000);
 
 test('次回試行時刻がoutboxより遅い場合は次回試行を早めない', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const jobId = randomUUID();
     await seedNotification(config, jobId, now, now + 1_001);
     expect(await dispatch(runtime)).toEqual({
@@ -156,7 +131,7 @@ test('次回試行時刻がoutboxより遅い場合は次回試行を早めな�
 }, 60_000);
 
 test('中央の通知が失敗しても後続を送信し復旧後は失敗分だけ送る', async () => {
-  await withRuntime(async (config, runtime) => {
+  await withDiagnosticRuntime({}, async (config, runtime) => {
     const first = randomUUID(),
       middle = randomUUID(),
       last = randomUUID();

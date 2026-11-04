@@ -1,41 +1,11 @@
 import { Temporal } from '@js-temporal/polyfill';
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
-import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
-const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
-type Config = ReturnType<typeof resolveRuntime>;
-type Runtime = Awaited<ReturnType<typeof startRuntime>>;
-async function withRuntime(
-  mode: 'normal' | 'forbidden-environment',
-  run: (config: Config, runtime: Runtime) => Promise<void>,
-) {
-  const config = resolveRuntime({
-    repositoryRoot,
-    appEnv: 'test',
-    runId: randomUUID(),
-    parallelIndex: 0,
-  });
-  const runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-    checkObjectProbe: mode,
-  });
-  let succeeded = false;
-  try {
-    await run(config, runtime);
-    succeeded = true;
-  } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
-  }
-}
-async function accept(runtime: Runtime): Promise<string> {
+import type { RuntimeConfig } from '@korekaite/runtime-config';
+import { runDatabaseCommand, type LocalRuntime } from '../src/runtime.ts';
+import { withDiagnosticRuntime } from './helpers/diagnostic-runtime.ts';
+
+async function accept(runtime: LocalRuntime): Promise<string> {
   const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
@@ -45,20 +15,20 @@ async function accept(runtime: Runtime): Promise<string> {
   const body: { jobId: string } = await response.json();
   return body.jobId;
 }
-function initialize(runtime: Runtime, objectId: string, jobId: string) {
+function initialize(runtime: LocalRuntime, objectId: string, jobId: string) {
   return fetch(`${runtime.baseUrl}/api/check-object-test`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ objectId, jobId }),
   });
 }
-async function readInitialization(runtime: Runtime, objectId: string) {
+async function readInitialization(runtime: LocalRuntime, objectId: string) {
   const query = new URLSearchParams({ view: 'initialization', objectId });
   const response = await fetch(`${runtime.baseUrl}/api/check-object-test?${query}`);
   expect(response.status).toBe(200);
   return response.json();
 }
-async function assertUntouched(config: Config, jobId: string) {
+async function assertUntouched(config: RuntimeConfig, jobId: string) {
   await runDatabaseCommand(config, [
     'execute',
     `
@@ -73,7 +43,7 @@ async function assertUntouched(config: Config, jobId: string) {
 }
 
 test('DO入口は不正UUIDを拒否しstorageとD1を変更しない', async () => {
-  await withRuntime('normal', async (config, runtime) => {
+  await withDiagnosticRuntime({ checkObjectProbe: 'normal' }, async (config, runtime) => {
     const jobId = await accept(runtime);
     const response = await initialize(runtime, jobId, 'not-a-uuid');
     expect(response.status).toBe(500);
@@ -87,7 +57,7 @@ test('DO入口は不正UUIDを拒否しstorageとD1を変更しない', async ()
 }, 60_000);
 
 test('保存済みDOへ別ジョブを渡すと元の値を保持し別ジョブに通知しない', async () => {
-  await withRuntime('normal', async (config, runtime) => {
+  await withDiagnosticRuntime({ checkObjectProbe: 'normal' }, async (config, runtime) => {
     const first = await accept(runtime),
       other = await accept(runtime);
     const initialized = await initialize(runtime, first, first);
@@ -112,13 +82,16 @@ test('保存済みDOへ別ジョブを渡すと元の値を保持し別ジョブ
 }, 60_000);
 
 test('許可外APP_ENVのDOは保存と通知より前に初期化を拒否する', async () => {
-  await withRuntime('forbidden-environment', async (config, runtime) => {
-    expect(config.environment).toBe('test');
-    const jobId = await accept(runtime);
-    const response = await initialize(runtime, jobId, jobId);
-    expect(response.status).toBe(500);
-    expect((await response.json()).error).toContain('診断DOを利用できない環境です。');
-    expect(await readInitialization(runtime, jobId)).toBeNull();
-    await assertUntouched(config, jobId);
-  });
+  await withDiagnosticRuntime(
+    { checkObjectProbe: 'forbidden-environment' },
+    async (config, runtime) => {
+      expect(config.environment).toBe('test');
+      const jobId = await accept(runtime);
+      const response = await initialize(runtime, jobId, jobId);
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toContain('診断DOを利用できない環境です。');
+      expect(await readInitialization(runtime, jobId)).toBeNull();
+      await assertUntouched(config, jobId);
+    },
+  );
 }, 60_000);

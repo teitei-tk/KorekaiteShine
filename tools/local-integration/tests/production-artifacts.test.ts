@@ -21,8 +21,13 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     const report = await verifyProductionArtifacts(project);
     expect(report.environments.sort()).toEqual(['client', 'evaluation', 'interview', 'ssr']);
     expect(report.routes.sort()).toEqual(['__root.tsx', 'api.interviews.ts', 'index.tsx']);
-    const config = JSON.parse(await readFile(join(project, 'dist/server/wrangler.json'), 'utf8'));
-    expect(config.vars.APP_ENV).toBe('production');
+    const config = JSON.parse(
+      await readFile(
+        join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
+        'utf8',
+      ),
+    );
+    expect(config.env.APP_ENV).toEqual({ type: 'text', value: 'production' });
     expect(config.name).toBe('korekaite-web-prod');
     succeeded = true;
   } finally {
@@ -37,7 +42,7 @@ test('監査記録にない配信ファイルを後から追加した場合も�
   let succeeded = false;
   try {
     const project = await buildProductionArtifacts(directory);
-    const extra = join(project, 'dist/client/extra');
+    const extra = join(project, '.cloudflare/output/v0/workers/default/assets/extra');
     await mkdir(extra);
     await writeFile(join(extra, 'diagnostics.js'), 'export const scenario = "exhaust_retries";');
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('未記録の本番配信物');
@@ -106,12 +111,19 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
         INSERT INTO preserved SELECT COUNT(*) FROM connection_checks WHERE writer = 'preserve' AND value = 'original';
       `,
       ]);
-      const web = JSON.parse(await readFile(join(project, 'dist/server/wrangler.json'), 'utf8'));
+      const web = JSON.parse(
+        await readFile(
+          join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
+          'utf8',
+        ),
+      );
       // HTTP入口にDO・他Worker・Queueの呼出し能力がないことも、実際の配置設定で確認する。
-      expect(web.durable_objects.bindings).toEqual([]);
-      expect(web.services).toEqual([]);
-      expect(web.queues.producers).toEqual([]);
-      expect(web.queues.consumers).toEqual([]);
+      expect(
+        Object.values(web.env as Record<string, { type: string }>)
+          .map((binding: { type: string }) => binding.type)
+          .sort(),
+      ).toEqual(['d1', 'text']);
+      expect(web.triggers ?? []).toEqual([]);
     } finally {
       await runtime.stop();
     }

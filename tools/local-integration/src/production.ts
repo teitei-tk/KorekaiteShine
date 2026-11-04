@@ -99,6 +99,7 @@ export async function runProductionBuild(project: string): Promise<void> {
   // 前回の監査情報や出力を今回のビルドの証拠として再利用させない。
   await rm(join(project, 'build-audit'), { recursive: true, force: true });
   await rm(join(project, 'dist'), { recursive: true, force: true });
+  await rm(join(project, '.cloudflare/output'), { recursive: true, force: true });
   await runNodeCommand({
     args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
     cwd: project,
@@ -182,16 +183,21 @@ export async function startProductionPreview(
 
 interface WorkerConfig {
   name: string;
-  vars: Record<string, string>;
-  workers_dev: boolean;
-  preview_urls: boolean;
-  d1_databases: { binding: string; database_name: string; database_id: string }[];
-  queues: {
-    producers: { binding: string; queue: string }[];
-    consumers: { queue: string; dead_letter_queue?: string }[];
-  };
-  durable_objects: { bindings: { name: string; class_name: string }[] };
-  services: { binding: string }[];
+  workersDev: boolean;
+  previewUrls: boolean;
+  env: Record<string, { type: string; name?: string; id?: string; value?: string }>;
+  triggers?: { type: string; name: string; deadLetterQueue?: string }[];
+}
+
+function workerOutputDirectory(
+  project: string,
+  environment: 'client' | 'ssr' | 'interview' | 'evaluation',
+): string {
+  return join(
+    project,
+    '.cloudflare/output/v0/workers',
+    environment === 'client' || environment === 'ssr' ? 'default' : production.workers[environment],
+  );
 }
 
 const forbiddenModule =
@@ -208,7 +214,8 @@ export async function verifyProductionArtifacts(
     const audit: BuildAudit = JSON.parse(
       await readFile(join(project, 'build-audit', `${environment}.json`), 'utf8'),
     );
-    const outputDirectory = join(project, 'dist', environment === 'ssr' ? 'server' : environment);
+    const workerDirectory = workerOutputDirectory(project, environment);
+    const outputDirectory = join(workerDirectory, environment === 'client' ? 'assets' : 'bundle');
     if (
       audit.environment !== environment ||
       audit.outputDirectory !== outputDirectory ||
@@ -259,32 +266,47 @@ export async function verifyProductionArtifacts(
     if (environment !== 'client') {
       const worker = environment === 'ssr' ? 'web' : environment;
       const config: WorkerConfig = JSON.parse(
-        await readFile(join(outputDirectory, 'wrangler.json'), 'utf8'),
+        await readFile(join(workerDirectory, 'worker.config.json'), 'utf8'),
       );
       if (
         config.name !== production.workers[worker] ||
-        config.vars.APP_ENV !== 'production' ||
-        config.workers_dev !== false ||
-        config.preview_urls !== false ||
+        config.env.APP_ENV?.type !== 'text' ||
+        config.env.APP_ENV.value !== 'production' ||
+        config.workersDev !== false ||
+        config.previewUrls !== false ||
         forbiddenContent.test(JSON.stringify(config))
       ) {
         throw new Error(`本番Worker設定に不整合があります: ${environment}`);
       }
+      const bindings = Object.entries(config.env);
+      const databases = bindings.filter(([, binding]) => binding.type === 'd1');
       if (
-        config.d1_databases.length !== 1 ||
-        config.d1_databases[0]?.binding !== 'DB' ||
-        config.d1_databases[0]?.database_id !== production.d1.id
+        databases.length !== 1 ||
+        config.env.DB?.type !== 'd1' ||
+        config.env.DB.id !== production.d1.id
       ) {
         throw new Error(`本番共有D1設定に不整合があります: ${environment}`);
       }
       const queueNames = new Set(Object.values(production.queues.evaluation));
-      for (const queue of [...config.queues.producers, ...config.queues.consumers]) {
-        if (!queueNames.has(queue.queue)) {
+      for (const [, binding] of bindings) {
+        if (
+          binding.type === 'queue' &&
+          (binding.name === undefined || !queueNames.has(binding.name))
+        ) {
           throw new Error(`本番以外のQueueが設定されています: ${environment}`);
         }
+        if (!['d1', 'text', 'queue', 'assets'].includes(binding.type)) {
+          throw new Error(`未実装の本番入口に検証用bindingがあります: ${environment}`);
+        }
       }
-      if (config.durable_objects.bindings.length || config.services.length) {
-        throw new Error(`未実装の本番入口に検証用bindingがあります: ${environment}`);
+      for (const trigger of config.triggers ?? []) {
+        if (
+          trigger.type !== 'queue' ||
+          !queueNames.has(trigger.name) ||
+          (trigger.deadLetterQueue !== undefined && !queueNames.has(trigger.deadLetterQueue))
+        ) {
+          throw new Error(`本番以外のQueueが設定されています: ${environment}`);
+        }
       }
     }
   }

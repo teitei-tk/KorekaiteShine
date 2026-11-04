@@ -18,7 +18,7 @@ test('開発とビルド済みWorkerに一覧APIの全HTTP契約ケースを送�
       clock: 'real',
       exitCode: 0,
       case: 'interviews-http-contract',
-      versions: { void: '1.4.0' },
+      versions: { void: '1.5.0' },
     });
     expect(report.actual.cases).toEqual(
       interviewCases.map((example, index) => ({

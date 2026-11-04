@@ -27,8 +27,7 @@ export async function runtimeVersions(): Promise<Record<string, string>> {
   const from = join(repositoryRoot, 'tools/local-integration/package.json');
   const framework = await dependency('void', from);
   const plugin = await dependency('@cloudflare/vite-plugin', framework.path);
-  const wrangler = await dependency('wrangler', plugin.path);
-  const miniflare = await dependency('miniflare', wrangler.path);
+  const miniflare = await dependency('miniflare', plugin.path);
   const vite = await dependency('vite', from);
   const root = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));
   return {
@@ -36,7 +35,6 @@ export async function runtimeVersions(): Promise<Record<string, string>> {
     packageManager: root.packageManager,
     void: framework.version,
     cloudflareVite: plugin.version,
-    wrangler: wrangler.version,
     miniflare: miniflare.version,
     vite: vite.version,
     lockfileSha256: createHash('sha256')

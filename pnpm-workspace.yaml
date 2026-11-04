@@ -20,5 +20,5 @@ trustLockfile: false
 overrides:
   '@babel/core>semver': '7.8.5'
   '@babel/helper-compilation-targets>semver': '7.8.5'
-  # 1.66.0では開発時のWorker初期化が失敗するため、Voidの対応範囲内で固定。
-  'void>@cloudflare/vite-plugin': '1.64.0'
+  # Void 1.5.0のBuild Output仕様に対応する2系の要求版へ固定。
+  'void>@cloudflare/vite-plugin': '2.0.0-beta.v.9'

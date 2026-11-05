@@ -61,7 +61,7 @@ pnpm test:integration
 
 `test:integration`は独立したtest環境だけを起動・準備・破棄します。開発DBは読み取り専用で検査し、10テーブルの件数・内容のハッシュと開発生成物が変わらないことを確認します。このSQLite読み取りは保持確認用であり、WorkerからD1への接続検査は別途実際のバインディングで行います。
 
-統合検査ではHTTP契約、診断3シナリオ、停止境界と再起動、通常Queue・DLQ、並列環境の分離を確認します。実時間の待機を短縮しないため、数分以上かかります。定期回復はローカルランタイムのscheduled入口を60秒周期で駆動します。
+全体検査ではHTTP契約、診断3シナリオ、停止境界と再起動、通常Queue・DLQ、並列環境の分離を確認します。実時間の待機を短縮しないため、数分以上かかります。定期回復はローカルランタイムのscheduled入口を60秒周期で駆動します。
 
 ## 結果と失敗時の確認先
 
@@ -75,4 +75,14 @@ pnpm test:integration
 
 ## 境界検査と実時間の結合検査
 
-HTTP契約（開発・ビルド済みWorker）は通常の`pnpm test`に含め、`pnpm test:integration`では重複実行しません。全体を検査する場合は`pnpm check`に加え、`pnpm prepare:integration`と`pnpm test:integration`を実行します。CIでは境界検査と結合検査を別runnerで並列実行します。
+HTTP契約（開発・ビルド済みWorker）は通常の`pnpm test`に含め、`pnpm test:integration`では重複実行しません。全体を検査する場合は`pnpm check`に加え、`pnpm prepare:integration`と`pnpm test:integration`を実行します。通常CIでは境界4分割と短い結合3分割を別runnerで並列実行します。長時間の再試行1件は独立した `Worker real-time checks` へ分離します。
+
+## 通常CIと長時間検査の使い分け
+
+`pnpm test:integration:pr` は通常PR向けの結合14件、`pnpm test:realtime` は実時間30・120・300秒の再試行と実DLQ受信1件を実行します。`pnpm test:integration` は両方を含む15件を維持します。結合検査の前には `pnpm prepare:integration` を実行してください。通常の `pnpm test` は時計を制御した再試行境界も含みます。
+
+長時間ワークフローは毎日03:17 JST、手動実行、関連変更のPRで動きます。定期実行はmainを対象とし、GitHub側の都合で遅延する場合があります。手動実行ではGitHub Actionsの `Worker real-time checks` からrefを選びます。新規ワークフローをmainへ取り込むまでは定期・手動の起動を確認できません。
+
+文書だけの変更は対象外です。コード・依存・設定の変更、削除・移動、変更一覧の取得不能は実行対象にします。`Realtime result` で対象外・成功・失敗・中断を確認できます。通常CIの成功だけで長時間検査も成功したとは扱いません。関連変更は長時間検査の成功を確認してから取り込み、失敗時は実行ログの原因を解消します。必須チェックのリポジトリ設定は自動変更しません。
+
+テストの所属は `tools/local-integration/src/test-suites.ts` に集約しています。新規・削除・移動したテストを登録し忘れた場合は起動前に失敗します。分割番号は境界1〜4、通常結合1〜3です。ローカルで特定分割を再現する場合は、例えば `pnpm --dir tools/local-integration test 1 --maxWorkers=2` を使います。

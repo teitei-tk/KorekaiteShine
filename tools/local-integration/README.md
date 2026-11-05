@@ -33,7 +33,7 @@ Web・Interview DO・Evaluationを一つのローカルランタイムで起動�
 
 ## テストの配置
 
-`pnpm test`はD1・DOの境界を含む通常検査、`pnpm test:integration`は実時間の配送・停止後回復・環境分離の検査です。実時間の統合検査は17ケースを維持しています。
+`pnpm test`はD1・DOの境界を含む通常検査、`pnpm test:integration`は実時間の配送・停止後回復・環境分離の検査です。実時間の統合検査は15ケースです。HTTP契約2件は通常検査だけで実行します。
 
 - [通知配送](tests/dispatch-notifications.test.ts)：ローカルD1と本物の配送処理で時刻境界と部分失敗を確認します。送信関数はtest専用probeで差し替えるため、実Queue配送の証拠とは区別します。
 - [DO入口](tests/check-object-guards.test.ts)：本物の初期化処理とDO storageで、不正UUID・別ジョブ・許可外環境の拒否と副作用を確認します。禁止環境は対象DOへの値だけを差し替え、リソースは独立test環境のままです。
@@ -54,6 +54,16 @@ test専用probeは`fixtures/`に置き、本番成果物への非包含を既存
 
 ## 境界検査と実時間の結合検査
 
-HTTP契約（開発・ビルド済みWorker）は通常の`pnpm test`に含め、`pnpm test:integration`では重複実行しません。全体を検査する場合は`pnpm check`に加え、`pnpm prepare:integration`と`pnpm test:integration`を実行します。CIでは境界検査と結合検査を別runnerで並列実行します。
+HTTP契約（開発・ビルド済みWorker）は通常の`pnpm test`に含め、`pnpm test:integration`では重複実行しません。全体を検査する場合は`pnpm check`に加え、`pnpm prepare:integration`と`pnpm test:integration`を実行します。通常CIでは境界4分割と短い結合3分割を別runnerで並列実行します。長時間の再試行1件は独立した `Worker real-time checks` へ分離します。
 
 通知時刻の境界8ケースは、ファイルごとの独立した環境を1回起動して直列実行します。各ケースが発行したジョブIDを追跡し、正常終了時にそのoutboxとジョブだけを削除します。失敗・タイムアウト後は後続ケースを拒否し、Workerを停止してDBとログを残します。全ケースが成功した環境だけを削除します。再起動・DO保存・実Queue配送を検証する他のテストは個別環境を使います。
+
+## 通常CIと長時間検査の使い分け
+
+`pnpm test:integration:pr` は通常PR向けの結合14件、`pnpm test:realtime` は実時間30・120・300秒の再試行と実DLQ受信1件を実行します。`pnpm test:integration` は両方を含む15件を維持します。結合検査の前には `pnpm prepare:integration` を実行してください。通常の `pnpm test` は時計を制御した再試行境界も含みます。
+
+長時間ワークフローは毎日03:17 JST、手動実行、関連変更のPRで動きます。定期実行はmainを対象とし、GitHub側の都合で遅延する場合があります。手動実行ではGitHub Actionsの `Worker real-time checks` からrefを選びます。新規ワークフローをmainへ取り込むまでは定期・手動の起動を確認できません。
+
+文書だけの変更は対象外です。コード・依存・設定の変更、削除・移動、変更一覧の取得不能は実行対象にします。`Realtime result` で対象外・成功・失敗・中断を確認できます。通常CIの成功だけで長時間検査も成功したとは扱いません。関連変更は長時間検査の成功を確認してから取り込み、失敗時は実行ログの原因を解消します。必須チェックのリポジトリ設定は自動変更しません。
+
+テストの所属は `tools/local-integration/src/test-suites.ts` に集約しています。新規・削除・移動したテストを登録し忘れた場合は起動前に失敗します。分割番号は境界1〜4、通常結合1〜3です。ローカルで特定分割を再現する場合は、例えば `pnpm --dir tools/local-integration test 1 --maxWorkers=2` を使います。

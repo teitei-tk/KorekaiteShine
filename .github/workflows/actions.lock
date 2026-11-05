@@ -23,6 +23,10 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'openai/codex-action@v1.13'
         - 'pnpm/action-setup@v6.1.0'
+    '.github/workflows/ci-realtime.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'actions/setup-node@v7.1.0'
+        - 'pnpm/action-setup@v6.1.0'
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'

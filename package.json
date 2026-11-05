@@ -21,7 +21,9 @@
     "db:migrate": "node tools/local-integration/src/run.ts db:migrate",
     "test:integration": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:integration",
     "db:reset-seed": "node tools/local-integration/src/run.ts db:reset-seed",
-    "prepare:integration": "node tools/local-integration/src/prepare-integration.ts"
+    "prepare:integration": "node tools/local-integration/src/prepare-integration.ts",
+    "test:integration:pr": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:integration:pr",
+    "test:realtime": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:realtime"
   },
   "devDependencies": {
     "lefthook": "2.2.1",

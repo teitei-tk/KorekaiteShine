@@ -179,7 +179,11 @@ jobs:
       - name: Test tools
         run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run test
   local-boundaries:
-    name: Local Worker boundaries
+    name: Local Worker boundaries (${{ matrix.shard }}/4)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -201,9 +205,13 @@ jobs:
       - name: Typecheck local integration tooling
         run: pnpm --filter @korekaite/local-integration typecheck
       - name: Test Worker and D1 boundaries
-        run: pnpm --filter @korekaite/local-integration test
+        run: pnpm --filter @korekaite/local-integration test ${{ matrix.shard }} --maxWorkers=2
   local-integration:
-    name: Local Worker integration
+    name: Local Worker integration (${{ matrix.shard }}/3)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -225,4 +233,4 @@ jobs:
       - name: Prepare development retention sentinel
         run: pnpm prepare:integration
       - name: Test real-time Queue delivery and recovery
-        run: pnpm test:integration
+        run: pnpm --filter @korekaite/local-integration test:integration:pr ${{ matrix.shard }} --maxWorkers=2

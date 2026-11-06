@@ -223,7 +223,7 @@ gh actions-lock --verify
 
 `pnpm check`にはリポジトリ全体のoxlintとoxfmtによる検査も含まれます。整形を修正する場合は、ルートで`pnpm format`を実行してください。
 
-GitHub Actionsの`CI`では、`Repository lint and format`・`Apps checks`・`Packages checks`・`Tools checks`・`Local Worker boundaries and integration`で検査を分担します。PRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
+GitHub Actionsの`CI`では、`Repository lint and format`・`Apps checks`・`Packages checks`・`Tools checks`・`Local Worker boundaries`・`Local Worker integration`で検査を分担します。PRとmainへのpushで動作し、WIFやOpenAIの認証情報を必要としません。
 
 認証・モデル・投稿の実検証はGitHubとOpenAIの設定後に別途行います。ローカルのテストは外部APIを模擬し、実際のアカウントへの接続成功を意味しません。
 
@@ -313,3 +313,7 @@ PR #68の旧監視実行41773819631は、`source-ci`待機が50分上限に達�
 2026年11月4日、通常CIを`docs.yml`／`Documentation checks`から`ci.yml`／`CI`へ変更し、検査を責務別のジョブに分割しました。PR #69で新旧CIの起動・監視互換対応と隔離用ビルド修正をmainへ先行反映し、PR #68をそのmainへrebaseしています。監視は新旧CIを含む実行一覧から対象の最新実行を選びます。
 
 後続Workflowはmain上、表示用監視はPRのbase上の信頼済みコードで動作します。更新後のpushで通常CIからレビュー生成・投稿・結果表示までの連動を確認します。旧baseで起動した監視の再実行だけでは、更新後の監視コードへ切り替わりません。
+
+## 長時間検査とレビュー開始
+
+通常の `CI` が成功するとAIレビューの対象判定へ進みます。`Worker real-time checks` はレビュー起点に追加せず、通常CIとの相互依存も設けません。このため関連変更の長時間検査が進行中でもレビューは開始できます。レビュー完了や通常CI成功は、長時間検査の成功を保証しません。関連変更の取り込み前には独立した `Realtime result` も確認してください。長時間検査の完了による二重レビューは行いません。

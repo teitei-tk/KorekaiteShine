@@ -88,13 +88,14 @@ GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取�
 | `apps`              | アプリのビルド・型検査・単体テスト                   |
 | `packages`          | 共有パッケージの生成・型検査・テスト                 |
 | `tools`             | ローカル結合検証を除く開発ツールの型検査・単体テスト |
-| `local-integration` | DO・D1境界テストと実時間の接続・回復・環境分離テスト |
+| `local-boundaries`  | DO・D1境界テスト、開発・ビルド済みWorkerのHTTP契約   |
+| `local-integration` | 実時間の接続・回復・環境分離テスト                   |
 | `docs`              | Node.js設定・文書・リンク・見出し検査                |
 | `verify-lockfile`   | Actionsロック検証                                    |
 
-ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-integration`が担当します。同ジョブは通常の境界テスト後に`pnpm prepare:integration`と`pnpm test:integration`を実行します。
+ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-boundaries`が担当します。`local-integration`の各分割は開発DB保持確認の準備と、通常結合14件の担当分だけを実行します。長時間1件は別ワークフローが担当します。
 
-通常検査の上限は15分、境界テストを追加した結合検証は25分です。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。
+通常検査の上限は15分、`local-boundaries`と`local-integration`はそれぞれ25分です。境界4分割と結合3分割に順序依存はなく、別runnerで並列実行します。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。 所要時間の内訳と環境共有の測定結果は[CI性能の検証記録](../../docs/research/ci-worker-test-performance.md)を参照してください。
 
 文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合もジョブは起動し、検査ステップをスキップして成功します。他のジョブは変更パスで省略しません。文書検査ツール自体の型検査・テストは`tools`が担当します。
 
@@ -123,3 +124,5 @@ gh actions-lock --verify
 `pnpm lint`はoxlintの`typescript/no-restricted-types`で、リポジトリ内の`unknown`型を拒否します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
 
 外部入力には具体的な入力型を付け、実行時の形式検証を維持してください。型アサーションだけではJSONやAPI応答を検証したことになりません。
+
+通常CIは境界4分割と通常結合3分割を含みます。450秒の再試行待機1件は `Worker real-time checks` に分離し、夜間・手動・関連変更のPRで実行します。通常CIの成功と長時間検査の結果は独立しています。全件のローカル検査は引き続き `pnpm check`、`pnpm prepare:integration`、`pnpm test:integration` です。

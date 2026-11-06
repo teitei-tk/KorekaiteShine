@@ -9,6 +9,9 @@ import {
 
 test('開発とビルド済みWorkerに一覧APIの全HTTP契約ケースを送り証拠を保存する', async () => {
   const results = await runHttpContractIntegration();
+  const installed = JSON.parse(
+    await readFile(new URL('../node_modules/void/package.json', import.meta.url), 'utf8'),
+  );
   expect(results.map((result) => result.mode)).toEqual(['dev', 'preview']);
   for (const result of results) {
     const report = JSON.parse(await readFile(result.resultPath, 'utf8'));
@@ -18,7 +21,7 @@ test('開発とビルド済みWorkerに一覧APIの全HTTP契約ケースを送�
       clock: 'real',
       exitCode: 0,
       case: 'interviews-http-contract',
-      versions: { void: '1.5.0' },
+      versions: { void: installed.version },
     });
     expect(report.actual.cases).toEqual(
       interviewCases.map((example, index) => ({

@@ -8,6 +8,8 @@ Web・Interview DO・Evaluationをローカルで接続する検証の記録で�
 
 2026年11月4日、mainの依存更新を移行先にも引き継ぎ、Void 1.5.0・Cloudflare Viteプラグイン2.0.0-beta.v.9・Miniflare 5.20261101.0-beta・Vitest 5.1.0へ更新しました。旧出力先を参照していた本番成果物監査を`.cloudflare/output/v0/workers`のbundle・assets・worker.config.jsonへ切り替えています。プラグイン2系はWranglerへ依存しないため、版情報はプラグインが直接使うMiniflareから取得し、Wrangler欄を記録しません。開発・プレビュー双方のHTTP契約と、診断コードの混入拒否・本番診断APIの404を再確認しました。
 
+2026年11月6日、Void 1.6.1への更新で、契約生成と`http-contract.test.ts`の2テストが成功しました。続く1.6.2でも同じ検査が成功し、開発・プレビュー双方の一覧APIと診断APIのHTTP契約を再確認しています。Cloudflare Viteプラグインの固定版は維持しています。
+
 「ローカルD1」は、MiniflareのD1バインディングとSQLite保存先を指します。Cloudflareトークンや1Passwordの秘密値は使用していません。開発DBの保持確認だけはNode SQLiteの読み取り専用接続を使い、アプリのD1接続検査と区別します。
 
 ## 移行元の履歴と互換性

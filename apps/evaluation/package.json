@@ -10,7 +10,7 @@
     "@js-temporal/polyfill": "0.5.1",
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",
-    "void": "1.5.0"
+    "void": "1.6.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261104.1",

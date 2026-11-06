@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "generate": "openapi-typescript ../../packages/api-contracts/generated/http/openapi.json -o ../../packages/api-contracts/generated/http/api.d.ts"
+    "generate": "openapi-typescript ../../packages/api-contracts/generated/http/openapi.json -o ../../packages/api-contracts/generated/http/api.d.ts",
+    "test": "node --test compatibility.test.ts"
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0",

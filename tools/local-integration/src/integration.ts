@@ -1,3 +1,4 @@
+import { startScheduledInterval } from './scheduled-interval.ts';
 import { runtimeVersions } from './versions.ts';
 import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -48,6 +49,7 @@ export interface IntegrationReport {
     intervalMs: number;
     invocations: {
       startedAt: number;
+      elapsedMs: number;
       completedAt: number | null;
       outcome: 'pending' | 'ok' | 'failed';
     }[];
@@ -287,16 +289,17 @@ export async function runDiagnosticScenario(input: {
   await writeFile(resultPath, JSON.stringify(report, null, 2), { flag: 'wx' });
   let runtime: LocalRuntime | undefined;
   let failure: Error | undefined;
-  let scheduledTimer: ReturnType<typeof setInterval> | undefined;
+  let stopScheduled: (() => void) | undefined;
   let scheduledPending: Promise<void> | undefined;
   let scheduledFailed = false;
   function startScheduled(activeRuntime: LocalRuntime): void {
-    scheduledTimer = setInterval(() => {
+    stopScheduled = startScheduledInterval((elapsedMs) => {
       if (scheduledPending || scheduledFailed) {
         return;
       }
       const invocation: IntegrationReport['scheduled']['invocations'][number] = {
         startedAt: Temporal.Now.instant().epochMilliseconds,
+        elapsedMs,
         completedAt: null,
         outcome: 'pending',
       };
@@ -519,7 +522,7 @@ export async function runDiagnosticScenario(input: {
       report.actual.queueRecovery = 'native_retry';
       report.actual.beforeRestartStatus = report.actual.status;
       report.actual.beforeRestartChecks = report.actual.checks;
-      clearInterval(scheduledTimer);
+      stopScheduled?.();
       await scheduledPending;
       if (scheduledFailed) {
         throw new IntegrationFailure('SCHEDULED_FAILED');
@@ -620,10 +623,18 @@ export async function runDiagnosticScenario(input: {
       if (
         !report.restart ||
         !first ||
-        first.startedAt - report.restart.restartedAt < 60_000 ||
+        first.elapsedMs < report.scheduled.intervalMs ||
         report.attempts[0]!.startedAt < first.startedAt
       ) {
-        throw new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH');
+        // CIに成果物がなくても、どの時刻条件に違反したかを識別できる数値だけ残す。
+        throw Object.assign(new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH'), {
+          recoveryTiming: {
+            restartedAt: report.restart?.restartedAt ?? null,
+            scheduledStartedAt: first?.startedAt ?? null,
+            scheduledElapsedMs: first?.elapsedMs ?? null,
+            attemptStartedAt: report.attempts[0]?.startedAt ?? null,
+          },
+        });
       }
     }
     if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
@@ -657,7 +668,7 @@ export async function runDiagnosticScenario(input: {
     report.exitCode = 1;
     report.failureCode = error instanceof IntegrationFailure ? error.code : 'UNEXPECTED_ERROR';
   } finally {
-    clearInterval(scheduledTimer);
+    stopScheduled?.();
     await scheduledPending;
     if (scheduledFailed) {
       failure = new IntegrationFailure('SCHEDULED_FAILED');

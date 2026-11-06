@@ -53,9 +53,7 @@ test('受付直後の停止から再起動し、実時間60秒周期のscheduled
   });
   expect(report.restart!.restartedAt).toBeGreaterThanOrEqual(report.restart!.stoppedAt);
   expect(report.scheduled.invocations.length).toBeGreaterThanOrEqual(1);
-  expect(
-    report.scheduled.invocations[0]!.startedAt - report.restart!.restartedAt,
-  ).toBeGreaterThanOrEqual(60_000);
+  expect(report.scheduled.invocations[0]!.elapsedMs).toBeGreaterThanOrEqual(60_000);
   expect(report.scheduled.invocations.every((entry) => entry.outcome === 'ok')).toBe(true);
   expect(report.attempts[0]!.startedAt).toBeGreaterThanOrEqual(
     report.scheduled.invocations[0]!.startedAt,
@@ -91,9 +89,7 @@ test('DO保存後に停止しても初回保存時刻を維持し、再起動後
   );
   expect(report.actual.doFirstReceivedAt).toBeLessThanOrEqual(report.actual.faultObservedAt!);
   expect(report.actual.faultObservedAt).toBeLessThanOrEqual(report.restart!.stoppedAt);
-  expect(
-    report.scheduled.invocations[0]!.startedAt - report.restart!.restartedAt,
-  ).toBeGreaterThanOrEqual(60_000);
+  expect(report.scheduled.invocations[0]!.elapsedMs).toBeGreaterThanOrEqual(60_000);
   expect(report.attempts[0]!.startedAt).toBeGreaterThanOrEqual(
     report.scheduled.invocations[0]!.startedAt,
   );
@@ -125,9 +121,7 @@ test('Queue送信直後の停止からD1の未送信outboxを回復し、実Cons
       queueObserved: true,
     },
   });
-  expect(
-    report.scheduled.invocations[0]!.startedAt - report.restart!.restartedAt,
-  ).toBeGreaterThanOrEqual(60_000);
+  expect(report.scheduled.invocations[0]!.elapsedMs).toBeGreaterThanOrEqual(60_000);
   expect(report.attempts[0]!.startedAt).toBeGreaterThanOrEqual(
     report.scheduled.invocations[0]!.startedAt,
   );

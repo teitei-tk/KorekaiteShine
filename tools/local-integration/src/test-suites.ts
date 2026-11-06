@@ -31,6 +31,7 @@ const boundaryGroups = [
     'notification-runtime',
     'readiness',
     'integration-run',
+    'scheduled-interval',
   ],
   [
     'dlq',

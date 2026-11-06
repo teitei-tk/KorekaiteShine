@@ -99,7 +99,8 @@ test('実git差分で文書だけを省略し、削除と移動・比較不能�
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-});
+  // Worker境界テストと並列に複数の実Git・Nodeプロセスを起動するため、I/O待ちを許容する。
+}, 30_000);
 
 test('長時間検査SummaryはPR headと実行commitを区別する', async () => {
   const { execFileSync } = await import('node:child_process');

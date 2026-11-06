@@ -167,6 +167,8 @@ overrides:
   '@babel/helper-compilation-targets>semver': 7.8.5
   void>@cloudflare/vite-plugin: 2.0.0-beta.v.9
 
+pnpmfileChecksum: sha256-+B5Iic+iw8zwI0nwcd62qJTFs+sfXC6f8+eftDe2QbM=
+
 importers:
 
   .:
@@ -382,10 +384,10 @@ importers:
     devDependencies:
       openapi-typescript:
         specifier: 7.13.0
-        version: 7.13.0(typescript@5.9.3)
+        version: 7.13.0
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 7.0.2
+        version: 7.0.2
 
   tools/docs:
     devDependencies:
@@ -3468,8 +3470,6 @@ packages:
   openapi-typescript@7.13.0:
     resolution: {integrity: sha512-EFP392gcqXS7ntPvbhBzbF8TyBA+baIYEm791Hy5YkjDYKTnk/Tn5OQeKm5BIZvJihpp8Zzr4hzx0Irde1LNGQ==}
     hasBin: true
-    peerDependencies:
-      typescript: ^5.x
 
   oxfmt@0.76.0:
     resolution: {integrity: sha512-Yo9RIn9lRWTm/U8obHbXUWc39lCpEFXlEggFoPx01zS18OCFi7mAwMmL05+p1AunuJgSkONffWyBHJzpMMCRuQ==}
@@ -6632,7 +6632,7 @@ snapshots:
 
   openapi-typescript-helpers@0.1.0: {}
 
-  openapi-typescript@7.13.0(typescript@5.9.3):
+  openapi-typescript@7.13.0:
     dependencies:
       '@redocly/openapi-core': 1.34.22(supports-color@10.2.2)
       ansi-colors: 4.1.3

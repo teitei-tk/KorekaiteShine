@@ -3,10 +3,14 @@ import { databaseOperation } from './database-error';
 import { and, eq } from 'void/db';
 import { jobs, jobOutbox, diagnosticRequests, diagnosticChecks } from '@korekaite/database';
 import type { createPrimaryDb } from '@korekaite/database/connection';
-import type { operations } from '@korekaite/api-contracts/http';
+import type {
+  GetCheckJobResponses,
+  StartCheckJobData,
+  StartCheckJobResponses,
+} from '@korekaite/api-contracts/http';
 
-type Start = operations['startCheckJob']['requestBody']['content']['application/json'];
-type Accepted = operations['startCheckJob']['responses'][202]['content']['application/json'];
+type Start = StartCheckJobData['body'];
+type Accepted = StartCheckJobResponses[202];
 export interface AcceptanceContext {
   db: ReturnType<typeof createPrimaryDb>;
   environment: 'development' | 'test';
@@ -96,7 +100,7 @@ export async function acceptDiagnosticJob(
   };
 }
 
-type CheckStatus = operations['getCheckJob']['responses'][200]['content']['application/json'];
+type CheckStatus = GetCheckJobResponses[200];
 
 export async function findDiagnosticJob(
   context: AcceptanceContext,

@@ -1,8 +1,7 @@
-import type { components } from '@korekaite/api-contracts/http';
+import type { CheckAccepted, CheckStatus } from '@korekaite/api-contracts/http';
 import { useEffect, useRef, useState } from 'react';
 import { createDiagnosticRun, DiagnosticValidationError, getDiagnosticStatus } from './client';
 
-type CheckStatus = components['schemas']['CheckStatus'];
 type Scenario = CheckStatus['scenario'];
 const scenarioLabels: Record<Scenario, string> = {
   success: '正常終了',
@@ -14,7 +13,7 @@ export function DiagnosticPage() {
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const [scenario, setScenario] = useState<Scenario>('success');
-  const [accepted, setAccepted] = useState<components['schemas']['CheckAccepted'] | null>(null);
+  const [accepted, setAccepted] = useState<CheckAccepted | null>(null);
   const [result, setResult] = useState<CheckStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

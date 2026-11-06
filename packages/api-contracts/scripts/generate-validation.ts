@@ -48,5 +48,5 @@ await writeFile(
 );
 await writeFile(
   'generated/http/validators.d.mts',
-  `// 自動生成。編集しないでください。\nimport type { ValidateFunction } from 'ajv';\nimport type { components, operations } from './api';\nexport const validateList: ValidateFunction<components['schemas']['InterviewList']>;\nexport const validateBadRequest: ValidateFunction<operations['listInterviews']['responses'][400]['content']['application/json']>;\nexport const validateQuery: ValidateFunction<operations['listInterviews']['parameters']['query']>;\n`,
+  `// 自動生成。編集しないでください。\nimport type { ValidateFunction } from 'ajv';\nimport type { InterviewList, ListInterviewsErrors, ListInterviewsData } from './client/types.gen';\nexport const validateList: ValidateFunction<InterviewList>;\nexport const validateBadRequest: ValidateFunction<ListInterviewsErrors[400]>;\nexport const validateQuery: ValidateFunction<ListInterviewsData['query']>;\n`,
 );

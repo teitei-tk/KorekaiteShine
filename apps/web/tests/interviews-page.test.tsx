@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"http://localhost:4327"}
 import './helpers/dom';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { InterviewPage } from '../src/routes/index';
 
-test('一覧の初回取得中は読み込み状態を表示する', () => {
+test('一覧の初回取得中は読み込み状態を表示する', async () => {
   const fetcher = vi.fn(() => new Promise<Response>(() => {}));
   vi.stubGlobal('fetch', fetcher);
   render(<InterviewPage />);
   expect(screen.getByRole('status').textContent).toBe('読み込み中…');
   expect(screen.queryByRole('table')).toBeNull();
   expect(screen.queryByRole('alert')).toBeNull();
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
 });
 
 const interviewList = {

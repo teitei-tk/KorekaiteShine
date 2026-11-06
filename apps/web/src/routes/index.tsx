@@ -1,13 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
-import type { components } from '@korekaite/api-contracts/http';
+import type { InterviewList } from '@korekaite/api-contracts/http';
 import { getInterviews } from '../lib/interviews';
 import { formatStartedAt } from '../lib/date-time';
 
 export const Route = createFileRoute('/')({ component: InterviewPage });
 
 export function InterviewPage() {
-  const [result, setResult] = useState<components['schemas']['InterviewList'] | null>(null);
+  const [result, setResult] = useState<InterviewList | null>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   useEffect(() => {

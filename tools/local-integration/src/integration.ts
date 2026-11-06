@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import type { components } from '@korekaite/api-contracts/http';
+import type { CheckStatus } from '@korekaite/api-contracts/http';
 import {
   validateCheckAccepted,
   validateCheckStatus,
@@ -17,7 +17,6 @@ import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand, type LocalRuntime } from './runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
-type CheckStatus = components['schemas']['CheckStatus'];
 type Outcome = Pick<CheckStatus, 'status' | 'attemptCount' | 'checks'>;
 type Scenario = CheckStatus['scenario'];
 type Fault =

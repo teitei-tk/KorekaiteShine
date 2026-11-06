@@ -29,3 +29,21 @@ test('一覧取得の通信例外を呼び出し元へ伝える', async () => {
     }),
   ).rejects.toBe(cause);
 });
+
+test('応答本文の受信中に切断されても元の通信例外を呼び出し元へ伝える', async () => {
+  const cause = new TypeError('response body interrupted');
+  await expect(
+    getInterviews(
+      'http://localhost',
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(cause);
+            },
+          }),
+          { headers: { 'Content-Type': 'application/json' } },
+        ),
+    ),
+  ).rejects.toBe(cause);
+});

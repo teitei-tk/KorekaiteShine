@@ -3,13 +3,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./http": "./generated/http/api.d.ts",
+    "./http": "./generated/http/client/types.gen.ts",
     "./http/validators": "./generated/http/validators.mjs",
     "./http/openapi": "./generated/http/openapi.json",
     "./messages": "./generated/messages/types.d.ts",
     "./messages/validators": "./generated/messages/validators.mjs",
     "./messages/schema": "./generated/messages/JobNotification.json",
-    "./http/diagnostics-validators": "./generated/http/diagnostics-validators.mjs"
+    "./http/diagnostics-validators": "./generated/http/diagnostics-validators.mjs",
+    "./http/sdk": "./generated/http/public-client/sdk.gen.ts",
+    "./http/client": "./generated/http/public-client/client/index.ts",
+    "./http/diagnostics-sdk": "./generated/http/client/sdk.gen.ts"
   },
   "scripts": {
     "generate": "tsp compile http/main.tsp --config tspconfig.yaml && pnpm --dir ../../tools/api-codegen generate && node scripts/generate-validation.ts && node scripts/generate-diagnostics-validation.ts && tsp compile messages/main.tsp --config tspconfig.messages.yaml && node scripts/generate-messages.ts",

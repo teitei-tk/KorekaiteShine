@@ -28,7 +28,7 @@ function add(name: string, schema: object, type: string): void {
 add(
   'validateCheckStart',
   operations.startCheckJob.requestBody.content['application/json'].schema,
-  "operations['startCheckJob']['requestBody']['content']['application/json']",
+  "StartCheckJobData['body']",
 );
 for (const [name, operationId, status] of [
   ['validateCheckAccepted', 'startCheckJob', 202],
@@ -43,7 +43,7 @@ for (const [name, operationId, status] of [
   add(
     name,
     operations[operationId].responses[status].content['application/json'].schema,
-    `operations['${operationId}']['responses'][${status}]['content']['application/json']`,
+    `${operationId === 'startCheckJob' ? 'StartCheckJob' : 'GetCheckJob'}${status < 300 ? 'Responses' : 'Errors'}[${status}]`,
   );
 }
 for (const [name, operationId, location, parameter] of [
@@ -60,7 +60,7 @@ for (const [name, operationId, location, parameter] of [
   add(
     name,
     entry.schema,
-    `operations['${operationId}']['parameters']['${location}']['${parameter}']`,
+    `${operationId === 'startCheckJob' ? 'StartCheckJob' : 'GetCheckJob'}Data['${location === 'header' ? 'headers' : location}']['${parameter}']`,
   );
 }
 await writeFile(
@@ -71,7 +71,7 @@ await writeFile(
   new URL('diagnostics-validators.d.mts', directory),
   `// 自動生成。編集しないでください。
 import type { ValidateFunction } from 'ajv';
-import type { operations } from './api';
+import type { StartCheckJobData, StartCheckJobResponses, StartCheckJobErrors, GetCheckJobData, GetCheckJobResponses, GetCheckJobErrors } from './client/types.gen';
 ${declarations.join('\n')}
 `,
 );

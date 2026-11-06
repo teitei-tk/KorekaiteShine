@@ -1,12 +1,10 @@
 import type { ErrorObject } from 'ajv';
-import type { operations } from '@korekaite/api-contracts/http';
+import type { GetCheckJobErrors, StartCheckJobErrors } from '@korekaite/api-contracts/http';
 
-type ValidationBody = operations['startCheckJob']['responses'][400]['content']['application/json'];
+type ValidationBody = StartCheckJobErrors[400];
 export type ValidationDetail = ValidationBody['error']['details'][number];
 
-type ErrorBody =
-  | operations['startCheckJob']['responses'][409 | 415 | 500 | 503]['content']['application/json']
-  | operations['getCheckJob']['responses'][404]['content']['application/json'];
+type ErrorBody = StartCheckJobErrors[409 | 415 | 500 | 503] | GetCheckJobErrors[404];
 type ErrorCode = ErrorBody['error']['code'];
 const errorStatuses: Record<ErrorCode, number> = {
   JOB_NOT_FOUND: 404,

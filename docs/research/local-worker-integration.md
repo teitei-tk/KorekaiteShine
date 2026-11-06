@@ -22,7 +22,7 @@ Web・Interview DO・Evaluationをローカルで接続する検証の記録で�
 
 引き継ぐ互換性の制約は次のとおりです。
 
-- openapi-typescriptはTypeScript 5系のCompiler APIを使います。7.0.2では型生成に失敗したため、当初は生成専用の`tools/api-codegen`を5.9.3に固定しました。2026年11月6日の更新では、[pnpmフック](../../.pnpmfile.cjs)でopenapi-typescript 7.13.0のTypeScriptをpeer依存から5.9.3の通常依存へ変更し、生成器のCompiler APIだけを分離しています。ツールとアプリの直接依存は7.0.2です。
+- 当初のopenapi-typescript 7.13.0はTypeScript 7.0.2で生成に失敗し、5.9.3を分離して使用しました。2026年11月6日、Hey APIへ移行してpnpmフックを削除しました。ただし公開版@hey-api/openapi-ts 0.99.0も7.0.2では`SyntaxKind.AnyKeyword`参照時に失敗します。生成専用パッケージを6.0.3に固定すると、名前付きモデルとFetch SDKの生成に成功しました。アプリと他のツールは7.0.2を維持します。上流mainの依存構成と公開済みパッケージの互換性は区別します。単一SDKでは本番ソースマップに診断操作が残り、既存の成果物検査が拒否したため、診断操作を除く通常API用SDKを別生成します。
 - Cloudflare Viteプラグイン1.66.0では開発時に`Parent environment not initialized`が発生しました。当時の1.64.0では起動しました。上流の原因は未特定です。現在はVoid 1.5.0のBuild Output仕様に合わせて2.0.0-beta.v.9へ固定しています。
 - CommonJS形式のAjv検証コードは開発時に`exports is not defined`で失敗したため、ES Modulesを事前生成します。実行時コンパイルは行いません。
 - Babel経由のsemver 6.3.1はpnpmの信頼ポリシーに拒否されました。coreとhelper-compilation-targetsに限り、provenanceのある7.8.5へ置換しています。今回の比較・範囲判定とビルドを検証したもので、Babelの全機能の互換性を保証しません。

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"http://localhost:4327"}
 import './helpers/dom';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { DiagnosticPage } from '../src/diagnostics/page';
@@ -114,7 +114,7 @@ test('送信中の操作を無効にし、再描画前の連打でも要求を�
     start().click();
     start().click();
   });
-  expect(fetcher).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
   expect(start().disabled).toBe(true);
   expect(resend().disabled).toBe(true);
   expect(refresh().disabled).toBe(true);
@@ -138,7 +138,7 @@ test('状態取得は受付したjobIdへ一度だけ送信し、取得中の操
     refresh().click();
     refresh().click();
   });
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
   const request = new Request(fetcher.mock.calls[1]![0]);
   expect(request.method).toBe('GET');
   expect(request.url).toBe(`http://localhost:4327/api/diagnostics/check-jobs/${jobId}`);

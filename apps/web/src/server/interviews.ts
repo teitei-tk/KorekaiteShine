@@ -1,7 +1,7 @@
-import type { components } from '@korekaite/api-contracts/http';
+import type { Interview } from '@korekaite/api-contracts/http';
 import { validateQuery } from '@korekaite/api-contracts/http/validators';
 
-const interviews: components['schemas']['Interview'][] = [
+const interviews: Interview[] = [
   {
     id: 'interview-001',
     theme: '接続状態をDOで管理した判断',

@@ -151,7 +151,7 @@ Web・Interview・Evaluationを独立した3 Workersとして配置します。W
 
 通常のHTTP APIの契約管理にTypeSpecを正式採用します。入力・応答・HTTPステータスをTypeSpecで定義し、OpenAPI 3.1、TypeScriptのAPI型、実行時検証コードを生成します。生成物を手編集せず、同じ契約を別のスキーマへ手書きしません。選定理由は[ADR 0006](../adr/0006-typespec-api-contracts.md)に記録します。
 
-TanStack StartのServer RoutesでHTTP APIを実装し、Reactから生成型とopenapi-fetchを使って呼び出します。同じAPIの契約をServer Functions側に重複定義しません。VoidはCloudflare連携・ビルド・配置を担い、既存のDO・Queues・D1の責務は維持します。
+TanStack StartのServer RoutesでHTTP APIを実装し、ReactからHey APIが生成する型とFetch SDKを使って呼び出します。同じAPIの契約をServer Functions側に重複定義しません。VoidはCloudflare連携・ビルド・配置を担い、既存のDO・Queues・D1の責務は維持します。
 
 APIの入力と受信した応答は境界で検証します。Ajvの検証コードはES Modulesとして事前生成し、Workers上でスキーマをコンパイルしません。型生成だけでは実データの正しさを保証できないため、実装したAPIの応答が契約に合うこともテストします。認可、状態遷移、重複防止、削除との競合などの振る舞いは、スキーマとは別に実装・テストします。
 
@@ -159,14 +159,14 @@ APIの入力と受信した応答は境界で検証します。Ajvの検証コ�
 
 ### 依存バージョンの制約
 
-2026年10月30日の初回ローカル検証はVoid 1.3.0、2026年11月2日以降の移行・3 Workers・DB操作はVoid 1.4.0で検証しました。現行の依存宣言はVoid 1.6.2へ更新しています。TypeSpec 1.17.0、React 19.3.1、TanStack Start 1.169.4、Vite 8.3.5、openapi-typescript 7.13.0を使用しています。現行の[依存宣言](../../apps/web/package.json)と[共有ロックファイル](../../pnpm-lock.yaml)、確認範囲と履歴を分けた[検証記録](../research/local-worker-integration.md)を参照してください。
+2026年10月30日の初回ローカル検証はVoid 1.3.0、2026年11月2日以降の移行・3 Workers・DB操作はVoid 1.4.0で検証しました。現行の依存宣言はVoid 1.6.2へ更新しています。TypeSpec 1.17.0、React 19.3.1、TanStack Start 1.169.4、Vite 8.3.5、@hey-api/openapi-ts 0.99.0を使用しています。現行の[依存宣言](../../apps/web/package.json)と[共有ロックファイル](../../pnpm-lock.yaml)、確認範囲と履歴を分けた[検証記録](../research/local-worker-integration.md)を参照してください。
 
-| 対象                      | 維持する制約と根拠                                                                                                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TypeScript                | openapi-typescript 7.13.0は5系のCompiler APIを使用するため、[pnpmフック](../../.pnpmfile.cjs)で生成器の通常依存だけ5.9.3に固定する。tools/api-codegenを含むツールとアプリの直接依存は7.0.2を使う |
-| Cloudflare Viteプラグイン | Void 1.5.0が要求する2.0.0-beta.v.9に固定する。旧1.64.0固定ではBuild Output仕様に非対応でビルドが失敗する。更新後の契約生成・型検査・開発・プレビュー・ブラウザ表示を再検証済み                   |
-| Ajvの出力形式             | CommonJS出力は開発時に失敗したため、検証コードはES Modulesで事前生成する                                                                                                                         |
-| Babelのsemver依存         | 6.3.1がpnpmの信頼ポリシーに拒否されたため、coreとhelper-compilation-targetsに限り7.8.5へ置換する。検証済みなのは今回の利用・ビルド範囲であり、Babel全機能の互換性ではない                        |
+| 対象                      | 維持する制約と根拠                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TypeScript                | @hey-api/openapi-ts 0.99.0は従来のCompiler APIを使うため、生成専用のtools/api-codegenだけ6.0.3に固定する。他のツールとアプリは7.0.2を使う。pnpmフックによる依存書き換えは行わない |
+| Cloudflare Viteプラグイン | Void 1.5.0が要求する2.0.0-beta.v.9に固定する。旧1.64.0固定ではBuild Output仕様に非対応でビルドが失敗する。更新後の契約生成・型検査・開発・プレビュー・ブラウザ表示を再検証済み    |
+| Ajvの出力形式             | CommonJS出力は開発時に失敗したため、検証コードはES Modulesで事前生成する                                                                                                          |
+| Babelのsemver依存         | 6.3.1がpnpmの信頼ポリシーに拒否されたため、coreとhelper-compilation-targetsに限り7.8.5へ置換する。検証済みなのは今回の利用・ビルド範囲であり、Babel全機能の互換性ではない         |
 
 pnpmの保護設定を緩めず、これらの固定・置換を維持します。依存を更新する場合は、契約生成・型検査・開発サーバー・ビルド済みWorker・ブラウザ表示を再検証してから制約を見直します。
 

@@ -25,14 +25,16 @@ jobs:
           ref: bdf19a4a223ec2549a3e2274a0cf61556bc07675
           path: .official-codex-action
           persist-credentials: false
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
       - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Prepare trusted isolation verification
         run: bash tools/ai-review/isolation/prepare.sh
       - name: Verify untrusted PR startup without external network

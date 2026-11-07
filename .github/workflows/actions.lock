@@ -10,6 +10,7 @@ workflows:
     '.github/workflows/ai-review-isolation.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
+        - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
         - 'openai/codex-action@v1.13'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/ai-review-notify.yml':
@@ -21,15 +22,18 @@ workflows:
         - 'actions/download-artifact@v8.0.2'
         - 'actions/setup-node@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
+        - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
         - 'openai/codex-action@v1.13'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/ci-realtime.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
+        - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
+        - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
         - 'pnpm/action-setup@v6.1.1'
 dependencies:
     'actions/checkout@v7.0.1':
@@ -57,6 +61,11 @@ dependencies:
         commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'
         owner_id: 44036562
         repo_id: 192625955
+    'flatt-security/setup-takumi-guard-npm@v1.4.0':
+        ref: 'v1.4.0'
+        commit: 'sha1-14f07d0cbc739b42a1b7c70a04c2b84cd1318ddd'
+        owner_id: 88821409
+        repo_id: 1160374496
     'openai/codex-action@v1.13':
         ref: 'v1.13'
         commit: 'sha1-bdf19a4a223ec2549a3e2274a0cf61556bc07675'

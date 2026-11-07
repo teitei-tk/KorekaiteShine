@@ -64,6 +64,23 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 仕様の根拠：[pnpm依存解決設定](https://pnpm.io/settings/dependency-resolution)、[ビルド設定](https://pnpm.io/settings/build)。
 
+### CIのTakumi Guard
+
+通常CI、Workerの実時間検査、AIレビュー、隔離受入検査では、公式の`setup-takumi-guard-npm` v1.4.0をpnpmの準備前に実行します。npm依存の取得先をTakumi Guardへ向け、匿名モードで悪性パッケージを拒否します。アカウント・トークン・Guard用のOIDC権限は不要です。ローカルのregistry設定は変更しません。
+
+各対象ジョブで有効なnpm・pnpmのregistryを確認し、通常CIの`Repository lint and format`では[遮断確認](check-guard.ts)も実行します。空の一時キャッシュで正常なパッケージの取得と公式の確認用パッケージの拒否を確認し、一時ファイルを削除します。接続障害、一般的な403、予期しない取得成功は失敗にします。外部通信を伴うため、遮断確認は`pnpm test`や`pnpm check`には含めません。
+
+Guard設定済みのCI環境では、次で再確認できます。ローカルで未設定ならregistry確認で停止します。
+
+```sh
+node tools/docs/check-guard.ts --registry-only
+node tools/docs/check-guard.ts
+```
+
+取得済み依存が現在のGuard判定を迂回しないよう、対象ジョブのpnpm storeキャッシュ復元とsetup-nodeの自動キャッシュを無効にしています。GitHub-hosted runnerの使い捨て環境を前提とし、pnpm Action自身のstoreキャッシュも既定の無効状態で使います。再実行では依存を再取得するため、通信量と所要時間が増えます。Guardの拒否・障害時は対象版と応答を確認し、必要に応じて復旧後に再実行してください。npm公式レジストリへの自動切替は行いません。
+
+匿名モードには取得履歴と事後通知がありません。scope別registryや直接URLの依存は別途レビューし、GitHub Releases・apt・Actions本体の取得はGuardの保護範囲外として扱います。固定版の確認結果と未検証範囲は[検証記録](../../docs/research/takumi-guard.md)、将来のShisho CloudへのOIDC移行は[導入設計](../../docs/superpowers/specs/2026-11-07-takumi-guard-design.md#将来のshisho-cloud連携)を参照してください。
+
 ## Dependabotによる依存更新
 
 [Dependabot設定](../../.github/dependabot.yml)で、`daily`（平日9時、日本時間）にnpm依存とGitHub Actionsの更新を確認します。更新PRの上限はそれぞれ10件です。メジャー更新も対象とし、自動マージは設定しません。

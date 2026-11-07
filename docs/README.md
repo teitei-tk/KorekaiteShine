@@ -21,7 +21,7 @@ AIレビューの正式な動作は[コメントと修正確認の要件](spec/a
 
 エージェントの認証確認・PR整理は[作業手順](runbooks/agent-workflow.md)、コードレビューは[基準](../CODING_STANDARDS.md)を参照してください。
 
-CIのTakumi Guardは匿名モードで導入します。[運用手順](../tools/docs/README.md#ciのtakumi-guard)、[検証記録](research/takumi-guard.md)、[実装計画](superpowers/plans/2026-11-07-takumi-guard.md)を参照してください。将来のShisho Cloud連携と、今回の匿名利用を区別しています。
+CIのTakumi Guardは匿名モードで構成しています。[運用手順](../tools/docs/README.md#ciのtakumi-guard)、[検証記録](research/takumi-guard.md)、[実装計画](superpowers/plans/2026-11-07-takumi-guard.md)を参照してください。将来のShisho Cloud連携と、今回の匿名利用を区別しています。
 
 カバレッジの再実行方法と対象範囲は[計測手順](runbooks/test-coverage.md)を参照してください。Node側の実測値と、Worker・子プロセス内部の未計測範囲を区別しています。
 

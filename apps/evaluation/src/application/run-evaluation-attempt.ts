@@ -15,7 +15,7 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
   }
   const controller = new AbortController();
   let stopped = false;
-  let stop = () => controller.abort();
+  let stop!: () => void;
   const cancelled = new Promise<false>((resolve) => {
     stop = () => {
       stopped = true;
@@ -27,9 +27,6 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
   let saveRetryTimer: ReturnType<typeof setTimeout> | undefined;
   let endSaveWait: (() => void) | undefined;
   const renew = async () => {
-    if (stopped) {
-      return;
-    }
     if (deps.now() >= deps.deadline) {
       return stop();
     }

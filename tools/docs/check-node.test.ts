@@ -52,3 +52,29 @@ test('曖昧なNode指定と不正なバージョン範囲を拒否する', asyn
   expect(await inspect({ '.node-version': 'latest' })).toHaveLength(1);
   expect(await inspect({ 'package.json': '{"engines":{"node":"invalid"}}' })).toHaveLength(1);
 });
+
+test('ルートのNode対応範囲が欠けていれば設定不足を報告する', async () => {
+  expect(await inspect({ 'package.json': '{}' })).toEqual(['package.json: engines.nodeが必要です']);
+});
+
+test('setup-nodeを使わないワークフローとステップはNode版の指定を要求しない', async () => {
+  expect(
+    await inspect({
+      '.github/workflows/empty.yml': 'name: placeholder\n',
+      '.github/workflows/reusable.yml': 'jobs:\n  reusable:\n    uses: ./other.yml\n',
+      '.github/workflows/check.yml':
+        'jobs:\n  check:\n    steps:\n      - run: echo check\n      - uses: actions/checkout@v4\n',
+    }),
+  ).toEqual([]);
+});
+
+test('setup-nodeのwith自体が欠けた場合もNode版の参照漏れとして報告する', async () => {
+  expect(
+    await inspect({
+      '.github/workflows/check.yml':
+        'jobs:\n  check:\n    steps:\n      - uses: actions/setup-node@v4\n',
+    }),
+  ).toEqual([
+    '.github/workflows/check.yml (check): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください',
+  ]);
+});

@@ -201,9 +201,9 @@ function workerOutputDirectory(
 }
 
 const forbiddenModule =
-  /\/diagnostics\/|\/worker\.local\.ts|\/fixtures\/|\/diagnostics-validators\.mjs/u;
+  /\/diagnostics\/|\/worker\.local\.ts|\/fixtures\/|\/diagnostics-validators\.mjs|\/tools\/coverage\//u;
 const forbiddenContent =
-  /\/api\/diagnostics|exhaust_retries|SIMULATED_AI_FAILURE|DIAGNOSTIC_(?:QUEUE|DLQ)|CHECK_OBJECT/u;
+  /\/api\/diagnostics|exhaust_retries|SIMULATED_AI_FAILURE|DIAGNOSTIC_(?:QUEUE|DLQ)|CHECK_OBJECT|__coverage__/u;
 
 export async function verifyProductionArtifacts(
   project: string,

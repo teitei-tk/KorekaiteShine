@@ -4,6 +4,88 @@ import type { Api } from './github.ts';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+it('完了結果の取得中にPRが閉じても成功を返さない', async () => {
+  const f = fixture();
+  const api: Api = async <T>(path: string) => {
+    const value = await f.api<T>(path);
+    if (path === 'actions/runs/20/attempts/1') {
+      f.pr.state = 'closed';
+    }
+    return value;
+  };
+  expect(await finishReview(api, f.revision, 20, 1)).toEqual({
+    conclusion: 'failure',
+    target: 'gate',
+    reason: 'TARGET_CHANGED',
+  });
+});
+it('取得した完了結果の生成元が違えば拒否する', async () => {
+  const f = fixture();
+  const api: Api = async <T>(path: string) =>
+    path === 'actions/runs/20/attempts/1' ? ({ ...f.review, id: 21 } as T) : f.api<T>(path);
+  await expect(finishReview(api, f.revision, 20, 1)).rejects.toThrow('監視結果が不一致');
+});
+it('完了確認前にPRが閉じたら対象変更を返す', async () => {
+  const f = fixture();
+  f.pr.state = 'closed';
+  expect(await finishReview(f.api, f.revision, 20, 1)).toEqual({
+    conclusion: 'failure',
+    target: 'gate',
+    reason: 'TARGET_CHANGED',
+  });
+});
+it('完了結果の実行IDが不正ならAPIを呼ばない', async () => {
+  const f = fixture();
+  await expect(finishReview(f.api, f.revision, 0, 1)).rejects.toThrow('監視結果が不正');
+  expect(f.calls).toEqual([]);
+});
+it('仮想mergeの親が対象と異なれば監視を失敗させる', async () => {
+  const f = fixture();
+  f.source.head_sha = 'c'.repeat(40);
+  const api: Api = async <T>(path: string) =>
+    path.startsWith('git/commits/') ? ({ parents: [] } as T) : f.api<T>(path);
+  expect(await inspectReview(api, f.revision)).toEqual({
+    status: 'failure',
+    target: 'source-ci',
+    reason: 'TARGET_CHANGED',
+  });
+});
+it('仮想mergeのSHAが不正ならコミットを問い合わせない', async () => {
+  const f = fixture();
+  f.source.head_sha = 'invalid';
+  await expect(inspectReview(f.api, f.revision)).rejects.toThrow('起点SHAが不正');
+  expect(f.calls.some((path) => path.startsWith('git/commits/'))).toBe(false);
+});
+it('一覧10ページの上限で停止し無期限に取得しない', async () => {
+  const f = fixture();
+  let pages = 0;
+  const api: Api = async <T>(path: string) => {
+    if (path.startsWith('actions/runs?')) {
+      pages++;
+      return {
+        workflow_runs: Array.from({ length: 100 }, (_, i) => ({
+          ...f.source,
+          id: i + 1,
+          created_at: '2026-10-24T00:00:00Z',
+        })),
+      } as T;
+    }
+    return f.api<T>(path);
+  };
+  await expect(inspectReview(api, f.revision)).rejects.toThrow('取得上限');
+  expect(pages).toBe(10);
+});
+it('一覧内の実行IDが不正なら別の成功実行へ読み飛ばさない', async () => {
+  const f = fixture();
+  f.source.id = 0;
+  await expect(inspectReview(f.api, f.revision)).rejects.toThrow('実行IDが不正');
+});
+it('実行一覧が配列でなければ監視を停止する', async () => {
+  const f = fixture();
+  const api: Api = async <T>(path: string) =>
+    path.startsWith('actions/runs?') ? ({ workflow_runs: null } as T) : f.api<T>(path);
+  await expect(inspectReview(api, f.revision)).rejects.toThrow('実行一覧が不正');
+});
 
 function fixture(workflow = '.github/workflows/docs.yml') {
   const revision = {

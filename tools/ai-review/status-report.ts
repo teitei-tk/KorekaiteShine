@@ -87,15 +87,16 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
     ['success', 'failure', 'neutral'].includes(value.status ?? '') &&
     validTarget(value.target ?? '') &&
     reasons.some((reason) => reason === value.reason) &&
+    // ここまでの許可リスト検査でjobとreasonの欠落は拒否される。
     (value.status !== 'success' ||
       (value.job === 'publish' &&
         value.target === 'publish' &&
-        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason ?? '')) ||
-      (['gate', 'generate'].includes(value.job ?? '') &&
+        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason!)) ||
+      (['gate', 'generate'].includes(value.job!) &&
         value.target === 'gate' &&
         value.reason === 'ALREADY_COMPLETE')) &&
     (value.status !== 'neutral' ||
-      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason ?? '') ||
+      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason!) ||
       (value.job === 'generate' && value.reason === 'COST_BUDGET_EXCEEDED')) &&
     (value.status !== 'failure' ||
       ![
@@ -105,7 +106,7 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
         'TARGET_CHANGED',
         'SKIPPED',
         'COST_BUDGET_EXCEEDED',
-      ].includes(value.reason ?? ''))
+      ].includes(value.reason!))
   );
 }
 export function writeStatusReport(

@@ -6,8 +6,12 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-async function dependency(name: string, from: string): Promise<{ path: string; version: string }> {
-  for (const directory of createRequire(from).resolve.paths(name) ?? []) {
+async function dependency(
+  name: 'void' | '@cloudflare/vite-plugin' | 'miniflare' | 'vite',
+  from: string,
+): Promise<{ path: string; version: string }> {
+  // 組込みモジュールではない固定依存名なので、Nodeは検索先の配列を返す。
+  for (const directory of createRequire(from).resolve.paths(name)!) {
     try {
       const path = await realpath(join(directory, name, 'package.json'));
       const manifest = JSON.parse(await readFile(path, 'utf8'));

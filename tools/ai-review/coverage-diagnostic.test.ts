@@ -1,6 +1,31 @@
 import { expect, it } from 'vitest';
 import { coverageDiagnostic, validCoverage, renderCoverage } from './coverage-diagnostic.ts';
 import { detail } from './diagnostics.ts';
+
+it('配列でない回答は専用の説明を表示し原文を含めない', () => {
+  const value = coverageDiagnostic(['a'.repeat(16)], JSON.parse('"private input"'));
+  expect(validCoverage(value)).toBe(true);
+  expect(renderCoverage(value)).toContain('一覧が配列ではありません');
+  expect(renderCoverage(value)).not.toContain('private input');
+});
+
+it('不整合な診断を表示して成功に見せない', () => {
+  expect(() => renderCoverage({ ...coverageDiagnostic([], []), received: 1 })).toThrow(
+    '確認範囲の診断が不正',
+  );
+});
+
+it('診断件数の負値・小数・過大値を拒否する', () => {
+  const valid = coverageDiagnostic([], []);
+  for (const expected of [-1, 0.5, 1_000_000_001]) {
+    expect(validCoverage({ ...valid, expected })).toBe(false);
+  }
+});
+
+it('欠損した診断オブジェクトを受理しない', () => {
+  expect(validCoverage(null)).toBe(false);
+  expect(validCoverage(undefined)).toBe(false);
+});
 it('欠落・重複・担当外を区別し、モデルの原文を保存しない', () => {
   const ids = ['a'.repeat(16), 'b'.repeat(16)];
   const value = coverageDiagnostic(ids, [ids[0], ids[0], 'SECRET', 'SECRET']);

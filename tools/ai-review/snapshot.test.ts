@@ -17,6 +17,21 @@ const input = {
   inline: [root, { ...root, id: 2, in_reply_to_id: 1, body: 'reply' }],
   threads: [{ id: 'T1', root: 1, resolved: false }],
 };
+it('保存済み履歴の外形と更新日時を検査する', () => {
+  expect(() => normalizeSnapshot(JSON.parse('{}'))).toThrow('履歴スナップショットが不正');
+  const withTimestamp = {
+    ...input,
+    issues: [{ ...input.issues[0], updated_at: '2026-11-08T00:00:00Z' }],
+  };
+  expect(normalizeSnapshot(withTimestamp).issues[0].updated_at).toBe('2026-11-08T00:00:00Z');
+  expect(() =>
+    normalizeSnapshot(
+      JSON.parse(
+        JSON.stringify({ ...withTimestamp, issues: [{ ...input.issues[0], updated_at: 42 }] }),
+      ),
+    ),
+  ).toThrow('履歴コメントが不正');
+});
 it.each([1000, 1001])('通常・行コメント%s件を打ち切らない', async (count) => {
   const api: Api = async <T>(path: string) => {
     const page = Number(new URL('https://example.invalid/' + path).searchParams.get('page'));
@@ -81,4 +96,102 @@ it('Resolve状態が取得できない時は停止する', async () => {
     return [] as T;
   };
   await expect(loadSnapshot(api, 1)).rejects.toThrow();
+});
+
+it('不正なコメント・行位置・スレッドを含む履歴を拒否する', () => {
+  expect(() => normalizeSnapshot({ ...input, issues: [{ ...input.issues[0], id: 0 }] })).toThrow(
+    '履歴コメントが不正',
+  );
+  expect(() => normalizeSnapshot({ ...input, inline: [{ ...root, line: 0 }] })).toThrow(
+    '行コメントが不正',
+  );
+  expect(() =>
+    normalizeSnapshot({ ...input, threads: [{ id: '', root: 1, resolved: false }] }),
+  ).toThrow('スレッド状態が不正');
+  expect(() => normalizeSnapshot({ ...input, issues: [input.issues[0], input.issues[0]] })).toThrow(
+    '履歴の関連が欠落・重複',
+  );
+});
+
+it('スレッドを次ページまで取得し、取得順に依存せず履歴を正規化する', async () => {
+  const cursors: (string | null)[] = [];
+  const api: Api = async <T>(path: string, _method?: string, body?: object) => {
+    if (path === 'graphql') {
+      const cursor = (body as { variables: { cursor: string | null } }).variables.cursor;
+      cursors.push(cursor);
+      return {
+        data: {
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: [
+                  {
+                    id: cursor ? 'A' : 'Z',
+                    isResolved: false,
+                    comments: { nodes: [{ databaseId: cursor ? 4 : 1 }] },
+                  },
+                ],
+                pageInfo: { hasNextPage: !cursor, endCursor: cursor ? null : 'next' },
+              },
+            },
+          },
+        },
+      } as T;
+    }
+    return (
+      path.startsWith('pulls/')
+        ? [root, { ...root, id: 4 }]
+        : [{ ...input.issues[0], id: 5 }, input.issues[0]]
+    ) as T;
+  };
+  const snapshot = await loadSnapshot(api, 7);
+  expect(cursors).toEqual([null, 'next']);
+  expect(snapshot.issues.map((c) => c.id)).toEqual([3, 5]);
+  expect(snapshot.threads.map((t) => t.id)).toEqual(['A', 'Z']);
+});
+
+it('次ページのカーソルが同じなら部分履歴を返さず停止する', async () => {
+  let requests = 0;
+  const api: Api = async <T>(path: string) => {
+    if (path !== 'graphql') {
+      return [] as T;
+    }
+    requests++;
+    return {
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: {
+              nodes: [],
+              pageInfo: { hasNextPage: true, endCursor: 'repeated' },
+            },
+          },
+        },
+      },
+    } as T;
+  };
+  await expect(loadSnapshot(api, 7)).rejects.toThrow('履歴ページが進みません');
+  expect(requests).toBe(2);
+});
+
+it('元コメントを持たないスレッドを拒否する', async () => {
+  const api: Api = async <T>(path: string) => {
+    return (
+      path === 'graphql'
+        ? {
+            data: {
+              repository: {
+                pullRequest: {
+                  reviewThreads: {
+                    nodes: [{ id: 'T1', isResolved: false, comments: { nodes: [] } }],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                  },
+                },
+              },
+            },
+          }
+        : []
+    ) as T;
+  };
+  await expect(loadSnapshot(api, 7)).rejects.toThrow('スレッド元が不明です');
 });

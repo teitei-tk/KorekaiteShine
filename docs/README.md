@@ -21,6 +21,10 @@ AIレビューの正式な動作は[コメントと修正確認の要件](spec/a
 
 エージェントの認証確認・PR整理は[作業手順](runbooks/agent-workflow.md)、コードレビューは[基準](../CODING_STANDARDS.md)を参照してください。
 
+テストの行・文・関数・分岐の実測値と、未計測範囲・不足箇所は[カバレッジ調査](research/test-coverage.md)を参照してください。
+
+計測漏れの解消から領域別のテスト追加・CIの閾値導入までの手順は、[4指標100%への実装計画](superpowers/plans/2026-11-07-full-test-coverage.md)を参照してください。
+
 ## 設計判断の記録
 
 | ADR                                               | 判断                                                                      |

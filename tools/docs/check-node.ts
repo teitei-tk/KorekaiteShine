@@ -60,10 +60,7 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
           if (!step.uses?.startsWith('actions/setup-node@')) {
             continue;
           }
-          if (
-            step.with?.['node-version-file'] !== '.node-version' ||
-            'node-version' in (step.with ?? {})
-          ) {
+          if (step.with?.['node-version-file'] !== '.node-version' || 'node-version' in step.with) {
             errors.push(
               `${file} (${job}): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください`,
             );
@@ -75,18 +72,18 @@ export async function checkNodeSettings(root: string, files: string[]): Promise<
   return errors;
 }
 
-async function main() {
+export async function main(root = repository) {
   const files = [
     ...new Set(
       execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
-        cwd: repository,
+        cwd: root,
         encoding: 'utf8',
       })
         .split('\0')
         .filter(Boolean),
     ),
   ];
-  const errors = await checkNodeSettings(repository, files);
+  const errors = await checkNodeSettings(root, files);
   if (errors.length) {
     console.error(errors.join('\n'));
     process.exitCode = 1;

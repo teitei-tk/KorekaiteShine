@@ -3,6 +3,33 @@ import { latestFollowupStatus } from './followup.ts';
 import type { Comment, ReviewComment } from './github.ts';
 import type { PriorFinding } from './history.ts';
 import { MARKER } from './policy.ts';
+
+it('旧形式返信の見出しだけでは未修正か確認不能かを推測しない', () => {
+  const comment = reply(20);
+  comment.body = comment.body.replace(
+    '### ☑️: 修正を確認しました\n修正済み: 確認済み',
+    '### 修正が確認できません\n不明な本文',
+  );
+  expect(latestFollowupStatus(original, [comment], [])).toBeUndefined();
+});
+
+it('旧形式の確認不能返信を独立した状態として読み取る', () => {
+  const comment = reply(20);
+  comment.body = comment.body.replace(
+    '### ☑️: 修正を確認しました\n修正済み: 確認済み',
+    '### 修正が確認できません\n確認不能: 資料不足',
+  );
+  expect(latestFollowupStatus(original, [comment], [])).toBe('unverified');
+});
+
+it('旧形式の未修正返信を修正済みとして扱わない', () => {
+  const comment = reply(20);
+  comment.body = comment.body.replace(
+    '### ☑️: 修正を確認しました\n修正済み: 確認済み',
+    '### 修正が確認できません\n未修正: 残存',
+  );
+  expect(latestFollowupStatus(original, [comment], [])).toBe('unfixed');
+});
 const sha = 'a'.repeat(40);
 const original: PriorFinding = {
   id: '10:1',

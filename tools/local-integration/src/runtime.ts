@@ -304,7 +304,9 @@ import { defineConfig } from 'vite';
 import { voidPlugin } from 'void';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
+${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `import { runtimeCoveragePlugin } from ${JSON.stringify(join(repositoryRoot, 'tools/coverage/src/runtime-plugin.ts'))};` : ''}
 export default defineConfig({ cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: [
+  ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `runtimeCoveragePlugin(${JSON.stringify(project)}),` : ''}
   voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: [
     { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
     { config: ${JSON.stringify(evaluation)}, viteEnvironment: { name: 'evaluation' } },
@@ -320,7 +322,8 @@ function runtimeEnvironment(config: RuntimeConfig) {
     ...process.env,
     APP_ENV: config.environment,
     NO_COLOR: '1',
-    VOID_INSPECTOR_PORT: 'false',
+    VOID_INSPECTOR_PORT:
+      process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? '0' : 'false',
     WRANGLER_LOG_PATH: join(config.artifactDirectory, 'wrangler.log'),
   };
 }
@@ -339,8 +342,8 @@ async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
 
 async function startUnlockedRuntime(
   config: RuntimeConfig,
-  mode: 'dev' | 'preview' = 'dev',
-  options: LocalRuntimeOptions = {},
+  mode: 'dev' | 'preview',
+  options: LocalRuntimeOptions,
   signal?: AbortSignal,
 ): Promise<LocalRuntime> {
   const project = await prepareRuntime(config, options, signal);
@@ -364,17 +367,21 @@ async function startUnlockedRuntime(
   );
   let output = '';
   let stopping = false;
+  let finishCoverage: (() => Promise<void>) | undefined;
   const closed = new Promise<{ exitCode: 0 | 1 }>((resolve) => {
     child.once('exit', () => resolve({ exitCode: stopping ? 0 : 1 }));
     child.once('error', () => resolve({ exitCode: 1 }));
   });
   async function stop(): Promise<void> {
     stopping = true;
+    await finishCoverage?.();
+    finishCoverage = undefined;
     await stopProcessGroup(child);
     await writeFile(join(config.artifactDirectory, 'runtime.log'), output);
   }
   try {
-    let onAbort = () => {};
+    // Promiseのexecutorで同期的に設定し、finallyで同じリスナーを解除する。
+    let onAbort!: () => void;
     const baseUrl = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(
         () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
@@ -413,6 +420,14 @@ async function startUnlockedRuntime(
     }).finally(() => signal?.removeEventListener('abort', onAbort));
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
+    if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
+      const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
+      finishCoverage = await startRuntimeCapture(
+        child.pid!,
+        baseUrl,
+        Object.values(config.workers),
+      );
+    }
     signal?.throwIfAborted();
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error('ローカルランタイムが起動確認中に終了しました。');

@@ -3,7 +3,7 @@ import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
 import { chmodSync, readFileSync, rmSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { authenticate } from '../wif.ts';
-import { verifyProxyIsolation } from './lifecycle.js';
+import { verifyProxyIsolation } from './lifecycle.ts';
 
 export type Launch = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 type Info = { pid: number; port: number };

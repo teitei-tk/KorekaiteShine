@@ -1,5 +1,5 @@
 import { readFileSync, writeSync } from 'node:fs';
-import { probeIsolation, type IsolationInput } from '../isolation-probe.js';
+import { probeIsolation, type IsolationInput } from '../isolation-probe.ts';
 const input: IsolationInput = JSON.parse(readFileSync('/opt/ai-review-probe/input.json', 'utf8'));
 input.env = process.env;
 // fixtureは子shellから呼び出される。PRスクリプト実行自体が許可されることも確認する。

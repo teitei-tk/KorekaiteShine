@@ -1,3 +1,5 @@
 import { defineConfig } from 'void/config';
 
-export default defineConfig({});
+const config = defineConfig({});
+
+export default config;

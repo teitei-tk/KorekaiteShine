@@ -102,11 +102,9 @@ async function discardAcceptanceResponse(url: string, key: string, body: string)
       (response) => {
         // 本文を一度も読み取らず、クライアント側の接続を破棄する。
         response.destroy();
-        if (response.statusCode === undefined) {
-          reject(new IntegrationFailure('ACCEPTANCE_CONTRACT'));
-        } else {
-          resolve(response.statusCode);
-        }
+        // ClientRequestのresponseイベントではHTTP解析済みのstatusCodeが必ずある。
+        // 不正なHTTP応答はresponseではなくrequestのerrorイベントへ進む。
+        resolve(response.statusCode!);
       },
     );
     request.on('error', reject);
@@ -291,29 +289,38 @@ export async function runDiagnosticScenario(input: {
   let scheduledPending: Promise<void> | undefined;
   let scheduledFailed = false;
   function startScheduled(activeRuntime: LocalRuntime): void {
+    let notBefore = Temporal.Now.instant().epochMilliseconds + report.scheduled.intervalMs;
     scheduledTimer = setInterval(() => {
       if (scheduledPending || scheduledFailed) {
         return;
       }
-      const invocation: IntegrationReport['scheduled']['invocations'][number] = {
-        startedAt: Temporal.Now.instant().epochMilliseconds,
-        completedAt: null,
-        outcome: 'pending',
-      };
-      report.scheduled.invocations.push(invocation);
-      scheduledPending = activeRuntime
-        .runScheduled(AbortSignal.timeout(10_000))
-        .then(() => {
-          invocation.outcome = 'ok';
-        })
-        .catch(() => {
-          invocation.outcome = 'failed';
-          scheduledFailed = true;
-        })
-        .finally(() => {
-          invocation.completedAt = Temporal.Now.instant().epochMilliseconds;
-          scheduledPending = undefined;
-        });
+      scheduledPending = (async () => {
+        // Nodeのタイマーは壁時計の期限よりわずかに早く発火し得るため、開始前に再確認する。
+        while (Temporal.Now.instant().epochMilliseconds < notBefore) {
+          await delay(notBefore - Temporal.Now.instant().epochMilliseconds);
+        }
+        const invocation: IntegrationReport['scheduled']['invocations'][number] = {
+          startedAt: Temporal.Now.instant().epochMilliseconds,
+          completedAt: null,
+          outcome: 'pending',
+        };
+        notBefore = invocation.startedAt + report.scheduled.intervalMs;
+        report.scheduled.invocations.push(invocation);
+        await activeRuntime
+          .runScheduled(AbortSignal.timeout(10_000))
+          .then(() => {
+            invocation.outcome = 'ok';
+          })
+          .catch(() => {
+            invocation.outcome = 'failed';
+            scheduledFailed = true;
+          })
+          .finally(() => {
+            invocation.completedAt = Temporal.Now.instant().epochMilliseconds;
+          });
+      })().finally(() => {
+        scheduledPending = undefined;
+      });
     }, report.scheduled.intervalMs);
   }
   try {
@@ -667,9 +674,8 @@ export async function runDiagnosticScenario(input: {
     try {
       await runtime?.stop();
       if (report.exitCode === 0) {
-        if (config.stateDirectory) {
-          await rm(config.stateDirectory, { recursive: true, force: true });
-        }
+        // この関数はappEnv: 'test'で解決するため、ローカル状態の保存先が必ずある。
+        await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       }
     } catch (error) {

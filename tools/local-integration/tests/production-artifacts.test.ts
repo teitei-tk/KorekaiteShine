@@ -168,3 +168,44 @@ test('3 Workersの本番入口へ診断importを混入させると、未使用�
     }
   }
 }, 90_000);
+
+test('本番入口へ計測ツールのimportが混入した場合は未使用でも拒否する', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-coverage-'));
+  let succeeded = false;
+  try {
+    const project = await buildProductionArtifacts(directory);
+    await verifyProductionArtifacts(project);
+    const entry = join(project, 'interview.production.ts');
+    const original = await readFile(entry, 'utf8');
+    const coverage = fileURLToPath(new URL('../../coverage/src/targets.ts', import.meta.url));
+    await writeFile(entry, `${original}\nimport ${JSON.stringify(coverage)};\n`);
+    await runProductionBuild(project);
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow(
+      '本番モジュールへ診断・検証コードが混入',
+    );
+    succeeded = true;
+  } finally {
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+}, 90000);
+
+test('本番成果物へ計測カウンターを挿入した場合も拒否する', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-counter-'));
+  let succeeded = false;
+  try {
+    const project = await buildProductionArtifacts(directory);
+    const entry = join(project, 'interview.production.ts');
+    await writeFile(entry, (await readFile(entry, 'utf8')) + '\nglobalThis.__coverage__ = {};\n');
+    await runProductionBuild(project);
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow(
+      '本番配信物へ診断コードが混入',
+    );
+    succeeded = true;
+  } finally {
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+}, 90000);

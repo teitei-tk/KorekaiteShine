@@ -8,6 +8,8 @@ Web・Interview DO・Evaluationをローカルで接続する検証の記録で�
 
 2026年11月4日、mainの依存更新を移行先にも引き継ぎ、Void 1.5.0・Cloudflare Viteプラグイン2.0.0-beta.v.9・Miniflare 5.20261101.0-beta・Vitest 5.1.0へ更新しました。旧出力先を参照していた本番成果物監査を`.cloudflare/output/v0/workers`のbundle・assets・worker.config.jsonへ切り替えています。プラグイン2系はWranglerへ依存しないため、版情報はプラグインが直接使うMiniflareから取得し、Wrangler欄を記録しません。開発・プレビュー双方のHTTP契約と、診断コードの混入拒否・本番診断APIの404を再確認しました。
 
+2026年11月6日、Void 1.6.1への更新で、契約生成と`http-contract.test.ts`の2テストが成功しました。続く1.6.2でも同じ検査が成功し、開発・プレビュー双方の一覧APIと診断APIのHTTP契約を再確認しています。Cloudflare Viteプラグインの固定版は維持しています。
+
 「ローカルD1」は、MiniflareのD1バインディングとSQLite保存先を指します。Cloudflareトークンや1Passwordの秘密値は使用していません。開発DBの保持確認だけはNode SQLiteの読み取り専用接続を使い、アプリのD1接続検査と区別します。
 
 ## 移行元の履歴と互換性
@@ -20,7 +22,7 @@ Web・Interview DO・Evaluationをローカルで接続する検証の記録で�
 
 引き継ぐ互換性の制約は次のとおりです。
 
-- openapi-typescriptはTypeScript 5系のCompiler APIを使います。7.0.2では型生成に失敗したため、生成専用の`tools/api-codegen`を5.9.3に固定し、アプリの型検査は7.0.2に分離しました。
+- openapi-typescriptはTypeScript 5系のCompiler APIを使います。7.0.2では型生成に失敗したため、当初は生成専用の`tools/api-codegen`を5.9.3に固定しました。2026年11月6日の更新では、[pnpmフック](../../.pnpmfile.cjs)でopenapi-typescript 7.13.0のTypeScriptをpeer依存から5.9.3の通常依存へ変更し、生成器のCompiler APIだけを分離しています。ツールとアプリの直接依存は7.0.2です。
 - Cloudflare Viteプラグイン1.66.0では開発時に`Parent environment not initialized`が発生しました。当時の1.64.0では起動しました。上流の原因は未特定です。現在はVoid 1.5.0のBuild Output仕様に合わせて2.0.0-beta.v.9へ固定しています。
 - CommonJS形式のAjv検証コードは開発時に`exports is not defined`で失敗したため、ES Modulesを事前生成します。実行時コンパイルは行いません。
 - Babel経由のsemver 6.3.1はpnpmの信頼ポリシーに拒否されました。coreとhelper-compilation-targetsに限り、provenanceのある7.8.5へ置換しています。今回の比較・範囲判定とビルドを検証したもので、Babelの全機能の互換性を保証しません。

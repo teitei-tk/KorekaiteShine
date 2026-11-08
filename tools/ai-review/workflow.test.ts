@@ -103,3 +103,19 @@ it('root実行の固定診断を保存し、後続の汎用失敗で上書きし
   }
   expect(generate).toContain('recordExecutionFailure(process.env)');
 });
+
+it('長時間検査を通常CIとAIレビューの開始待ちに含めない', () => {
+  const backend = workflow('ai-review');
+  expect(backend).toContain('workflows: [Documentation checks, CI]');
+  expect(backend).not.toContain('Worker real-time checks');
+  expect(backend).toContain("github.event.workflow_run.conclusion == 'success'");
+  expect(workflow('ci')).not.toContain('ci-realtime');
+  expect(workflow('ci')).not.toContain('test:integration\n');
+  const realtime = workflow('ci-realtime');
+  expect(realtime).toContain('name: Worker real-time checks');
+  expect(realtime).not.toContain('workflow_run:');
+  expect(realtime).not.toContain('continue-on-error');
+  expect(realtime).toContain('needs: [changes, realtime]');
+  expect(realtime).toContain('if: always()');
+  expect(realtime).not.toMatch(/:\s*write\b|secrets\.|id-token:/);
+});

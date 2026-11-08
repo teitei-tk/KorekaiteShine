@@ -44,7 +44,7 @@ afterEach(() => {
 export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?: Input['fault']) {
   clock.milliseconds = 0;
   clock.httpStatus = 202;
-  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
   const base = Temporal.Instant.from('2026-11-03T00:00:00.000Z').epochMilliseconds;
   vi.spyOn(performance, 'now').mockImplementation(() => clock.milliseconds);
   vi.spyOn(Temporal.Now, 'instant').mockImplementation(() =>

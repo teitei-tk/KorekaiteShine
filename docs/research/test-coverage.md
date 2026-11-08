@@ -2,7 +2,28 @@
 
 2026年11月6日、コミット`95e5230604b78f74f6066e46c79f73ac7a0af51a`を対象に、既存テストの行・文・関数・分岐カバレッジを計測しました。100%に向けて、計測経路が接続されていない範囲と、計測済みコードで実行されなかった箇所を分けて扱います。
 
-## 最終検証結果
+## main統合後の検証
+
+2026年11月8日、PR #83へmainの`fec4683f9c717638903cf3d2d2ade41a0c45b51b`を統合し、競合を解消しました。全体計測の実行IDは`cc48d43a-5da3-4a78-ac51-e7ea80df8407`で、158ファイル・1103テストが成功しました（783.60秒）。API型生成器のNode.js互換性テストも独立した必須suiteとして成功しています。
+
+| 指標 | 網羅数／総数 | カバレッジ |
+| ---- | ------------ | ---------- |
+| 行   | 4033／4033   | 100%       |
+| 文   | 4162／4162   | 100%       |
+| 関数 | 758／758     | 100%       |
+| 分岐 | 3104／3104   | 100%       |
+
+対象は131ファイルで、実行要素がある127ファイルすべてが4指標100%、要素なしは4ファイルです。未実行位置は0件です。必須suiteは`inventory`・`generate`・`api-codegen`・`prepare`・`tests`で、元ソースと計測コードのハッシュを照合しています。統合元mainで追加された手書きコードも対象に含めており、以前の125対象の数値とは分母が異なります。
+
+通常CIの境界4分割・結合3分割、Takumi Guard、依存更新、型生成器のCompiler API分離を維持しました。全体計測と100%判定は独立した`Worker real-time checks`で行います。従来のNode限定V8計測は`pnpm test:coverage:node`として残し、出力先を`coverage/node/`へ分けました。
+
+定期実行はmainの単調時計方式へ統一し、早期発火・壁時計補正の回帰テストを維持しました。追加テスト16ファイルをmainのCI分割へ登録し、起動CLI・Guard・変更判定・依存フックの不足ケースも補っています。統合後の初回実行では旧Void 1.5.0を期待するテスト1件が失敗したため採用せず、mainの1.6.2に合わせて修正後に再検証しました。
+
+型検査・Webビルド・Lint・整形・文書検査も成功しています。Actions参照はmainと同一です。ローカルでのActionsロックのオンライン検証はツール取得の403により未実施であり、CIの検証を別途確認します。
+
+以下はmain統合前の履歴です。末尾のファイル別一覧は今回の統合後の実測です。
+
+## main統合前の最終検証結果
 
 2026年11月8日、計画に沿った追加と収集経路の接続を終え、同じソース・計測形式で全体計測を2回実行しました。各回とも通常テストと追加7結合テスト、Node子プロセス、実Workerの記録を同じ実行IDの台帳へ収集しています。
 
@@ -237,10 +258,11 @@ node .local/coverage-audit/summarize.mjs
 
 ## ファイル別の最終値
 
-最終の全体計測の値です。要素がない指標は「—」で示します。
+main統合後の全体計測です。要素がない指標は「—」で示します。
 
 | ファイル                                                                                                                                     | 状態      | 行               | 文               | 関数           | 分岐             |
 | -------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------- | ---------------- | -------------- | ---------------- |
+| [.pnpmfile.cjs](../../.pnpmfile.cjs)                                                                                                         | 4指標100% | 100%（5／5）     | 100%（5／5）     | 100%（1／1）   | 100%（4／4）     |
 | [apps/evaluation/src/application/classify-delivery.ts](../../apps/evaluation/src/application/classify-delivery.ts)                           | 4指標100% | 100%（5／5）     | 100%（5／5）     | 100%（1／1）   | 100%（4／4）     |
 | [apps/evaluation/src/application/consume-dlq.ts](../../apps/evaluation/src/application/consume-dlq.ts)                                       | 4指標100% | 100%（5／5）     | 100%（5／5）     | 100%（1／1）   | 100%（4／4）     |
 | [apps/evaluation/src/application/consume-job.ts](../../apps/evaluation/src/application/consume-job.ts)                                       | 4指標100% | 100%（27／27）   | 100%（27／27）   | 100%（5／5）   | 100%（29／29）   |
@@ -345,26 +367,31 @@ node .local/coverage-audit/summarize.mjs
 | [tools/coverage/src/vitest-setup.ts](../../tools/coverage/src/vitest-setup.ts)                                                               | 4指標100% | 100%（5／5）     | 100%（5／5）     | 100%（1／1）   | 100%（2／2）     |
 | [tools/coverage/src/worker.ts](../../tools/coverage/src/worker.ts)                                                                           | 4指標100% | 100%（51／51）   | 100%（51／51）   | 100%（12／12） | 100%（19／19）   |
 | [tools/coverage/src/workerd-inspector.ts](../../tools/coverage/src/workerd-inspector.ts)                                                     | 4指標100% | 100%（32／32）   | 100%（35／35）   | 100%（8／8）   | 100%（19／19）   |
+| [tools/docs/check-guard.ts](../../tools/docs/check-guard.ts)                                                                                 | 4指標100% | 100%（30／30）   | 100%（30／30）   | 100%（3／3）   | 100%（28／28）   |
 | [tools/docs/check-node.ts](../../tools/docs/check-node.ts)                                                                                   | 4指標100% | 100%（37／37）   | 100%（37／37）   | 100%（3／3）   | 100%（41／41）   |
 | [tools/docs/check.ts](../../tools/docs/check.ts)                                                                                             | 4指標100% | 100%（149／149） | 100%（151／151） | 100%（14／14） | 100%（140／140） |
 | [tools/local-integration/src/build-audit.ts](../../tools/local-integration/src/build-audit.ts)                                               | 4指標100% | 100%（15／15）   | 100%（15／15）   | 100%（2／2）   | 100%（6／6）     |
+| [tools/local-integration/src/ci-selection.ts](../../tools/local-integration/src/ci-selection.ts)                                             | 4指標100% | 100%（27／27）   | 100%（29／29）   | 100%（5／5）   | 100%（40／40）   |
 | [tools/local-integration/src/database.ts](../../tools/local-integration/src/database.ts)                                                     | 4指標100% | 100%（35／35）   | 100%（35／35）   | 100%（3／3）   | 100%（38／38）   |
 | [tools/local-integration/src/development-snapshot.ts](../../tools/local-integration/src/development-snapshot.ts)                             | 4指標100% | 100%（36／36）   | 100%（36／36）   | 100%（4／4）   | 100%（11／11）   |
 | [tools/local-integration/src/diagnostic-http-contract.ts](../../tools/local-integration/src/diagnostic-http-contract.ts)                     | 4指標100% | 100%（98／98）   | 100%（99／99）   | 100%（8／8）   | 100%（14／14）   |
 | [tools/local-integration/src/evidence.ts](../../tools/local-integration/src/evidence.ts)                                                     | 4指標100% | 100%（23／23）   | 100%（23／23）   | 100%（3／3）   | 100%（6／6）     |
 | [tools/local-integration/src/http-contract.ts](../../tools/local-integration/src/http-contract.ts)                                           | 4指標100% | 100%（30／30）   | 100%（31／31）   | 100%（5／5）   | 100%（8／8）     |
 | [tools/local-integration/src/integration-run.ts](../../tools/local-integration/src/integration-run.ts)                                       | 4指標100% | 100%（11／11）   | 100%（12／12）   | 100%（3／3）   | 100%（3／3）     |
-| [tools/local-integration/src/integration.ts](../../tools/local-integration/src/integration.ts)                                               | 4指標100% | 100%（240／240） | 100%（242／242） | 100%（21／21） | 100%（242／242） |
+| [tools/local-integration/src/integration.ts](../../tools/local-integration/src/integration.ts)                                               | 4指標100% | 100%（235／235） | 100%（237／237） | 100%（19／19） | 100%（245／245） |
 | [tools/local-integration/src/isolation.ts](../../tools/local-integration/src/isolation.ts)                                                   | 4指標100% | 100%（93／93）   | 100%（98／98）   | 100%（18／18） | 100%（14／14）   |
 | [tools/local-integration/src/lock.ts](../../tools/local-integration/src/lock.ts)                                                             | 4指標100% | 100%（13／13）   | 100%（13／13）   | 100%（2／2）   | 100%（10／10）   |
 | [tools/local-integration/src/prepare-integration.ts](../../tools/local-integration/src/prepare-integration.ts)                               | 4指標100% | 100%（19／19）   | 100%（19／19）   | 100%（2／2）   | 100%（7／7）     |
 | [tools/local-integration/src/process.ts](../../tools/local-integration/src/process.ts)                                                       | 4指標100% | 100%（52／52）   | 100%（55／55）   | 100%（13／13） | 100%（32／32）   |
 | [tools/local-integration/src/production.ts](../../tools/local-integration/src/production.ts)                                                 | 4指標100% | 100%（114／114） | 100%（117／117） | 100%（16／16） | 100%（76／76）   |
 | [tools/local-integration/src/readiness.ts](../../tools/local-integration/src/readiness.ts)                                                   | 4指標100% | 100%（5／5）     | 100%（5／5）     | 100%（1／1）   | 100%（5／5）     |
+| [tools/local-integration/src/run-test-suite.ts](../../tools/local-integration/src/run-test-suite.ts)                                         | 4指標100% | 100%（38／38）   | 100%（40／40）   | 100%（11／11） | 100%（17／17）   |
 | [tools/local-integration/src/run.ts](../../tools/local-integration/src/run.ts)                                                               | 4指標100% | 100%（51／51）   | 100%（51／51）   | 100%（9／9）   | 100%（32／32）   |
 | [tools/local-integration/src/runtime-owner-host.ts](../../tools/local-integration/src/runtime-owner-host.ts)                                 | 4指標100% | 100%（45／45）   | 100%（45／45）   | 100%（11／11） | 100%（31／31）   |
 | [tools/local-integration/src/runtime-owner.ts](../../tools/local-integration/src/runtime-owner.ts)                                           | 4指標100% | 100%（42／42）   | 100%（45／45）   | 100%（17／17） | 100%（22／22）   |
 | [tools/local-integration/src/runtime.ts](../../tools/local-integration/src/runtime.ts)                                                       | 4指標100% | 100%（128／128） | 100%（130／130） | 100%（22／22） | 100%（90／90）   |
+| [tools/local-integration/src/scheduled-interval.ts](../../tools/local-integration/src/scheduled-interval.ts)                                 | 4指標100% | 100%（12／12）   | 100%（13／13）   | 100%（3／3）   | 100%（2／2）     |
+| [tools/local-integration/src/test-suites.ts](../../tools/local-integration/src/test-suites.ts)                                               | 4指標100% | 100%（23／23）   | 100%（25／25）   | 100%（5／5）   | 100%（26／26）   |
 | [tools/local-integration/src/versions.ts](../../tools/local-integration/src/versions.ts)                                                     | 4指標100% | 100%（17／17）   | 100%（17／17）   | 100%（2／2）   | 100%（9／9）     |
 
 計測要素が0件のファイルは次のとおりです。型のみ、空のエントリ、再exportであり、0件を動作検証済みの100%とは扱いません。

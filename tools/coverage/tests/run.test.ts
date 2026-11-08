@@ -23,10 +23,11 @@ test('全体収集はAPI生成と保持確認の準備を済ませてから結�
   const { commands } = collect.mock.calls[0][0];
   expect(commands.map((command: { suite: string }) => command.suite)).toEqual([
     'generate',
+    'api-codegen',
     'prepare',
     'tests',
   ]);
-  expect(commands[1]).toMatchObject({ command: 'pnpm', args: ['prepare:integration'] });
+  expect(commands[2]).toMatchObject({ command: 'pnpm', args: ['prepare:integration'] });
 });
 
 test('CLIの正常終了で4指標の集計を標準出力へ書く', async () => {

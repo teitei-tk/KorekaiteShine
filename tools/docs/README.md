@@ -64,6 +64,23 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 仕様の根拠：[pnpm依存解決設定](https://pnpm.io/settings/dependency-resolution)、[ビルド設定](https://pnpm.io/settings/build)。
 
+### CIのTakumi Guard
+
+通常CI、Workerの実時間検査、AIレビュー、隔離受入検査では、公式の`setup-takumi-guard-npm` v1.4.0をpnpmの準備前に実行します。npm依存の取得先をTakumi Guardへ向け、匿名モードで悪性パッケージを拒否します。アカウント・トークン・Guard用のOIDC権限は不要です。ローカルのregistry設定は変更しません。
+
+各対象ジョブで有効なnpm・pnpmのregistryを確認し、通常CIの`Repository lint and format`では[遮断確認](check-guard.ts)も実行します。空の一時キャッシュで正常なパッケージの取得と公式の確認用パッケージの拒否を確認し、一時ファイルを削除します。接続障害、一般的な403、予期しない取得成功は失敗にします。外部通信を伴うため、遮断確認は`pnpm test`や`pnpm check`には含めません。
+
+Guard設定済みのCI環境では、次で再確認できます。ローカルで未設定ならregistry確認で停止します。
+
+```sh
+node tools/docs/check-guard.ts --registry-only
+node tools/docs/check-guard.ts
+```
+
+取得済み依存が現在のGuard判定を迂回しないよう、対象ジョブのpnpm storeキャッシュ復元とsetup-nodeの自動キャッシュを無効にしています。GitHub-hosted runnerの使い捨て環境を前提とし、pnpm Action自身のstoreキャッシュも既定の無効状態で使います。再実行では依存を再取得するため、通信量と所要時間が増えます。Guardの拒否・障害時は対象版と応答を確認し、必要に応じて復旧後に再実行してください。npm公式レジストリへの自動切替は行いません。
+
+匿名モードには取得履歴と事後通知がありません。scope別registryや直接URLの依存は別途レビューし、GitHub Releases・apt・Actions本体の取得はGuardの保護範囲外として扱います。固定版の確認結果と未検証範囲は[検証記録](../../docs/research/takumi-guard.md)、将来のShisho CloudへのOIDC移行は[導入設計](../../docs/superpowers/specs/2026-11-07-takumi-guard-design.md#将来のshisho-cloud連携)を参照してください。
+
 ## Dependabotによる依存更新
 
 [Dependabot設定](../../.github/dependabot.yml)で、`daily`（平日9時、日本時間）にnpm依存とGitHub Actionsの更新を確認します。更新PRの上限はそれぞれ10件です。メジャー更新も対象とし、自動マージは設定しません。
@@ -88,13 +105,14 @@ GitHub Actionsでも`.node-version`からNode.jsのバージョンを読み取�
 | `apps`              | アプリのビルド・型検査・単体テスト                   |
 | `packages`          | 共有パッケージの生成・型検査・テスト                 |
 | `tools`             | ローカル結合検証を除く開発ツールの型検査・単体テスト |
-| `local-integration` | DO・D1境界テストと実時間の接続・回復・環境分離テスト |
+| `local-boundaries`  | DO・D1境界テスト、開発・ビルド済みWorkerのHTTP契約   |
+| `local-integration` | 実時間の接続・回復・環境分離テスト                   |
 | `docs`              | Node.js設定・文書・リンク・見出し検査                |
 | `verify-lockfile`   | Actionsロック検証                                    |
 
-ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-integration`が担当します。同ジョブは通常の境界テスト後に`pnpm prepare:integration`と`pnpm test:integration`を実行します。
+ジョブ間では生成物を共有せず、型検査・テストを行う各ジョブで共有契約を生成します。`apps/interview`と共有D1の実行境界テストは`tools/local-integration/tests`にあるため、`local-boundaries`が担当します。`local-integration`の各分割は開発DB保持確認の準備と、通常結合14件の担当分だけを実行します。長時間1件は別ワークフローが担当します。
 
-通常検査の上限は15分、境界テストを追加した結合検証は25分です。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。
+通常検査の上限は15分、`local-boundaries`と`local-integration`はそれぞれ25分です。境界4分割と結合3分割に順序依存はなく、別runnerで並列実行します。旧ジョブでは依存インストール・ビルド・型検査後の通常テスト中に5分上限へ達したため、分割後も実行時間を確保します。CIでは整形を書き換えず、実AIやCloudflareクラウドへ接続しません。ローカルの全体検査入口は`pnpm check`です。 所要時間の内訳と環境共有の測定結果は[CI性能の検証記録](../../docs/research/ci-worker-test-performance.md)を参照してください。
 
 文書検査ジョブでは、Markdown・`tools/docs/**`・Workflow・各`package.json`・共有の依存設定・Node.js設定・Markdown/Lint/整形設定・Git除外設定に変更がある場合だけ、依存インストールと検査を実行します。相対リンク切れを確認するため、任意のファイルの削除・移動も対象です。PRは分岐点からheadまで、mainへのpushはpush前後を比較し、比較元が取得できない場合は検査します。対象外の場合もジョブは起動し、検査ステップをスキップして成功します。他のジョブは変更パスで省略しません。文書検査ツール自体の型検査・テストは`tools`が担当します。
 
@@ -130,4 +148,6 @@ gh actions-lock --verify
 
 `pnpm check:coverage`は、現在のコミット・対象集合・元ソースと計測コードのハッシュが一致する保存結果だけを検査します。全体と各ファイルの4指標を実数で判定し、1件でも未網羅なら失敗します。必須suiteの欠落、失敗・未完了の収集、空のレポートも成功扱いしません。計測要素がない個別ファイルは理由を記録し、到達済みには数えません。
 
-CIでは既存のローカル結合ジョブで両コマンドを順に実行します。通常テストを含むため、他のアプリ・パッケージ・ツールのジョブは型検査を担当し、テストを重ねて実行しません。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
+通常CIの境界4分割・結合3分割と、各パッケージの型検査・テストは維持します。両コマンドは独立した`Worker real-time checks`で順に実行し、長時間の全体計測と100%判定を担当します。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
+
+通常CIは境界4分割と通常結合3分割を含みます。450秒の再試行待機1件と全体カバレッジ検査は `Worker real-time checks` に分離し、夜間・手動・関連変更のPRで実行します。通常CIの成功と長時間検査の結果は独立しています。全件のローカル検査は引き続き `pnpm check`、`pnpm prepare:integration`、`pnpm test:integration` です。

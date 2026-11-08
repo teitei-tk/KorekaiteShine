@@ -34,6 +34,11 @@ export async function main(
         args: ['--filter', '@korekaite/api-contracts', 'generate'],
       },
       {
+        suite: 'api-codegen',
+        command: 'pnpm',
+        args: ['--filter', 'korekaite-shine-api-codegen', 'test'],
+      },
+      {
         suite: 'prepare',
         command: 'pnpm',
         args: ['prepare:integration'],

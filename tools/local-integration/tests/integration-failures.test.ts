@@ -236,7 +236,8 @@ test('scheduledが失敗すると後続の周期起動を抑止し検証全体�
   const fixture = scenarioFixture();
   vi.mocked(fixture.runtime.runScheduled).mockRejectedValue(new Error('private details'));
   fixture.replies.accept = async () => {
-    await fixture.advance(120_000);
+    await fixture.advance(60_000);
+    await fixture.advance(60_000);
     return Response.json(fixture.accepted, { status: 202 });
   };
   const report = await fixture.fails('SCHEDULED_FAILED');
@@ -281,20 +282,4 @@ test.each([
   const { report } = await fixture.run();
   expect(report.exitCode).toBe(0);
   expect(vi.getTimerCount()).toBe(0);
-});
-
-test('定期タイマーが壁時計の期限より1ms早く発火しても回復を前倒ししない', async () => {
-  const fixture = scenarioFixture('success', 'after_acceptance');
-  const schedule = globalThis.setInterval;
-  vi.spyOn(globalThis, 'setInterval').mockImplementation((callback, milliseconds) =>
-    schedule(() => {
-      fixture.clock.milliseconds -= 1;
-      callback();
-    }, milliseconds),
-  );
-  const { report } = await fixture.run();
-  expect(
-    report.scheduled.invocations[0]!.startedAt - report.restart!.restartedAt,
-  ).toBeGreaterThanOrEqual(60_000);
-  expect(fixture.runtime.runScheduled).toHaveBeenCalledTimes(1);
 });

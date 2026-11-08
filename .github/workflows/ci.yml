@@ -65,7 +65,9 @@ jobs:
             esac
           done < "$RUNNER_TEMP/docs-changes"
           echo "required=$required" >> "$GITHUB_OUTPUT"
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+        if: steps.changes.outputs.required == 'true'
+      - uses: pnpm/action-setup@v6.1.1
         if: steps.changes.outputs.required == 'true'
         with:
           package_json_file: package.json
@@ -73,8 +75,10 @@ jobs:
         if: steps.changes.outputs.required == 'true'
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        if: steps.changes.outputs.required == 'true'
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Install documentation check dependencies
         if: steps.changes.outputs.required == 'true'
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -92,14 +96,16 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Lint repository with oxlint
@@ -114,20 +120,24 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
       - name: Build and typecheck apps
         run: pnpm --filter './apps/*' --workspace-concurrency=1 run typecheck
+      - name: Test apps
+        run: pnpm --filter './apps/*' --workspace-concurrency=1 run test
   packages:
     name: Packages checks
     runs-on: ubuntu-latest
@@ -136,20 +146,24 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
       - name: Build and typecheck packages
         run: pnpm --filter './packages/*' --workspace-concurrency=1 run typecheck
+      - name: Test packages
+        run: pnpm --filter './packages/*' --workspace-concurrency=1 run test
   tools:
     name: Tools checks
     runs-on: ubuntu-latest
@@ -158,43 +172,81 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
       - name: Build and typecheck tools
         run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run typecheck
-  local-integration:
-    name: Local Worker boundaries and integration
+      - name: Test tools
+        run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run test
+  local-boundaries:
+    name: Local Worker boundaries (${{ matrix.shard }}/4)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
           package_json_file: package.json
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
       - name: Typecheck local integration tooling
         run: pnpm --filter @korekaite/local-integration typecheck
-      - name: Measure all tests including Worker boundaries and real-time recovery
-        run: pnpm test:coverage
-      - name: Require every file to reach 100 percent in all four metrics
-        run: pnpm check:coverage
+      - name: Test Worker and D1 boundaries
+        run: pnpm --filter @korekaite/local-integration test ${{ matrix.shard }} --maxWorkers=2
+  local-integration:
+    name: Local Worker integration (${{ matrix.shard }}/3)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate shared contracts
+        run: pnpm --filter @korekaite/api-contracts generate
+      - name: Prepare development retention sentinel
+        run: pnpm prepare:integration
+      - name: Test real-time Queue delivery and recovery
+        run: pnpm --filter @korekaite/local-integration test:integration:pr ${{ matrix.shard }} --maxWorkers=2

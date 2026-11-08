@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { runDatabaseCommand, type LocalRuntime } from '../src/runtime.ts';
-import { withDiagnosticRuntime } from './helpers/diagnostic-runtime.ts';
+import { createNotificationRuntime } from './helpers/notification-runtime.ts';
+
+const suite = createNotificationRuntime();
+beforeAll(() => suite.start(), 60_000);
+afterAll(() => suite.stop(), 30_000);
 
 const now = 1_000_000;
 
@@ -43,118 +47,150 @@ async function assertSent(config: RuntimeConfig, jobId: string, sent: boolean) {
   ]);
 }
 
-test('予定時刻が現在から-1msなら遅延0秒で送信する', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + -1);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 0 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '予定時刻が現在から-1msなら遅延0秒で送信する',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + -1);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 0 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('予定時刻が現在から0msなら遅延0秒で送信する', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + 0);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 0 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '予定時刻が現在から0msなら遅延0秒で送信する',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + 0);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 0 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('予定時刻が現在から1msなら遅延1秒で送信する', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + 1);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 1 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '予定時刻が現在から1msなら遅延1秒で送信する',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + 1);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 1 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('予定時刻が現在から1001msなら遅延2秒で送信する', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + 1001);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 2 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '予定時刻が現在から1001msなら遅延2秒で送信する',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + 1001);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 2 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('予定時刻が現在から86400000msなら遅延86400秒で送信する', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + 86400000);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 86400 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '予定時刻が現在から86400000msなら遅延86400秒で送信する',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + 86400000);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 86400 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('24時間の上限を1ms越える予定は未送信のまま残す', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now + 86_400_001);
-    expect(await dispatch(runtime)).toEqual({ outboxSent: 0, outboxDeferred: 0, requests: [] });
-    await assertSent(config, jobId, false);
-  });
-}, 60_000);
+test(
+  '24時間の上限を1ms越える予定は未送信のまま残す',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now + 86_400_001);
+      expect(await dispatch(runtime)).toEqual({ outboxSent: 0, outboxDeferred: 0, requests: [] });
+      await assertSent(config, jobId, false);
+    }, signal);
+  },
+);
 
-test('次回試行時刻がoutboxより遅い場合は次回試行を早めない', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const jobId = randomUUID();
-    await seedNotification(config, jobId, now, now + 1_001);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 2 }],
-    });
-    await assertSent(config, jobId, true);
-  });
-}, 60_000);
+test(
+  '次回試行時刻がoutboxより遅い場合は次回試行を早めない',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const jobId = newJobId();
+      await seedNotification(config, jobId, now, now + 1_001);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 2 }],
+      });
+      await assertSent(config, jobId, true);
+    }, signal);
+  },
+);
 
-test('中央の通知が失敗しても後続を送信し復旧後は失敗分だけ送る', async () => {
-  await withDiagnosticRuntime({}, async (config, runtime) => {
-    const first = randomUUID(),
-      middle = randomUUID(),
-      last = randomUUID();
-    await seedNotification(config, first, now - 3);
-    await seedNotification(config, middle, now - 2);
-    await seedNotification(config, last, now - 1);
-    expect(await dispatch(runtime, middle)).toEqual({
-      outboxSent: 2,
-      outboxDeferred: 1,
-      requests: [
-        { purpose: 'diagnostics', operation: 'notify', jobId: first, delaySeconds: 0 },
-        { purpose: 'diagnostics', operation: 'notify', jobId: middle, delaySeconds: 0 },
-        { purpose: 'diagnostics', operation: 'notify', jobId: last, delaySeconds: 0 },
-      ],
-    });
-    await assertSent(config, first, true);
-    await assertSent(config, middle, false);
-    await assertSent(config, last, true);
-    expect(await dispatch(runtime)).toEqual({
-      outboxSent: 1,
-      outboxDeferred: 0,
-      requests: [{ purpose: 'diagnostics', operation: 'notify', jobId: middle, delaySeconds: 0 }],
-    });
-    await assertSent(config, middle, true);
-  });
-}, 60_000);
+test(
+  '中央の通知が失敗しても後続を送信し復旧後は失敗分だけ送る',
+  { timeout: 60_000, concurrent: false },
+  async ({ signal }) => {
+    await suite.run(async ({ config, runtime, newJobId }) => {
+      const first = newJobId(),
+        middle = newJobId(),
+        last = newJobId();
+      await seedNotification(config, first, now - 3);
+      await seedNotification(config, middle, now - 2);
+      await seedNotification(config, last, now - 1);
+      expect(await dispatch(runtime, middle)).toEqual({
+        outboxSent: 2,
+        outboxDeferred: 1,
+        requests: [
+          { purpose: 'diagnostics', operation: 'notify', jobId: first, delaySeconds: 0 },
+          { purpose: 'diagnostics', operation: 'notify', jobId: middle, delaySeconds: 0 },
+          { purpose: 'diagnostics', operation: 'notify', jobId: last, delaySeconds: 0 },
+        ],
+      });
+      await assertSent(config, first, true);
+      await assertSent(config, middle, false);
+      await assertSent(config, last, true);
+      expect(await dispatch(runtime)).toEqual({
+        outboxSent: 1,
+        outboxDeferred: 0,
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId: middle, delaySeconds: 0 }],
+      });
+      await assertSent(config, middle, true);
+    }, signal);
+  },
+);

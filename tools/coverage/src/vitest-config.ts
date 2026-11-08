@@ -12,7 +12,7 @@ export function vitestCoverageConfig(config: string, projects: readonly string[]
     root,
     plugins: [coveragePlugin(root, run)],
     test: {
-      maxWorkers: 4,
+      maxWorkers: 2,
       fileParallelism: true,
       reporters: ['verbose'],
       setupFiles: [fileURLToPath(new URL('./vitest-setup.ts', import.meta.url))],

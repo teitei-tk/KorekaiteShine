@@ -1,0 +1,11 @@
+--- a/apps/interview/src/server/live-connection.ts
++++ b/apps/interview/src/server/live-connection.ts
+@@ -74,7 +74,7 @@
+   try {
+     const response = await fetcher('https://api.openai.com/v1/live/sessions', {
+       headers: { Upgrade: 'websocket', Authorization: `Bearer ${apiKey}` },
+-      redirect: 'manual',
++      redirect: 'error',
+       signal,
+     });
+     if (response.status !== 101 || !response.webSocket) {

@@ -1,0 +1,11 @@
+--- a/packages/api-contracts/events/live.tsp
++++ b/packages/api-contracts/events/live.tsp
+@@ -68,7 +68,7 @@
+ }
+ model LiveAudioEvent {
+   type: "session.output_audio.delta";
+-  @minLength(1) event_id?: string;
++  @minLength(1) event_id: string;
+   @maxLength(131072) @pattern("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$") delta: string;
+ }
+ model LiveUsage { @minValue(0) seconds: float64; }

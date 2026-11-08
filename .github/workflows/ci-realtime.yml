@@ -60,6 +60,15 @@ jobs:
         run: pnpm test:coverage
       - name: Require all four metrics to reach 100 percent
         run: pnpm check:coverage
+      - name: Show coverage suite failures
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for log in coverage/runs/*/*.log; do
+            echo "::group::$log"
+            tail -n 200 "$log"
+            echo "::endgroup::"
+          done
   result:
     name: Realtime result
     needs: [changes, realtime]

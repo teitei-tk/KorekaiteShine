@@ -45,6 +45,7 @@ export function InterviewPage() {
         lineHeight: 1.8,
       }}
     >
+      <a href="/practice">経験Markdownで面接を練習する</a>
       <h1>面接一覧</h1>
       <p>ローカル連携検証用の架空データです。</p>
       <button

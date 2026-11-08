@@ -4,7 +4,12 @@
   "type": "module",
   "exports": {
     ".": "./db/schema.ts",
-    "./connection": "./src/connection.ts"
+    "./connection": "./src/connection.ts",
+    "./jobs": "./db/schema/jobs.ts",
+    "./interviews": "./db/schema/interviews.ts",
+    "./materials": "./db/schema/materials.ts",
+    "./usage": "./db/schema/usage.ts",
+    "./audio-periods": "./src/audio-periods.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

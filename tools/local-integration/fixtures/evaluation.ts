@@ -1,3 +1,5 @@
+import { confirmFixtureKey } from './ai-bindings';
+import { diagnosticTransactionEffects } from '../../../apps/evaluation/src/diagnostics/transaction-effects';
 import { Temporal } from '@js-temporal/polyfill';
 import { readAckStopHistoryForTest } from './ack-stop';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
@@ -29,10 +31,15 @@ import {
 export class TopologyEvaluation extends WorkerEntrypoint<{
   DB: D1Database;
   APP_ENV: string;
+  OPENAI_API_KEY?: string;
   DIAGNOSTIC_QUEUE: Queue<JobNotification>;
   DIAGNOSTIC_DLQ: Queue<JobNotification>;
   EVALUATION_DLQ: Queue<JobNotification>;
 }> {
+  confirmFixtureKey(digest: string) {
+    return confirmFixtureKey(this.env, digest);
+  }
+
   async dispatchForTest(now: number, failJobId?: string) {
     if (
       this.env.APP_ENV !== 'test' ||
@@ -151,6 +158,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       },
       {
         db: primary,
+        effects: diagnosticTransactionEffects(primary),
         now: () => now ?? Temporal.Now.instant().epochMilliseconds,
         newId: () => crypto.randomUUID(),
         evaluate: async (jobId, attemptNumber) => {

@@ -1,3 +1,4 @@
+import { localProcessEnvironment } from './local-environment.ts';
 import { confirmHttpReady } from './readiness.ts';
 import { stopProcessGroup, runNodeCommand } from './process.ts';
 import { spawn } from 'node:child_process';
@@ -41,13 +42,15 @@ export async function buildProductionArtifacts(directory: string): Promise<strin
   for (const worker of workers) {
     await writeFile(
       join(project, `${worker}.production.ts`),
-      `export { default } from ${JSON.stringify(join(repositoryRoot, `apps/${worker}/src/worker.ts`))};\n`,
+      `export { default${worker === 'interview' ? ', InterviewObject' : ''} } from ${JSON.stringify(join(repositoryRoot, `apps/${worker}/src/worker.ts`))};\n`,
     );
   }
   const interview = {
     ...common,
     name: production.workers.interview,
     main: join(project, 'interview.production.ts'),
+    durable_objects: { bindings: [{ name: 'INTERVIEW_SESSION', class_name: 'InterviewObject' }] },
+    migrations: [{ tag: 'v1', new_sqlite_classes: ['InterviewObject'] }],
     queues: {
       producers: [{ binding: 'EVALUATION_QUEUE', queue: production.queues.evaluation.queue }],
     },
@@ -55,6 +58,11 @@ export async function buildProductionArtifacts(directory: string): Promise<strin
   const evaluation = {
     ...common,
     name: production.workers.evaluation,
+    vars: {
+      ...common.vars,
+      EVALUATION_QUEUE_NAME: production.queues.evaluation.queue,
+      EVALUATION_DLQ_NAME: production.queues.evaluation.dlq,
+    },
     main: join(project, 'evaluation.production.ts'),
     queues: {
       producers: [
@@ -104,7 +112,7 @@ export async function runProductionBuild(project: string): Promise<void> {
     args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
     cwd: project,
     env: {
-      ...process.env,
+      ...localProcessEnvironment(),
       APP_ENV: 'production',
       NO_COLOR: '1',
       VOID_INSPECTOR_PORT: 'false',
@@ -133,7 +141,7 @@ export async function startProductionPreview(
     {
       cwd: project,
       env: {
-        ...process.env,
+        ...localProcessEnvironment(),
         APP_ENV: 'production',
         NO_COLOR: '1',
         VOID_INSPECTOR_PORT: 'false',
@@ -185,7 +193,17 @@ interface WorkerConfig {
   name: string;
   workersDev: boolean;
   previewUrls: boolean;
-  env: Record<string, { type: string; name?: string; id?: string; value?: string }>;
+  env: Record<
+    string,
+    {
+      type: string;
+      name?: string;
+      id?: string;
+      value?: string;
+      worker?: string;
+      exportName?: string;
+    }
+  >;
   triggers?: { type: string; name: string; deadLetterQueue?: string }[];
 }
 
@@ -288,16 +306,30 @@ export async function verifyProductionArtifacts(
         throw new Error(`本番共有D1設定に不整合があります: ${environment}`);
       }
       const queueNames = new Set(Object.values(production.queues.evaluation));
-      for (const [, binding] of bindings) {
+      for (const [bindingName, binding] of bindings) {
         if (
           binding.type === 'queue' &&
           (binding.name === undefined || !queueNames.has(binding.name))
         ) {
           throw new Error(`本番以外のQueueが設定されています: ${environment}`);
         }
+        if (binding.type === 'durable-object') {
+          if (
+            environment !== 'interview' ||
+            bindingName !== 'INTERVIEW_SESSION' ||
+            binding.worker !== production.workers.interview ||
+            binding.exportName !== 'InterviewObject'
+          ) {
+            throw new Error(`本番の面接DO設定に不整合があります: ${environment}`);
+          }
+          continue;
+        }
         if (!['d1', 'text', 'queue', 'assets'].includes(binding.type)) {
           throw new Error(`未実装の本番入口に検証用bindingがあります: ${environment}`);
         }
+      }
+      if (environment === 'interview' && config.env.INTERVIEW_SESSION?.type !== 'durable-object') {
+        throw new Error('本番の面接DO設定がありません。');
       }
       for (const trigger of config.triggers ?? []) {
         if (
@@ -311,7 +343,21 @@ export async function verifyProductionArtifacts(
     }
   }
   const routes = (await readdir(join(project, 'src/routes'))).sort();
-  if (JSON.stringify(routes) !== JSON.stringify(['__root.tsx', 'api.interviews.ts', 'index.tsx'])) {
+  if (
+    JSON.stringify(routes) !==
+    JSON.stringify([
+      '__root.tsx',
+      'api.interview-history.ts',
+      'api.interviews.$interviewId.live.ts',
+      'api.interviews.$interviewId.retry.ts',
+      'api.interviews.$interviewId.ts',
+      'api.interviews.ts',
+      'api.local-session.ts',
+      'api.materials.analyze.ts',
+      'index.tsx',
+      'practice.tsx',
+    ])
+  ) {
     throw new Error('本番ルート走査対象に未確認のルートがあります。');
   }
   const tree = await readFile(join(project, 'src/routeTree.gen.ts'), 'utf8');

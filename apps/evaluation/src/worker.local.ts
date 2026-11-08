@@ -1,3 +1,4 @@
+import evaluation, { type EvaluationEnvironment } from './worker';
 import { Temporal } from '@js-temporal/polyfill';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { isQuarantinedDelivery } from './server/repositories/delivery-anomalies';
@@ -16,7 +17,7 @@ import type {
 } from '@cloudflare/workers-types';
 import { recoverJobs } from './application/recover-jobs';
 
-interface RecoveryEnvironment {
+interface RecoveryEnvironment extends EvaluationEnvironment {
   DB: D1Database;
   APP_ENV: string;
   DIAGNOSTIC_QUEUE_NAME: string;
@@ -36,6 +37,9 @@ export default {
   async queue(batch: MessageBatch<JobNotification>, env: RecoveryEnvironment): Promise<void> {
     if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test') {
       throw new Error('診断評価を利用できない環境です。');
+    }
+    if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) {
+      return evaluation.queue(batch, env);
     }
     for (const message of batch.messages) {
       const kind = batch.queue === env.DIAGNOSTIC_QUEUE_NAME ? 'normal' : 'dlq';

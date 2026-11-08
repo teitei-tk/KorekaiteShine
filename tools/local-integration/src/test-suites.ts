@@ -1,7 +1,15 @@
 const integrationGroups = [
   ['restart'],
   ['cli-recovery', 'isolation'],
-  ['end-to-end', 'formal-routing', 'dlq-restart', 'queue-retry'],
+  [
+    'end-to-end',
+    'formal-routing',
+    'interview-evaluation-worker',
+    'voice-interview',
+    'interview-http',
+    'dlq-restart',
+    'queue-retry',
+  ],
 ];
 const paths = (names: readonly string[]) => names.map((name) => `tests/${name}.test.ts`);
 const boundaryGroups = [
@@ -28,6 +36,7 @@ const boundaryGroups = [
     'lease',
     'http-contract',
     'schema',
+    'interview-schema',
     'notification-runtime',
     'readiness',
     'integration-run',

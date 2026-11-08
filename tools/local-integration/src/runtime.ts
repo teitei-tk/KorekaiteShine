@@ -1,3 +1,8 @@
+import {
+  localProcessEnvironment,
+  localAiEnvironment,
+  aiBindingNames,
+} from './local-environment.ts';
 import { confirmHttpReady } from './readiness.ts';
 import { startOwnedRuntime, connectLocalRuntime } from './runtime-owner.ts';
 import { stopProcessGroup, runNodeCommand } from './process.ts';
@@ -21,6 +26,13 @@ export interface LocalRuntime {
 }
 
 export interface LocalRuntimeOptions {
+  port?: number;
+  /** 面接DOの上流音声だけを独立test環境で代替する。 */
+  interviewVoiceMock?: boolean;
+  materialAnalysisMock?: boolean;
+  testAiBindings?: Record<string, string>;
+  /** 正式評価WorkerのAI呼出だけを独立test環境で代替する。 */
+  interviewEvaluationMock?: boolean;
   /** 受付・障害境界テストでだけ使用し、通常起動では自動初期化する。 */
   manualDiagnostics?: boolean;
   /** DO・送信境界のテストだけで評価の業務処理を保留する。 */
@@ -45,10 +57,14 @@ async function prepareRuntime(
   config: RuntimeConfig,
   options: LocalRuntimeOptions = {},
   signal?: AbortSignal,
+  aiBindings: Record<string, string> = {},
 ): Promise<string> {
   signal?.throwIfAborted();
   if (
-    (options.manualDiagnostics ||
+    (options.materialAnalysisMock ||
+      options.interviewVoiceMock ||
+      options.interviewEvaluationMock ||
+      options.manualDiagnostics ||
       options.probeOnlyEvaluation ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
@@ -84,6 +100,26 @@ async function prepareRuntime(
     }
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
+  if (options.testAiBindings) {
+    await writeFile(
+      join(project, 'src/routes/api.ai-binding-test.ts'),
+      `
+import { createFileRoute } from '@tanstack/react-router';
+import { env } from 'cloudflare:workers';
+import { confirmFixtureKey } from ${JSON.stringify(join(fixtures, 'ai-bindings.ts'))};
+export const Route = createFileRoute('/api/ai-binding-test')({ server: { handlers: { GET: async ({request}) => {
+  if (env.APP_ENV !== 'test') return new Response(null,{status:404});
+  const digest = new URL(request.url).searchParams.get('digest') ?? '';
+  return Response.json({ web: await confirmFixtureKey(env,digest), interview: await env.INTERVIEW.getByName('binding-test').confirmFixtureKey(digest), evaluation: await env.EVALUATION_PROBE.confirmFixtureKey(digest) });
+} } } });`,
+    );
+  }
+  if (options.materialAnalysisMock) {
+    await cp(
+      join(fixtures, 'api.materials.analyze.ts'),
+      join(project, 'src/routes/api.materials.analyze.ts'),
+    );
+  }
   await writeFile(
     join(project, 'src/routes/diagnostics.tsx'),
     `import { createFileRoute } from '@tanstack/react-router';
@@ -164,7 +200,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   const interviewEntry = join(project, 'interview.local.ts');
   await writeFile(
     interviewEntry,
-    `export { default${options.checkObjectProbe ? '' : ', CheckObject'} } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject${options.checkObjectProbe ? ', InspectableCheckObject as CheckObject' : ''} } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
+    `export { ${options.interviewVoiceMock ? 'MockInterviewObject as InterviewObject' : 'InterviewObject'} } from ${JSON.stringify(options.interviewVoiceMock ? join(fixtures, 'voice-interview.ts') : join(repositoryRoot, 'apps/interview/src/worker.ts'))};\nexport { default${options.checkObjectProbe ? '' : ', CheckObject'} } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject${options.checkObjectProbe ? ', InspectableCheckObject as CheckObject' : ''} } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
   );
   const diagnostics = config.queues.diagnostics;
   if (!diagnostics) {
@@ -172,6 +208,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
   }
   const interview = {
     ...common,
+    secrets: { required: aiBindingNames(aiBindings, 'interview') },
     vars: {
       ...common.vars,
       ...(options.checkObjectProbe
@@ -194,12 +231,14 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     durable_objects: {
       bindings: [
         { name: 'INTERVIEW', class_name: 'TopologyObject' },
+        { name: 'INTERVIEW_SESSION', class_name: 'InterviewObject' },
         { name: 'CHECK_OBJECT', class_name: 'CheckObject' },
       ],
     },
     migrations: [
       { tag: 'v1', new_sqlite_classes: ['TopologyObject'] },
       { tag: 'v2', new_sqlite_classes: ['CheckObject'] },
+      { tag: 'v3', new_sqlite_classes: ['InterviewObject'] },
     ],
   };
   const evaluationEntry = join(project, 'evaluation.local.ts');
@@ -207,7 +246,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     evaluationEntry,
     `import application from ${JSON.stringify(join(repositoryRoot, 'apps/evaluation/src/worker.local.ts'))};
 import probe, { recordQueueDelivery, holdBeforeEvaluationForTest } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
-${config.environment === 'test' ? `import { consumeFormalForTest } from ${JSON.stringify(join(fixtures, 'formal-evaluation.ts'))};` : ''}
+${config.environment === 'test' ? `import { consumeFormalForTest } from ${JSON.stringify(join(fixtures, options.interviewEvaluationMock ? 'interview-evaluation.ts' : 'formal-evaluation.ts'))};` : ''}
 ${options.stopAfterResultBeforeAck ? `import { stopAfterResultBeforeAckForTest } from ${JSON.stringify(join(fixtures, 'ack-stop.ts'))};` : ''}
 export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export default {
@@ -217,6 +256,7 @@ export default {
   );
   const evaluation = {
     ...common,
+    secrets: { required: aiBindingNames(aiBindings, 'evaluation') },
     name: config.workers.evaluation,
     vars: {
       ...common.vars,
@@ -237,25 +277,21 @@ export default {
         { binding: 'EVALUATION_DLQ', queue: config.queues.evaluation.dlq },
       ],
       consumers: [
-        ...(config.environment === 'test'
-          ? [
-              {
-                queue: config.queues.evaluation.queue,
-                max_batch_size: 1,
-                max_batch_timeout: 1,
-                max_retries: 3,
-                retry_delay: 30,
-                dead_letter_queue: config.queues.evaluation.dlq,
-              },
-              {
-                queue: config.queues.evaluation.dlq,
-                max_batch_size: 1,
-                max_batch_timeout: 1,
-                max_retries: 3,
-                retry_delay: 30,
-              },
-            ]
-          : []),
+        {
+          queue: config.queues.evaluation.queue,
+          max_batch_size: 1,
+          max_batch_timeout: 1,
+          max_retries: 3,
+          retry_delay: 30,
+          dead_letter_queue: config.queues.evaluation.dlq,
+        },
+        {
+          queue: config.queues.evaluation.dlq,
+          max_batch_size: 1,
+          max_batch_timeout: 1,
+          max_retries: 3,
+          retry_delay: 30,
+        },
         {
           queue: diagnostics.queue,
           max_batch_size: 1,
@@ -277,6 +313,7 @@ export default {
   };
   const web = {
     ...common,
+    secrets: { required: aiBindingNames(aiBindings, 'web') },
     name: config.workers.web,
     queues: { producers: [{ binding: 'EVALUATION_QUEUE', queue: config.queues.evaluation.queue }] },
     services: [
@@ -289,6 +326,7 @@ export default {
     durable_objects: {
       bindings: [
         { name: 'INTERVIEW', class_name: 'TopologyObject', script_name: config.doOwner },
+        { name: 'INTERVIEW_SESSION', class_name: 'InterviewObject', script_name: config.doOwner },
         { name: 'CHECK_OBJECT', class_name: 'CheckObject', script_name: config.doOwner },
       ],
     },
@@ -315,9 +353,10 @@ export default defineConfig({ cacheDir: ${JSON.stringify(join(config.artifactDir
   return project;
 }
 
-function runtimeEnvironment(config: RuntimeConfig) {
+function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, string> = {}) {
   return {
-    ...process.env,
+    ...localProcessEnvironment(),
+    ...aiBindings,
     APP_ENV: config.environment,
     NO_COLOR: '1',
     VOID_INSPECTOR_PORT: 'false',
@@ -343,7 +382,13 @@ async function startUnlockedRuntime(
   options: LocalRuntimeOptions = {},
   signal?: AbortSignal,
 ): Promise<LocalRuntime> {
-  const project = await prepareRuntime(config, options, signal);
+  const aiBindings = localAiEnvironment(
+    config.environment,
+    mode,
+    process.env,
+    options.testAiBindings,
+  );
+  const project = await prepareRuntime(config, options, signal, aiBindings);
   signal?.throwIfAborted();
   const child = spawn(
     process.execPath,
@@ -353,11 +398,12 @@ async function startUnlockedRuntime(
       '--host',
       '127.0.0.1',
       '--port',
-      '0',
+      String(options.port ?? 0),
+      '--strictPort',
     ],
     {
       cwd: project,
-      env: runtimeEnvironment(config),
+      env: runtimeEnvironment(config, aiBindings),
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     },
@@ -446,7 +492,10 @@ export async function startRuntimeInProcess(
   signal?.throwIfAborted();
   if (
     mode === 'preview' &&
-    (options.manualDiagnostics ||
+    (options.materialAnalysisMock ||
+      options.interviewVoiceMock ||
+      options.interviewEvaluationMock ||
+      options.manualDiagnostics ||
       options.probeOnlyEvaluation ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||

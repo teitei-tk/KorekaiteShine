@@ -10,7 +10,7 @@ export async function consumeDlq(
   deps: EvaluationDependencies,
 ): Promise<DeliveryDecision> {
   const now = deps.now();
-  if (await recordDlqReceipt(deps.db, notification.jobId, context, now)) {
+  if (await recordDlqReceipt(deps.db, notification.jobId, context, now, deps.effects)) {
     return { action: 'ack' };
   }
   await ensureRecoveryNotification(
@@ -20,7 +20,7 @@ export async function consumeDlq(
     deps.newId(),
     now,
   );
-  return (await recordDlqReceipt(deps.db, notification.jobId, context, now))
+  return (await recordDlqReceipt(deps.db, notification.jobId, context, now, deps.effects))
     ? { action: 'ack' }
     : { action: 'retry', delaySeconds: 30 };
 }

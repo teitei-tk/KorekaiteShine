@@ -1,6 +1,6 @@
 import { Temporal } from '@js-temporal/polyfill';
 import { and, asc, eq, isNull, lte, notExists, or } from 'void/db';
-import { jobs, jobOutbox, deletedJobs } from '@korekaite/database';
+import { jobs, jobOutbox, deletedJobs } from '@korekaite/database/jobs';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import type { D1Database } from '@cloudflare/workers-types';
 

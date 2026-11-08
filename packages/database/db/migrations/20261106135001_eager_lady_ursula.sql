@@ -1,0 +1,1 @@
+ALTER TABLE `interviews` ADD `stream_generation` integer;

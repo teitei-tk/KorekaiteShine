@@ -1,6 +1,6 @@
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import type { createPrimaryDb } from '@korekaite/database/connection';
-import { jobs, deletedJobs } from '@korekaite/database';
+import { jobs, deletedJobs } from '@korekaite/database/jobs';
 import { eq } from 'void/db';
 
 type DeliveryClassification =

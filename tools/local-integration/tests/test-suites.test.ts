@@ -4,7 +4,9 @@ import { selectTestFiles } from '../src/test-suites.ts';
 test('PR結合から長時間だけを除き、全結合と排他的に対応させる', () => {
   const short = selectTestFiles('integration-pr');
   const long = selectTestFiles('realtime');
-  expect(short).toHaveLength(7);
+  expect(short).toHaveLength(10);
+  expect(short).toContain('tests/voice-interview.test.ts');
+  expect(short).toContain('tests/interview-evaluation-worker.test.ts');
   expect(long).toEqual(['tests/realtime-retries.test.ts']);
   expect(short.filter((file) => long.includes(file)).length).toBe(0);
   expect(new Set(selectTestFiles('integration-all'))).toEqual(new Set([...short, ...long]));

@@ -1,5 +1,6 @@
+import type { JobTransactionEffects } from './transaction-effects';
 import { runnableJobStates, terminalJobStates } from '../../domain/job-state';
-import type { EvaluationFailure } from '../../domain/evaluation-result';
+import type { EvaluationFailure, EvaluationValue } from '../../domain/evaluation-result';
 import { maxEvaluationAttempts, retryDelayMs } from '../../domain/retry-policy';
 import { and, eq, exists, gt, inArray, isNull, lt, lte, ne, notExists, or, sql } from 'void/db';
 import {
@@ -7,9 +8,8 @@ import {
   jobOutbox,
   executionSlots,
   jobAttempts,
-  diagnosticChecks,
   deletedJobs,
-} from '@korekaite/database';
+} from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { executionTiming } from '../../domain/lease';
 
@@ -146,12 +146,14 @@ function ownedExecution(db: Database, lease: ExecutionLease, now: number) {
 export async function completeExecution(
   db: Database,
   lease: ExecutionLease,
-  result: { summary: string },
+  result: EvaluationValue,
   now: number,
+  effects?: JobTransactionEffects,
 ): Promise<boolean> {
   const owned = ownedExecution(db, lease, now);
   const ownedJob = db.select().from(jobs).where(owned);
-  const [, , completed] = await db.batch([
+  const extra = effects?.completed?.(exists(ownedJob), lease.jobId, now) ?? [];
+  const results = await db.batch([
     db
       .update(jobAttempts)
       .set({ finishedAt: now, resultJson: JSON.stringify(result) })
@@ -163,10 +165,7 @@ export async function completeExecution(
           exists(ownedJob),
         ),
       ),
-    db
-      .update(diagnosticChecks)
-      .set({ consumerCompletion: 'passed' })
-      .where(and(eq(diagnosticChecks.jobId, lease.jobId), exists(ownedJob))),
+    ...extra,
     db
       .update(jobs)
       .set({
@@ -200,6 +199,7 @@ export async function completeExecution(
       ),
     ),
   ]);
+  const completed = results[1 + extra.length] as { jobId: string }[];
   return completed.length === 1;
 }
 

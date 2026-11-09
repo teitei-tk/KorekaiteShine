@@ -30,7 +30,7 @@ interface DatabaseOptions {
 async function executeDatabaseCommand(
   config: RuntimeConfig,
   args: DatabaseCommand,
-  options: DatabaseOptions = {},
+  options: DatabaseOptions,
 ): Promise<void> {
   options.signal?.throwIfAborted();
   if (config.environment === 'production' || !config.stateDirectory) {

@@ -10,11 +10,12 @@ const markdown = new MarkdownIt();
 type Token = ReturnType<typeof markdown.parse>[number];
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-function plainText(tokens: Token[] | null | undefined = []): string {
-  return (tokens ?? [])
+// 固定版MarkdownItはinlineとimageにchildren配列を生成する（空の場合も[]）。
+function plainText(tokens: Token[]): string {
+  return tokens
     .map((token) => {
       if (token.type === 'image') {
-        return plainText(token.children);
+        return plainText(token.children!);
       }
       if (token.type === 'text' || token.type === 'code_inline') {
         return token.content;
@@ -40,10 +41,10 @@ function parse(source: string) {
       line = token.map[0] + 1;
     }
     if (token.type === 'heading_open') {
-      anchors.add(slugger.slug(plainText(tokens[index + 1]?.children)));
+      anchors.add(slugger.slug(plainText(tokens[index + 1]!.children!)));
     }
     if (token.type === 'inline') {
-      for (const child of token.children ?? []) {
+      for (const child of token.children!) {
         const url =
           child.type === 'link_open'
             ? child.attrGet('href')
@@ -275,7 +276,7 @@ export async function checkCommands(root: string, files: string[]) {
         line = token.map[0] + 1;
       }
       if (token.type === 'inline') {
-        for (const child of token.children ?? []) {
+        for (const child of token.children!) {
           if (child.type === 'code_inline') {
             commands.push({ text: child.content, line });
           }
@@ -349,12 +350,12 @@ export async function checkCommands(root: string, files: string[]) {
   return errors;
 }
 
-async function main() {
+export async function main(root = repository) {
   // Git管理対象と未追跡ファイルを検査し、依存・生成物はGitの除外設定に従う。
   const files = [
     ...new Set(
       execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
-        cwd: repository,
+        cwd: root,
         encoding: 'utf8',
       })
         .split('\0')
@@ -364,7 +365,7 @@ async function main() {
   const existing = [];
   for (const file of files) {
     try {
-      await stat(path.join(repository, file));
+      await stat(path.join(root, file));
       existing.push(file);
     } catch (error) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
@@ -372,18 +373,18 @@ async function main() {
       }
     }
   }
-  const config = JSON.parse(await readFile(path.join(repository, '.markdownlint.json'), 'utf8'));
-  const result = await lint({ files: existing.map((file) => path.join(repository, file)), config });
+  const config = JSON.parse(await readFile(path.join(root, '.markdownlint.json'), 'utf8'));
+  const result = await lint({ files: existing.map((file) => path.join(root, file)), config });
   const formatting = Object.entries(result)
     .flatMap(([file, errors]) =>
       errors.map(
         (error) =>
-          `${path.relative(repository, file)}:${error.lineNumber}: ${error.ruleNames[0]} ${error.ruleDescription}${error.errorDetail ? ` (${error.errorDetail})` : ''}`,
+          `${path.relative(root, file)}:${error.lineNumber}: ${error.ruleNames[0]} ${error.ruleDescription}${error.errorDetail ? ` (${error.errorDetail})` : ''}`,
       ),
     )
     .join('\n');
-  const links = await checkLinks(repository, existing);
-  const commands = await checkCommands(repository, existing);
+  const links = await checkLinks(root, existing);
+  const commands = await checkCommands(root, existing);
   if (formatting) {
     console.error(formatting);
   }

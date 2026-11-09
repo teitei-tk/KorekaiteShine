@@ -35,10 +35,8 @@ export function DiagnosticPage() {
         setAccepted(null);
         setResult(null);
       }
-      if (!run.current) {
-        return;
-      }
-      setAccepted(await run.current.start());
+      // 新規作成の失敗はcatchへ進み、再送ボタンはrunがある場合だけ有効になる。
+      setAccepted(await run.current!.start());
     } catch (cause) {
       if (cause instanceof DiagnosticValidationError && cause.code === 'VALIDATION_ERROR') {
         const locations = cause.details.map(

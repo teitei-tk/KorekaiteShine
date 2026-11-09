@@ -124,3 +124,70 @@ test('長時間検査SummaryはPR headと実行commitを区別する', async () 
   expect(output).toContain(`PR head: ${'a'.repeat(40)}`);
   expect(output).toContain(`実行commit: ${'b'.repeat(40)}`);
 });
+
+test('PR比較のSHAが欠落・不正なら長時間検査を省略しない', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('../src/ci-selection.ts', import.meta.url))],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, EVENT_NAME: 'pull_request', BASE_SHA: undefined, HEAD_SHA: undefined },
+    },
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.stdout).toContain('required=true');
+});
+
+test('対象外・判定失敗・不正な判定結果を終了コードとSummaryへ反映する', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const { mkdtempSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const root = mkdtempSync(join(tmpdir(), 'ci-summary-'));
+  try {
+    for (const [detection, required, result, code] of [
+      ['success', 'false', 'skipped', 0],
+      ['failure', undefined, undefined, 1],
+      ['success', 'invalid', undefined, 1],
+    ] as const) {
+      const summary = join(root, 'summary.md');
+      const child = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL('../src/ci-selection.ts', import.meta.url)), 'result'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DETECTION_RESULT: detection,
+            REQUIRED: required,
+            TEST_RESULT: result,
+            HEAD_SHA: undefined,
+            GITHUB_SHA: undefined,
+            GITHUB_STEP_SUMMARY: summary,
+          },
+        },
+      );
+      expect(child.status, child.stderr).toBe(code);
+      expect(child.stdout).toContain(code === 0 ? '対象外（文書のみ' : '結果なし');
+      expect(readFileSync(summary, 'utf8')).toContain(child.stdout.trim());
+      expect(child.stdout).toContain('実行commit: 不明');
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('変更判定CLIの未知の引数を正常終了にしない', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const child = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('../src/ci-selection.ts', import.meta.url)), 'invalid'],
+    { encoding: 'utf8' },
+  );
+  expect(child.status).toBe(1);
+  expect(child.stderr).toContain('引数が不明');
+});

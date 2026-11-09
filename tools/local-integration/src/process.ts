@@ -35,7 +35,8 @@ export async function runNodeCommand(input: {
     child.once('exit', resolve);
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let onAbort = () => {};
+  // Promiseのexecutorで同期的に設定し、finallyで同じリスナーを解除する。
+  let onAbort!: () => void;
   try {
     const code = await Promise.race([
       exited,

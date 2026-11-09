@@ -6,6 +6,10 @@ const integrationGroups = [
 const paths = (names: readonly string[]) => names.map((name) => `tests/${name}.test.ts`);
 const boundaryGroups = [
   [
+    'build-audit',
+    'http-contract-errors',
+    'process-command-boundaries',
+    'runtime-errors',
     'check-object',
     'recovery',
     'check-object-guards',
@@ -15,6 +19,10 @@ const boundaryGroups = [
     'run-test-suite',
   ],
   [
+    'cli-boundaries',
+    'integration-failures',
+    'process-errors',
+    'runtime-owner-errors',
     'topology',
     'execution',
     'dispatch-notifications',
@@ -24,6 +32,10 @@ const boundaryGroups = [
     'evidence',
   ],
   [
+    'database-errors',
+    'isolation-errors',
+    'production-audit-errors',
+    'runtime-owner-host',
     'delivery-anomalies',
     'lease',
     'http-contract',
@@ -34,6 +46,10 @@ const boundaryGroups = [
     'scheduled-interval',
   ],
   [
+    'development-snapshot',
+    'prepare-integration-errors',
+    'production-preview-errors',
+    'versions',
     'dlq',
     'diagnostics',
     'production-artifacts',

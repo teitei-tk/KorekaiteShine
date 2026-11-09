@@ -1,5 +1,49 @@
 import { expect, it } from 'vitest';
 import { runVersion } from './run-version.ts';
+
+it('比較応答にstatusがなければ包含確認成功として扱わない', () => {
+  const f = fixture();
+  expect(() =>
+    runVersion('20', expected, (path) => (path.includes('/compare/') ? '{}' : f.read(path))),
+  ).toThrow('Invalid comparison');
+});
+
+it('元CIの対象もheadも不明ならSHAを表示せず対象不明とする', () => {
+  const f = fixture();
+  const result = runVersion('20', undefined, (path) => {
+    const body = JSON.parse(f.read(path));
+    if (path.endsWith('/10/attempts/2')) {
+      body.pull_requests = [];
+    }
+    return JSON.stringify(body);
+  });
+  expect(result.output).toContain('対象SHA: 元CIの記録から特定できません');
+  expect(result.output).not.toContain('元CIのhead SHA');
+});
+
+it('表示名と元CIの試行番号が異なれば対象を拒否する', () => {
+  const f = fixture();
+  expect(() =>
+    runVersion('20', expected, (path) => {
+      const body = JSON.parse(f.read(path));
+      if (path.endsWith('/10/attempts/2')) {
+        body.run_attempt = 3;
+      }
+      return JSON.stringify(body);
+    }),
+  ).toThrow('Invalid source');
+});
+
+it('レビュー実行の表示名が欠落していれば元CIを推測しない', () => {
+  const f = fixture();
+  expect(() =>
+    runVersion('20', expected, (path) => {
+      const body = JSON.parse(f.read(path));
+      delete body.display_title;
+      return JSON.stringify(body);
+    }),
+  ).toThrow('Invalid source');
+});
 const code = 'a'.repeat(40),
   head = 'b'.repeat(40),
   base = 'c'.repeat(40),

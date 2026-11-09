@@ -3,6 +3,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { collectFromGit, changedLines } from './material.ts';
+
+it('diffヘッダーやhunk外の行を投稿可能な変更行として数えない', () => {
+  expect(
+    changedLines('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-old\n+new'),
+  ).toEqual([1]);
+});
 it('追加行だけを投稿候補にする', () =>
   expect(changedLines('@@ -1,2 +1,3 @@\n same\n+new\n-old\n+newer')).toEqual([2, 3]));
 it('原文への参照と全差分行を準備し独自分割を作らない', () => {

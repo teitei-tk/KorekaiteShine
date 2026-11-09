@@ -6,6 +6,15 @@ import { completedOutcome } from './check-status.ts';
 import type { ReviewRun } from './check-status.ts';
 import type { Api } from './github.ts';
 
+it('失敗ジョブを特定できなくても元実行の失敗をworkflowとして返す', async () => {
+  const read: Api = async <T>() => ({ jobs: [{ name: 'generate', conclusion: null }] }) as T;
+  expect(await completedOutcome(read, { ...run, conclusion: 'failure' })).toEqual({
+    conclusion: 'failure',
+    target: 'workflow',
+    reason: 'EXECUTION_FAILED',
+  });
+});
+
 const run: ReviewRun = {
   id: 20,
   run_attempt: 1,

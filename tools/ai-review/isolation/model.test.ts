@@ -47,6 +47,29 @@ it('Schema指定とAPI出力、利用量が揃った時だけ成功する', () =
     total_tokens: 12,
   });
 });
+
+it('本文を持たない補助イベントや推論項目を最終出力と混同しない', () => {
+  const event = JSON.parse(response.body.slice(5));
+  event.response.output.unshift({ type: 'reasoning' });
+  const res = { ...response, body: 'data: {}\n' + 'data: ' + JSON.stringify(event) + '\n' };
+  expect(verifyModelEvidence(request, res, '{"status":"ok"}')).toEqual({
+    input_tokens: 10,
+    output_tokens: 2,
+    total_tokens: 12,
+  });
+});
+
+it('最終出力項目にtextがなければ成功扱いしない', () => {
+  const event = JSON.parse(response.body.slice(5));
+  delete event.response.output[0].content[0].text;
+  expect(() =>
+    verifyModelEvidence(
+      request,
+      { ...response, body: 'data: ' + JSON.stringify(event) },
+      '{"status":"ok"}',
+    ),
+  ).toThrow();
+});
 it.each([
   [{ body: { model: 'other' } }, response, '{"status":"ok"}'],
   [request, { ...response, status: 403 }, '{"status":"ok"}'],

@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { authenticate } from '../wif.ts';
-import { wifProxyArgs } from './wif.js';
+import { wifProxyArgs } from './wif.ts';
 import {
   identity,
   alive,
@@ -21,7 +21,7 @@ import {
   configHash,
   configureProxy,
   verifyProxyIsolation,
-} from './lifecycle.js';
+} from './lifecycle.ts';
 
 const home = '/home/ai-review/.codex';
 const directory = '/opt/ai-review-probe/private/model';

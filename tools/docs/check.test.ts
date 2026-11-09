@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, onTestFinished, test } from 'vitest';
@@ -21,6 +21,51 @@ test('日本語・装飾・コード・重複見出しと参照形式リンク�
     '用語 集.md': '# **判断**の`根拠`\n\n## 判断の根拠\n',
   });
   expect(await checkLinks(root, ['README.md', '用語 集.md'])).toEqual([]);
+});
+
+test('画像の代替テキストと改行を含む見出しのアンカーを解決する', async () => {
+  const root = await fixture({
+    'README.md':
+      '# ![図 **説明**](image.svg)\n\n[画像見出し](#図-説明)\n\n一行目\n二行目\n===\n\n[改行](#一行目-二行目)\n\n三行目  \n四行目\n===\n\n[強制改行](#三行目-四行目)\n',
+    'image.svg': '<svg/>',
+  });
+  expect(await checkLinks(root, ['README.md'])).toEqual([]);
+});
+
+test('空の見出しや代替テキストが空の画像も例外なく検査する', async () => {
+  const root = await fixture({
+    'README.md': '#\n\n## ![](image.svg)\n\n[画像](image.svg)\n',
+    'image.svg': '<svg/>',
+  });
+  expect(await checkLinks(root, ['README.md'])).toEqual([]);
+});
+
+test('HTTP以外の未対応プロトコルをローカルファイルとして検査しない', async () => {
+  const root = await fixture({ 'README.md': '# 案内\n\n[FTP](ftp://example.invalid/file)\n' });
+  expect(await checkLinks(root, ['README.md'])).toEqual([
+    'README.md:3: 未対応のリンク形式: ftp://example.invalid/file',
+  ]);
+});
+
+test('先頭スラッシュのリンクは文書の階層にかかわらずリポジトリ基準で解決する', async () => {
+  const root = await fixture({
+    'README.md': '# 案内\n',
+    'docs/guide.md': '# ガイド\n\n[案内](/README.md#案内)\n',
+  });
+  expect(await checkLinks(root, ['docs/guide.md'])).toEqual([]);
+});
+
+test('ディレクトリの存在は確認するがディレクトリと非Markdownの見出しは拒否する', async () => {
+  const root = await fixture({
+    'README.md':
+      '# 案内\n\n[資料](docs)\n\n[資料の見出し](docs#見出し)\n\n[画像の見出し](image.svg#見出し)\n',
+    'docs/guide.md': '# ガイド\n',
+    'image.svg': '<svg/>',
+  });
+  expect(await checkLinks(root, ['README.md'])).toEqual([
+    `README.md:5: ディレクトリへの見出しリンクは未対応: docs#${encodeURIComponent('見出し')}`,
+    `README.md:7: Markdown以外の見出しリンクは未対応: image.svg#${encodeURIComponent('見出し')}`,
+  ]);
 });
 
 test('同一文書アンカーとSetext見出し、画像を確認する', async () => {
@@ -55,6 +100,15 @@ test('リポジトリ外への相対パスを拒否する', async () => {
   const errors = await checkLinks(root, ['README.md']);
   expect(errors).toHaveLength(1);
   expect(errors[0]).toMatch(/リポジトリ外/);
+});
+
+test('リポジトリ内のリンク名でも外部ファイルを指すシンボリックリンクは拒否する', async () => {
+  const outside = await fixture({ 'external.md': '# 外部\n' });
+  const root = await fixture({ 'README.md': '# 案内\n\n[外部](linked.md)\n' });
+  await symlink(path.join(outside, 'external.md'), path.join(root, 'linked.md'));
+  expect(await checkLinks(root, ['README.md'])).toEqual([
+    'README.md:3: リポジトリ外を指すシンボリックリンク: linked.md',
+  ]);
 });
 
 test('表内のリンクを検査し、欠落箇所の行を報告する', async () => {
@@ -108,6 +162,22 @@ test('表内のコマンド欠落を報告し、Objectの継承プロパティ�
 test('リポジトリ外のパッケージ参照を拒否する', async () => {
   const root = await fixture({ 'README.md': '`pnpm --dir ../outside test`' });
   expect((await checkCommands(root, ['README.md']))[0]).toMatch(/リポジトリ外/);
+});
+
+test('外部package.jsonへのシンボリックリンクをコマンドの根拠として使わない', async () => {
+  const outside = await fixture({ 'package.json': '{"scripts":{"test":"vitest"}}' });
+  const root = await fixture({ 'README.md': '# 案内\n\n`pnpm test`\n' });
+  await symlink(path.join(outside, 'package.json'), path.join(root, 'package.json'));
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:3: リポジトリ外のpackage.json',
+  ]);
+});
+
+test('package.jsonの不正JSONをスクリプト欠落と区別して報告する', async () => {
+  const root = await fixture({ 'README.md': '# 案内\n\n`pnpm test`\n', 'package.json': '{' });
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:3: package.jsonのJSONが不正: package.json',
+  ]);
 });
 
 test('未対応オプションと引用付きパスをスクリプト欠落として誤検知しない', async () => {

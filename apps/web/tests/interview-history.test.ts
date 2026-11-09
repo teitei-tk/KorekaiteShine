@@ -69,6 +69,11 @@ test('本人の履歴だけを新しい順に返し、同時刻の面接もカ�
         })
       ).status,
     ).toBe(403);
+    const request = new Request('http://localhost/api/interview-history');
+    database.sqlite.exec('UPDATE interviews SET created_at=-1');
+    expect((await interviewHistoryRequest(request, deps)).status).toBe(503);
+    database.sqlite.exec('DROP TABLE interviews');
+    expect((await interviewHistoryRequest(request, deps)).status).toBe(503);
   } finally {
     database.close();
   }

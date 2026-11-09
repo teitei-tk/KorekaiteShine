@@ -1,4 +1,5 @@
 import {
+  coverageEnvironment,
   localProcessEnvironment,
   localAiEnvironment,
   aiBindingNames,
@@ -358,6 +359,7 @@ export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(
 function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, string> = {}) {
   return {
     ...localProcessEnvironment(),
+    ...coverageEnvironment(config.environment),
     ...aiBindings,
     APP_ENV: config.environment,
     NO_COLOR: '1',

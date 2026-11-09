@@ -13,6 +13,8 @@ export function vitestCoverageConfig(config: string, projects: readonly string[]
     plugins: [coveragePlugin(root, run)],
     test: {
       maxWorkers: 2,
+      // CLI の子プロセス起動と同期計測を含む検査にも実行時間を確保する。
+      testTimeout: 30_000,
       fileParallelism: true,
       reporters: ['verbose'],
       setupFiles: [fileURLToPath(new URL('./vitest-setup.ts', import.meta.url))],

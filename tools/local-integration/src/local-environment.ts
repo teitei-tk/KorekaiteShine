@@ -32,6 +32,11 @@ export function localProcessEnvironment(source: NodeJS.ProcessEnv = process.env)
     'XDG_DATA_HOME',
   ]);
 }
+export function coverageEnvironment(environment: string) {
+  return environment === 'test' && process.env.KOREKAITE_COVERAGE_RUN
+    ? pick(process.env, ['KOREKAITE_COVERAGE_RUN', 'KOREKAITE_COVERAGE_SUITE'])
+    : {};
+}
 export function localAiEnvironment(
   environment: string,
   mode: string,

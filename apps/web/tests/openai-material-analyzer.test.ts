@@ -95,6 +95,7 @@ test('推論項目を飛ばして完成メッセージを読み、失敗・拒�
         output: [{ ...message, content: [{ type: 'output_text', text: '不正JSON' }] }],
       },
     ],
+    [200, { ...completed, output: [{ ...message, role: 'user' }] }],
     [200, { ...completed, output: [message, message] }],
   ] as const) {
     const fetcher = vi.fn<typeof fetch>(async () => Response.json(body, { status }));

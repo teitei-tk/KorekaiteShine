@@ -115,3 +115,31 @@ test('音声は接続確認済みの現世代だけが期限内に送信でき�
   const ending = transitionInterview(active, { type: 'finish' }, 2_000);
   expect(canSendAudio(ending, ending.generation, 2_000)).toBe(false);
 });
+
+test('状態に合わない通知を無視し、開始前の制御操作を拒否する', () => {
+  const state = createInterviewState('a');
+  expect(transitionInterview(state, { type: 'disconnected', generation: 0 }, 1)).toBe(state);
+  expect(transitionInterview(state, { type: 'closed', generation: 0 }, 1)).toBe(state);
+  expect(transitionInterview(state, { type: 'start_failed', generation: 0 }, 1)).toBe(state);
+  for (const action of [
+    { type: 'ready', generation: 0 },
+    { type: 'pause' },
+    { type: 'takeover' },
+  ] as const) {
+    expect(() => transitionInterview(state, action, 1)).toThrow();
+  }
+  const connecting = transitionInterview(state, { type: 'connect' }, 0);
+  expect(transitionInterview(connecting, { type: 'takeover' }, 200).deadline).toBe(30000);
+  const ending = transitionInterview(connecting, { type: 'finish' }, 1);
+  expect(transitionInterview(ending, { type: 'tick' }, 2)).toBe(ending);
+  const ended = transitionInterview(ending, { type: 'persisted' }, 2);
+  expect(transitionInterview(ended, { type: 'persisted' }, 3)).toBe(ended);
+});
+
+test('期限が未設定の保存状態でも再接続と引き継ぎに新しい期限を設定する', () => {
+  const state = { ...createInterviewState('a'), status: 'connecting' as const, generation: 1 };
+  expect(transitionInterview(state, { type: 'disconnected', generation: 1 }, 100).deadline).toBe(
+    60100,
+  );
+  expect(transitionInterview(state, { type: 'takeover' }, 100).deadline).toBe(30100);
+});

@@ -1,66 +1,7 @@
 import { createInterviewEvaluator } from '../src/server/openai-interview-evaluator.ts';
 import { expect, test, vi } from 'vitest';
-import type { EvaluationSnapshot } from '@korekaite/database';
+import { result, snapshot } from './fixtures/evaluation';
 import { evaluateInterview } from '../src/application/evaluate-interview.ts';
-
-export const snapshot: EvaluationSnapshot = {
-  schemaVersion: 1,
-  interview: {
-    interviewId: 'interview',
-    materialHash: 'hash',
-    themeTitle: '構成',
-    themeHeading: '判断',
-    themeExcerpt: '架空の経験',
-    background: '',
-    activeMs: 1000,
-  },
-  fragments: [
-    {
-      fragmentId: 'f1',
-      interviewId: 'interview',
-      sequence: 1,
-      generation: 1,
-      sourceEventId: 'e1',
-      speaker: 'user',
-      content: '制約を比較しました。',
-      sourceStartMs: 0,
-      sourceEndMs: 1000,
-      receivedAt: 10,
-    },
-  ],
-  playback: [],
-  transcriptIncomplete: false,
-  evaluation: {
-    model: 'test-model',
-    promptVersion: 'v1',
-    rubricVersion: 'v1',
-    instructions: '根拠だけで評価する。',
-    rubric: '架空の評価基準',
-  },
-};
-export function result() {
-  const axis = { status: 'unconfirmed', score: null, reason: '未質問です。', evidence: [] };
-  return {
-    summary: '制約について説明した。',
-    axes: {
-      problem: {
-        status: 'scored',
-        score: 2,
-        reason: '比較内容の説明が不足している。',
-        evidence: [{ source: 'transcript', fragmentIds: ['f1'], quote: '制約を比較しました。' }],
-      },
-      alternatives: axis,
-      reasoning: axis,
-      action: axis,
-      learning: axis,
-    },
-    strengths: [],
-    gaps: [],
-    unconfirmed: [],
-    practiceQuestions: [],
-    consistency: [],
-  };
-}
 
 test('保存された原文に基づく五軸評価を返し、捏造引用と状態・点数の不整合を拒否する', async () => {
   const signal = new AbortController().signal;
@@ -187,4 +128,156 @@ test('利用者の回答がない場合はAIを呼ばず、点数なしの五軸
     }
   }
   expect(generate).not.toHaveBeenCalled();
+});
+
+test('外部応答の形式・件数・役割・本文を確認してから評価を受け取る', async () => {
+  const message = {
+    type: 'message',
+    role: 'assistant',
+    status: 'completed',
+    content: [{ type: 'output_text', text: '{}' }],
+  };
+  const responses = [
+    null,
+    [],
+    'invalid',
+    {},
+    { status: 'completed', error: { message: 'failure' } },
+    { status: 'completed', output: null },
+    ...[
+      [null, 1, { type: 'reasoning' }],
+      [message, message],
+      [{ ...message, role: 'user' }],
+      [{ ...message, status: 'incomplete' }],
+      [{ ...message, content: null }],
+      [{ ...message, content: [] }],
+      ...[
+        null,
+        [],
+        1,
+        { type: 'refusal' },
+        { type: 'output_text' },
+        { type: 'output_text', text: 'invalid json' },
+      ].map((content) => [{ ...message, content: [content] }]),
+    ].map((output) => ({ status: 'completed', output })),
+  ];
+  for (const response of responses) {
+    const generate = createInterviewEvaluator({
+      apiKey: 'fixture',
+      fetcher: async () => Response.json(response),
+    });
+    expect(await evaluateInterview(snapshot, new AbortController().signal, generate)).toEqual({
+      ok: false,
+      error: { code: 'INVALID_AI_RESULT', retryable: true },
+    });
+  }
+});
+
+test('無効なAPI設定では送信を止め、HTTPエラーから再試行の可否を判定する', async () => {
+  const signal = new AbortController().signal;
+  for (const [apiKey, model] of [
+    [' ', 'model'],
+    ['fixture', ' '],
+  ]) {
+    const generate = createInterviewEvaluator({ apiKey });
+    expect(
+      await evaluateInterview(
+        { ...snapshot, evaluation: { ...snapshot.evaluation, model } },
+        signal,
+        generate,
+      ),
+    ).toEqual({
+      ok: false,
+      error: { code: 'AI_CONFIGURATION_INVALID', retryable: false },
+    });
+  }
+  for (const status of [408, 503]) {
+    const generate = createInterviewEvaluator({
+      apiKey: 'fixture',
+      fetcher: async () => new Response(null, { status }),
+    });
+    expect(await evaluateInterview(snapshot, signal, generate)).toEqual({
+      ok: false,
+      error: { code: 'AI_UNAVAILABLE', retryable: true },
+    });
+  }
+  for (const value of ['Sat, 31 Feb 2024 00:00:00 GMT', '999999999999999999']) {
+    const generate = createInterviewEvaluator({
+      apiKey: 'fixture',
+      fetcher: async () => new Response(null, { status: 429, headers: { 'Retry-After': value } }),
+    });
+    expect(await evaluateInterview(snapshot, signal, generate)).toEqual({
+      ok: false,
+      error: { code: 'AI_RETRY_AFTER_INVALID', retryable: false },
+    });
+  }
+});
+
+test('評価開始前と実行中の中断を検知する', async () => {
+  const generate = vi.fn(async () => result());
+  expect(await evaluateInterview(snapshot, AbortSignal.abort(), generate)).toMatchObject({
+    error: { code: 'AI_ABORTED' },
+  });
+  expect(generate).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  expect(
+    await evaluateInterview(snapshot, controller.signal, async () => {
+      controller.abort();
+      return result();
+    }),
+  ).toMatchObject({ error: { code: 'INVALID_AI_RESULT' } });
+});
+
+test('材料の引用、連続した発言、整合性評価の二つの根拠を保存内容と照合する', async () => {
+  const base = snapshot.fragments[0];
+  const input = {
+    ...snapshot,
+    fragments: [
+      base,
+      { ...base, fragmentId: 'f2', sequence: 2, content: '次の回答' },
+      { ...base, fragmentId: 'f4', sequence: 4 },
+      { ...base, fragmentId: 'f5', sequence: 5, speaker: 'assistant' as const },
+    ],
+  };
+  const transcript = (ids: string[], quote = base.content) => ({
+    source: 'transcript',
+    fragmentIds: ids,
+    quote,
+  });
+  const material = { source: 'material', fragmentIds: [], quote: input.interview.themeExcerpt };
+  const evaluate = async (overrides: object) =>
+    (
+      await evaluateInterview(input, new AbortController().signal, async () => ({
+        ...result(),
+        ...overrides,
+      }))
+    ).ok;
+  for (const [evidence, expected] of [
+    [material, true],
+    [{ ...material, fragmentIds: ['f1'] }, false],
+    [{ ...material, quote: '不一致' }, false],
+    [transcript([]), false],
+    [transcript(['missing']), false],
+    [transcript(['f1', 'f4']), false],
+    [transcript(['f4', 'f5']), false],
+    [transcript(['f1', 'f2'], base.content + '次の回答'), true],
+  ] as const) {
+    expect(await evaluate({ strengths: [{ text: '観察', evidence: [evidence] }] })).toBe(expected);
+  }
+  const first = transcript(['f1']),
+    second = transcript(['f2'], '次の回答');
+  for (const [left, right, expected] of [
+    [first, second, true],
+    [first, first, false],
+    [material, second, false],
+    [first, material, false],
+    [transcript([]), second, false],
+    [first, transcript([]), false],
+  ] as const) {
+    expect(
+      await evaluate({
+        consistency: [{ first: left, second: right, status: 'resolved', explanation: '説明' }],
+      }),
+    ).toBe(expected);
+  }
 });

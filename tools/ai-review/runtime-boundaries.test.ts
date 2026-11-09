@@ -131,7 +131,9 @@ const reportEnv = {
   AI_REVIEW_REPORT: '/fixture/status.json',
   GITHUB_STEP_SUMMARY: '/fixture/summary',
 };
+const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
 beforeEach(() => {
+  Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'linux' });
   vi.clearAllMocks();
   fixture.files.clear();
   fixture.alive = true;
@@ -192,6 +194,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  Object.defineProperty(process, 'platform', platformDescriptor);
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();

@@ -32,6 +32,9 @@ test('分析枠を確保してからAIへ送り、保存した候補を返し、
     expect((await analyzeStoredMaterialRequest(request(), { ...deps, apiKey: '' })).status).toBe(
       503,
     );
+    expect(
+      (await analyzeStoredMaterialRequest(request(), { ...deps, actor: () => '' })).status,
+    ).toBe(503);
     expect(await database.db.select().from(usageReservations)).toHaveLength(0);
     for (let index = 0; index < 10; index += 1) {
       const response = await analyzeStoredMaterialRequest(request(), deps);

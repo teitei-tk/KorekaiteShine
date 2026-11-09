@@ -135,7 +135,11 @@ beforeEach(() => {
   vi.spyOn(process, 'kill').mockReturnValue(true);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  vi.stubGlobal('process', { ...process, argv: ['node', 'fixture', '/fixture/action.js'] });
+  vi.stubGlobal('process', {
+    ...process,
+    platform: 'linux',
+    argv: ['node', 'fixture', '/fixture/action.js'],
+  });
   vi.mocked(networkInterfaces).mockReturnValue({
     lo: [
       {

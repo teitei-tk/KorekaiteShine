@@ -78,6 +78,11 @@ test('失敗した本人の評価を同じ固定入力で一度だけ再受付�
     expect(await database.db.select().from(jobs)).toHaveLength(1);
     expect(await database.db.select().from(evaluationInputs)).toHaveLength(1);
     database.sqlite.exec('DROP TRIGGER reject_retry_outbox');
+    database.sqlite.exec(
+      'CREATE TRIGGER skip_retry BEFORE INSERT ON jobs BEGIN SELECT RAISE(IGNORE); END',
+    );
+    expect((await retryEvaluationRequest(request(), 'one', deps)).status).toBe(409);
+    database.sqlite.exec('DROP TRIGGER skip_retry');
     const result = await Promise.all([
       retryEvaluationRequest(request(), 'one', deps),
       retryEvaluationRequest(request(), 'one', deps),
@@ -90,6 +95,19 @@ test('失敗した本人の評価を同じ固定入力で一度だけ再受付�
       .select()
       .from(evaluationInputs)
       .where(eq(evaluationInputs.jobId, first.jobId));
+    await database.db.insert(jobs).values({
+      jobId: 'bad-id',
+      actorId: 'actor',
+      purpose: 'evaluation',
+      status: 'pending',
+      acceptedAt: 1,
+      updatedAt: 1,
+    });
+    await database.db
+      .update(evaluationInputs)
+      .set({ jobId: 'bad-id' })
+      .where(eq(evaluationInputs.jobId, first.jobId));
+    expect((await retryEvaluationRequest(request(), 'one', deps)).status).toBe(503);
     expect(copy.inputJson).toEqual(snapshot);
     expect(copy.createdAt).toBeGreaterThan(1);
     expect(await database.db.select().from(jobOutbox)).toMatchObject([

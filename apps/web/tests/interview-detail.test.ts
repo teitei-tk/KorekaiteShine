@@ -114,6 +114,14 @@ test('本人の原文と評価を返し、内部設定・別人の記録・壊�
     expect((await interviewDetailRequest(request, '../one', deps)).status).toBe(400);
     await database.db.update(jobAttempts).set({ resultJson: '{"private":"bad"}' });
     expect((await interviewDetailRequest(request, 'one', deps)).status).toBe(503);
+    await database.db.delete(jobAttempts);
+    expect((await interviewDetailRequest(request, 'one', deps)).status).toBe(503);
+    await database.db.delete(evaluationInputs);
+    expect(await (await interviewDetailRequest(request, 'one', deps)).json()).toMatchObject({
+      evaluation: null,
+    });
+    database.sqlite.exec('DROP TABLE transcript_fragments');
+    expect((await interviewDetailRequest(request, 'one', deps)).status).toBe(503);
   } finally {
     database.close();
   }

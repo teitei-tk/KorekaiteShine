@@ -3,6 +3,7 @@ import { interviews } from '@korekaite/database';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import {
   appendTranscript,
+  markTranscriptIncomplete,
   loadInterview,
   saveInterviewState,
   recordPlayback,
@@ -308,6 +309,59 @@ test('接続欠落の記録は終了時に引き継ぎ、呼出側のfalseで消
     );
     const row = database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get()!;
     expect(JSON.parse(String(row.input_json)).transcriptIncomplete).toBe(true);
+  } finally {
+    database.close();
+  }
+});
+
+test('同時到着した原文と再生確認を一度だけ保存し、旧世代の新規確認を拒否する', async () => {
+  const database = await setup();
+  try {
+    const fragment = {
+      interviewId: 'interview',
+      generation: 1,
+      fragmentId: 'f',
+      sourceEventId: 's',
+      speaker: 'assistant' as const,
+      content: '質問',
+      receivedAt: 2,
+    };
+    const results = await Promise.all([
+      appendTranscript(database.db, 'actor', fragment),
+      appendTranscript(database.db, 'actor', fragment),
+    ]);
+    expect(results[0]).toMatchObject({ sequence: 1 });
+    expect(results[1]).toEqual(results[0]);
+    const input = { interviewId: 'interview', generation: 1, audioOffsetMs: 2, receivedAt: 3 };
+    expect(
+      await Promise.all([
+        recordPlayback(database.db, 'actor', input),
+        recordPlayback(database.db, 'actor', input),
+      ]),
+    ).toEqual([true, true]);
+    expect(await recordPlayback(database.db, 'actor', { ...input, generation: 10 })).toBe(false);
+    const state = (await loadInterview(database.db, 'actor', 'interview'))!;
+    await expect(
+      saveInterviewState(database.db, 'actor', { ...state, status: 'ended' }, state.revision),
+    ).rejects.toThrow('一体');
+    for (const [actor, now] of [
+      ['actor', -1],
+      ['missing', 5],
+    ] as const) {
+      await expect(
+        markTranscriptIncomplete(database.db, actor, 'interview', now),
+      ).rejects.toThrow();
+    }
+    await database.db.update(interviews).set({ status: 'ending', streamGeneration: null });
+    await expect(
+      finishInterview(
+        database.db,
+        'actor',
+        'interview',
+        { evaluation, jobId: 'invalid', transcriptIncomplete: false },
+        4,
+      ),
+    ).rejects.toThrow('設定');
   } finally {
     database.close();
   }

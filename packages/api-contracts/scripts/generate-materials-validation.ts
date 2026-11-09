@@ -5,6 +5,7 @@ import { withReachableSchemas } from './reachable-schema.ts';
 
 const directory = new URL('../generated/http/', import.meta.url);
 const document = JSON.parse(await readFile(new URL('openapi.json', directory), 'utf8'));
+const responseSchema = aiSchema(document.components.schemas.MaterialAnalysisResult);
 const ajv = new Ajv2020({
   strict: false,
   coerceTypes: false,
@@ -79,5 +80,5 @@ function aiSchema(schema: MaterialSchema): MaterialSchema {
 }
 await writeFile(
   new URL('material-analysis.schema.json', directory),
-  `${JSON.stringify(aiSchema(document.components.schemas.MaterialAnalysisResult), null, 2)}\n`,
+  `${JSON.stringify(responseSchema, null, 2)}\n`,
 );

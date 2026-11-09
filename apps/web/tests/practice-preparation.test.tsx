@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import './helpers/dom';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { PracticePreparation } from '../src/components/practice-preparation';
@@ -66,4 +66,18 @@ test('ファイル選択では送信せず、OpenAIへの送信前に全文とUT
   ).toBeTruthy();
   expect(screen.getByRole('checkbox', { name: /OpenAI/ })).toBeTruthy();
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+test('空の選択を無視し、サイズ超過と読み取り失敗を伝える', async () => {
+  const user = userEvent.setup();
+  render(<PracticePreparation onCreated={vi.fn()} />);
+  const input = screen.getByLabelText(/ファイルを選ぶ/);
+  fireEvent.change(input, { target: { files: [] } });
+  expect(screen.queryByRole('alert')).toBeNull();
+  await user.upload(input, new File(['x'.repeat(32769)], 'large.md'));
+  expect(screen.getByRole('alert').textContent).toMatch(/32 KiB/);
+  const file = new File(['x'], 'error.md');
+  vi.spyOn(file, 'text').mockRejectedValue('read failed');
+  await user.upload(input, file);
+  expect(screen.getByRole('alert').textContent).toMatch(/操作を完了/);
 });

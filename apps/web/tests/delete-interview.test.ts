@@ -99,6 +99,7 @@ test('本人が評価中の面接を削除すると原文・実行履歴を消�
       (await deleteInterviewRequest(request, 'one', { ...deps, actor: () => 'other' })).status,
     ).toBe(404);
     expect(discard).not.toHaveBeenCalled();
+    expect((await deleteInterviewRequest(request, '../one', deps)).status).toBe(400);
     expect((await deleteInterviewRequest(request, 'one', deps)).status).toBe(204);
     expect((await deleteInterviewRequest(request, 'one', deps)).status).toBe(204);
     for (const table of [

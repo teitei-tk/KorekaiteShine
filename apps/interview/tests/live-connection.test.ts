@@ -1,4 +1,5 @@
 import { expect, test, vi } from 'vitest';
+import * as validators from '@korekaite/api-contracts/events/validators';
 import type { LiveTranscriptEvent } from '@korekaite/api-contracts/events/live';
 import type { LiveStartEvent } from '@korekaite/api-contracts/events/live-start';
 import {
@@ -73,6 +74,7 @@ function fakeSocket() {
   return {
     socket,
     send,
+    dispatch: events.dispatchEvent.bind(events),
     message: (data: object) =>
       events.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) })),
   };
@@ -482,6 +484,193 @@ test('文字起こし保存の応答が止まっても終了要求から15秒で
     release();
     await vi.advanceTimersByTimeAsync(0);
     expect(result).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+const started = { type: 'session.started', event_id: 's', session: { id: 'upstream' } };
+const closedEvent = {
+  type: 'session.closed',
+  event_id: 'end',
+  reason: 'expired',
+  usage: { seconds: 2 },
+};
+const audioEvent = { type: 'session.output_audio.delta', event_id: 'audio', delta: 'AAA=' };
+
+function openFixture() {
+  const fake = fakeSocket();
+  const handlers = {
+    dial: async () => fake.socket,
+    onReady: vi.fn(async (_id: string) => {}),
+    onTranscript: vi.fn(async () => {}),
+    onAudio: vi.fn(),
+    onUsage: vi.fn(async () => {}),
+  };
+  const connection = createLiveConnection({ apiKey: 'fixture', session }, handlers);
+  return { fake, handlers, connection };
+}
+
+test.each([
+  ['JSON構文', '{', 'INVALID_EVENT'],
+  ['null', 'null', 'INVALID_EVENT'],
+  ['種別欠落', '{}', 'INVALID_EVENT'],
+  ['契約違反', '{"type":"session.started"}', 'INVALID_EVENT'],
+  ['バイナリ', new ArrayBuffer(2), 'INVALID_EVENT'],
+  ['文字数上限', 'a'.repeat(262145), 'BUFFER_LIMIT'],
+  ['バイト数上限', 'あ'.repeat(100000), 'BUFFER_LIMIT'],
+  ['開始前音声', JSON.stringify(audioEvent), 'INVALID_EVENT'],
+  ['開始前終了', JSON.stringify(closedEvent), 'INVALID_EVENT'],
+] as const)('%s の受信で接続を解放する', async (_name, data, reason) => {
+  const { fake, connection } = openFixture();
+  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  fake.dispatch(new MessageEvent('message', { data }));
+  await expect(connection.closed).resolves.toMatchObject({ complete: false, reason });
+});
+
+test('重複した開始と内部イベントを無視し、音声位置と使用量を通知する', async () => {
+  const { fake, handlers, connection } = openFixture();
+  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  fake.message({ type: 'responses.internal' });
+  fake.message(started);
+  await connection.ready;
+  fake.message(started);
+  fake.message(audioEvent);
+  for (const n of [9, 3]) {
+    fake.message({ type: 'session.usage.updated', event_id: 'usage', usage: { seconds: n } });
+  }
+  await vi.waitFor(() => expect(handlers.onUsage).toHaveBeenCalledTimes(2));
+  expect(handlers.onReady).toHaveBeenCalledTimes(1);
+  expect(handlers.onAudio).toHaveBeenCalledWith(new Uint8Array(2), 0);
+  for (const length of [0, 1, 9602]) {
+    expect(connection.sendAudio(new Uint8Array(length))).toBe(false);
+  }
+  expect(connection.request('unknown' as 'skip')).toBe(false);
+  const result = connection.close();
+  expect(connection.close()).toBe(result);
+  fake.message(audioEvent);
+  fake.message({ ...closedEvent, reason: 'new_reason' });
+  await expect(result).resolves.toMatchObject({
+    complete: true,
+    upstreamReason: 'unknown',
+    usageSeconds: 9,
+  });
+  expect(handlers.onAudio).toHaveBeenCalledTimes(1);
+  expect(handlers.onUsage).toHaveBeenLastCalledWith(9, true);
+});
+
+test('接続の事前条件と接続開始失敗を区別する', async () => {
+  const { fake, handlers, connection } = openFixture();
+  await expect(connection.close()).resolves.toMatchObject({ reason: 'ABORTED' });
+  expect(() => createLiveConnection({ apiKey: ' ', session }, handlers)).toThrow('設定');
+  await expect(dialLiveSocket('', new AbortController().signal)).rejects.toThrow('設定');
+  await expect(dialLiveSocket('key', AbortSignal.abort())).rejects.toThrow('設定');
+  await expect(
+    dialLiveSocket('key', new AbortController().signal, async () => ({
+      status: 101,
+      webSocket: null,
+    })),
+  ).rejects.toThrow('接続できません');
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+  try {
+    const fallback = createLiveConnection(
+      { apiKey: 'key', session },
+      { ...handlers, dial: undefined },
+    );
+    await expect(fallback.closed).resolves.toMatchObject({ reason: 'DIAL_FAILED' });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  fake.send.mockImplementationOnce(() => {
+    throw new Error('closed');
+  });
+  const next = createLiveConnection({ apiKey: 'key', session }, handlers);
+  await expect(next.closed).resolves.toMatchObject({ reason: 'CONNECT_FAILED' });
+});
+
+test('通信切断と送信失敗を検出し、残っている通知も安全に破棄する', async () => {
+  for (const kind of ['error', 'send'] as const) {
+    const { fake, connection } = openFixture();
+    await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+    fake.message(started);
+    await connection.ready;
+    if (kind === 'error') {
+      fake.dispatch(new Event(kind));
+    } else {
+      fake.send.mockImplementationOnce(() => {
+        throw new Error('closed');
+      });
+      expect(connection.sendAudio(new Uint8Array(2))).toBe(false);
+    }
+    await expect(connection.closed).resolves.toMatchObject({ reason: 'TRANSPORT_CLOSED' });
+  }
+});
+
+test('開始の保存中に切断した場合は遅れて完了してもreadyを通知しない', async () => {
+  vi.useFakeTimers();
+  try {
+    const { fake, connection, handlers } = openFixture();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    handlers.onReady.mockReturnValueOnce(pending);
+    await vi.advanceTimersByTimeAsync(0);
+    fake.message(started);
+    fake.dispatch(new Event('close'));
+    fake.message(audioEvent);
+    fake.dispatch(new Event('error'));
+    await vi.advanceTimersByTimeAsync(15000);
+    await expect(connection.closed).resolves.toMatchObject({ reason: 'TRANSPORT_CLOSED' });
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(connection.ready).rejects.toThrow('開始できません');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('送信契約の検証失敗と切断済みソケットには送信しない', async () => {
+  const { fake, connection } = openFixture();
+  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  fake.message(started);
+  await connection.ready;
+  const validator = vi.spyOn(validators, 'validateLiveClientEvent').mockReturnValueOnce(false);
+  try {
+    expect(connection.request('skip')).toBe(false);
+  } finally {
+    validator.mockRestore();
+  }
+  fake.socket.close();
+  expect(connection.sendAudio(new Uint8Array(2))).toBe(false);
+  expect(fake.send).toHaveBeenCalledTimes(1);
+  connection.abort();
+});
+
+test('終了期限を過ぎて保存が失敗しても、確定した終了理由を維持する', async () => {
+  vi.useFakeTimers();
+  try {
+    const { fake, handlers, connection } = openFixture();
+    let fail!: (error: Error) => void;
+    const saving = new Promise<void>((_, reject) => {
+      fail = reject;
+    });
+    handlers.onTranscript.mockReturnValueOnce(saving);
+    await vi.advanceTimersByTimeAsync(0);
+    fake.message(started);
+    await connection.ready;
+    fake.message({
+      type: 'session.output_transcript.delta',
+      event_id: 't',
+      delta: '本文',
+      start_ms: 1,
+      end_ms: 2,
+    });
+    const closing = connection.close();
+    await vi.advanceTimersByTimeAsync(15000);
+    fail(new Error('保存失敗'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await closing).toMatchObject({ reason: 'CLOSE_TIMEOUT' });
   } finally {
     vi.useRealTimers();
   }

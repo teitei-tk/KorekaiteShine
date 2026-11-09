@@ -24,3 +24,13 @@ test('生成validatorをrequireなしのESMで読み込み、絵文字をUnicode
   );
   expect(JSON.parse(result)).toEqual([true, false]);
 });
+
+test('Workerに変換できないCommonJS helperを含むvalidatorの生成を拒否する', async () => {
+  const { Ajv2020 } = await import('ajv/dist/2020.js');
+  const { default: addFormats } = await import('ajv-formats');
+  const { standaloneValidator } = await import('../scripts/standalone-validator.ts');
+  const ajv = new Ajv2020({ code: { source: true, esm: true } });
+  addFormats(ajv);
+  ajv.addSchema({ $id: 'date-time', type: 'string', format: 'date-time' });
+  expect(() => standaloneValidator(ajv, { validate: 'date-time' })).toThrow('未対応のCommonJS参照');
+});

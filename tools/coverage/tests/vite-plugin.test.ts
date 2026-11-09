@@ -18,6 +18,9 @@ test('Vite変換で原本と同じ計測位置を使い対象外には触れな�
   const plugin = coveragePlugin('/repo', run);
   expect(plugin.enforce).toBe('pre');
   expect(
+    plugin.transform('export default "/assets/worklet.js";', `/repo/${path}?url`),
+  ).toBeUndefined();
+  expect(
     plugin.transform('export const untouched = 1;', '/repo/node_modules/x/index.js'),
   ).toBeUndefined();
   const transformed = plugin.transform(source, `/repo/${path}`)!;

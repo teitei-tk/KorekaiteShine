@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
@@ -43,7 +43,12 @@ test('実際の依存解決位置から固定版とロックファイルの証�
     actual.createRequire(from).resolve.paths(name),
   );
   const versions = await runtimeVersions();
-  expect(versions).toMatchObject({ node: process.version, void: '1.6.2', vite: '8.3.5' });
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  expect(versions).toMatchObject({
+    node: process.version,
+    void: manifest.dependencies.void,
+    vite: manifest.devDependencies.vite,
+  });
   expect(versions.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
   expect(versions.cloudflareVite).toMatch(/^\d+\.\d+\.\d+/);
   expect(versions.miniflare).toMatch(/^\d+\.\d+\.\d+/);

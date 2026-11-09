@@ -697,3 +697,185 @@ test('上流Upgrade失敗は音声枠を消費せず、同じ面接を開始前�
     database.close();
   }
 });
+
+async function lifecycleFixture() {
+  const database = createTestDatabase();
+  await database.db.insert(interviews).values({
+    interviewId: 'i',
+    actorId: 'actor',
+    materialHash: 'hash',
+    themeTitle: '題',
+    themeHeading: '判断',
+    themeExcerpt: '例',
+    background: '',
+    status: 'ready',
+    createdAt: 0,
+    updatedAt: 0,
+  });
+  const options = {
+    db: database.db,
+    actorId: 'actor',
+    interviewId: 'i',
+    now: () => 100,
+    newJobId: () => crypto.randomUUID(),
+    apiKey: 'fixture',
+    responsesModel: 'mock',
+    voice: 'marin' as const,
+    evaluation,
+  };
+  let close!: (result: LiveClosed) => void;
+  const closed = new Promise<LiveClosed>((resolve) => {
+    close = resolve;
+  });
+  const handlers: LiveHandlers[] = [];
+  const abort = vi.fn();
+  const session = createInterviewSession({
+    ...options,
+    connect: (_, hooks) => {
+      handlers.push(hooks);
+      return {
+        ready: Promise.resolve('s'),
+        closed,
+        abort,
+        sendAudio: () => true,
+        request: () => true,
+        close: () => closed,
+      };
+    },
+  });
+  return { database, session, options, close, handlers, abort };
+}
+
+test('保存済みの終了・終了待ち・期限切れの面接を開始操作から回復する', async () => {
+  for (const status of ['ending', 'ended', 'paused'] as const) {
+    const { database, session } = await lifecycleFixture();
+    try {
+      await database.db
+        .update(interviews)
+        .set({ status, deadline: status === 'paused' ? 50 : null });
+      expect(await session.start()).toMatchObject({ status: 'ended' });
+      expect(await session.recover()).toMatchObject({ status: 'ended' });
+      expect(await database.db.select().from(evaluationInputs)).toHaveLength(
+        status === 'ended' ? 0 : 1,
+      );
+    } finally {
+      database.close();
+    }
+  }
+});
+
+test('利用枠・状態取得・保存の競合で開始や終了の成功を返さない', async () => {
+  const { database, session, options } = await lifecycleFixture();
+  try {
+    await expect(
+      createInterviewSession({ ...options, interviewId: 'missing' }).state(),
+    ).rejects.toThrow('見つかりません');
+    await expect(
+      createInterviewSession({ ...options, responsesModel: ' ' }).start(),
+    ).rejects.toThrow('設定');
+    database.sqlite.exec(
+      'CREATE TRIGGER ignore_state BEFORE UPDATE ON interviews BEGIN SELECT RAISE(IGNORE); END',
+    );
+    await expect(session.start()).rejects.toThrow('競合');
+    database.sqlite.exec('DROP TRIGGER ignore_state');
+    await database.db.update(interviews).set({ status: 'ending', streamGeneration: 1 });
+    await expect(session.finish()).rejects.toThrow('終了内容');
+    await database.db.update(interviews).set({ status: 'ready', streamGeneration: null });
+    session.discard();
+    await expect(session.start()).rejects.toThrow('削除済み');
+  } finally {
+    database.close();
+  }
+});
+
+test('開始後の重複接続を拒否し、終了済みの接続からの通知を無視する', async () => {
+  for (const reason of ['discard', 'generation', 'failure'] as const) {
+    const { database, session, handlers, close, abort } = await lifecycleFixture();
+    try {
+      expect(await session.request(1, 'skip')).toBe(false);
+      await session.start();
+      expect(await session.recover()).toMatchObject({ status: 'connecting' });
+      await expect(session.start()).rejects.toThrow('前の音声接続');
+      expect(await session.request(2, 'skip')).toBe(false);
+      expect(await session.request(1, 'skip')).toBe(false);
+      await handlers[0].onReady('upstream');
+      expect(await session.request(1, 'rephrase')).toBe(true);
+      // 保存済み発言に時刻がない上流実装でも原文は保持する。
+      await handlers[0].onTranscript({
+        type: 'session.output_transcript.delta',
+        event_id: 't',
+        delta: '質問',
+      } as Parameters<LiveHandlers['onTranscript']>[0]);
+      expect(await database.db.select().from(transcriptFragments)).toMatchObject([
+        { speaker: 'assistant', sourceStartMs: null, sourceEndMs: null },
+      ]);
+      if (reason === 'discard') {
+        session.discard();
+        expect(abort).toHaveBeenCalledOnce();
+      }
+      if (reason === 'generation') {
+        await database.db.update(interviews).set({ streamGeneration: 2 });
+      }
+      close({
+        reason: 'DIAL_FAILED',
+        usageSeconds: null,
+        upstreamReason: null,
+        complete: false,
+      });
+      await Promise.resolve();
+      const state = await session.state();
+      expect(state.status).toBe(reason === 'failure' ? 'reconnecting' : 'active');
+    } finally {
+      database.close();
+    }
+  }
+});
+
+test('接続参照のない復旧状態でも一時停止でき、期限到達後は評価依頼に進む', async () => {
+  const { database, session } = await lifecycleFixture();
+  try {
+    await database.db
+      .update(interviews)
+      .set({ status: 'active', activeSince: 1, deadline: 200, generation: 1 });
+    expect((await session.pause()).status).toBe('paused');
+    await database.db.update(interviews).set({ deadline: 100 });
+    expect((await session.tick()).status).toBe('ended');
+  } finally {
+    database.close();
+  }
+});
+
+test('既定の音声接続でUpgradeが拒否された場合に開始前へ戻す', async () => {
+  const { database, options } = await lifecycleFixture();
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+  try {
+    const session = createInterviewSession(options);
+    await session.start();
+    await vi.waitFor(async () =>
+      expect(await session.state()).toMatchObject({ status: 'ready', streamGeneration: null }),
+    );
+  } finally {
+    vi.unstubAllGlobals();
+    database.close();
+  }
+});
+
+test('上流の終了待ちで面接が削除された場合は終了要求へ失敗を返す', async () => {
+  const { database, session, close } = await lifecycleFixture();
+  try {
+    await session.start();
+    const finishing = session.finish();
+    await vi.waitFor(async () => expect(await session.state()).toMatchObject({ status: 'ending' }));
+    await database.db.delete(interviews);
+    close({
+      complete: true,
+      reason: 'confirmed',
+      upstreamReason: 'close_requested',
+      usageSeconds: 0,
+    });
+    await expect(finishing).rejects.toThrow('面接が見つかりません');
+    expect(await database.db.select().from(evaluationInputs)).toHaveLength(0);
+  } finally {
+    database.close();
+  }
+});

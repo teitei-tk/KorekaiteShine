@@ -5,6 +5,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { onTestFinished } from 'vitest';
 
+// CI・コンテナの実行UIDに依存せず、Linuxの非特権プロセスを再現する。
+export const unprivilegedLinux = `
+Object.defineProperty(process, 'platform', { value: 'linux' });
+process.getuid = () => 1000;
+`;
+
 /** ghとfetchの応答だけを制御し、元ソースのCLI入口を実Nodeで実行する。 */
 export function cliFixture() {
   const directory = mkdtempSync(join(tmpdir(), 'ai-review-cli-'));

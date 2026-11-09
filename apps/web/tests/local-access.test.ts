@@ -50,3 +50,22 @@ test('読取とWebSocketにもcookieを要求し、WebSocketはOriginが必須',
     ),
   ).toBe('local-developer');
 });
+
+test('空のcookie、余分なcookie、認可しないメソッドやUpgradeを扱う', () => {
+  expect(() => createLocalAccess('test', '短い')).toThrow('不正');
+  const access = createLocalAccess('test', token);
+  const path = 'https://localhost/api/interviews';
+  const get = (method: string, extras: Record<string, string> = {}) =>
+    new Request(path, {
+      method,
+      headers: { Origin: 'https://localhost', Cookie: cookie, ...extras },
+    });
+  expect(access.actor(new Request(path), 'read')).toBeNull();
+  expect(access.actor(get('HEAD', { Cookie: 'preference=x; ' + cookie }), 'read')).toBe(
+    'local-developer',
+  );
+  expect(access.actor(get('POST'), 'read')).toBeNull();
+  expect(access.actor(get('GET'), 'websocket')).toBeNull();
+  expect(access.actor(get('GET'), 'write')).toBeNull();
+  expect(access.actor(get('GET', { Cookie: cookie + '; ' + cookie }), 'read')).toBeNull();
+});

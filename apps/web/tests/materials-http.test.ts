@@ -125,3 +125,29 @@ test('本文サイズを申告ヘッダーに依存せず制限し、超過ス�
   expect(reserveAnalysis).not.toHaveBeenCalled();
   expect(analyze).not.toHaveBeenCalled();
 });
+
+test('空の本文、根拠のないAI結果、不正な保存IDを異なるエラーで返す', async () => {
+  const markdown = 'テスト材料';
+  const deps = {
+    authorize: () => true,
+    reserveAnalysis: async () => true,
+    saveAnalysis: async () => '',
+    analyze: async () => ({ themes: [{ title: '選択', heading: '本文', excerpt: markdown }] }),
+  };
+  const post = (body?: string) =>
+    new Request('http://localhost/api/materials/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+  const body = JSON.stringify({ markdown, confirmed: true });
+  expect(await (await analyzeMaterialRequest(post(), deps)).json()).toMatchObject({
+    error: { code: 'INVALID_MATERIAL' },
+  });
+  expect(
+    await (await analyzeMaterialRequest(post(body), { ...deps, analyze: async () => null })).json(),
+  ).toMatchObject({ error: { code: 'INVALID_AI_RESULT' } });
+  expect(await (await analyzeMaterialRequest(post(body), deps)).json()).toMatchObject({
+    error: { code: 'ANALYSIS_SAVE_FAILED' },
+  });
+});

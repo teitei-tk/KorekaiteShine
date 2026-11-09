@@ -14,7 +14,10 @@ export function coveragePlugin(
     name: 'korekaite-test-coverage',
     enforce: 'pre' as const,
     transform(source: string, id: string) {
-      const file = id.split('?')[0];
+      const [file, query] = id.split('?');
+      if (new URLSearchParams(query).has('url')) {
+        return;
+      }
       const alias = aliases.find(({ from }) => file.startsWith(from + '/'));
       const path = relative(root, alias ? resolve(alias.to, relative(alias.from, file)) : file);
       const target = targets.get(path);

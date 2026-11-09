@@ -53,3 +53,10 @@ test('起動確認のHTTP応答が失敗状態なら本文の完了後も準備�
     });
   }
 });
+
+test('呼び出し元が起動を取り消した場合はHTTP確認を中止する', async () => {
+  const reason = new Error('起動が取り消されました。');
+  await expect(
+    confirmHttpReady('data:text/plain,ready', 1000, AbortSignal.abort(reason)),
+  ).rejects.toBe(reason);
+});

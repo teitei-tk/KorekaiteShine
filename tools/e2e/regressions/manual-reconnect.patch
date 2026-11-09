@@ -1,0 +1,14 @@
+--- a/apps/web/src/components/practice-live.tsx
++++ b/apps/web/src/components/practice-live.tsx
+@@ -369,9 +369,8 @@
+       {disconnected ? (
+         <button
+           onClick={() => {
+-            reconnect.current.until = performance.now() + 60000;
+-            reconnect.current.delay = 1000;
+-            setRevision((value) => value + 1);
++            reconnect.current = { until: 0, delay: 1000, resume: false };
++            setRevision(revision + 1);
+           }}
+         >
+           再接続

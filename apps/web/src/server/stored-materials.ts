@@ -18,24 +18,31 @@ export function analyzeStoredMaterialRequest(
   },
 ): Promise<Response> {
   const actorId = deps.actor(request);
+  function authenticatedActorId(): string {
+    if (!actorId) {
+      throw new Error('本人確認が必要です。');
+    }
+    return actorId;
+  }
   const analysisId = deps.newId();
   return analyzeMaterialRequest(request, {
     authorize: () => actorId !== null,
     analyze: deps.analyze ?? createMaterialAnalyzer({ apiKey: deps.apiKey, model: deps.model }),
     reserveAnalysis: async () => {
-      if (!actorId || !deps.apiKey.trim() || !deps.model.trim()) {
+      if (!deps.apiKey.trim() || !deps.model.trim()) {
         throw new Error('分析設定が不足しています。');
       }
-      return reserveAnalysis(deps.db, { reservationId: analysisId, actorId, now: deps.now() });
+      return reserveAnalysis(deps.db, {
+        reservationId: analysisId,
+        actorId: authenticatedActorId(),
+        now: deps.now(),
+      });
     },
     saveAnalysis: async (markdown, result) => {
-      if (!actorId) {
-        throw new Error('本人確認が必要です。');
-      }
       const now = deps.now();
       await saveMaterialAnalysis(deps.db, {
         analysisId,
-        actorId,
+        actorId: authenticatedActorId(),
         markdown,
         result,
         model: deps.model,

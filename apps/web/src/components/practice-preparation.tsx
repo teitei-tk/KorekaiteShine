@@ -137,21 +137,21 @@ export function PracticePreparation({
             <button
               type="button"
               disabled={selected === null}
-              onClick={() =>
-                void perform(async () => {
-                  if (selected === null) {
-                    return;
-                  }
-                  attempt.current ||= crypto.randomUUID();
-                  onCreated(
-                    await prepareInterview({
-                      interviewId: attempt.current,
-                      analysisId: analysis.analysisId,
-                      themeIndex: selected,
-                      background,
-                    }),
-                  );
-                })
+              onClick={
+                selected === null
+                  ? undefined
+                  : () =>
+                      void perform(async () => {
+                        attempt.current ||= crypto.randomUUID();
+                        onCreated(
+                          await prepareInterview({
+                            interviewId: attempt.current,
+                            analysisId: analysis.analysisId,
+                            themeIndex: selected,
+                            background,
+                          }),
+                        );
+                      })
               }
             >
               面接を準備する

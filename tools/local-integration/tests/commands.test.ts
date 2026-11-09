@@ -42,3 +42,23 @@ test('ローカル起動に必要な環境だけを引き継ぎ、AI値は開発
   expect(localAiEnvironment('development', 'preview', source)).toEqual({});
   expect(localAiEnvironment('test', 'dev', source)).toEqual({});
 });
+
+test('架空のAI設定は独立テストのdevに限定し、設定名を制限する', () => {
+  const fixture = {
+    OPENAI_API_KEY: 'fixture-test-key',
+    RESPONSES_MODEL: 'test-model',
+    UNRELATED: 'value',
+  };
+  expect(localAiEnvironment('test', 'dev', {}, fixture)).toEqual({
+    OPENAI_API_KEY: 'fixture-test-key',
+    RESPONSES_MODEL: 'test-model',
+  });
+  for (const [environment, mode, bindings] of [
+    ['development', 'dev', fixture],
+    ['test', 'preview', fixture],
+    ['test', 'dev', {}],
+    ['test', 'dev', { OPENAI_API_KEY: 'invalid' }],
+  ] as const) {
+    expect(() => localAiEnvironment(environment, mode, {}, bindings)).toThrow('架空のAI設定');
+  }
+});

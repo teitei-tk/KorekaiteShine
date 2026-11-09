@@ -47,6 +47,7 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
       }),
   );
   const db = {} as EvaluationDependencies['db'];
+  const effects = { completed: vi.fn(() => []) };
   const result = consumeJob(
     { schemaVersion: 1, jobId },
     {
@@ -55,7 +56,7 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
       expectedPurpose: 'evaluation',
       kind: 'normal',
     },
-    { db, now: () => vi.getMockedSystemTime()!.getTime(), newId: () => 'owner', evaluate },
+    { db, now: () => vi.getMockedSystemTime()!.getTime(), newId: () => 'owner', evaluate, effects },
   );
   await vi.advanceTimersByTimeAsync(30_000);
   expect(renewExecution).toHaveBeenCalledExactlyOnceWith(db, lease, 30_000);
@@ -66,6 +67,7 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
     lease,
     { summary: 'result' },
     30_000,
+    effects,
   );
   expect(evaluate).toHaveBeenCalledTimes(1);
   expect(vi.getTimerCount()).toBe(0);

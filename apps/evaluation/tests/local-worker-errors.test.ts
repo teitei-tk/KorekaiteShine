@@ -1,3 +1,7 @@
+import formalWorker from '../src/worker';
+import { consumeJob } from '../src/application/consume-job';
+vi.mock('../src/application/consume-job', () => ({ consumeJob: vi.fn() }));
+
 import { afterEach, expect, test, vi } from 'vitest';
 import worker from '../src/worker.local';
 import { consumeDiagnostic } from '../src/diagnostics/consume';
@@ -26,7 +30,7 @@ function environment(appEnv = 'test') {
 function batch(queue = 'diagnostics') {
   const message = {
     id: 'message',
-    body: { schemaVersion: 1, jobId: '00000000-0000-4000-8000-000000000001' },
+    body: { schemaVersion: 1 as const, jobId: '00000000-0000-4000-8000-000000000001' },
     ack: vi.fn(),
     retry: vi.fn(),
   };
@@ -98,4 +102,42 @@ test('scheduledで正式評価の回復通知を送る際は遅延を維持し�
   await worker.scheduled({} as Parameters<typeof worker.scheduled>[0], env);
   expect(send).toHaveBeenCalledExactlyOnceWith(notification, { delaySeconds: 30 });
   expect(diagnosticSend).not.toHaveBeenCalled();
+});
+
+test('定期回復では診断と評価の最終失敗をそれぞれのDLQへ送る', async () => {
+  const env = environment();
+  const send = vi.fn(),
+    diagnosticSend = vi.fn();
+  env.EVALUATION_DLQ = { send } as object as typeof env.EVALUATION_DLQ;
+  env.DIAGNOSTIC_DLQ = { send: diagnosticSend } as object as typeof env.DIAGNOSTIC_DLQ;
+  const message = batch().messages[0].body;
+  vi.mocked(recoverJobs).mockImplementationOnce(async (deps) => {
+    await deps.sendNotification('evaluation', 'notify_dlq', message, 0);
+    await deps.sendNotification('diagnostics', 'notify_dlq', message, 0);
+    return { outboxSent: 2, outboxDeferred: 0 };
+  });
+  await worker.scheduled({} as Parameters<typeof worker.scheduled>[0], env);
+  expect(send).toHaveBeenCalledExactlyOnceWith(message, { delaySeconds: 0 });
+  expect(diagnosticSend).toHaveBeenCalledExactlyOnceWith(message, { delaySeconds: 0 });
+});
+
+test('正式Workerは診断用通知の送信を拒否し、配送を保留したメッセージをackする', async () => {
+  const env = environment();
+  env.EVALUATION_QUEUE_NAME = 'evaluation';
+  env.EVALUATION_DLQ_NAME = 'evaluation-dlq';
+  const send = vi.fn();
+  env.EVALUATION_QUEUE = { send } as object as typeof env.EVALUATION_QUEUE;
+  const message = batch('evaluation');
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  vi.mocked(dispatchNotifications).mockImplementationOnce(async (deps) => {
+    await deps.sendNotification('diagnostics', 'notify', message.messages[0].body, 0);
+    return { outboxSent: 1, outboxDeferred: 0 };
+  });
+  vi.mocked(consumeJob).mockResolvedValue({ action: 'ack' });
+  await formalWorker.queue(message, env);
+  expect(send).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalledExactlyOnceWith(
+    JSON.stringify({ event: 'evaluation_dispatch_deferred', messageId: 'message' }),
+  );
+  expect(message.messages[0].ack).toHaveBeenCalledOnce();
 });

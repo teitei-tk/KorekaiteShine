@@ -44,6 +44,11 @@ export async function main(
         args: ['prepare:integration'],
       },
       {
+        suite: 'web-build',
+        command: 'pnpm',
+        args: ['--dir', 'apps/web', 'build:app'],
+      },
+      {
         suite: 'tests',
         command: process.execPath,
         args: [vitest, 'run', '--config', join(root, 'vitest.coverage.config.ts')],

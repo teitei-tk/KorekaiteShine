@@ -102,6 +102,10 @@ test('保存済みテーマで面接を開始し、分析候補の期限後も�
     );
     expect(competing.status).toBe(409);
     const row = database.sqlite.prepare('SELECT theme_excerpt, background FROM interviews').get();
+    database.sqlite.exec('UPDATE interviews SET created_at=-1');
+    expect((await createInterviewRequest(request(), deps)).status).toBe(503);
+    database.sqlite.exec('DROP TABLE interviews');
+    expect((await createInterviewRequest(request(), deps)).status).toBe(503);
     expect(row).toEqual({ theme_excerpt: '静的配信を選んだ。', background: input.background });
   } finally {
     database.close();

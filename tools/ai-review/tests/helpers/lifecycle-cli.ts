@@ -18,6 +18,7 @@ files.set(root + '/upstream-report.json', JSON.stringify({ count: 1, authOk: tru
 files.set(root + '/lifecycle.json', JSON.stringify({ proxy: { pid: 32102, start: '99' }, backend: { pid: 32101, start: '99' }, infoPath: home + '/20.json', configHash: digest('trusted config'), startedAt: '0' }));
 if (scenario === 'changed-config') files.set(home + '/config.toml', 'changed');
 if (scenario === 'missing-report') files.delete(root + '/upstream-report.json');
+Object.defineProperty(process, 'platform', { value: 'linux' });
 process.getuid = () => 0;
 process.hrtime.bigint = () => 1000000000n;
 process.kill = (pid) => { if (![32101, 32102].includes(pid)) throw new Error('unexpected PID'); alive.delete(pid); return true; };

@@ -219,6 +219,7 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
       clearTimeout(timer);
     };
   }, [id, revision]);
+  const evaluation = detail?.evaluation;
   return (
     <article>
       {error && <p role="alert">{error}</p>}
@@ -254,23 +255,19 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
                 ` · 次の試行 ${timestamp(detail.evaluation.nextAttemptAt)}`}
             </p>
           )}
-          {detail.evaluation?.status === 'failed' && (
+          {evaluation?.status === 'failed' && (
             <section>
               <p>
-                {failureReasons[detail.evaluation.lastErrorCode ?? ''] ??
+                {failureReasons[evaluation.lastErrorCode ?? ''] ??
                   '評価を完了できませんでした。時間をおいて再評価してください。'}
               </p>
               <button
                 disabled={retrying}
                 onClick={async () => {
-                  const failed = detail.evaluation;
-                  if (!failed) {
-                    return;
-                  }
                   setRetrying(true);
                   setError('');
                   try {
-                    await requestEvaluationRetry(id, failed.jobId);
+                    await requestEvaluationRetry(id, evaluation.jobId);
                     setRevision((value) => value + 1);
                   } catch (cause) {
                     setError(

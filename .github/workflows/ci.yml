@@ -250,3 +250,24 @@ jobs:
         run: pnpm prepare:integration
       - name: Test real-time Queue delivery and recovery
         run: pnpm --filter @korekaite/local-integration test:integration:pr ${{ matrix.shard }} --maxWorkers=2
+  voice-e2e:
+    name: Voice interview browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: node tools/docs/check-guard.ts --registry-only
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @korekaite/api-contracts generate
+      - run: pnpm --filter @korekaite/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

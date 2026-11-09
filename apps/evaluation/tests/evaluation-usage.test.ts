@@ -1,3 +1,4 @@
+import { snapshot } from './fixtures/evaluation.ts';
 import { createJobEvaluator } from '../src/server/evaluate-job';
 import { interviews, evaluationInputs } from '@korekaite/database/interviews';
 import { jobs } from '@korekaite/database/jobs';
@@ -121,6 +122,51 @@ test('枠がない新規ジョブではAIを呼ばず、既存予約の再試行
     expect(generate).not.toHaveBeenCalled();
     await evaluate('job-0', 1, signal);
     expect(generate).toHaveBeenCalledTimes(1);
+  } finally {
+    database.close();
+  }
+});
+
+test('評価枠を確保する間に中断したジョブではAIに送信しない', async () => {
+  const database = createTestDatabase();
+  const controller = new AbortController();
+  try {
+    const material = snapshot.interview;
+    await database.db
+      .insert(interviews)
+      .values({ ...material, actorId: 'actor', status: 'ended', createdAt: 0, updatedAt: 1 });
+    await database.db.insert(jobs).values({
+      jobId: 'job',
+      actorId: 'actor',
+      purpose: 'evaluation',
+      status: 'running',
+      attemptCount: 1,
+      acceptedAt: 0,
+      updatedAt: 1,
+    });
+    await database.db.insert(evaluationInputs).values({
+      jobId: 'job',
+      interviewId: material.interviewId,
+      kind: 'manual',
+      lastSequence: 1,
+      model: 'fixture',
+      promptVersion: 'v1',
+      rubricVersion: 'v1',
+      createdAt: 1,
+      inputJson: snapshot,
+    });
+    const generate = vi.fn(async () => null);
+    const evaluate = createJobEvaluator(database.db, generate, () => {
+      controller.abort();
+      return 1000;
+    });
+    expect(await evaluate('job', 1, controller.signal)).toMatchObject({
+      error: { code: 'AI_ABORTED' },
+    });
+    expect(generate).not.toHaveBeenCalled();
+    const liveClock = createJobEvaluator(database.db, generate);
+    await liveClock('job', 1, new AbortController().signal);
+    expect(generate).toHaveBeenCalledOnce();
   } finally {
     database.close();
   }

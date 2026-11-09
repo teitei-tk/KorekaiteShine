@@ -1,0 +1,13 @@
+{
+  "name": "@korekaite/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "13.3.0",
+    "playwright": "1.65.0",
+    "ws": "8.21.0"
+  }
+}

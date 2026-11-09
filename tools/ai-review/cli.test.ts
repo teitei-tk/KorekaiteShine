@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cliFixture } from './tests/helpers/cli.ts';
+import { cliFixture, unprivilegedLinux } from './tests/helpers/cli.ts';
 import { apiFixture } from './tests/helpers/api.ts';
 import { artifactFixture } from './tests/helpers/artifact.ts';
 import { saveArtifact } from './artifact.ts';
@@ -9,9 +9,13 @@ import { MARKER } from './policy.ts';
 import { historyMarker } from './history.ts';
 import { wifCliBootstrap } from './tests/helpers/wif-cli.ts';
 
-it('隔離WIF CLIは実行前提を満たさなければ固定理由で終了する', () => {
+it.each([
+  ['非特権ユーザー', unprivilegedLinux],
+  ['OIDCトークン欠落', wifCliBootstrap],
+])('隔離WIF CLIは%sで通信せず固定理由を返す', (_reason, bootstrap) => {
   const fixture = cliFixture();
   const result = fixture.run('isolation/wif.ts', {
+    bootstrap,
     env: { ACTIONS_ID_TOKEN_REQUEST_TOKEN: undefined },
   });
   expect(result.status).toBe(1);
@@ -47,6 +51,7 @@ it('runtimeのCLIは準備成功時に正常終了する', () => {
     bootstrap: `
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
+Object.defineProperty(process, 'platform', { value: 'linux' });
 process.getuid = () => 0;
 const managed = (path) => typeof path === 'string' && (path.startsWith('/opt/ai-review') || path.startsWith('/home/ai-review'));
 const read = fs.readFileSync;

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { resolveRuntime } from '@korekaite/runtime-config';
 import type { BuildAudit } from '../../src/build-audit.ts';
 
 export async function productionFixture() {
-  const project = await mkdtemp(join(tmpdir(), 'production-audit-'));
+  const project = await realpath(await mkdtemp(join(tmpdir(), 'production-audit-')));
   onTestFinished(() => rm(project, { recursive: true, force: true }));
   const repositoryRoot = fileURLToPath(new URL('../../../../', import.meta.url));
   const production = resolveRuntime({ repositoryRoot, appEnv: 'production' });
@@ -20,7 +20,17 @@ export async function productionFixture() {
       name: string;
       workersDev: boolean;
       previewUrls: boolean;
-      env: Record<string, { type: string; value?: string; id?: string; name?: string }>;
+      env: Record<
+        string,
+        {
+          type: string;
+          value?: string;
+          id?: string;
+          name?: string;
+          worker?: string;
+          exportName?: string;
+        }
+      >;
       triggers?: { type: string; name: string; deadLetterQueue?: string }[];
     }
   > = {};
@@ -68,7 +78,23 @@ export async function productionFixture() {
       };
     }
   }
-  const routes = ['__root.tsx', 'api.interviews.ts', 'index.tsx'];
+  configs.interview.env.INTERVIEW_SESSION = {
+    type: 'durable-object',
+    worker: production.workers.interview,
+    exportName: 'InterviewObject',
+  };
+  const routes = [
+    '__root.tsx',
+    'api.interview-history.ts',
+    'api.interviews.$interviewId.live.ts',
+    'api.interviews.$interviewId.retry.ts',
+    'api.interviews.$interviewId.ts',
+    'api.interviews.ts',
+    'api.local-session.ts',
+    'api.materials.analyze.ts',
+    'index.tsx',
+    'practice.tsx',
+  ];
   await mkdir(join(project, 'src/routes'), { recursive: true });
   for (const route of routes) {
     await writeFile(join(project, 'src/routes', route), '');
@@ -86,5 +112,5 @@ export async function productionFixture() {
     }
   };
   await save();
-  return { project, audits, configs, save, production };
+  return { project, routes, audits, configs, save, production };
 }

@@ -1,0 +1,101 @@
+--- a/apps/interview/src/application/interview-session.ts
++++ b/apps/interview/src/application/interview-session.ts
+@@ -1,4 +1,5 @@
+-import { remainingAudioMs } from '../server/repositories/audio-usage';
++import { usageLimits } from '@korekaite/runtime-config/limits';
++import { reserveAudio, settleAudio } from '../server/repositories/audio-usage';
+ import { asc, eq } from 'void/db';
+ import { transcriptFragments, type EvaluationConfiguration } from '@korekaite/database/interviews';
+ import type { createPrimaryDb } from '@korekaite/database/connection';
+@@ -163,11 +164,20 @@
+           await finalize();
+           return read();
+         }
+-        if ((await remainingAudioMs(db, actorId, options.now())) <= 0) {
++        const reservationId = `audio:${interviewId}:${row.generation + 1}`;
++        const reserved = await reserveAudio(db, {
++          reservationId,
++          actorId,
++          desiredSeconds: Math.ceil((usageLimits.interviewActiveMs - row.activeMs) / 1000) + 45,
++          now: options.now(),
++        });
++        const deadline = reserved ? reserved.createdAt + reserved.seconds * 1000 - 15000 : 0;
++        if (!reserved || deadline <= options.now()) {
+           throw new AudioUsageLimitError('音声利用枠が不足しています。');
+         }
+-        const connecting = await transition({ type: 'connect' });
++        const connecting = await transition({ type: 'connect', deadline });
+         if (connecting.status === 'ending') {
++          await settleAudio(db, { reservationId, actorId, seconds: 0, now: options.now() });
+           await finalize();
+           return read();
+         }
+@@ -181,9 +191,7 @@
+           {
+             onReady: () =>
+               serial(async () => {
+-                const now = options.now();
+-                const remaining = await remainingAudioMs(db, actorId, now);
+-                await transition({ type: 'ready', generation, deadline: now + remaining });
++                await transition({ type: 'ready', generation, deadline });
+               }),
+             onTranscript: (event) =>
+               serial(async () => {
+@@ -220,6 +228,11 @@
+             if (discarded) {
+               return;
+             }
++            if (result.complete && result.usageSeconds !== null) {
++              if (!(await settleAudio(db, { reservationId, actorId, seconds: result.usageSeconds, now: options.now() }))) {
++                throw new Error('音声利用量を保存できませんでした。');
++              }
++            }
+             const before = await read();
+             if (before.streamGeneration !== generation) {
+               return;
+--- a/apps/interview/src/server/repositories/audio-usage.ts
++++ b/apps/interview/src/server/repositories/audio-usage.ts
+@@ -1,3 +1,5 @@
++import { and, eq, isNull, sql } from 'void/db';
++import { usageReservations } from '@korekaite/database/usage';
+ import { usedAudioMs } from '@korekaite/database/audio-periods';
+ import { Temporal } from '@js-temporal/polyfill';
+ import { usageLimits } from '@korekaite/runtime-config/limits';
+@@ -22,3 +24,37 @@
+   });
+   return Math.max(0, usageLimits.audioSecondsPerDay * 1000 - used);
+ }
++
++type Database = ReturnType<typeof createPrimaryDb>;
++export async function reserveAudio(db: Database, input: {
++  reservationId: string; actorId: string; desiredSeconds: number; now: number;
++}): Promise<{ seconds: number; createdAt: number } | null> {
++  if (!Number.isSafeInteger(input.desiredSeconds) || input.desiredSeconds <= 0) { return null; }
++  const day = Temporal.Instant.fromEpochMilliseconds(input.now).toZonedDateTimeISO(usageLimits.timeZone).toPlainDate().toString();
++  await db.run(sql`
++    WITH remaining AS (
++      SELECT MAX(0, ${usageLimits.audioSecondsPerDay} - COALESCE(SUM(${usageReservations.amount}), 0)) AS available
++      FROM ${usageReservations} WHERE ${usageReservations.actorId} = ${input.actorId}
++      AND ${usageReservations.day} = ${day} AND ${usageReservations.kind} = 'audio'
++    )
++    INSERT INTO ${usageReservations} (reservation_id, actor_id, day, kind, amount, created_at)
++    SELECT ${input.reservationId}, ${input.actorId}, ${day}, 'audio', MIN(${input.desiredSeconds}, available), ${input.now}
++    FROM remaining WHERE available > 0
++    ON CONFLICT DO NOTHING
++  `);
++  const [saved] = await db.select().from(usageReservations).where(eq(usageReservations.reservationId, input.reservationId));
++  return saved && saved.actorId === input.actorId && saved.day === day && saved.kind === 'audio' && saved.settledAt === null
++    ? { seconds: saved.amount, createdAt: saved.createdAt } : null;
++}
++
++export async function settleAudio(db: Database, input: {
++  reservationId: string; actorId: string; seconds: number; now: number;
++}): Promise<boolean> {
++  if (!Number.isFinite(input.seconds) || input.seconds < 0 || !Number.isSafeInteger(Math.ceil(input.seconds))) { return false; }
++  const amount = Math.ceil(input.seconds);
++  const match = and(eq(usageReservations.reservationId, input.reservationId), eq(usageReservations.actorId, input.actorId), eq(usageReservations.kind, 'audio'));
++  await db.update(usageReservations).set({ amount, settledAt: input.now }).where(and(match, isNull(usageReservations.settledAt)));
++  const [saved] = await db.select().from(usageReservations).where(match);
++  // 予約を超える上流報告も丸めて隠さず記録し、次回の残枠へ反映する。
++  return Boolean(saved && saved.settledAt !== null && saved.amount === amount);
++}

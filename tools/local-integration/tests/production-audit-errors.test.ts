@@ -130,6 +130,15 @@ test('監査と配信物とWorker設定が整合する4環境の記録を受理�
   const fixture = await productionFixture();
   await expect(verifyProductionArtifacts(fixture.project)).resolves.toEqual({
     environments: ['client', 'ssr', 'interview', 'evaluation'],
-    routes: ['__root.tsx', 'api.interviews.ts', 'index.tsx'],
+    routes: fixture.routes,
   });
+});
+
+test('本番面接Workerに面接DOのbindingが欠落した場合は拒否する', async () => {
+  const fixture = await productionFixture();
+  delete fixture.configs.interview.env.INTERVIEW_SESSION;
+  await fixture.save();
+  await expect(verifyProductionArtifacts(fixture.project)).rejects.toThrow(
+    '本番の面接DO設定がありません',
+  );
 });

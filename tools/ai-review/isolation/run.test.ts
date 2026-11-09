@@ -104,6 +104,7 @@ beforeEach(() => {
   vi.spyOn(process, 'getuid').mockReturnValue(0);
   vi.stubGlobal('process', {
     ...process,
+    platform: 'linux',
     argv: ['node', 'fixture', '/fixture/action.js', 'github'],
   });
   vi.spyOn(console, 'log').mockImplementation(() => {});

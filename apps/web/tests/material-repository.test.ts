@@ -27,6 +27,22 @@ test('検証済み候補を本人と期限に結び付け、Markdown全文を保
     expect(
       JSON.stringify(database.sqlite.prepare('SELECT * FROM material_analyses').all()),
     ).not.toContain('未選択の秘密の原文');
+    await expect(
+      saveMaterialAnalysis(database.db, {
+        analysisId: 'bad',
+        actorId: 'actor',
+        markdown: '経験',
+        result: { themes: [] },
+        model: 'test',
+        promptVersion: 'v1',
+        createdAt: 100,
+        expiresAt: 200,
+      }),
+    ).rejects.toThrow('保存形式');
+    database.sqlite.exec("UPDATE material_analyses SET candidates_json='{}'");
+    await expect(findMaterialTheme(database.db, 'actor', 'analysis', 0, 100)).rejects.toThrow(
+      '保存された分析候補',
+    );
   } finally {
     database.close();
   }

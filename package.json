@@ -26,7 +26,9 @@
     "check:coverage": "node tools/coverage/run.ts --check",
     "test:integration:pr": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:integration:pr",
     "test:realtime": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:realtime",
-    "test:coverage:node": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-api-codegen test && vitest run --config vitest.coverage.config.mts --coverage"
+    "test:coverage:node": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-api-codegen test && vitest run --config vitest.coverage.config.mts --coverage",
+    "test:e2e": "node tools/e2e/run.mjs pr",
+    "test:e2e:live": "node tools/e2e/run.mjs live"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "5.1.0",

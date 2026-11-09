@@ -1,4 +1,5 @@
 import {
+  coverageEnvironment,
   localProcessEnvironment,
   localAiEnvironment,
   aiBindingNames,
@@ -343,7 +344,7 @@ import { voidPlugin } from 'void';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
 ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `import { runtimeCoveragePlugin } from ${JSON.stringify(join(repositoryRoot, 'tools/coverage/src/runtime-plugin.ts'))};` : ''}
-export default defineConfig({ cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: [
+export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: [
   ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `runtimeCoveragePlugin(${JSON.stringify(project)}),` : ''}
   voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: [
     { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
@@ -358,6 +359,7 @@ export default defineConfig({ cacheDir: ${JSON.stringify(join(config.artifactDir
 function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, string> = {}) {
   return {
     ...localProcessEnvironment(),
+    ...coverageEnvironment(config.environment),
     ...aiBindings,
     APP_ENV: config.environment,
     NO_COLOR: '1',

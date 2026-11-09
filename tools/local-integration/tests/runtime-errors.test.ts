@@ -227,3 +227,60 @@ test('HTTP到達確認後に起動し停止確認後にだけ環境ロックを�
   expect(fixture.release).toHaveBeenCalledTimes(1);
   await expect(runtime.closed).resolves.toEqual({ exitCode: 0 });
 });
+
+test('独立テストで指定した代替実装とAI確認ルートをWorkerの起動元に反映する', async () => {
+  const fixture = await runtimeFixture();
+  const runtime = await startRuntimeInProcess(fixture.config, 'dev', {
+    materialAnalysisMock: true,
+    interviewVoiceMock: true,
+    interviewEvaluationMock: true,
+    testAiBindings: { OPENAI_API_KEY: 'fixture-runtime' },
+    manualDiagnostics: true,
+    checkObjectProbe: 'normal',
+    holdEvaluationBeforeConsume: true,
+    stopAfterResultBeforeAck: true,
+  });
+  try {
+    const project = join(fixture.config.artifactDirectory, 'web');
+    const contents = (file: string) => readFile(join(project, file), 'utf8');
+    expect(await contents('interview.local.ts')).toContain(
+      'MockInterviewObject as InterviewObject',
+    );
+    expect(await contents('evaluation.local.ts')).toContain('interview-evaluation.ts');
+    expect(await contents('evaluation.local.ts')).toContain(
+      'await holdBeforeEvaluationForTest(env)',
+    );
+    expect(await contents('evaluation.local.ts')).toContain(
+      'await stopAfterResultBeforeAckForTest',
+    );
+    expect(await contents('src/routes/api.ai-binding-test.ts')).toContain('confirmFixtureKey');
+    expect(await contents('src/routes/api.materials.analyze.ts')).toBe(
+      await readFile(new URL('../fixtures/api.materials.analyze.ts', import.meta.url), 'utf8'),
+    );
+    expect(await contents('vite.config.ts')).toContain('"CHECK_OBJECT_ENV":"test"');
+    expect(await contents('src/routes/api.diagnostics.check-jobs.ts')).toContain(
+      'scheduleInitialization: undefined',
+    );
+  } finally {
+    await runtime.stop();
+  }
+});
+
+test('診断DOの環境拒否とQueueプローブを独立テストのWorker設定に反映する', async () => {
+  const fixture = await runtimeFixture();
+  const runtime = await startRuntimeInProcess(fixture.config, 'dev', {
+    probeOnlyEvaluation: true,
+    checkObjectProbe: 'forbidden-environment',
+  });
+  try {
+    const project = join(fixture.config.artifactDirectory, 'web');
+    expect(await readFile(join(project, 'vite.config.ts'), 'utf8')).toContain(
+      '"CHECK_OBJECT_ENV":"forbidden-test"',
+    );
+    expect(await readFile(join(project, 'evaluation.local.ts'), 'utf8')).toContain(
+      'queue: probe.queue',
+    );
+  } finally {
+    await runtime.stop();
+  }
+});

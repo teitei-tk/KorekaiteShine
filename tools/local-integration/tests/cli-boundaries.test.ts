@@ -96,7 +96,7 @@ test('DBマイグレーションをmigrateへ振り分ける', async () => {
 
 test('previewを起動し二度の終了シグナルでも停止処理は一度だけ行う', async () => {
   const fixture = await cliFixture(['preview']);
-  expect(startRuntime).toHaveBeenCalledWith(expect.any(Object), 'preview');
+  expect(startRuntime).toHaveBeenCalledWith(expect.any(Object), 'preview', { port: 0 });
   fixture.events.emit('SIGTERM');
   fixture.events.emit('SIGINT');
   await vi.advanceTimersByTimeAsync(0);

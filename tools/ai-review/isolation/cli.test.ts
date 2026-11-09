@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { cliFixture } from '../tests/helpers/cli.ts';
+import { cliFixture, unprivilegedLinux } from '../tests/helpers/cli.ts';
 import { lifecycleBootstrap } from '../tests/helpers/lifecycle-cli.ts';
 import { modelCliFixture } from '../tests/helpers/model-cli.ts';
 it('modelは不正操作・成果物欠落・権限不足を固定理由で拒否する', () => {
@@ -15,7 +15,9 @@ it('modelは不正操作・成果物欠落・権限不足を固定理由で拒�
     expect(result.stderr).toContain('WIF model verification failed');
   }
   const fixture = cliFixture();
-  expect(fixture.run('isolation/model.ts', { args: ['wait'] }).status).toBe(1);
+  expect(
+    fixture.run('isolation/model.ts', { args: ['wait'], bootstrap: unprivilegedLinux }).status,
+  ).toBe(1);
 });
 it('modelはプロキシの途中終了や終了API失敗を成功扱いしない', () => {
   for (const scenario of ['expired-proxy', 'finish-pid', 'shutdown-failure']) {
@@ -128,7 +130,10 @@ it('lifecycleは不正な操作・モードと実行権限不足を拒否する'
   }
   const fixture = cliFixture();
   expect(
-    fixture.run('isolation/lifecycle.ts', { args: ['prepare', 'complete', '20'] }).status,
+    fixture.run('isolation/lifecycle.ts', {
+      args: ['prepare', 'complete', '20'],
+      bootstrap: unprivilegedLinux,
+    }).status,
   ).toBe(1);
 });
 it('lifecycleは外側とsandbox両方の隔離検査に成功を要求する', () => {

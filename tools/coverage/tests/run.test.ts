@@ -25,8 +25,10 @@ test('全体収集はAPI生成と保持確認の準備を済ませてから結�
     'generate',
     'api-codegen',
     'prepare',
+    'web-build',
     'tests',
   ]);
+  expect(commands[3]).toMatchObject({ command: 'pnpm', args: ['--dir', 'apps/web', 'build:app'] });
   expect(commands[2]).toMatchObject({ command: 'pnpm', args: ['prepare:integration'] });
 });
 

@@ -1,6 +1,6 @@
 # ローカル開発と接続検査
 
-開発者がWeb・Interview DO・Evaluationの接続を確認するための手順です。リポジトリルートで、固定版のNode.jsとpnpmを使います。Cloudflare上のリソースには接続せず、トークンや1Passwordの設定は不要です。ここでいうローカルD1は、MiniflareがSQLiteで動かすD1です。
+開発者がWeb・Interview DO・Evaluationの接続を確認するための手順です。リポジトリルートで、固定版のNode.jsとpnpmを使います。診断やモックを使う検査は、トークンや1Passwordの設定なしで実行できます。ここでいうローカルD1は、MiniflareがSQLiteで動かすD1です。
 
 ## 起動と停止
 
@@ -21,6 +21,31 @@ pnpm preview:local
 ```
 
 操作入口は`APP_ENV`省略時に`development`を選びます。`test`を明示する場合は、一意な`LOCAL_TEST_RUN_ID`と0以上の整数の`LOCAL_TEST_SLOT`が必要です。`production`と追加引数は拒否します。
+
+## 経験Markdownで音声面接を試す
+
+`/practice` は、Markdownの内容確認、テーマ選択、音声面接、評価結果の閲覧に使います。実AIで練習する場合は、1PasswordのDeveloper Environmentに次の変数を用意します。
+
+| 変数名             | 用途                                      |
+| ------------------ | ----------------------------------------- |
+| `OPENAI_API_KEY`   | 材料分析・音声・評価に使うAPIキー         |
+| `MATERIAL_MODEL`   | テーマ抽出に使うResponses対応モデル       |
+| `RESPONSES_MODEL`  | 音声面接中の推論に使うResponses対応モデル |
+| `EVALUATION_MODEL` | 面接終了時に固定する評価モデル            |
+| `LIVE_VOICE`       | 任意の音声指定。省略時は `marin`          |
+
+リポジトリルートで契約を生成し、1Password CLIで開発サーバーを起動します。`INTERVIEW_1PASSWORD_ENV_ID` には使用するEnvironmentのIDを指定します。
+
+```sh
+pnpm --filter @korekaite/api-contracts generate
+op run --environment "$INTERVIEW_1PASSWORD_ENV_ID" -- node tools/local-integration/src/run.ts dev
+```
+
+開発用の面接画面は `http://127.0.0.1:63286/practice` です。再起動後も同じURLを使います。面接画面を開き、経験Markdownを選んで送信内容を確認します。候補から今回話すテーマを選び、「面接を準備する」を押します。「マイクを許可して開始」で音声接続が始まり、「終了して評価する」で保存済みの回答が評価に渡ります。履歴から同じ面接を開くと評価と引用元を読み返せます。
+
+自動検査では架空のキーを3 Workersへ渡し、生成設定・ログ・開発用ビルド成果物に値が含まれないことを確認しています。実機のマイク、モデルの利用権限、日本語の音声品質は実接続で確認する項目です。
+
+日本時間の1日につき、分析10回・音声60分・新規評価10回までです。1回の面接時間は最大20分です。音声枠は接続が成立して「面接中」だった時間を数えます。一時停止・切断・終了で計測を止め、日本時間の日付をまたいだ区間は日ごとに集計します。実際の料金は各モデルの利用状況によって変わります。
 
 ## DBの変更
 

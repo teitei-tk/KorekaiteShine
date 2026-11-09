@@ -1,3 +1,4 @@
+import { diagnosticTransactionEffects } from './transaction-effects';
 import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
@@ -15,6 +16,7 @@ export async function consumeDiagnostic(
   const db = createPrimaryDb(binding);
   return consumeJob(notification, context, {
     db,
+    effects: diagnosticTransactionEffects(db),
     now: () => Temporal.Now.instant().epochMilliseconds,
     newId: () => crypto.randomUUID(),
     evaluate: async (jobId, attemptNumber, signal) => {

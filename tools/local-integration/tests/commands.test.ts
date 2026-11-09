@@ -1,3 +1,5 @@
+import { localProcessEnvironment, localAiEnvironment } from '../src/local-environment.ts';
+
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -22,4 +24,21 @@ test('統合検証モジュールをNode.jsの直接実行で読み込める', (
     },
   );
   expect(result.status, result.stderr).toBe(0);
+});
+
+test('ローカル起動に必要な環境だけを引き継ぎ、AI値は開発用の明示した名前だけで取得する', () => {
+  const source = {
+    PATH: '/bin',
+    OPENAI_API_KEY: 'fixture-api-key',
+    MATERIAL_MODEL: 'fixture-model',
+    OTHER_SECRET: 'other',
+    VITE_PUBLIC_SECRET: 'public',
+  };
+  expect(localProcessEnvironment(source)).toEqual({ PATH: '/bin' });
+  expect(localAiEnvironment('development', 'dev', source)).toEqual({
+    OPENAI_API_KEY: 'fixture-api-key',
+    MATERIAL_MODEL: 'fixture-model',
+  });
+  expect(localAiEnvironment('development', 'preview', source)).toEqual({});
+  expect(localAiEnvironment('test', 'dev', source)).toEqual({});
 });

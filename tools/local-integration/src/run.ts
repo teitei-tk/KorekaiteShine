@@ -30,7 +30,9 @@ async function main(): Promise<void> {
   } else if (command === 'db:generate' || command === 'db:migrate') {
     await runDatabaseCommand(config, [command === 'db:generate' ? 'generate' : 'migrate']);
   } else {
-    const runtime = await startRuntime(config, command === 'preview' ? 'preview' : 'dev');
+    const runtime = await startRuntime(config, command === 'preview' ? 'preview' : 'dev', {
+      port: command === 'dev' && config.environment === 'development' ? 63286 : 0,
+    });
     let stopping = false;
     const scheduledAbort = new AbortController();
     let scheduledPending: Promise<void> | undefined;

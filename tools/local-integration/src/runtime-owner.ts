@@ -1,3 +1,4 @@
+import { localProcessEnvironment, localAiEnvironment } from './local-environment.ts';
 import { fork } from 'node:child_process';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import type { LocalRuntime, LocalRuntimeOptions } from './runtime.ts';
@@ -58,6 +59,7 @@ export async function startOwnedRuntime(
 ): Promise<LocalRuntime> {
   const owner = fork(new URL('./runtime-owner-host.ts', import.meta.url), [], {
     execArgv: [],
+    env: { ...localProcessEnvironment(), ...localAiEnvironment(config.environment, mode) },
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
   owner.stderr!.resume();

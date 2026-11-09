@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/resources.ts",
-    "./artifacts": "./src/artifacts.ts"
+    "./artifacts": "./src/artifacts.ts",
+    "./limits": "./src/limits.ts"
   },
   "scripts": {
     "test": "vitest run",

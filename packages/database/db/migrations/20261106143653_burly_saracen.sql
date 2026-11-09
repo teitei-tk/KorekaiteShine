@@ -1,0 +1,1 @@
+ALTER TABLE `interviews` ADD `transcript_incomplete` integer DEFAULT false NOT NULL;

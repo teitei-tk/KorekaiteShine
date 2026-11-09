@@ -20,7 +20,18 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     const project = await buildProductionArtifacts(directory);
     const report = await verifyProductionArtifacts(project);
     expect(report.environments.sort()).toEqual(['client', 'evaluation', 'interview', 'ssr']);
-    expect(report.routes.sort()).toEqual(['__root.tsx', 'api.interviews.ts', 'index.tsx']);
+    expect(report.routes.sort()).toEqual([
+      '__root.tsx',
+      'api.interview-history.ts',
+      'api.interviews.$interviewId.live.ts',
+      'api.interviews.$interviewId.retry.ts',
+      'api.interviews.$interviewId.ts',
+      'api.interviews.ts',
+      'api.local-session.ts',
+      'api.materials.analyze.ts',
+      'index.tsx',
+      'practice.tsx',
+    ]);
     const config = JSON.parse(
       await readFile(
         join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
@@ -29,6 +40,14 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     );
     expect(config.env.APP_ENV).toEqual({ type: 'text', value: 'production' });
     expect(config.name).toBe('korekaite-web-prod');
+    const interviewConfigPath = join(
+      project,
+      '.cloudflare/output/v0/workers/korekaite-interview-prod/worker.config.json',
+    );
+    const interviewConfig = JSON.parse(await readFile(interviewConfigPath, 'utf8'));
+    interviewConfig.env.INTERVIEW_SESSION.exportName = 'UnexpectedObject';
+    await writeFile(interviewConfigPath, JSON.stringify(interviewConfig));
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow('本番の面接DO設定に不整合');
     succeeded = true;
   } finally {
     if (succeeded) {

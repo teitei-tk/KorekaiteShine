@@ -1,7 +1,7 @@
 import { Temporal } from '@js-temporal/polyfill';
 import type { D1Database } from '@cloudflare/workers-types';
 import { and, asc, eq, lte, notExists } from 'void/db';
-import { jobs, deletedJobs } from '@korekaite/database';
+import { jobs, deletedJobs } from '@korekaite/database/jobs';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { executionTiming } from '../domain/lease';
 import { recoverExpiredExecution } from '../server/repositories/job-execution';

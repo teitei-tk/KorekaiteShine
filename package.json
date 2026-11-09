@@ -29,7 +29,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "5.1.0",
     "lefthook": "2.2.1",
-    "oxfmt": "0.76.0",
+    "oxfmt": "0.77.0",
     "oxlint": "1.91.0",
     "vitest": "5.1.0"
   },

@@ -7,9 +7,10 @@
     "dev": "pnpm generate && vite --host 127.0.0.1 --port 4327 --strictPort",
     "preview": "vite preview --host 127.0.0.1 --port 4328 --strictPort",
     "verify:http": "node scripts/verify-http.ts",
-    "build": "pnpm generate && vite build",
+    "build": "pnpm generate && pnpm build:app",
+    "build:app": "vite build",
     "typecheck": "pnpm build && tsc --noEmit",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "pnpm build:app && vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",

@@ -46,7 +46,7 @@ export default defineConfig({
         '**/*.config.ts',
         '**/routeTree.gen.ts',
       ],
-      reportsDirectory: './coverage',
+      reportsDirectory: './coverage/node',
       reporter: ['text-summary', 'html', 'json', 'json-summary', 'lcov'],
       // 失敗した実行の部分的な数値を基準値として保存しない。
       reportOnFailure: false,

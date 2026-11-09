@@ -20,7 +20,18 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     const project = await buildProductionArtifacts(directory);
     const report = await verifyProductionArtifacts(project);
     expect(report.environments.sort()).toEqual(['client', 'evaluation', 'interview', 'ssr']);
-    expect(report.routes.sort()).toEqual(['__root.tsx', 'api.interviews.ts', 'index.tsx']);
+    expect(report.routes.sort()).toEqual([
+      '__root.tsx',
+      'api.interview-history.ts',
+      'api.interviews.$interviewId.live.ts',
+      'api.interviews.$interviewId.retry.ts',
+      'api.interviews.$interviewId.ts',
+      'api.interviews.ts',
+      'api.local-session.ts',
+      'api.materials.analyze.ts',
+      'index.tsx',
+      'practice.tsx',
+    ]);
     const config = JSON.parse(
       await readFile(
         join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
@@ -29,6 +40,14 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     );
     expect(config.env.APP_ENV).toEqual({ type: 'text', value: 'production' });
     expect(config.name).toBe('korekaite-web-prod');
+    const interviewConfigPath = join(
+      project,
+      '.cloudflare/output/v0/workers/korekaite-interview-prod/worker.config.json',
+    );
+    const interviewConfig = JSON.parse(await readFile(interviewConfigPath, 'utf8'));
+    interviewConfig.env.INTERVIEW_SESSION.exportName = 'UnexpectedObject';
+    await writeFile(interviewConfigPath, JSON.stringify(interviewConfig));
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow('本番の面接DO設定に不整合');
     succeeded = true;
   } finally {
     if (succeeded) {
@@ -168,3 +187,44 @@ test('3 Workersの本番入口へ診断importを混入させると、未使用�
     }
   }
 }, 90_000);
+
+test('本番入口へ計測ツールのimportが混入した場合は未使用でも拒否する', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-coverage-'));
+  let succeeded = false;
+  try {
+    const project = await buildProductionArtifacts(directory);
+    await verifyProductionArtifacts(project);
+    const entry = join(project, 'interview.production.ts');
+    const original = await readFile(entry, 'utf8');
+    const coverage = fileURLToPath(new URL('../../coverage/src/targets.ts', import.meta.url));
+    await writeFile(entry, `${original}\nimport ${JSON.stringify(coverage)};\n`);
+    await runProductionBuild(project);
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow(
+      '本番モジュールへ診断・検証コードが混入',
+    );
+    succeeded = true;
+  } finally {
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+}, 90000);
+
+test('本番成果物へ計測カウンターを挿入した場合も拒否する', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-counter-'));
+  let succeeded = false;
+  try {
+    const project = await buildProductionArtifacts(directory);
+    const entry = join(project, 'interview.production.ts');
+    await writeFile(entry, (await readFile(entry, 'utf8')) + '\nglobalThis.__coverage__ = {};\n');
+    await runProductionBuild(project);
+    await expect(verifyProductionArtifacts(project)).rejects.toThrow(
+      '本番配信物へ診断コードが混入',
+    );
+    succeeded = true;
+  } finally {
+    if (succeeded) {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+}, 90000);

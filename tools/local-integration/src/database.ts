@@ -1,3 +1,4 @@
+import { localProcessEnvironment } from './local-environment.ts';
 import { lockEnvironment } from './lock.ts';
 import { runNodeCommand } from './process.ts';
 import { cp, mkdir, readlink, symlink, writeFile } from 'node:fs/promises';
@@ -30,7 +31,7 @@ interface DatabaseOptions {
 async function executeDatabaseCommand(
   config: RuntimeConfig,
   args: DatabaseCommand,
-  options: DatabaseOptions = {},
+  options: DatabaseOptions,
 ): Promise<void> {
   options.signal?.throwIfAborted();
   if (config.environment === 'production' || !config.stateDirectory) {
@@ -92,7 +93,7 @@ async function executeDatabaseCommand(
     `import { voidPlugin } from 'void';\nvoidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)} });\n`,
   );
   const env = {
-    ...process.env,
+    ...localProcessEnvironment(),
     APP_ENV: config.environment,
     NO_COLOR: '1',
     WRANGLER_LOG_PATH: join(config.artifactDirectory, 'db-wrangler.log'),

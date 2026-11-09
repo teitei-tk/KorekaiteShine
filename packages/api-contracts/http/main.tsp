@@ -1,4 +1,8 @@
+import "./application.tsp";
+import "./evaluation.tsp";
 import "./diagnostics.tsp";
+import "./materials.tsp";
+import "./interviews.tsp";
 import "@typespec/http";
 import "@typespec/openapi3";
 

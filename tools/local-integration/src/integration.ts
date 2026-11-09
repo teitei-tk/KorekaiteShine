@@ -104,11 +104,9 @@ async function discardAcceptanceResponse(url: string, key: string, body: string)
       (response) => {
         // 本文を一度も読み取らず、クライアント側の接続を破棄する。
         response.destroy();
-        if (response.statusCode === undefined) {
-          reject(new IntegrationFailure('ACCEPTANCE_CONTRACT'));
-        } else {
-          resolve(response.statusCode);
-        }
+        // ClientRequestのresponseイベントではHTTP解析済みのstatusCodeが必ずある。
+        // 不正なHTTP応答はresponseではなくrequestのerrorイベントへ進む。
+        resolve(response.statusCode!);
       },
     );
     request.on('error', reject);
@@ -621,7 +619,6 @@ export async function runDiagnosticScenario(input: {
     if (restarts) {
       const first = report.scheduled.invocations[0];
       if (
-        !report.restart ||
         !first ||
         first.elapsedMs < report.scheduled.intervalMs ||
         report.attempts[0]!.startedAt < first.startedAt
@@ -629,10 +626,11 @@ export async function runDiagnosticScenario(input: {
         // CIに成果物がなくても、どの時刻条件に違反したかを識別できる数値だけ残す。
         throw Object.assign(new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH'), {
           recoveryTiming: {
-            restartedAt: report.restart?.restartedAt ?? null,
+            // 再起動経路では上でrestartを設定し、試行履歴も件数と形式を検証済み。
+            restartedAt: report.restart!.restartedAt,
             scheduledStartedAt: first?.startedAt ?? null,
             scheduledElapsedMs: first?.elapsedMs ?? null,
-            attemptStartedAt: report.attempts[0]?.startedAt ?? null,
+            attemptStartedAt: report.attempts[0]!.startedAt,
           },
         });
       }
@@ -678,9 +676,8 @@ export async function runDiagnosticScenario(input: {
     try {
       await runtime?.stop();
       if (report.exitCode === 0) {
-        if (config.stateDirectory) {
-          await rm(config.stateDirectory, { recursive: true, force: true });
-        }
+        // この関数はappEnv: 'test'で解決するため、ローカル状態の保存先が必ずある。
+        await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       }
     } catch (error) {

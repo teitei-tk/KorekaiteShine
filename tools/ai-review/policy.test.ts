@@ -59,6 +59,16 @@ const result = {
 };
 const lines = { 'src/app.ts': [2, 3] };
 
+it('未確認事項を保持して表示し、空の説明は拒否する', () => {
+  const review = validReview({ ...result, uncertainties: ['外部サービスの応答は未確認'] }, lines);
+  expect(renderReview(review, sha, 'b'.repeat(40))).toContain(
+    '未確認事項:\n- 外部サービスの応答は未確認',
+  );
+  expect(() => validReview({ ...result, uncertainties: ['  '] }, lines)).toThrow(
+    'レビュー形式が不正です',
+  );
+});
+
 describe('モデル出力の境界', () => {
   it('変更行にある指摘を受け入れる', () => expect(validReview(result, lines)).toEqual(result));
   it.each(['line', 'path', 'count', 'status', 'empty'])('%sが不正なら投稿しない', (kind) => {

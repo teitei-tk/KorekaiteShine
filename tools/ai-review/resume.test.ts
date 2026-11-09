@@ -1,10 +1,31 @@
 import { expect, it } from 'vitest';
 import { createArtifact } from './artifact.ts';
-import { publishArtifact } from './publish.ts';
+import { publishArtifact, recognizeOperations } from './publish.ts';
 import { type Snapshot } from './snapshot.ts';
 import { type Api, type ApiBody } from './github.ts';
 import { MARKER, type Review } from './policy.ts';
 import { historyMarker } from './history.ts';
+
+it('同じ対象に別の生成実行の投稿があれば履歴が一致しても新規投稿しない', async () => {
+  const f = fixture();
+  const comment = {
+    id: 100,
+    user: bot,
+    body: `${MARKER}\n<!-- revision:${head}:${base} -->\n${historyMarker([])}\n<!-- generation:v2:19:1:${head}:${base} -->`,
+  };
+  f.snapshot.issues.push(comment);
+  f.artifact.metadata.history.issues.push(comment);
+  const artifact = createArtifact(f.artifact.metadata, f.artifact.review, f.artifact.origin, null);
+  await expect(publishArtifact(f.api, artifact)).rejects.toThrow('別生成の投稿');
+  expect(f.count()).toBe(0);
+});
+
+it('同じ操作マーカーが二つのコメントに存在したら再開を拒否する', () => {
+  const f = fixture();
+  const body = f.artifact.operations.find((operation) => operation.kind === 'summary')!.body;
+  f.snapshot.issues.push({ id: 100, body, user: bot }, { id: 101, body, user: bot });
+  expect(() => recognizeOperations(f.artifact, f.snapshot)).toThrow('投稿操作が重複');
+});
 const head = 'a'.repeat(40),
   base = 'b'.repeat(40),
   old = 'c'.repeat(40);

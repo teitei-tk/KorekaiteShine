@@ -15,3 +15,15 @@ export {
   dlqReceipts,
 } from './schema/jobs.ts';
 export { diagnosticRequests, diagnosticChecks } from './schema/diagnostics.ts';
+export { materialAnalyses } from './schema/materials.ts';
+export {
+  interviews,
+  transcriptFragments,
+  playbackReceipts,
+  evaluationInputs,
+  deletedInterviews,
+  type EvaluationConfiguration,
+  type EvaluationSnapshot,
+} from './schema/interviews.ts';
+
+export { usageReservations, audioUsagePeriods } from './schema/usage.ts';

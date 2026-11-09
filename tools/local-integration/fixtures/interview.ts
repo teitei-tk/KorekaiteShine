@@ -1,3 +1,4 @@
+import { confirmFixtureKey } from './ai-bindings';
 import type { Queue } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
@@ -27,8 +28,13 @@ export class InspectableCheckObject extends CheckObject {
 
 export class TopologyObject extends DurableObject<{
   APP_ENV: string;
+  OPENAI_API_KEY?: string;
   EVALUATION_QUEUE: Queue<JobNotification>;
 }> {
+  confirmFixtureKey(digest: string) {
+    return confirmFixtureKey(this.env, digest);
+  }
+
   async writeIsolationMarker(marker: string) {
     if (
       this.env.APP_ENV !== 'test' ||

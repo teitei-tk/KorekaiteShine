@@ -33,11 +33,11 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node tools/local-integration/src/ci-selection.ts >> "$GITHUB_OUTPUT"
   realtime:
-    name: Real-time retry and DLQ
+    name: Full coverage, real-time retry and DLQ
     needs: changes
     if: needs.changes.outputs.required == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -56,8 +56,19 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
-      - name: Test real-time retry intervals and DLQ
-        run: pnpm --filter @korekaite/local-integration test:realtime --maxWorkers=1
+      - name: Measure all tests including real-time retry and DLQ
+        run: pnpm test:coverage
+      - name: Require all four metrics to reach 100 percent
+        run: pnpm check:coverage
+      - name: Show coverage suite failures
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for log in coverage/runs/*/*.log; do
+            echo "::group::$log"
+            tail -n 200 "$log"
+            echo "::endgroup::"
+          done
   result:
     name: Realtime result
     needs: [changes, realtime]

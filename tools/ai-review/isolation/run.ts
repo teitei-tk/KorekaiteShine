@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { probeIsolation, type IsolationInput } from '../isolation-probe.js';
+import { probeIsolation, type IsolationInput } from '../isolation-probe.ts';
 
 if (process.platform !== 'linux' || process.getuid?.() !== 0) {
   throw new Error('requires disposable Linux root environment');

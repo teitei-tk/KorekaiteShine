@@ -1,0 +1,439 @@
+import { useEffect, useRef, useState } from 'react';
+import { Temporal } from '@js-temporal/polyfill';
+import type { InterviewServerEvent } from '@korekaite/api-contracts/events/interview-server';
+import type { InterviewCommand } from '@korekaite/api-contracts/events/interview-client';
+import { validateInterviewServerEvent } from '@korekaite/api-contracts/events/validators';
+import { sessionToken } from '../lib/practice';
+import { encodeMicrophoneFrame, openInterviewAudio } from '../lib/practice-audio';
+
+type State = Extract<InterviewServerEvent, { type: 'state' }>;
+type Transcript = Extract<InterviewServerEvent, { type: 'transcript' }>;
+const statuses = {
+  ready: '開始前',
+  connecting: '音声接続中',
+  active: '面接中',
+  paused: '一時停止中',
+  reconnecting: '再開待ち',
+  ending: '保存中',
+  ended: '保存完了',
+};
+const messages = {
+  AUDIO_USAGE_LIMIT: 'アプリ内の面接時間が本日の60分に達しました。日本時間の翌日から再開できます。',
+  AUDIO_CONNECT_FAILED: '音声AIへの接続に失敗しました。再度開始してください。',
+  INVALID_EVENT: '操作を確認できませんでした。',
+  STALE_STATE: '面接の状態が変わりました。',
+  NOT_OWNER: '別のタブが操作中です。',
+  UNAVAILABLE: '面接に接続できませんでした。',
+  CONTEXT_LIMIT: '会話が再開時の上限に達しました。',
+};
+
+export function PracticeLive({
+  id,
+  onEnded,
+  onDeleted,
+}: {
+  id: string;
+  onEnded(): void;
+  onDeleted?(): void;
+}) {
+  const socket = useRef<WebSocket | null>(null);
+  const latest = useRef<State | null>(null);
+  const media = useRef<Awaited<ReturnType<typeof openInterviewAudio>> | null>(null);
+  const permission = useRef<AbortController | null>(null);
+  const [state, setState] = useState<State | null>(null);
+  const [fragments, setFragments] = useState<Transcript[]>([]);
+  const [error, setError] = useState('');
+  const [disconnected, setDisconnected] = useState(false);
+  const reconnect = useRef({ until: 0, delay: 1000, resume: false });
+  const [revision, setRevision] = useState(0);
+  const [pending, setPending] = useState(false);
+  const [now, setNow] = useState(0);
+  const ended = useRef(onEnded);
+  const removed = useRef(onDeleted);
+  useEffect(() => {
+    removed.current = onDeleted;
+  }, [onDeleted]);
+  useEffect(() => {
+    ended.current = onEnded;
+  }, [onEnded]);
+  function release() {
+    permission.current?.abort();
+    permission.current = null;
+    media.current?.close();
+    media.current = null;
+  }
+  function command(type: InterviewCommand['type']) {
+    if (!latest.current || socket.current?.readyState !== 1) {
+      return;
+    }
+    socket.current.send(
+      JSON.stringify({
+        type,
+        commandId: crypto.randomUUID(),
+        generation: latest.current.generation,
+      }),
+    );
+  }
+  useEffect(() => {
+    setState(null);
+    setDisconnected(false);
+    setError('');
+    setFragments([]);
+    setPending(false);
+    const address = new URL(`/api/interviews/${encodeURIComponent(id)}/live`, window.location.href);
+    address.protocol = address.protocol === 'https:' ? 'wss:' : 'ws:';
+    const attempt = new AbortController();
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let handshake: ReturnType<typeof setTimeout> | undefined;
+    let terminal = false;
+    function disconnectedPeer() {
+      clearTimeout(handshake);
+      const retry = reconnect.current;
+      if (latest.current) {
+        retry.resume = Boolean(
+          media.current &&
+          latest.current.canControl &&
+          ['active', 'connecting'].includes(latest.current.status),
+        );
+      }
+      release();
+      setDisconnected(true);
+      latest.current = null;
+      setPending(false);
+      if (!terminal) {
+        const time = performance.now();
+        retry.until ||= time + 60000;
+        if (time + retry.delay < retry.until) {
+          retryTimer = setTimeout(() => {
+            if (performance.now() < retry.until) {
+              setRevision((value) => value + 1);
+            }
+          }, retry.delay);
+          retry.delay = Math.min(retry.delay * 2, 5000);
+        }
+      }
+    }
+    async function connect() {
+      if (revision > 0) {
+        try {
+          await sessionToken(AbortSignal.any([attempt.signal, AbortSignal.timeout(10000)]));
+        } catch {
+          if (!attempt.signal.aborted) {
+            setError('ローカルサーバーに接続できません。起動時のURLを確認してください。');
+            disconnectedPeer();
+          }
+          return;
+        }
+      }
+      if (attempt.signal.aborted) {
+        return;
+      }
+      const peer = new WebSocket(address);
+      peer.binaryType = 'arraybuffer';
+      socket.current = peer;
+      const windowLeft = reconnect.current.until
+        ? reconnect.current.until - performance.now()
+        : 10000;
+      handshake = setTimeout(() => peer.close(), Math.max(1, Math.min(10000, windowLeft)));
+      let header: Extract<InterviewServerEvent, { type: 'audio' }> | null = null;
+      const saved = new Map<string, Transcript>();
+      peer.onmessage = ({ data }: MessageEvent<string | ArrayBuffer>) => {
+        try {
+          if (typeof data !== 'string') {
+            const audio = header;
+            header = null;
+            if (!audio || !(data instanceof ArrayBuffer) || audio.byteLength !== data.byteLength) {
+              throw new Error();
+            }
+            if (
+              latest.current?.status === 'active' &&
+              latest.current.canControl &&
+              latest.current.generation === audio.generation
+            ) {
+              media.current?.play(data, () => {
+                if (
+                  peer.readyState === 1 &&
+                  latest.current?.generation === audio.generation &&
+                  latest.current.canControl
+                ) {
+                  peer.send(
+                    JSON.stringify({
+                      type: 'playback',
+                      commandId: crypto.randomUUID(),
+                      generation: audio.generation,
+                      audioOffsetMs: audio.endOffsetMs,
+                    }),
+                  );
+                }
+              });
+            }
+            return;
+          }
+          const event = JSON.parse(data);
+          if (header || !validateInterviewServerEvent(event)) {
+            throw new Error();
+          }
+          switch (event.type) {
+            case 'state': {
+              if (event.interviewId !== id) {
+                throw new Error();
+              }
+              if (
+                (latest.current?.canControl && !event.canControl) ||
+                ['paused', 'reconnecting', 'ending', 'ended'].includes(event.status)
+              ) {
+                release();
+              }
+              clearTimeout(handshake);
+              const resume =
+                reconnect.current.resume && performance.now() < reconnect.current.until;
+              reconnect.current = { until: 0, delay: 1000, resume: false };
+              latest.current = event;
+              if (resume && event.status === 'reconnecting') {
+                void begin('resume');
+              }
+              setState(event);
+              setNow(Temporal.Now.instant().epochMilliseconds);
+              if (event.status === 'ended') {
+                terminal = true;
+                ended.current();
+              }
+              break;
+            }
+            case 'deleted':
+              if (event.interviewId !== id) {
+                throw new Error();
+              }
+              release();
+              peer.close();
+              terminal = true;
+              removed.current?.();
+              break;
+            case 'audio':
+              header = event;
+              break;
+            case 'transcript':
+              saved.set(event.fragmentId, event);
+              setFragments([...saved.values()].sort((a, b) => a.sequence - b.sequence));
+              break;
+            case 'error':
+              setError(messages[event.code]);
+              if (
+                !latest.current?.canControl ||
+                event.code === 'AUDIO_USAGE_LIMIT' ||
+                event.code === 'AUDIO_CONNECT_FAILED'
+              ) {
+                release();
+              }
+              setPending(false);
+              break;
+            case 'ack':
+              break;
+          }
+        } catch {
+          setError('音声接続を再開してください。');
+          release();
+          peer.close();
+        }
+      };
+      peer.onclose = () => {
+        peer.onclose = null;
+        disconnectedPeer();
+      };
+      peer.onerror = () => setError('面接画面とローカルサーバーの接続が切れました。');
+    }
+    void connect();
+    return () => {
+      attempt.abort();
+      clearTimeout(retryTimer);
+      clearTimeout(handshake);
+      const peer = socket.current;
+      if (peer) {
+        peer.onclose = null;
+        peer.onmessage = null;
+        peer.onerror = null;
+        peer.close();
+      }
+      release();
+      latest.current = null;
+      socket.current = null;
+    };
+  }, [id, revision]);
+  useEffect(() => {
+    if (state?.status !== 'active' || disconnected) {
+      return;
+    }
+    const timer = setInterval(() => setNow(Temporal.Now.instant().epochMilliseconds), 500);
+    return () => clearInterval(timer);
+  }, [state?.status, disconnected]);
+  async function begin(type: 'start' | 'resume' | 'takeover') {
+    const initial = latest.current;
+    if (!initial || permission.current) {
+      return;
+    }
+    const controller = new AbortController();
+    permission.current = controller;
+    setPending(true);
+    setError('');
+    try {
+      const audio = await openInterviewAudio(
+        controller.signal,
+        (bytes) => {
+          const current = latest.current;
+          const peer = socket.current;
+          if (
+            !controller.signal.aborted &&
+            current?.status === 'active' &&
+            current.canControl &&
+            peer?.readyState === 1
+          ) {
+            if (peer.bufferedAmount > 256 * 1024) {
+              release();
+              peer.close();
+              setError('音声の送信が追いつかず接続を停止しました。');
+              return;
+            }
+            peer.send(encodeMicrophoneFrame(current.generation, bytes));
+          }
+        },
+        () => {
+          release();
+          command('pause');
+          setError('マイクが切断されました。');
+        },
+      );
+      if (
+        controller.signal.aborted ||
+        latest.current?.generation !== initial.generation ||
+        socket.current?.readyState !== 1
+      ) {
+        audio.close();
+        if (permission.current === controller) {
+          release();
+        }
+        return;
+      }
+      media.current = audio;
+      command(type);
+    } catch {
+      if (!controller.signal.aborted) {
+        release();
+        setError('マイクの使用許可と入力機器を確認してください。');
+      }
+    } finally {
+      if (!permission.current || permission.current === controller) {
+        setPending(false);
+      }
+    }
+  }
+  const elapsed =
+    (state?.activeMs ?? 0) +
+    (state?.status === 'active' && state.activeSince !== null
+      ? Math.max(0, Math.min(now, state.deadline ?? now) - state.activeSince)
+      : 0);
+  const turns: {
+    speaker: Transcript['speaker'];
+    generation: number;
+    content: string;
+    id: string;
+  }[] = [];
+  for (const item of fragments) {
+    const last = turns.at(-1);
+    if (last?.speaker === item.speaker && last.generation === item.generation) {
+      last.content += item.content;
+    } else {
+      turns.push({
+        speaker: item.speaker,
+        generation: item.generation,
+        content: item.content,
+        id: item.fragmentId,
+      });
+    }
+  }
+  const question = turns
+    .slice()
+    .reverse()
+    .find((turn) => turn.speaker === 'assistant');
+  return (
+    <section>
+      <h3>音声面接</h3>
+      <p role="status">
+        {disconnected ? '切断' : state ? statuses[state.status] : '接続中'} ·{' '}
+        {Math.floor(elapsed / 60000)}分{Math.floor(elapsed / 1000) % 60}秒
+      </p>
+      {state?.status === 'active' && elapsed >= 15 * 60000 && (
+        <p>
+          15分が経過しました。今回の判断を振り返り、話し終えたら評価へ進んでください。面接は20分で終了します。
+        </p>
+      )}
+      {disconnected ? (
+        <button
+          onClick={() => {
+            reconnect.current.until = performance.now() + 60000;
+            reconnect.current.delay = 1000;
+            setRevision((value) => value + 1);
+          }}
+        >
+          再接続
+        </button>
+      ) : (
+        state && (
+          <fieldset disabled={pending} style={{ border: 0, padding: 0 }}>
+            {state.status === 'ready' && (
+              <button onClick={() => void begin('start')}>マイクを許可して開始</button>
+            )}
+            {['paused', 'reconnecting'].includes(state.status) && (
+              <button onClick={() => void begin('resume')}>マイクを許可して再開</button>
+            )}
+            {!state.canControl && ['active', 'connecting', 'paused'].includes(state.status) && (
+              <button onClick={() => void begin('takeover')}>このタブで引き継ぐ</button>
+            )}
+            {state.canControl && state.status === 'active' && (
+              <>
+                <button
+                  onClick={() => {
+                    release();
+                    command('pause');
+                  }}
+                >
+                  一時停止
+                </button>
+                <button onClick={() => command('rephrase')}>言い換えを依頼</button>
+                <button onClick={() => command('skip')}>質問を見送る</button>
+              </>
+            )}
+            {(state.canControl || ['ready', 'reconnecting'].includes(state.status)) && (
+              <button
+                onClick={() => {
+                  release();
+                  command('finish');
+                }}
+              >
+                終了して評価する
+              </button>
+            )}
+          </fieldset>
+        )
+      )}
+      {error && <p role="alert">{error}</p>}
+      {question && (
+        <>
+          <h4>現在の質問</h4>
+          <p>{question.content}</p>
+        </>
+      )}
+      {turns.length > 0 && (
+        <>
+          <h4>保存された会話</h4>
+          <ol>
+            {turns.map((turn) => (
+              <li key={turn.id}>
+                <strong>{turn.speaker === 'user' ? 'あなた' : '面接官'}</strong> {turn.content}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  );
+}

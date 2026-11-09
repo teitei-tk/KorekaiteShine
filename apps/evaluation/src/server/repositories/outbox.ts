@@ -12,7 +12,7 @@ import {
   or,
   sql,
 } from 'void/db';
-import { jobs, jobOutbox, deletedJobs, dlqReceipts } from '@korekaite/database';
+import { jobs, jobOutbox, deletedJobs, dlqReceipts } from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { runnableJobStates } from '../../domain/job-state';
 import { maxEvaluationAttempts } from '../../domain/retry-policy';

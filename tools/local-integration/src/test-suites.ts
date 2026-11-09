@@ -1,11 +1,23 @@
 const integrationGroups = [
   ['restart'],
   ['cli-recovery', 'isolation'],
-  ['end-to-end', 'formal-routing', 'dlq-restart', 'queue-retry'],
+  [
+    'end-to-end',
+    'formal-routing',
+    'interview-evaluation-worker',
+    'voice-interview',
+    'interview-http',
+    'dlq-restart',
+    'queue-retry',
+  ],
 ];
 const paths = (names: readonly string[]) => names.map((name) => `tests/${name}.test.ts`);
 const boundaryGroups = [
   [
+    'build-audit',
+    'http-contract-errors',
+    'process-command-boundaries',
+    'runtime-errors',
     'check-object',
     'recovery',
     'check-object-guards',
@@ -15,6 +27,10 @@ const boundaryGroups = [
     'run-test-suite',
   ],
   [
+    'cli-boundaries',
+    'integration-failures',
+    'process-errors',
+    'runtime-owner-errors',
     'topology',
     'execution',
     'dispatch-notifications',
@@ -24,16 +40,25 @@ const boundaryGroups = [
     'evidence',
   ],
   [
+    'database-errors',
+    'isolation-errors',
+    'production-audit-errors',
+    'runtime-owner-host',
     'delivery-anomalies',
     'lease',
     'http-contract',
     'schema',
+    'interview-schema',
     'notification-runtime',
     'readiness',
     'integration-run',
     'scheduled-interval',
   ],
   [
+    'development-snapshot',
+    'prepare-integration-errors',
+    'production-preview-errors',
+    'versions',
     'dlq',
     'diagnostics',
     'production-artifacts',

@@ -33,7 +33,7 @@ import {
 } from './artifact.ts';
 import { digest } from './snapshot.ts';
 import { writeStatusReport, type RuntimeTarget } from './status-report.ts';
-type Mark = (target?: RuntimeTarget) => RuntimeTarget;
+type Mark = (target: RuntimeTarget) => RuntimeTarget;
 import type { ReviewInput } from './policy.ts';
 const root = '/opt/ai-review',
   worktree = `${root}/pr`,
@@ -316,9 +316,7 @@ export async function executeRuntime(
   let target: RuntimeTarget = 'runtime/preflight';
   const mark: Mark = (next) => {
     const previous = target;
-    if (next) {
-      target = next;
-    }
+    target = next;
     return previous;
   };
   try {

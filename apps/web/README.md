@@ -1,6 +1,8 @@
 # Webのローカル検証
 
-既存試作の一覧画面とAPIを移行したWebアプリです。一覧は架空の2件を使う暫定契約です。診断機能ではWebからDO・Queue・評価Consumer・ローカルD1への接続を確認できます。正式な履歴仕様、認可、音声、実AIは後続範囲です。契約の原本は`packages/api-contracts/http/main.tsp`に集約し、型と検証コードを生成して使用します。
+`/practice` で経験Markdownを確認してテーマを選び、音声面接と五軸評価の振り返りを行います。履歴には本人の記録を表示し、評価の引用から原文を参照できます。ローカルWorkerとモックAIを通す検査、マイク操作をモックにした画面検査を用意しています。実AIでの試行手順は[ローカル開発手順](../../docs/runbooks/local-development.md#経験markdownで音声面接を試す)を参照してください。
+
+`/` は架空の一覧を使う既存試作の入口で、`/practice` へのリンクがあります。`/diagnostics` は開発用の接続・障害検証に使います。HTTPの契約は `packages/api-contracts/http/main.tsp` から生成します。
 
 ## 起動と検査
 

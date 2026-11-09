@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"url":"http://localhost:4327"}
 import './helpers/dom';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { DiagnosticPage } from '../src/diagnostics/page';
@@ -267,4 +267,37 @@ test('新規開始中は前回の受付と診断結果を消す', async () => {
   expect(screen.queryByRole('region', { name: '診断結果' })).toBeNull();
   await act(async () => pending.resolve(Response.json(accepted, { status: 202 })));
   expect(screen.queryByRole('region', { name: '診断結果' })).toBeNull();
+});
+
+test('許可外のシナリオ変更を受けても最後の有効な選択だけを送信する', async () => {
+  const fetcher = vi.fn<typeof fetch>(async () =>
+    Response.json({ ...accepted, scenario: 'retry_then_success' }, { status: 202 }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  render(<DiagnosticPage />);
+  const select = screen.getByRole<HTMLSelectElement>('combobox');
+  await userEvent.selectOptions(select, 'retry_then_success');
+  fireEvent.change(select, { target: { value: 'not-a-scenario' } });
+  expect(select.value).toBe('retry_then_success');
+  await userEvent.click(start());
+  await screen.findByRole('region', { name: '受付結果' });
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(await new Request(fetcher.mock.calls[0]![0]).json()).toEqual({
+    scenario: 'retry_then_success',
+  });
+});
+
+test('実行情報の作成に失敗した場合は要求を送らず、再送も許可しない', async () => {
+  const fetcher = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', fetcher);
+  const newId = vi.spyOn(crypto, 'randomUUID').mockImplementationOnce(() => {
+    throw new Error('識別子を作成できません');
+  });
+  render(<DiagnosticPage />);
+  await userEvent.click(start());
+  expect((await screen.findByRole('alert')).textContent).toContain('受付結果を確認できません');
+  expect(resend().disabled).toBe(true);
+  await userEvent.click(resend());
+  expect(newId).toHaveBeenCalledOnce();
+  expect(fetcher).not.toHaveBeenCalled();
 });

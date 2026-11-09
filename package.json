@@ -22,14 +22,16 @@
     "test:integration": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:integration",
     "db:reset-seed": "node tools/local-integration/src/run.ts db:reset-seed",
     "prepare:integration": "node tools/local-integration/src/prepare-integration.ts",
+    "test:coverage": "node tools/coverage/run.ts",
+    "check:coverage": "node tools/coverage/run.ts --check",
     "test:integration:pr": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:integration:pr",
     "test:realtime": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:realtime",
-    "test:coverage": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-api-codegen test && vitest run --config vitest.coverage.config.mts --coverage"
+    "test:coverage:node": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-api-codegen test && vitest run --config vitest.coverage.config.mts --coverage"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "5.1.0",
     "lefthook": "2.2.1",
-    "oxfmt": "0.76.0",
+    "oxfmt": "0.77.0",
     "oxlint": "1.92.0",
     "vitest": "5.1.0"
   },

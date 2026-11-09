@@ -104,6 +104,7 @@ export const deliveryAnomalies = sqliteTable(
 export const deletedJobs = sqliteTable('deleted_jobs', {
   jobId: text('job_id').primaryKey(),
   deletedAt: integer('deleted_at').notNull(),
+  interviewId: text('interview_id'),
 });
 
 // 配送異常の隔離とは分け、正常なDLQ照合も受信単位で記録する。

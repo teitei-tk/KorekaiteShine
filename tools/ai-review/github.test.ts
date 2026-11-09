@@ -1,6 +1,37 @@
 import { expect, it } from 'vitest';
 import { target } from './github.ts';
 import type { Api } from './github.ts';
+import { MARKER, revisionMarker } from './policy.ts';
+
+it('同じbaseとheadの完了マーカーがあれば再レビューしない', async () => {
+  const fixture = setup();
+  fixture.prior.push({
+    id: 1,
+    body: MARKER + revisionMarker(head, base),
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+  });
+  expect(await target(fixture.api, 1)).toMatchObject({ status: 'already-complete' });
+});
+
+it('CIのheadが不正なSHAならmergeの照会へ進まない', async () => {
+  const fixture = setup();
+  fixture.run.head_sha = 'invalid';
+  expect(await target(fixture.api, 1)).toEqual({ status: 'excluded' });
+  expect(fixture.requests).toEqual(['actions/runs/1', 'pulls/7']);
+});
+
+it('取得したPRの番号がCIの対象と違う場合は除外する', async () => {
+  const fixture = setup();
+  fixture.pr.number = 8;
+  expect(await target(fixture.api, 1)).toEqual({ status: 'excluded' });
+});
+
+it('CIが不正なPR番号を指す場合はPR資料を取得しない', async () => {
+  const fixture = setup();
+  fixture.run.pull_requests[0].number = 0;
+  expect(await target(fixture.api, 1)).toEqual({ status: 'excluded' });
+  expect(fixture.requests).toEqual(['actions/runs/1']);
+});
 
 const head = 'a'.repeat(40),
   base = 'b'.repeat(40);
@@ -29,6 +60,8 @@ function setup(kind = 'owner') {
       },
     ],
   };
+  const parents = [{ sha: base }, { sha: 'd'.repeat(40) }];
+  const prior: { id: number; body: string; user: { login: string; type: string } }[] = [];
   const api: Api = async <T>(path: string) => {
     requests.push(path);
     if (path.startsWith('actions/')) {
@@ -38,15 +71,21 @@ function setup(kind = 'owner') {
       return pr as T;
     }
     if (path.startsWith('git/commits/')) {
-      return { parents: [{ sha: base }, { sha: 'd'.repeat(40) }] } as T;
+      return { parents } as T;
     }
     if (path.startsWith('issues/')) {
-      return [] as T;
+      return prior as T;
     }
     throw new Error('予期しない呼び出し');
   };
-  return { api, requests, run };
+  return { api, requests, run, pr, parents, prior };
 }
+
+it('CIの仮想mergeが現在のbaseとheadを親に持つ場合は受理する', async () => {
+  const fixture = setup('stale');
+  fixture.parents[1].sha = head;
+  expect(await target(fixture.api, 1)).toMatchObject({ status: 'ready' });
+});
 it('他人のPRは再実行者に関係なく除外し資料取得へ進まない', async () => {
   const { api, requests } = setup('other');
   expect(await target(api, 1)).toEqual({ status: 'excluded' });

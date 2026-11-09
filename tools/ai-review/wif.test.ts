@@ -1,5 +1,31 @@
-import { expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { authenticate } from './wif.ts';
+afterEach(() => vi.unstubAllGlobals());
+
+it('HTTPのOIDC取得先へ要求トークンを送信しない', async () => {
+  const request = vi.fn<typeof fetch>();
+  await expect(
+    authenticate(
+      { ...env, ACTIONS_ID_TOKEN_REQUEST_URL: 'http://oidc.invalid' },
+      'claims',
+      request,
+    ),
+  ).rejects.toThrow('OIDC URLが不正');
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('OIDC設定が欠けていれば要求しない', async () => {
+  const request = vi.fn<typeof fetch>();
+  await expect(
+    authenticate({ ...env, OPENAI_WIF_AUDIENCE: undefined }, 'claims', request),
+  ).rejects.toThrow('WIF設定が不足');
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('既定fetchでも不正なOIDC応答をクレームとして受け付けない', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ value: 'not-a-jwt' })));
+  await expect(authenticate(env, 'claims')).rejects.toThrow('OIDC応答が不正');
+});
 const env = {
   ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.test/token?x=1',
   ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'github-secret',
@@ -26,6 +52,13 @@ function jwt(repository = 'teitei-tk/KorekaiteShine') {
     '.signature'
   );
 }
+
+it('任意のマスク通知を省略しても選別したクレームだけを返す', async () => {
+  const request = (async () => Response.json({ value: jwt() })) as typeof fetch;
+  const result = await authenticate(env, 'claims', request);
+  expect(result.claims.repository).toBe('teitei-tk/KorekaiteShine');
+  expect(result).not.toHaveProperty('token');
+});
 it('クレーム確認だけではOpenAIへ通信しない', async () => {
   const urls: string[] = [];
   const request = (async (url: string | URL | Request) => {

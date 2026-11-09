@@ -1,0 +1,1 @@
+ALTER TABLE `usage_reservations` ADD `settled_at` integer;

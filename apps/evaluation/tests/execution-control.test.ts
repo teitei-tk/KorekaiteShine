@@ -252,3 +252,126 @@ test.each(['timeout', 'lease-loss'] as const)(
     expect(vi.getTimerCount()).toBe(0);
   },
 );
+
+test.each([1000, 1001])(
+  '期限に達した時刻%dで開始した試行は評価・更新・保存を開始しない',
+  async (now) => {
+    vi.useFakeTimers();
+    const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
+      ok: true,
+      value: { summary: '実行禁止' },
+    }));
+    const renew = vi.fn(async () => true);
+    const save = vi.fn(async () => true);
+    expect(
+      await runEvaluationAttempt({ now: () => now, deadline: 1000, evaluate, renew, save }),
+    ).toBe(false);
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(renew).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  },
+);
+
+test('更新タイマー発火前に壁時計が期限へ進んだら実行権を更新せず停止する', async () => {
+  vi.useFakeTimers();
+  let now = 0;
+  const evaluated = deferredEvaluation();
+  const evaluate = vi.fn(async () => evaluated.promise);
+  const renew = vi.fn(async () => true);
+  const save = vi.fn(async () => true);
+  const result = runEvaluationAttempt({ now: () => now, deadline: 180_000, evaluate, renew, save });
+  now = 180_000;
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(await result).toBe(false);
+  expect(evaluate).toHaveBeenCalledOnce();
+  expect(renew).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test('成功終了後に保留していた更新が成功しても次の更新を予約しない', async () => {
+  vi.useFakeTimers();
+  const evaluated = deferredEvaluation();
+  let release!: (value: boolean) => void;
+  const renewing = new Promise<boolean>((resolve) => {
+    release = resolve;
+  });
+  const renew = vi.fn(() => renewing);
+  const save = vi.fn(async () => true);
+  const result = runEvaluationAttempt({
+    now: () => 0,
+    deadline: 180_000,
+    evaluate: async () => evaluated.promise,
+    renew,
+    save,
+  });
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(renew).toHaveBeenCalledOnce();
+  const value: EvaluationResult = { ok: true, value: { summary: '更新応答より先に保存' } };
+  evaluated.resolve(value);
+  expect(await result).toBe(true);
+  release(true);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(vi.getTimerCount()).toBe(0);
+  expect(save).toHaveBeenCalledExactlyOnceWith(value);
+  await vi.advanceTimersByTimeAsync(180_000);
+  expect(renew).toHaveBeenCalledOnce();
+});
+
+test('期限で停止した後に保留中の保存が失敗しても保存を再試行しない', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(0);
+  let rejectSave!: (error: Error) => void;
+  const saving = new Promise<boolean>((_resolve, reject) => {
+    rejectSave = reject;
+  });
+  const save = vi.fn(() => saving);
+  const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
+    ok: true,
+    value: { summary: '保存待機' },
+  }));
+  const result = runEvaluationAttempt({
+    now: () => vi.getMockedSystemTime()!.getTime(),
+    deadline: 1000,
+    evaluate,
+    renew: async () => true,
+    save,
+  });
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await result).toBe(false);
+  rejectSave(new Error('期限後に届いた保存失敗'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(save).toHaveBeenCalledOnce();
+  expect(evaluate).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test('保存失敗時に壁時計が期限へ達していれば期限タイマー前でも再保存しない', async () => {
+  vi.useFakeTimers();
+  let now = 0;
+  let rejectSave!: (error: Error) => void;
+  const saving = new Promise<boolean>((_resolve, reject) => {
+    rejectSave = reject;
+  });
+  const save = vi.fn(() => saving);
+  const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
+    ok: true,
+    value: { summary: '保存待機' },
+  }));
+  const result = runEvaluationAttempt({
+    now: () => now,
+    deadline: 1000,
+    evaluate,
+    renew: async () => true,
+    save,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(save).toHaveBeenCalledOnce();
+  now = 1000;
+  rejectSave(new Error('保存先の障害'));
+  expect(await result).toBe(false);
+  expect(save).toHaveBeenCalledOnce();
+  expect(evaluate).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+});

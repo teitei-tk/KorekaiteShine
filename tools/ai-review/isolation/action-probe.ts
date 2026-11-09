@@ -3,7 +3,7 @@
 // 本番Workflowの実行ラッパーとして使用してはならない。
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { probeIsolation, requireIsolationReport, type IsolationInput } from '../isolation-probe.js';
+import { probeIsolation, requireIsolationReport, type IsolationInput } from '../isolation-probe.ts';
 
 const args = process.argv.slice(2);
 const outputIndex = args.indexOf('--output-last-message');

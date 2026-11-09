@@ -1,3 +1,4 @@
+import type { JobTransactionEffects } from '../server/repositories/transaction-effects';
 import { consumeDlq } from './consume-dlq';
 import { classifyDelivery } from './classify-delivery';
 import {
@@ -28,6 +29,7 @@ export interface DeliveryContext {
   kind: 'normal' | 'dlq';
 }
 export interface EvaluationDependencies {
+  effects?: JobTransactionEffects;
   db: ReturnType<typeof createPrimaryDb>;
   now(): number;
   newId(): string;
@@ -124,7 +126,7 @@ export async function consumeJob(
       renew: () => renewExecution(deps.db, lease, deps.now()),
       save: (result) =>
         result.ok
-          ? completeExecution(deps.db, lease, result.value, deps.now())
+          ? completeExecution(deps.db, lease, result.value, deps.now(), deps.effects)
           : failExecution(deps.db, lease, result.error, deps.newId(), deps.now()),
     });
     return saved ? { action: 'ack' } : retry;

@@ -1,5 +1,5 @@
 import { and, eq } from 'void/db';
-import { deliveryAnomalies } from '@korekaite/database';
+import { deliveryAnomalies } from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import type { DeliveryContext } from '../../application/consume-job';
 import type { JobPurpose } from './job-execution';

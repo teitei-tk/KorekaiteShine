@@ -17,7 +17,7 @@ import {
   requireIsolationReport,
   type IsolationInput,
   type IsolationReport,
-} from '../isolation-probe.js';
+} from '../isolation-probe.ts';
 
 const home = '/home/ai-review/.codex';
 const privateDir = '/opt/ai-review-probe/private';

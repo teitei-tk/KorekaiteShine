@@ -1,12 +1,12 @@
+import type { JobTransactionEffects } from './transaction-effects';
 import { and, eq, exists, gt, inArray, isNull, notExists, or, sql } from 'void/db';
 import {
   jobs,
   deletedJobs,
   dlqReceipts,
-  diagnosticChecks,
   executionSlots,
   jobOutbox,
-} from '@korekaite/database';
+} from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import type { DeliveryContext } from '../../application/consume-job';
 import { terminalJobStates, runnableJobStates } from '../../domain/job-state';
@@ -18,6 +18,7 @@ export async function recordDlqReceipt(
   jobId: string,
   context: DeliveryContext,
   now: number,
+  effects?: JobTransactionEffects,
 ): Promise<boolean> {
   const matchingJob = and(
     eq(jobs.jobId, jobId),
@@ -96,37 +97,16 @@ export async function recordDlqReceipt(
         set: { lastReceivedAt: now },
       })
       .returning({ jobId: dlqReceipts.jobId }),
-    db
-      .update(jobs)
-      .set({ updatedAt: now })
-      .where(
-        and(
-          matchingJob,
-          exists(receipt),
-          exists(
-            db
-              .select()
-              .from(diagnosticChecks)
-              .where(
-                and(
-                  eq(diagnosticChecks.jobId, jobs.jobId),
-                  eq(diagnosticChecks.dlqReceipt, 'pending'),
-                ),
-              ),
-          ),
-        ),
+    ...(effects?.dlqReceived?.(
+      exists(
+        db
+          .select()
+          .from(jobs)
+          .where(and(matchingJob, exists(receipt))),
       ),
-    db
-      .update(diagnosticChecks)
-      .set({ dlqReceipt: 'passed' })
-      .where(
-        and(
-          eq(diagnosticChecks.jobId, jobId),
-          eq(diagnosticChecks.dlqReceipt, 'pending'),
-          exists(receipt),
-          exists(db.select().from(jobs).where(matchingJob)),
-        ),
-      ),
+      jobId,
+      now,
+    ) ?? []),
   ]);
   return recorded.length === 1;
 }

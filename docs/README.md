@@ -2,11 +2,11 @@
 
 この文書群は、開発者本人と開発を支援するエージェントが、合意済みの要件と選定理由を確認するためのものです。本文は日本語で記述します。製品名、API名、ファイル名は公式の表記を使います。
 
-2026年10月24日からの設計相談を整理し、2026年11月2日に3 Workers・共有D1・環境分離、Queue契約・評価ジョブ制御の合意を追加しました。2026年11月3日、既存試作の移行と、診断ジョブによるWeb→DO→Queue→評価Consumer→ローカルD1の接続、再試行・DLQ・停止後回復を検証しました。正式な面接・実AI・Access・クラウド配置は後続範囲です。文書の更新はクラウド作成の承認を意味しません。
+2026年10月24日からの設計相談を整理し、2026年11月2日に3 Workers・共有D1・環境分離、Queue契約・評価ジョブ制御の合意を追加しました。2026年11月3日、既存試作の移行と、診断ジョブによるWeb→DO→Queue→評価Consumer→ローカルD1の接続、再試行・DLQ・停止後回復を検証しました。2026年11月7日には、経験Markdownの送信確認から音声面接、五軸評価の取得、再評価、削除までをローカルWorkerと架空のAIで検証しました。実機のマイクと実AIを使う面接、Cloudflare Accessとクラウド配置は今後の検証項目です。
 
 ## 読む順序
 
-TypeSpecとReact・TanStack Start・Voidの接続は、[Webアプリ](../apps/web/README.md)へ移行しています。架空データの一覧APIと診断機能の検証であり、本番アプリ全体の実装完了を意味しません。
+TypeSpecとReact・TanStack Start・Voidの接続は、[Webアプリ](../apps/web/README.md)へ移行しています。ローカルの面接画面は `/practice` です。必要なモデル設定と起動方法は[経験Markdownで音声面接を試す](runbooks/local-development.md#経験markdownで音声面接を試す)を参照してください。
 
 [既存試作の移行と3 Workersのローカル接続確認の実装計画](superpowers/plans/2026-11-02-local-worker-skeleton.md)に沿って実装しました。起動・停止・DB操作・検査は[ローカル開発手順](runbooks/local-development.md)、固定版・互換性制約・観測結果は[検証記録](research/local-worker-integration.md)を参照してください。
 
@@ -21,9 +21,13 @@ AIレビューの正式な動作は[コメントと修正確認の要件](spec/a
 
 エージェントの認証確認・PR整理は[作業手順](runbooks/agent-workflow.md)、コードレビューは[基準](../CODING_STANDARDS.md)を参照してください。
 
+テストの行・文・関数・分岐の実測値と、未計測範囲・不足箇所は[カバレッジ調査](research/test-coverage.md)を参照してください。
+
+計測漏れの解消から領域別のテスト追加・CIの閾値導入までの手順は、[4指標100%への実装計画](superpowers/plans/2026-11-07-full-test-coverage.md)を参照してください。
+
 CIのTakumi Guardは匿名モードで構成しています。[運用手順](../tools/docs/README.md#ciのtakumi-guard)、[検証記録](research/takumi-guard.md)、[実装計画](superpowers/plans/2026-11-07-takumi-guard.md)を参照してください。将来のShisho Cloud連携と、今回の匿名利用を区別しています。
 
-カバレッジの再実行方法と対象範囲は[計測手順](runbooks/test-coverage.md)を参照してください。Node側の実測値と、Worker・子プロセス内部の未計測範囲を区別しています。
+カバレッジの再実行方法と対象範囲は[計測手順](runbooks/test-coverage.md)を参照してください。Node限定の補助計測と、Worker・子プロセスも収集する全体計測を区別しています。
 
 ## 設計判断の記録
 

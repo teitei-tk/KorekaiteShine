@@ -2,9 +2,93 @@ import { expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { notifyFailure } from './failure-notify.ts';
+import { notifyFailure, failureTarget } from './failure-notify.ts';
 import type { Api, Comment } from './github.ts';
 import { prFixture } from './policy.test.ts';
+it('投稿直前の最終照合でPRが閉じられた場合は通知しない', async () => {
+  const f = fixture();
+  let reads = 0;
+  const api: Api = async <T>(
+    path: string,
+    method?: string,
+    body?: import('./github.ts').ApiBody,
+  ) => {
+    if (path === 'pulls/7' && ++reads === 3) {
+      return { ...f.pr, state: 'closed' } as T;
+    }
+    return f.api<T>(path, method, body);
+  };
+  expect(await notifyFailure(api, 20, 1, f.directory)).toEqual({ status: 'skipped' });
+  expect(reads).toBe(3);
+  expect(f.posted).toEqual([]);
+});
+it('実行タイトルが欠落した応答を通知対象にしない', async () => {
+  const f = fixture();
+  Reflect.deleteProperty(f.run, 'display_title');
+  expect(await failureTarget(f.api, 20, 1)).toBeUndefined();
+  expect(f.posted).toEqual([]);
+});
+it('通知APIが不正なコメントIDを返したら成功扱いしない', async () => {
+  const f = fixture();
+  const api: Api = async <T>(
+    path: string,
+    method?: string,
+    body?: import('./github.ts').ApiBody,
+  ) => {
+    if (method === 'POST') {
+      return { id: 0 } as T;
+    }
+    return f.api<T>(path, method, body);
+  };
+  await expect(notifyFailure(api, 20, 1, f.directory)).rejects.toThrow('通知結果が不正');
+});
+it('既存通知が重複していればさらに通知を追加しない', async () => {
+  const f = fixture();
+  await notifyFailure(f.api, 20, 1, f.directory);
+  f.prior.push({ ...f.prior[0], id: 101 });
+  await expect(notifyFailure(f.api, 20, 1, f.directory)).rejects.toThrow('失敗通知が重複');
+  expect(f.posted).toHaveLength(1);
+});
+it('上限件数のジョブ一覧は欠落の可能性があるため通知を停止する', async () => {
+  const f = fixture();
+  const api: Api = async <T>(
+    path: string,
+    method?: string,
+    body?: import('./github.ts').ApiBody,
+  ) => {
+    if (path.includes('/jobs?')) {
+      return {
+        jobs: Array.from({ length: 100 }, () => ({ name: 'generate', conclusion: 'failure' })),
+      } as T;
+    }
+    return f.api<T>(path, method, body);
+  };
+  await expect(notifyFailure(api, 20, 1, f.directory)).rejects.toThrow('ジョブ一覧が不正');
+  expect(f.posted).toEqual([]);
+});
+
+it('不正な実行ID・試行番号はAPIを呼ばず拒否する', async () => {
+  let calls = 0;
+  const api: Api = async () => {
+    calls++;
+    throw new Error('unexpected');
+  };
+  await expect(failureTarget(api, 0, 1)).rejects.toThrow('実行IDが不正');
+  await expect(failureTarget(api, 20, 0)).rejects.toThrow('実行IDが不正');
+  expect(calls).toBe(0);
+});
+
+it('元実行を確定できないタイトルや旧試行を通知しない', async () => {
+  for (const title of ['invalid', 'AI review / source run 999999999999999999 attempt 1 / review']) {
+    const f = fixture();
+    f.run.display_title = title;
+    expect(await failureTarget(f.api, 20, 1)).toBeUndefined();
+    expect(f.posted).toEqual([]);
+  }
+  const f = fixture();
+  f.source.run_attempt = 2;
+  expect(await failureTarget(f.api, 20, 1)).toBeUndefined();
+});
 
 function fixture(reason = 'OUTPUT_INVALID') {
   const pr = prFixture();

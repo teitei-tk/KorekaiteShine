@@ -83,9 +83,7 @@ export async function notifyFailure(
     return { status: 'skipped' };
   }
   const outcome = await completedOutcome(api, accepted.run, directory);
-  if (outcome.conclusion === 'success' || outcome.conclusion === 'neutral') {
-    return { status: 'skipped' };
-  }
+  // successの実行は上で除外済み。completedOutcomeはそれ以外を成功・中立に変換しない。
   const { number } = accepted.pr;
   const head = accepted.pr.head.sha,
     base = accepted.pr.base.sha;

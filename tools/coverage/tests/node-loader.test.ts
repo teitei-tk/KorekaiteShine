@@ -65,7 +65,7 @@ test.each([0, 1])('Node子プロセスの終了コード%dでも収集の完了�
 
 test('SIGKILLされたNode子プロセスも同期journalから実行回数を回収する', async () => {
   const root = mkdtempSync(join(tmpdir(), 'coverage-node-kill-'));
-  let child: ReturnType<typeof spawn> | undefined;
+  const childState = { child: undefined as ReturnType<typeof spawn> | undefined };
   try {
     const path = 'choose.mjs';
     const source = 'export function choose(value) { if(value) return 1; return 2; }';
@@ -88,7 +88,7 @@ test('SIGKILLされたNode子プロセスも同期journalから実行回数を�
     writeFileSync(join(root, path), source);
     const config = join(root, 'run.json');
     writeFileSync(config, JSON.stringify({ root, directory, run }));
-    child = spawn(
+    childState.child = spawn(
       process.execPath,
       [
         '--import',
@@ -108,19 +108,19 @@ test('SIGKILLされたNode子プロセスも同期journalから実行回数を�
       },
     );
     await new Promise<void>((resolve, reject) => {
-      child!.stdout!.once('data', () => resolve());
-      child!.once('error', reject);
-      child!.once('exit', () => reject(new Error('準備前に終了しました')));
+      childState.child!.stdout!.once('data', () => resolve());
+      childState.child!.once('error', reject);
+      childState.child!.once('exit', () => reject(new Error('準備前に終了しました')));
     });
-    const closed = new Promise((resolve) => child!.once('close', resolve));
-    child.kill('SIGKILL');
+    const closed = new Promise((resolve) => childState.child!.once('close', resolve));
+    childState.child.kill('SIGKILL');
     await closed;
     const records = readCaptures(directory);
     expect(records[0].status).toBe('complete');
     expect(records[0].files[0].coverage.f['0']).toBe(1);
     expect(records[0].files[0].coverage.b['0']).toEqual([1, 0]);
   } finally {
-    child?.kill('SIGKILL');
+    childState.child?.kill('SIGKILL');
     rmSync(root, { recursive: true, force: true });
   }
 });

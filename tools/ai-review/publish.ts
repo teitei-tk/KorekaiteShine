@@ -74,7 +74,7 @@ export async function publishArtifact(
 ): Promise<'REVIEW_COMPLETE' | 'ALREADY_COMPLETE' | 'TARGET_CHANGED'> {
   const artifact = validateArtifact(input, input.origin),
     m = artifact.metadata;
-  let wrote = false;
+  const wroteState = { wrote: false };
   for (const op of artifact.operations) {
     const pr = await api<PullRequest>(`pulls/${m.number}`);
     if (
@@ -118,9 +118,9 @@ export async function publishArtifact(
         { body: op.body },
       );
     }
-    wrote = true;
+    wroteState.wrote = true;
   }
-  return wrote ? 'REVIEW_COMPLETE' : 'ALREADY_COMPLETE';
+  return wroteState.wrote ? 'REVIEW_COMPLETE' : 'ALREADY_COMPLETE';
 }
 if (import.meta.main) {
   try {

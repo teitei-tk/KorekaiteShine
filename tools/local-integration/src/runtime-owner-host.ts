@@ -1,10 +1,12 @@
 import { startRuntimeInProcess, PendingRuntimeCleanup, type LocalRuntime } from './runtime.ts';
 import type { RuntimeOwnerMessage, RuntimeOwnerRequest } from './runtime-owner.ts';
 
-let starting: Promise<LocalRuntime> | undefined;
-let stopping = false;
-let cleanup: Promise<void> | undefined;
-let pendingCleanup: (() => Promise<void>) | undefined;
+const startingContext = {
+  starting: undefined as Promise<LocalRuntime> | undefined,
+  stopping: false,
+  cleanup: undefined as Promise<void> | undefined,
+  pendingCleanup: undefined as (() => Promise<void>) | undefined,
+};
 const startup = new AbortController();
 
 function send(message: RuntimeOwnerMessage): void {
@@ -19,24 +21,24 @@ function report(error: Error | string): void {
 }
 
 function stop(): void {
-  stopping = true;
+  startingContext.stopping = true;
   startup.abort();
-  if (cleanup) {
+  if (startingContext.cleanup) {
     return;
   }
-  cleanup = (async () => {
-    const runtime = await starting?.catch((error) => {
+  startingContext.cleanup = (async () => {
+    const runtime = await startingContext.starting?.catch((error) => {
       if (error instanceof PendingRuntimeCleanup) {
-        pendingCleanup = error.cleanup;
+        startingContext.pendingCleanup = error.cleanup;
       }
       return undefined;
     });
     if (runtime) {
       await runtime.stop();
     }
-    if (pendingCleanup) {
-      await pendingCleanup();
-      pendingCleanup = undefined;
+    if (startingContext.pendingCleanup) {
+      await startingContext.pendingCleanup();
+      startingContext.pendingCleanup = undefined;
     }
     if (process.connected) {
       process.disconnect?.();
@@ -44,7 +46,7 @@ function stop(): void {
   })().catch((error) => {
     report(error instanceof Error ? error : 'ランタイム停止の確認に失敗しました。');
     // 停止を確認できない間は所有者とロックを残し、再取得による二重起動を防ぐ。
-    cleanup = undefined;
+    startingContext.cleanup = undefined;
     setTimeout(stop, 1000);
   });
 }
@@ -57,19 +59,24 @@ process.on('message', (message: RuntimeOwnerRequest) => {
     stop();
     return;
   }
-  if (message.type !== 'start' || starting || stopping) {
+  if (message.type !== 'start' || startingContext.starting || startingContext.stopping) {
     return;
   }
-  starting = startRuntimeInProcess(message.config, message.mode, message.options, startup.signal);
-  starting.then(
+  startingContext.starting = startRuntimeInProcess(
+    message.config,
+    message.mode,
+    message.options,
+    startup.signal,
+  );
+  startingContext.starting.then(
     (runtime) => {
       void runtime.closed.then(({ exitCode }) => {
-        if (exitCode !== 0 && !stopping) {
+        if (exitCode !== 0 && !startingContext.stopping) {
           report('ローカルランタイムが予期せず終了しました。');
           stop();
         }
       });
-      if (stopping) {
+      if (startingContext.stopping) {
         stop();
       } else {
         send({ type: 'ready', baseUrl: runtime.baseUrl });

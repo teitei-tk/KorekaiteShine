@@ -93,11 +93,11 @@ test('材料分析HTTPは認可・送信確認・容量・利用枠を通過し�
 test('本文サイズを申告ヘッダーに依存せず制限し、超過ストリームを中止する', async () => {
   const cancel = vi.fn();
   const encoder = new TextEncoder();
-  let sent = false;
+  const sentState = { sent: false };
   const body = new ReadableStream({
     pull(controller) {
-      if (!sent) {
-        sent = true;
+      if (!sentState.sent) {
+        sentState.sent = true;
         controller.enqueue(encoder.encode(' '.repeat(200_001)));
       } else {
         controller.enqueue(encoder.encode('{"markdown":"資料","confirmed":true}'));

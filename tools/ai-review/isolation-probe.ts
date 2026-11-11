@@ -88,11 +88,11 @@ async function socketDenied(path: string): Promise<boolean> {
 }
 
 export async function probeIsolation(input: IsolationInput): Promise<IsolationReport> {
-  let pidNamespace: string | undefined;
+  const pidNamespaceState = { pidNamespace: undefined as string | undefined };
   try {
     const value = readlinkSync('/proc/self/ns/pid');
     if (/^pid:\[\d+\]$/.test(value)) {
-      pidNamespace = value;
+      pidNamespaceState.pidNamespace = value;
     }
   } catch {
     /* 非Linuxや不可視の場合も、隔離成功の根拠にはしない。 */
@@ -148,18 +148,27 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   ];
   for (const { pid, label } of processes) {
     for (const name of ['environ', 'mem']) {
-      let observation = 'readable';
-      let passed = false;
+      const observationContext = { observation: 'readable', passed: false };
       try {
         closeSync(openSync(`/proc/${pid}/${name}`, 'r'));
       } catch (error) {
         const code = error instanceof Error && 'code' in error ? String(error.code) : '';
-        observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(code)
+        observationContext.observation = ['EACCES', 'EPERM', 'ENOENT', 'EROFS', 'ESRCH'].includes(
+          code,
+        )
           ? code
           : 'other-error';
-        passed = parentAccessIsolated(code, input.parentPidNamespace, pidNamespace);
+        observationContext.passed = parentAccessIsolated(
+          code,
+          input.parentPidNamespace,
+          pidNamespaceState.pidNamespace,
+        );
       }
-      checks.push({ name: `${label}-${name}`, passed, observation });
+      checks.push({
+        name: `${label}-${name}`,
+        passed: observationContext.passed,
+        observation: observationContext.observation,
+      });
     }
   }
   for (const [index, path] of (input.protectedSockets ?? []).entries()) {
@@ -168,7 +177,11 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
   checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
   checks.push({ name: 'network', passed: await networkDenied(input.port) });
-  return { passed: checks.every((check) => check.passed), checks, pidNamespace };
+  return {
+    passed: checks.every((check) => check.passed),
+    checks,
+    pidNamespace: pidNamespaceState.pidNamespace,
+  };
 }
 
 export function requireIsolationReport(text: string, names: string[]): void {

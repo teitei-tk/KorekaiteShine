@@ -9,7 +9,7 @@
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "types": ["node"],
-    "lib": ["ES2022", "DOM", "ESNext.Temporal"]
+    "lib": ["ES2022", "ES2024.Promise", "DOM", "ESNext.Temporal"]
   },
   "include": ["src", "tests", "generated/**/*.d.ts", "generated/**/*.d.mts"]
 }

@@ -48,53 +48,55 @@ export async function authenticateProxy(
     // 標準エラーにも外部応答や資格情報を出さない。
     stdio: ['pipe', 'ignore', 'ignore'],
   });
-  let failed = false;
+  const failedState = { failed: false };
   child.on('error', () => {
-    failed = true;
+    failedState.failed = true;
   });
   child.stdin!.on('error', () => {
-    failed = true;
+    failedState.failed = true;
   });
-  const running = () => child.exitCode === null && child.signalCode === null && !failed;
-  let info: Info | undefined;
-  let stopped = false;
+  const running = () => child.exitCode === null && child.signalCode === null && !failedState.failed;
+  const infoContext = { info: undefined as Info | undefined, stopped: false };
   try {
     child.stdin!.end(`${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}\n`);
     const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
     while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
-      let candidate: Partial<Info> | undefined;
+      const candidateState = { candidate: undefined as Partial<Info> | undefined };
       try {
-        candidate = JSON.parse(readFileSync(infoPath, 'utf8'));
+        candidateState.candidate = JSON.parse(readFileSync(infoPath, 'utf8'));
       } catch {
         /* 作成・書込み待ち */
       }
       if (
-        candidate &&
-        Number.isInteger(candidate.port) &&
-        candidate.port! > 0 &&
-        candidate.port! < 65536
+        candidateState.candidate &&
+        Number.isInteger(candidateState.candidate.port) &&
+        candidateState.candidate.port! > 0 &&
+        candidateState.candidate.port! < 65536
       ) {
-        if (candidate.pid !== child.pid) {
+        if (candidateState.candidate.pid !== child.pid) {
           throw new Error('proxy identity mismatch');
         }
-        info = { pid: candidate.pid!, port: candidate.port! };
+        infoContext.info = {
+          pid: candidateState.candidate.pid!,
+          port: candidateState.candidate.port!,
+        };
         break;
       }
       await delay(25);
     }
-    if (!info || !running()) {
+    if (!infoContext.info || !running()) {
       throw new Error('official WIF exchange did not become ready');
     }
     chmodSync(infoPath, 0o444);
-    inspect(info);
+    inspect(infoContext.info);
     if (!running()) {
       throw new Error('proxy exited during isolation verification');
     }
   } finally {
     try {
-      if (info && running()) {
+      if (infoContext.info && running()) {
         // 初期交換はserver-infoより前。モデルAPIには要求を送らず、公式終了APIのみ呼ぶ。
-        const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
+        const response = await fetch(`http://127.0.0.1:${infoContext.info.port}/shutdown`, {
           method: 'GET',
           redirect: 'error',
           signal: AbortSignal.timeout(3000),
@@ -103,7 +105,7 @@ export async function authenticateProxy(
         while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
           await delay(25);
         }
-        stopped = response.ok && child.exitCode === 0;
+        infoContext.stopped = response.ok && child.exitCode === 0;
       }
     } finally {
       if (child.exitCode === null && child.signalCode === null) {
@@ -113,7 +115,7 @@ export async function authenticateProxy(
       rmSync(infoPath, { force: true });
     }
   }
-  if (!stopped) {
+  if (!infoContext.stopped) {
     throw new Error('official proxy shutdown failed');
   }
 }

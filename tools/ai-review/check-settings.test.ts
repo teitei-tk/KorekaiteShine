@@ -104,7 +104,10 @@ it('取得失敗や壊れたJSONを、stdout・stderr・例外を漏らさず報
   const sensitive = 'private-response-fixture';
   const readers = [
     () => {
-      throw Object.assign(new Error(sensitive), { stdout: sensitive, stderr: sensitive });
+      throw new (class extends Error {
+        stdout = sensitive;
+        stderr = sensitive;
+      })(sensitive);
     },
     () => sensitive,
     read({ [sensitive]: sensitive }),

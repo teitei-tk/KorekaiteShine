@@ -192,7 +192,7 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timerState = { timer: undefined as ReturnType<typeof setTimeout> | undefined };
     async function refresh() {
       try {
         const value = await readDetail(id, controller.signal);
@@ -205,7 +205,7 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
           value.evaluation &&
           ['pending', 'running', 'retry_wait'].includes(value.evaluation.status)
         ) {
-          timer = setTimeout(refresh, 3000);
+          timerState.timer = setTimeout(refresh, 3000);
         }
       } catch (cause) {
         if (!controller.signal.aborted) {
@@ -216,7 +216,7 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
     void refresh();
     return () => {
       controller.abort();
-      clearTimeout(timer);
+      clearTimeout(timerState.timer);
     };
   }, [id, revision]);
   const evaluation = detail?.evaluation;

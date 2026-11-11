@@ -5,13 +5,7 @@ import type { EvaluationResult } from '../src/domain/evaluation-result.ts';
 afterEach(() => vi.useRealTimers());
 
 function deferredEvaluation() {
-  let finish: (value: EvaluationResult) => void = () => {
-    throw new Error('評価待機の初期化前です。');
-  };
-  const promise = new Promise<EvaluationResult>((resolve) => {
-    finish = resolve;
-  });
-  return { promise, resolve: finish };
+  return Promise.withResolvers<EvaluationResult>();
 }
 
 test('AIが120秒で完了しなければ通信を中止し、再呼出しせず失敗を保存する', async () => {
@@ -140,7 +134,7 @@ test('保存失敗が続き更新処理も応答しなくても、180秒で試�
     savedAt.push(vi.getMockedSystemTime()!.getTime());
     throw new Error('保存先が応答できません。');
   });
-  let settled = false;
+  const settledState = { settled: false };
   const result = runEvaluationAttempt({
     now: () => vi.getMockedSystemTime()!.getTime(),
     deadline,
@@ -148,11 +142,11 @@ test('保存失敗が続き更新処理も応答しなくても、180秒で試�
     renew,
     save,
   }).then((value) => {
-    settled = true;
+    settledState.settled = true;
     return value;
   });
   await vi.advanceTimersByTimeAsync(179_999);
-  expect(settled).toBe(false);
+  expect(settledState.settled).toBe(false);
   expect(renew).toHaveBeenCalledOnce();
   expect(savedAt.length).toBeGreaterThan(1);
   await vi.advanceTimersByTimeAsync(1);
@@ -275,13 +269,19 @@ test.each([1000, 1001])(
 
 test('更新タイマー発火前に壁時計が期限へ進んだら実行権を更新せず停止する', async () => {
   vi.useFakeTimers();
-  let now = 0;
+  const nowState = { now: 0 };
   const evaluated = deferredEvaluation();
   const evaluate = vi.fn(async () => evaluated.promise);
   const renew = vi.fn(async () => true);
   const save = vi.fn(async () => true);
-  const result = runEvaluationAttempt({ now: () => now, deadline: 180_000, evaluate, renew, save });
-  now = 180_000;
+  const result = runEvaluationAttempt({
+    now: () => nowState.now,
+    deadline: 180_000,
+    evaluate,
+    renew,
+    save,
+  });
+  nowState.now = 180_000;
   await vi.advanceTimersByTimeAsync(30_000);
   expect(await result).toBe(false);
   expect(evaluate).toHaveBeenCalledOnce();
@@ -293,10 +293,8 @@ test('更新タイマー発火前に壁時計が期限へ進んだら実行権�
 test('成功終了後に保留していた更新が成功しても次の更新を予約しない', async () => {
   vi.useFakeTimers();
   const evaluated = deferredEvaluation();
-  let release!: (value: boolean) => void;
-  const renewing = new Promise<boolean>((resolve) => {
-    release = resolve;
-  });
+
+  const { promise: renewing, resolve: release } = Promise.withResolvers<boolean>();
   const renew = vi.fn(() => renewing);
   const save = vi.fn(async () => true);
   const result = runEvaluationAttempt({
@@ -322,10 +320,8 @@ test('成功終了後に保留していた更新が成功しても次の更新�
 test('期限で停止した後に保留中の保存が失敗しても保存を再試行しない', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(0);
-  let rejectSave!: (error: Error) => void;
-  const saving = new Promise<boolean>((_resolve, reject) => {
-    rejectSave = reject;
-  });
+
+  const { promise: saving, reject: rejectSave } = Promise.withResolvers<boolean>();
   const save = vi.fn(() => saving);
   const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
     ok: true,
@@ -349,18 +345,16 @@ test('期限で停止した後に保留中の保存が失敗しても保存を�
 
 test('保存失敗時に壁時計が期限へ達していれば期限タイマー前でも再保存しない', async () => {
   vi.useFakeTimers();
-  let now = 0;
-  let rejectSave!: (error: Error) => void;
-  const saving = new Promise<boolean>((_resolve, reject) => {
-    rejectSave = reject;
-  });
+  const nowState = { now: 0 };
+
+  const { promise: saving, reject: rejectSave } = Promise.withResolvers<boolean>();
   const save = vi.fn(() => saving);
   const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
     ok: true,
     value: { summary: '保存待機' },
   }));
   const result = runEvaluationAttempt({
-    now: () => now,
+    now: () => nowState.now,
     deadline: 1000,
     evaluate,
     renew: async () => true,
@@ -368,7 +362,7 @@ test('保存失敗時に壁時計が期限へ達していれば期限タイマ�
   });
   await vi.advanceTimersByTimeAsync(0);
   expect(save).toHaveBeenCalledOnce();
-  now = 1000;
+  nowState.now = 1000;
   rejectSave(new Error('保存先の障害'));
   expect(await result).toBe(false);
   expect(save).toHaveBeenCalledOnce();

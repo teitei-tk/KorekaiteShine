@@ -16,7 +16,7 @@ test('DLQ確認の初回変更と公開更新日時を一体保存し、保存�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -71,13 +71,11 @@ test('DLQ確認の初回変更と公開更新日時を一体保存し、保存�
       }),
       checks: { dlqReceipt: 'passed' },
     });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受信保存後にpassedにする', async () => {
@@ -88,7 +86,7 @@ test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -135,13 +133,11 @@ test('失敗確定ではDLQ確認を完了せず、ローカルDLQ配送の受�
       INSERT INTO four SELECT COUNT(*) FROM job_attempts;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('完了・取消済みのDLQ通知は状態を変えず受信記録を保存してackする', async () => {
@@ -152,7 +148,7 @@ test('完了・取消済みのDLQ通知は状態を変えず受信記録を保�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     for (const status of ['completed', 'cancelled']) {
       const jobId = randomUUID();
@@ -179,13 +175,11 @@ test('完了・取消済みのDLQ通知は状態を変えず受信記録を保�
       `,
       ]);
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DLQは有効な実行権と未来の通知を維持し、受信だけ記録する', async () => {
@@ -196,7 +190,7 @@ test('DLQは有効な実行権と未来の通知を維持し、受信だけ記�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const runningId = randomUUID();
     const futureId = randomUUID();
@@ -236,13 +230,11 @@ test('DLQは有効な実行権と未来の通知を維持し、受信だけ記�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('回復経路のない未完了ジョブのDLQは通知待ちを保存し、失敗へ上書きしない', async () => {
@@ -253,7 +245,7 @@ test('回復経路のない未完了ジョブのDLQは通知待ちを保存し�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     for (const status of ['pending', 'retry_wait']) {
       const jobId = randomUUID();
@@ -266,7 +258,7 @@ test('回復経路のない未完了ジョブのDLQは通知待ちを保存し�
         ${status === 'retry_wait' ? `INSERT INTO job_outbox (id, job_id, purpose, operation, generation, scheduled_at, sent_at) VALUES ('${randomUUID()}', '${jobId}', 'diagnostics', 'notify', 0, 1000, 1000);` : ''}
       `,
       ]);
-      for (let delivery = 0; delivery < 2; delivery++) {
+      for (const _ of Array(2).keys()) {
         const response = await fetch(
           `${runtime.baseUrl}/api/evaluation-test?kind=dlq&now=2000&messageId=${messageId}`,
           {
@@ -290,13 +282,11 @@ test('回復経路のない未完了ジョブのDLQは通知待ちを保存し�
       `,
       ]);
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DLQ保存失敗は受信記録とpassedを巻き戻してretryし、復旧後の重複受信は一件に集約する', async () => {
@@ -307,7 +297,7 @@ test('DLQ保存失敗は受信記録とpassedを巻き戻してretryし、復旧
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -356,13 +346,11 @@ test('DLQ保存失敗は受信記録とpassedを巻き戻してretryし、復旧
       INSERT INTO zero SELECT COUNT(*) FROM job_outbox WHERE operation IN ('notify', 'notify_dlq');
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DLQが保存した回復通知を即時に通常Queueへ送り、scheduledなしで評価を再開する', async () => {
@@ -372,34 +360,41 @@ test('DLQが保存した回復通知を即時に通常Queueへ送り、scheduled
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', { probeOnlyEvaluation: true }),
+  };
   try {
-    const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
-      body: JSON.stringify({ scenario: 'success' }),
-    });
+    const acceptedResponse = await fetch(
+      `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+        body: JSON.stringify({ scenario: 'success' }),
+      },
+    );
     expect(acceptedResponse.status).toBe(202);
     const { jobId } = await acceptedResponse.json();
     await expect
       .poll(
-        async () => (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)).json(),
+        async () =>
+          (
+            await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)
+          ).json(),
         { timeout: 8_000, interval: 100 },
       )
       .toMatchObject({ message: { jobId } });
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     // 最初の配送はprobeだけが受信。DO保存済み・未評価の状態から本Consumerへ引き継ぐ。
-    runtime = await startRuntime(config, 'dev');
+    runtimeContext.runtime = await startRuntime(config, 'dev');
     const status = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+      (await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
     expect(await status()).toMatchObject({
       status: 'pending',
       attemptCount: 0,
       checks: { doPersistence: 'passed' },
     });
     const response = await fetch(
-      `${runtime.baseUrl}/api/evaluation-test?transport=queue&kind=dlq`,
+      `${runtimeContext.runtime.baseUrl}/api/evaluation-test?transport=queue&kind=dlq`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -424,13 +419,11 @@ test('DLQが保存した回復通知を即時に通常Queueへ送り、scheduled
       INSERT INTO zero SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify_dlq';
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知保存後にackする', async () => {
@@ -441,7 +434,7 @@ test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -490,11 +483,9 @@ test('期限切れrunningのDLQは猶予中にackせず、回復処理の通知�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

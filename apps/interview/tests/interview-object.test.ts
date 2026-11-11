@@ -160,7 +160,7 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
     await f.seed();
     f.env.OPENAI_API_KEY = 'fixture';
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    for (let i = 0; i < 4; i++) {
+    for (const _ of Array(4).keys()) {
       expect((await f.fetchObject()).status).toBe(101);
     }
     expect((await f.fetchObject()).status).toBe(503);

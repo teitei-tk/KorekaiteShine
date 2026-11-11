@@ -1,3 +1,4 @@
+import { SystemError } from '../../../tools/testing/system-error.mts';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,7 +14,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 test('生成物の所有記録を書けない場合は元の書き込みエラーを返す', async () => {
   const root = await mkdtemp(join(tmpdir(), 'korekaite-artifact-error-'));
   try {
-    const error = Object.assign(new Error('書き込み権限がありません'), { code: 'EACCES' });
+    const error = new SystemError('書き込み権限がありません', 'EACCES');
     vi.mocked(writeFile).mockRejectedValueOnce(error);
     const runtime = resolveRuntime({
       repositoryRoot: root,

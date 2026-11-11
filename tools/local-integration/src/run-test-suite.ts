@@ -9,9 +9,9 @@ import { stopProcessGroup } from './process.ts';
 
 export async function runTestProcess(args: readonly string[], cwd: string): Promise<number> {
   const child = spawn(process.execPath, [...args], { cwd, stdio: 'inherit', detached: true });
-  let interrupted: NodeJS.Signals | undefined;
+  const interruptedState = { interrupted: undefined as NodeJS.Signals | undefined };
   const interrupt = (signal: NodeJS.Signals) => {
-    interrupted = signal;
+    interruptedState.interrupted = signal;
     child.kill(signal);
   };
   const sigint = () => interrupt('SIGINT');
@@ -22,7 +22,7 @@ export async function runTestProcess(args: readonly string[], cwd: string): Prom
     return await new Promise<number>((resolve, reject) => {
       child.once('error', reject);
       child.once('close', (code, signal) => {
-        const cause = interrupted ?? signal;
+        const cause = interruptedState.interrupted ?? signal;
         resolve(cause ? 128 + constants.signals[cause] : (code ?? 1));
       });
     });

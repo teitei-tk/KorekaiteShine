@@ -19,7 +19,7 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
   vi.stubGlobal('WebSocket', Peer);
   const session = { interviewId: 'one', theme: '選択', status: 'ready', createdAt: 1, activeMs: 0 };
   const theme = { title: '選択', heading: '本文', excerpt: '架空' };
-  let ended = false;
+  const endedState = { ended: false };
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url) => {
@@ -34,7 +34,7 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
           return Response.json(session);
         case '/api/interviews/one':
           return Response.json({
-            session: { ...session, status: ended ? 'ended' : 'ready' },
+            session: { ...session, status: endedState.ended ? 'ended' : 'ready' },
             material: theme,
             background: '',
             transcriptIncomplete: false,
@@ -68,7 +68,7 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
   await waitFor(() => expect(peers).toHaveLength(1));
   const [socket] = peers;
   expect(socket.url.protocol).toBe('wss:');
-  ended = true;
+  endedState.ended = true;
   await act(async () =>
     socket.onmessage(
       new MessageEvent('message', {

@@ -18,7 +18,7 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
     parallelIndex: 0,
   });
   const fixture = join(config.artifactDirectory, 'migration-source');
-  let succeeded = false;
+
   try {
     await prepareMigrationFixture(fixture, '20261102094333_many_post');
     await runDatabaseCommand(config, ['migrate'], { schemaDirectory: fixture });
@@ -36,7 +36,7 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
       { schemaDirectory: fixture },
     );
     await prepareMigrationFixture(fixture, '20261102101336_wide_zombie');
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (const _ of Array(2).keys()) {
       await runDatabaseCommand(config, ['migrate'], { schemaDirectory: fixture });
       await runDatabaseCommand(
         config,
@@ -58,12 +58,10 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
         { schemaDirectory: fixture },
       );
     }
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('失敗したmigrationは変更と履歴を残さず、修正後に再適用できる', async () => {
@@ -77,7 +75,7 @@ test('失敗したmigrationは変更と履歴を残さず、修正後に再適�
   });
   const fixture = join(config.artifactDirectory, 'migration-source');
   const options = { schemaDirectory: fixture };
-  let succeeded = false;
+
   try {
     await prepareMigrationFixture(fixture, '20261102101336_wide_zombie');
     await runDatabaseCommand(config, ['migrate'], options);
@@ -135,10 +133,8 @@ test('失敗したmigrationは変更と履歴を残さず、修正後に再適�
       ],
       options,
     );
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

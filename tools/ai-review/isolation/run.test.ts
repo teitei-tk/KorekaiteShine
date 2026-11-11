@@ -29,7 +29,11 @@ vi.mock('../isolation-probe.ts', async (original) => ({
   probeIsolation: vi.fn(),
 }));
 
-let servers: Server[];
+function closedAllServers() {
+  return vi
+    .mocked(createServer)
+    .mock.results.every(({ value: server }) => vi.mocked(server.close).mock.calls.length === 1);
+}
 it('検査後に受信器へ接続できなければ隔離成功としない', async () => {
   vi.mocked(createConnection).mockImplementationOnce(() => {
     const socket = new Socket();
@@ -37,7 +41,7 @@ it('検査後に受信器へ接続できなければ隔離成功としない', a
     return socket;
   });
   await expect(import('./run.ts')).rejects.toThrow('fixture connection');
-  expect(servers.every((server) => vi.mocked(server.close).mock.calls.length === 1)).toBe(true);
+  expect(closedAllServers()).toBe(true);
 });
 it('root権限やActionパスがなければ受け入れ検査を開始しない', async () => {
   vi.spyOn(process, 'getuid').mockReturnValue(1000);
@@ -49,12 +53,12 @@ it('root権限やActionパスがなければ受け入れ検査を開始しない
   expect(createServer).not.toHaveBeenCalled();
 });
 it('Actionの非ゼロ終了を受け入れ成功にしない', async () => {
-  status = 1;
+  statusContext.status = 1;
   await expect(import('./run.ts')).rejects.toThrow('isolation acceptance failed');
-  expect(servers.every((server) => vi.mocked(server.close).mock.calls.length === 1)).toBe(true);
+  expect(closedAllServers()).toBe(true);
 });
 it('Actionの完了中にrunnerが置換された場合は拒否する', async () => {
-  changed = true;
+  statusContext.changed = true;
   await expect(import('./run.ts')).rejects.toThrow('runner process changed during probe');
 });
 it('runnerと親のPID名前空間が一致しなければ拒否する', async () => {
@@ -64,11 +68,13 @@ it('runnerと親のPID名前空間が一致しなければ拒否する', async (
   await expect(import('./run.ts')).rejects.toThrow('runner PID namespace mismatch');
 });
 it('親PID名前空間を観測できなければ検査を中止する', async () => {
-  report.pidNamespace = undefined;
+  vi.mocked(probeIsolation).mockResolvedValue({ ...fixtureReport(), pidNamespace: undefined });
   await expect(import('./run.ts')).rejects.toThrow('parent PID namespace unavailable');
 });
 it('負の対照が保護対象へのアクセスを拒否した場合は検証を中止する', async () => {
+  const report = fixtureReport();
   report.checks[0].passed = true;
+  vi.mocked(probeIsolation).mockResolvedValue(report);
   await expect(import('./run.ts')).rejects.toThrow('negative control failed');
   expect(spawn).not.toHaveBeenCalled();
 });
@@ -84,23 +90,38 @@ it('github検証で実runnerがなければ成功扱いしない', async () => {
   expect(spawn).not.toHaveBeenCalled();
 });
 it('受信器のアドレス不明時は両受信器を閉じて失敗する', async () => {
-  address = null;
+  address.mockReturnValue(null);
   await expect(import('./run.ts')).rejects.toThrow('listener not ready');
-  expect(servers.every((server) => vi.mocked(server.close).mock.calls.length === 1)).toBe(true);
+  expect(closedAllServers()).toBe(true);
 });
-let address: { port: number } | null;
-let report: IsolationReport;
-let status = 0;
-let changed = false;
-let statReads = 0;
+const address = vi.fn<() => { port: number } | null>();
+function fixtureReport(): IsolationReport {
+  return {
+    passed: false,
+    pidNamespace: 'pid:[100]',
+    checks: [
+      'uid',
+      'protected-file-0',
+      'read-only-directory-0',
+      'network',
+      'parent-environ',
+      'parent-mem',
+      'groups',
+      'protected-socket-0',
+      'read-only-file-0',
+      'read-only-file-1',
+      'read-only-file-2',
+    ].map((name) => ({ name, passed: false })),
+  };
+}
+const statusContext = { status: 0, changed: false, statReads: 0 };
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  servers = [];
-  address = { port: 43210 };
-  status = 0;
-  changed = false;
-  statReads = 0;
+  address.mockReturnValue({ port: 43210 });
+  statusContext.status = 0;
+  statusContext.changed = false;
+  statusContext.statReads = 0;
   vi.spyOn(process, 'getuid').mockReturnValue(0);
   vi.stubGlobal('process', {
     ...process,
@@ -118,7 +139,11 @@ beforeEach(() => {
     if (String(path).endsWith('/101/stat')) {
       return (
         '101 (fixture) ' +
-        ['S', ...Array(18).fill('0'), changed && ++statReads > 1 ? '100' : '99'].join(' ')
+        [
+          'S',
+          ...Array(18).fill('0'),
+          statusContext.changed && ++statusContext.statReads > 1 ? '100' : '99',
+        ].join(' ')
       );
     }
     throw new Error('fixture proc disappeared');
@@ -126,40 +151,22 @@ beforeEach(() => {
   vi.mocked(readlinkSync).mockImplementation((path) =>
     String(path).endsWith('/exe') ? '/runner/bin/Runner.Worker' : 'pid:[100]',
   );
-  report = {
-    passed: false,
-    pidNamespace: 'pid:[100]',
-    checks: [
-      'uid',
-      'protected-file-0',
-      'read-only-directory-0',
-      'network',
-      'parent-environ',
-      'parent-mem',
-      'groups',
-      'protected-socket-0',
-      'read-only-file-0',
-      'read-only-file-1',
-      'read-only-file-2',
-    ].map((name) => ({ name, passed: false })),
-  };
-  vi.mocked(probeIsolation).mockImplementation(async () => report);
+  vi.mocked(probeIsolation).mockResolvedValue(fixtureReport());
   vi.mocked(createServer).mockImplementation((callback) => {
     const socket = new Socket();
     vi.spyOn(socket, 'end').mockImplementation(() => socket);
-    const server = Object.assign(new EventEmitter(), {
-      listen: vi.fn((...args) => {
+    const server = new (class extends EventEmitter {
+      listen = vi.fn((...args) => {
         (callback as (socket: Socket) => void)(socket);
         (args.at(-1) as () => void)();
         return server;
-      }),
-      address: vi.fn(() => address),
-      close: vi.fn((callback) => {
+      });
+      address = address;
+      close = vi.fn((callback) => {
         callback();
         return server;
-      }),
-    }) as object as Server;
-    servers.push(server);
+      });
+    })() as object as Server;
     return server;
   });
   vi.mocked(createConnection).mockImplementation(() => {
@@ -169,7 +176,7 @@ beforeEach(() => {
   });
   vi.mocked(spawn).mockImplementation(() => {
     const child = new ChildProcess();
-    queueMicrotask(() => child.emit('exit', status));
+    queueMicrotask(() => child.emit('exit', statusContext.status));
     return child;
   });
 });
@@ -188,5 +195,5 @@ it('負の対照と実runnerの同一性を確かめてActionの結果を受け�
     expect.stringContaining('"protectedProcesses":[101]'),
     { mode: 0o444 },
   );
-  expect(servers.every((server) => vi.mocked(server.close).mock.calls.length === 1)).toBe(true);
+  expect(closedAllServers()).toBe(true);
 });

@@ -53,26 +53,22 @@ afterEach(() => {
 // 同じ受け入れ条件に模擬ブラウザの観測結果を与え、失敗を検知する側も検証する。
 async function observer() {
   const world = {};
-  let time = 0,
-    started = null,
-    active = 0,
-    generation = 1,
-    refused = false;
+  const timeContext = { time: 0, started: null, active: 0, generation: 1, refused: false };
   const transcripts = [];
-  vi.spyOn(performance, 'now').mockImplementation(() => time);
+  vi.spyOn(performance, 'now').mockImplementation(() => timeContext.time);
   delay.mockImplementation(async (ms) => {
-    time += ms;
+    timeContext.time += ms;
   });
   const close = () => {
-    if (started !== null) {
-      active += time - started;
-      started = null;
+    if (timeContext.started !== null) {
+      timeContext.active += timeContext.time - timeContext.started;
+      timeContext.started = null;
     }
   };
   const settings = {
     url: 'http://127.0.0.1:4327',
     rejectDials: (value) => {
-      refused = value;
+      timeContext.refused = value;
     },
     stop: vi.fn(),
     restart: vi.fn(),
@@ -93,23 +89,23 @@ async function observer() {
   const context = { newPage: () => page, request: { get: async () => ({ status: () => 403 }) } };
   const browser = { newContext: () => context, close: vi.fn() };
   chromium.launch.mockResolvedValue(browser);
-  let input, output;
+  const inputContext = { input: undefined, output: undefined };
   const server = {
     send: vi.fn(),
     close,
     onMessage: (fn) => {
-      output = fn;
+      inputContext.output = fn;
     },
   };
   const client = {
     send: vi.fn(),
     close: vi.fn(),
     onMessage: (fn) => {
-      input = fn;
+      inputContext.input = fn;
     },
     connectToServer: () => server,
   };
-  const emit = (event) => output(JSON.stringify(event));
+  const emit = (event) => inputContext.output(JSON.stringify(event));
   const locator = (name) => ({
     waitFor: vi.fn(),
     first() {
@@ -125,7 +121,7 @@ async function observer() {
       document.body.append(field);
     },
     click: async () => {
-      if (name === 'マイクを許可して開始' && refused) {
+      if (name === 'マイクを許可して開始' && timeContext.refused) {
         emit({ type: 'error', code: 'AUDIO_CONNECT_FAILED' });
         return;
       }
@@ -136,9 +132,9 @@ async function observer() {
           button.textContent = name;
           document.body.append(button);
           button.click();
-          generation++;
+          timeContext.generation++;
         }
-        started = time;
+        timeContext.started = timeContext.time;
         emit({ type: 'state', interviewId: 'one', status: 'active' });
       } else if (name === '一時停止' || name === '終了して評価する') {
         close();
@@ -161,8 +157,8 @@ async function observer() {
       response('/api/interviews', 'GET', {}),
       response('/api/interviews', 'POST', { interviewId: 'one', theme: '題材' }),
       response('/api/interviews/one', 'GET', {
-        session: { interviewId: 'one', activeMs: active },
-        audioRemainingMs: 3600000 - active,
+        session: { interviewId: 'one', activeMs: timeContext.active },
+        audioRemainingMs: 3600000 - timeContext.active,
         transcripts: [...transcripts],
       }),
     ];
@@ -183,19 +179,31 @@ async function observer() {
       content: speaker,
       sequence: transcripts.length,
       fragmentId: String(transcripts.length),
-      generation,
+      generation: timeContext.generation,
     };
     transcripts.push(event);
     emit(event);
   }
   speak.mockImplementation(async () => {
-    for (let n = 0; n < 3; n++) {
-      input(voice);
+    for (const _ of Array(3).keys()) {
+      inputContext.input(voice);
     }
     transcript('user');
     transcript('assistant');
   });
-  return { world, relay, client, server, input, output, page, context, emit, close, browser };
+  return {
+    world,
+    relay,
+    client,
+    server,
+    input: inputContext.input,
+    output: inputContext.output,
+    page,
+    context,
+    emit,
+    close,
+    browser,
+  };
 }
 
 test.each(scenarios.map((section) => [section.split('\n')[0], section]))(

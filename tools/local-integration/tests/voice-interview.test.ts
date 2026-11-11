@@ -21,8 +21,7 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     interviewVoiceMock: true,
     interviewEvaluationMock: true,
   });
-  let succeeded = false;
-  let socket: WebSocket | undefined;
+  const succeededContext = { socket: undefined as WebSocket | undefined };
   try {
     const bootstrap = await fetch(`${runtime.baseUrl}/api/local-session`);
     expect(bootstrap.status).toBe(200);
@@ -81,8 +80,10 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       });
       return peer;
     }
-    socket = await openPeer();
-    socket.send(JSON.stringify({ type: 'start', commandId: 'start', generation: 0 }));
+    succeededContext.socket = await openPeer();
+    succeededContext.socket.send(
+      JSON.stringify({ type: 'start', commandId: 'start', generation: 0 }),
+    );
     await expect
       .poll(() => events.some((event) => event.type === 'state' && event.status === 'active'), {
         timeout: 10000,
@@ -90,25 +91,27 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       .toBe(true);
     const audio = new ArrayBuffer(10);
     new DataView(audio).setFloat64(0, 1);
-    socket.send(audio);
+    succeededContext.socket.send(audio);
     await expect
       .poll(() => events.filter((event) => event.type !== 'state'), {
         timeout: 10000,
       })
       .toContainEqual(expect.objectContaining({ type: 'transcript', speaker: 'user' }));
     const closed = new Promise<void>((resolve) =>
-      socket!.addEventListener('close', () => resolve(), { once: true }),
+      succeededContext.socket!.addEventListener('close', () => resolve(), { once: true }),
     );
-    socket.close();
+    succeededContext.socket.close();
     await closed;
     events.length = 0;
-    socket = await openPeer();
+    succeededContext.socket = await openPeer();
     await expect
       .poll(() => events.some((e) => e.type === 'state' && e.status === 'reconnecting'), {
         timeout: 10000,
       })
       .toBe(true);
-    socket.send(JSON.stringify({ type: 'resume', commandId: 'resume', generation: 2 }));
+    succeededContext.socket.send(
+      JSON.stringify({ type: 'resume', commandId: 'resume', generation: 2 }),
+    );
     await expect
       .poll(
         () => events.some((e) => e.type === 'state' && e.status === 'active' && e.generation === 3),
@@ -116,13 +119,15 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       )
       .toBe(true);
     new DataView(audio).setFloat64(0, 3);
-    socket.send(audio);
+    succeededContext.socket.send(audio);
     await expect
       .poll(() => events.some((e) => e.type === 'transcript' && e.generation === 3), {
         timeout: 10000,
       })
       .toBe(true);
-    socket.send(JSON.stringify({ type: 'finish', commandId: 'end', generation: 3 }));
+    succeededContext.socket.send(
+      JSON.stringify({ type: 'finish', commandId: 'end', generation: 3 }),
+    );
     await expect
       .poll(() => events.some((event) => event.type === 'state' && event.status === 'ended'), {
         timeout: 10000,
@@ -169,7 +174,9 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     });
     expect(deleted.status).toBe(204);
     await expect.poll(() => events.some((e) => e.type === 'deleted'), { timeout: 5000 }).toBe(true);
-    await expect.poll(() => socket?.readyState, { timeout: 5000 }).toBe(WebSocket.CLOSED);
+    await expect
+      .poll(() => succeededContext.socket?.readyState, { timeout: 5000 })
+      .toBe(WebSocket.CLOSED);
     for (const source of ['source=web', 'source=evaluation&kind=dlq']) {
       const late = await fetch(`${runtime.baseUrl}/api/formal-queue-test?${source}`, {
         method: 'POST',
@@ -205,12 +212,10 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       'execute',
       `CREATE TEMP TABLE assertion (value INTEGER CHECK(value=0)); INSERT INTO assertion SELECT COUNT(*) FROM jobs WHERE job_id='${ended.evaluationJobId}'; INSERT INTO assertion SELECT COUNT(*) FROM transcript_fragments WHERE interview_id='voice-fixture'; INSERT INTO assertion SELECT COUNT(*) FROM material_analyses WHERE analysis_id='${analysisId}';`,
     ]);
-    succeeded = true;
   } finally {
-    socket?.close();
+    succeededContext.socket?.close();
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
 }, 90000);

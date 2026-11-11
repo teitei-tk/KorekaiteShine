@@ -151,12 +151,12 @@ it('スレッドを次ページまで取得し、取得順に依存せず履歴�
 });
 
 it('次ページのカーソルが同じなら部分履歴を返さず停止する', async () => {
-  let requests = 0;
+  const requestsState = { requests: 0 };
   const api: Api = async <T>(path: string) => {
     if (path !== 'graphql') {
       return [] as T;
     }
-    requests++;
+    requestsState.requests++;
     return {
       data: {
         repository: {
@@ -171,7 +171,7 @@ it('次ページのカーソルが同じなら部分履歴を返さず停止す�
     } as T;
   };
   await expect(loadSnapshot(api, 7)).rejects.toThrow('履歴ページが進みません');
-  expect(requests).toBe(2);
+  expect(requestsState.requests).toBe(2);
 });
 
 it('元コメントを持たないスレッドを拒否する', async () => {

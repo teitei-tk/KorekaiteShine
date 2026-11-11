@@ -4,9 +4,9 @@ import { createMaterialAnalyzer } from '../src/server/openai-material-analyzer';
 test('材料を命令と分離し、指定モデルと生成Schemaで分析して結果を読み取る', async () => {
   const markdown = '# 判断\n静的配信を選んだ。';
   const value = { themes: [{ title: '配信方式', heading: '判断', excerpt: '静的配信を選んだ。' }] };
-  let sent: Request | undefined;
+  const sentState = { sent: undefined as Request | undefined };
   const fetcher = vi.fn<typeof fetch>(async (input, init) => {
-    sent = new Request(input, init);
+    sentState.sent = new Request(input, init);
     return Response.json({
       id: 'resp_fixture',
       object: 'response',
@@ -33,10 +33,10 @@ test('材料を命令と分離し、指定モデルと生成Schemaで分析し�
   });
   const controller = new AbortController();
   expect(await analyze(markdown, controller.signal)).toEqual(value);
-  expect(sent?.url).toBe('https://api.openai.com/v1/responses');
-  expect(sent?.headers.get('Authorization')).toBe('Bearer fixture-key');
+  expect(sentState.sent?.url).toBe('https://api.openai.com/v1/responses');
+  expect(sentState.sent?.headers.get('Authorization')).toBe('Bearer fixture-key');
   expect(fetcher).toHaveBeenCalledTimes(1);
-  const body = await sent!.json();
+  const body = await sentState.sent!.json();
   expect(body).toMatchObject({
     model: 'fixture-model',
     store: false,

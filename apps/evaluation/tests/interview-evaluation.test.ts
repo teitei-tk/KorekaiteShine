@@ -37,11 +37,11 @@ test('保存された原文に基づく五軸評価を返し、捏造引用と�
 });
 
 test('固定入力と採点基準をstore:falseで送り、秘密値や外部エラー本文を結果に残さない', async () => {
-  let sent = '';
+  const sentState = { sent: '' };
   const generate = createInterviewEvaluator({
     apiKey: 'fixture-key',
     fetcher: async (_url, init) => {
-      sent = String(init?.body);
+      sentState.sent = String(init?.body);
       return Response.json({
         status: 'completed',
         output: [
@@ -58,15 +58,15 @@ test('固定入力と採点基準をstore:falseで送り、秘密値や外部エ
   expect(await evaluateInterview(snapshot, new AbortController().signal, generate)).toMatchObject({
     ok: true,
   });
-  expect(JSON.parse(sent)).toMatchObject({
+  expect(JSON.parse(sentState.sent)).toMatchObject({
     model: 'test-model',
     store: false,
     tools: [],
     tool_choice: 'none',
     instructions: snapshot.evaluation.instructions,
   });
-  expect(sent).toContain('制約を比較しました。');
-  expect(sent).not.toContain('fixture-key');
+  expect(sentState.sent).toContain('制約を比較しました。');
+  expect(sentState.sent).not.toContain('fixture-key');
   const failed = createInterviewEvaluator({
     apiKey: 'fixture-key',
     fetcher: async () => new Response('fixture-key external-error', { status: 401 }),

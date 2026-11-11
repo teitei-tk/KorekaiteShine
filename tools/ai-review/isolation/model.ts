@@ -239,7 +239,7 @@ async function waitAndReject(): Promise<void> {
 }
 async function finish(outcome: string): Promise<void> {
   const value = state();
-  let stopped = false;
+  const stoppedState = { stopped: false };
   try {
     const info = await readInfo(value.infoPath);
     try {
@@ -281,11 +281,16 @@ async function finish(outcome: string): Promise<void> {
           redirect: 'error',
           signal: AbortSignal.timeout(3000),
         });
-        for (let attempt = 0; attempt < 60 && alive(value.proxy); attempt++) {
+        for (const _ of Array(60)) {
+          if (!alive(value.proxy)) {
+            break;
+          }
           await delay(50);
         }
-        stopped = response.ok && !alive(value.proxy);
-        console.log(`WIF model probe: official shutdown ${stopped ? 'passed' : 'failed'}`);
+        stoppedState.stopped = response.ok && !alive(value.proxy);
+        console.log(
+          `WIF model probe: official shutdown ${stoppedState.stopped ? 'passed' : 'failed'}`,
+        );
       }
     }
   } finally {
@@ -294,7 +299,7 @@ async function finish(outcome: string): Promise<void> {
     }
     rmSync(value.infoPath, { force: true });
   }
-  if (!stopped) {
+  if (!stoppedState.stopped) {
     throw new Error('official shutdown failed');
   }
 }

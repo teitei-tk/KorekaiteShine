@@ -27,9 +27,9 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-  let output = '';
+  const outputState = { output: '' };
   child.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
+    outputState.output += chunk.toString();
   });
   child.stderr.resume();
   const closed = new Promise<number>((resolve) => {
@@ -38,28 +38,33 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
   });
   return {
     async ready(): Promise<string> {
-      let baseUrl: string | undefined;
+      const baseUrlState = { baseUrl: undefined as string | undefined };
       await expect
         .poll(
           () => {
-            baseUrl = output.match(/ローカルWeb: (http:\/\/127\.0\.0\.1:\d+)/u)?.[1];
-            return baseUrl !== undefined;
+            baseUrlState.baseUrl = outputState.output.match(
+              /ローカルWeb: (http:\/\/127\.0\.0\.1:\d+)/u,
+            )?.[1];
+            return baseUrlState.baseUrl !== undefined;
           },
           { timeout: 60_000, interval: 100 },
         )
         .toBe(true);
-      return baseUrl!;
+      return baseUrlState.baseUrl!;
     },
     async stop(): Promise<number> {
       if (child.exitCode === null && child.signalCode === null) {
         child.kill('SIGTERM');
       }
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timerState = { timer: undefined as ReturnType<typeof setTimeout> | undefined };
       try {
         return await Promise.race([
           closed,
           new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error('CLIの停止期限を超過しました。')), 15_000);
+            timerState.timer = setTimeout(
+              () => reject(new Error('CLIの停止期限を超過しました。')),
+              15_000,
+            );
           }),
         ]);
       } catch (error) {
@@ -67,7 +72,7 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
         await closed;
         throw error;
       } finally {
-        clearTimeout(timer);
+        clearTimeout(timerState.timer);
       }
     },
   };
@@ -99,16 +104,16 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
           await rm(config.stateDirectory!, { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
-        let cli: ReturnType<typeof launchCli> | undefined;
+        const cliState = { cli: undefined as ReturnType<typeof launchCli> | undefined };
         evidence.cleanup(async () => {
-          await cli?.stop();
+          await cliState.cli?.stop();
         });
         if (mode === 'preview') {
           await buildRuntime(config);
         }
-        cli = launchCli(config, runId, slot, mode);
-        let baseUrl = await cli.ready();
-        const accepted = await fetch(`${baseUrl}/api/diagnostics/check-jobs`, {
+        cliState.cli = launchCli(config, runId, slot, mode);
+        const baseUrlState = { baseUrl: await cliState.cli.ready() };
+        const accepted = await fetch(`${baseUrlState.baseUrl}/api/diagnostics/check-jobs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
           body: JSON.stringify({ scenario: 'retry_then_success' }),
@@ -118,7 +123,7 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         const { jobId } = await accepted.json();
         const status = async () =>
           (
-            await fetch(`${baseUrl}/api/diagnostics/check-jobs/${jobId}`, {
+            await fetch(`${baseUrlState.baseUrl}/api/diagnostics/check-jobs/${jobId}`, {
               signal: AbortSignal.timeout(10_000),
             })
           ).json();
@@ -134,8 +139,8 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         INSERT INTO one SELECT COUNT(*) FROM job_outbox WHERE job_id = '${jobId}' AND operation = 'notify' AND generation = 1 AND sent_at IS NOT NULL;
       `,
         ]);
-        expect(await cli.stop()).toBe(0);
-        cli = undefined;
+        expect(await cliState.cli.stop()).toBe(0);
+        cliState.cli = undefined;
         expect(
           Temporal.Now.instant().epochMilliseconds,
           '予約済み再試行の配送前に停止する',
@@ -147,8 +152,8 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
             delayedNotificationSentVerified: true,
           },
         });
-        cli = launchCli(config, runId, slot, mode);
-        baseUrl = await cli.ready();
+        cliState.cli = launchCli(config, runId, slot, mode);
+        baseUrlState.baseUrl = await cliState.cli.ready();
         const readyAt = performance.now();
         expect(await status()).toMatchObject({ status: 'retry_wait', attemptCount: 1 });
         // テストからscheduledや回復関数を呼ばず、実CLI自身の周期処理を待つ。
@@ -176,8 +181,8 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         INSERT INTO one SELECT COUNT(*) FROM connection_checks WHERE writer = 'scheduled';
       `,
         ]);
-        const exitCode = await cli.stop();
-        cli = undefined;
+        const exitCode = await cliState.cli.stop();
+        cliState.cli = undefined;
         expect(exitCode).toBe(0);
         evidence.observe({
           recoveryAfterReadyMs,

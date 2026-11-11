@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ChildProcess } from 'node:child_process';
 import { PassThrough } from 'node:stream';
 import { readFileSync, rmSync } from 'node:fs';
@@ -19,8 +19,8 @@ const env = {
   OPENAI_IDENTITY_PROVIDER_ID: 'idp',
   OPENAI_SERVICE_ACCOUNT_ID: 'account',
 };
-let child: ChildProcess;
 it('隔離検査中にプロキシが終了した場合は初期交換成功で終わらせない', async () => {
+  const child = createChild();
   await expect(
     authenticateProxy(
       env,
@@ -36,6 +36,7 @@ it('隔離検査中にプロキシが終了した場合は初期交換成功で�
   expect(child.kill).not.toHaveBeenCalled();
 });
 it('標準入力の切断時は要求トークンの引き渡し成功にしない', async () => {
+  const child = createChild();
   vi.spyOn(child.stdin!, 'end').mockImplementation(() => {
     child.stdin!.emit('error', new Error('fixture'));
     return child.stdin!;
@@ -52,6 +53,7 @@ it('標準入力の切断時は要求トークンの引き渡し成功にしな�
   expect(child.kill).toHaveBeenCalledWith('SIGKILL');
 });
 it('プロキシ起動のerrorイベントを成功扱いせず子を回収する', async () => {
+  const child = createChild();
   vi.spyOn(child.stdin!, 'end').mockImplementation(() => {
     child.emit('error', new Error('fixture'));
     return child.stdin!;
@@ -68,8 +70,8 @@ it('プロキシ起動のerrorイベントを成功扱いせず子を回収す�
   expect(child.kill).toHaveBeenCalledWith('SIGKILL');
   expect(rmSync).toHaveBeenLastCalledWith('/fixture/info', { force: true });
 });
-beforeEach(() => {
-  child = new ChildProcess();
+function createChild() {
+  const child = new ChildProcess();
   Object.defineProperty(child, 'pid', { value: 12345 });
   child.stdin = new PassThrough();
   vi.spyOn(child, 'kill').mockImplementation(() => {
@@ -85,7 +87,8 @@ beforeEach(() => {
       return new Response(null, { status: 200 });
     }),
   );
-});
+  return child;
+}
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();

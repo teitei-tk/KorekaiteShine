@@ -37,13 +37,15 @@ test('診断HTTPのContent-Type欠落を契約違反にし調査用の成果物�
 });
 
 async function failureFixture() {
-  let directory = '';
+  const directoryState = { directory: '' };
   const stop = vi.fn(async () => {});
   vi.mocked(startRuntime).mockImplementation(async (config) => {
-    directory = config.artifactDirectory;
-    onTestFinished(() => rm(dirname(dirname(directory)), { recursive: true, force: true }));
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'evidence.txt'), 'retain');
+    directoryState.directory = config.artifactDirectory;
+    onTestFinished(() =>
+      rm(dirname(dirname(directoryState.directory)), { recursive: true, force: true }),
+    );
+    await mkdir(directoryState.directory, { recursive: true });
+    await writeFile(join(directoryState.directory, 'evidence.txt'), 'retain');
     return {
       baseUrl: 'http://contract.invalid',
       stop,
@@ -51,7 +53,7 @@ async function failureFixture() {
       runScheduled: async () => {},
     };
   });
-  return { stop, directory: () => directory };
+  return { stop, directory: () => directoryState.directory };
 }
 
 test('面談HTTP契約の失敗ではランタイムを停止し調査用の成果物を残す', async () => {

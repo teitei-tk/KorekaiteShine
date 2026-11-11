@@ -1,3 +1,4 @@
+import { readJsonBody } from './json-body';
 import type { components } from '@korekaite/api-contracts/http';
 import {
   validateMaterialErrorBody,
@@ -7,7 +8,6 @@ import {
   analyzeMaterial,
   readMaterialInput,
   type MaterialAnalysisDependencies,
-  type MaterialAnalysisInput,
 } from '../application/analyze-material';
 
 interface MaterialHttpDependencies extends MaterialAnalysisDependencies {
@@ -47,43 +47,20 @@ export async function analyzeMaterialRequest(
   if (!deps.authorize(request)) {
     return errorResponse('FORBIDDEN');
   }
-  if (
-    request.headers.get('Content-Type')?.split(';')[0].trim().toLowerCase() !== 'application/json'
-  ) {
-    return errorResponse('UNSUPPORTED_MEDIA_TYPE');
+  // JSONのUnicodeエスケープを許容しつつ、読み取る本文のバイト数を制限する。
+  const body = await readJsonBody(request, 200_000);
+  if (!body.ok) {
+    const errors = {
+      UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',
+      REQUEST_TOO_LARGE: 'MATERIAL_TOO_LARGE',
+      INVALID_REQUEST: 'INVALID_MATERIAL',
+    } as const;
+    return errorResponse(errors[body.code]);
   }
-  let input: MaterialAnalysisInput | null;
-  try {
-    if (!request.body) {
-      return errorResponse('INVALID_MATERIAL');
-    }
-    const reader = request.body.getReader();
-    const decoder = new TextDecoder('utf-8', { fatal: true });
-    let bytes = 0;
-    let source = '';
-    try {
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) {
-          break;
-        }
-        bytes += chunk.value.byteLength;
-        // JSONのUnicodeエスケープを許容しつつ、本文を無制限には保持しない。
-        if (bytes > 200_000) {
-          await reader.cancel();
-          return errorResponse('MATERIAL_TOO_LARGE');
-        }
-        source += decoder.decode(chunk.value, { stream: true });
-      }
-      source += decoder.decode();
-    } finally {
-      reader.releaseLock();
-    }
-    input = JSON.parse(source);
-  } catch {
-    return errorResponse('INVALID_MATERIAL');
-  }
-  const checked = readMaterialInput(input);
+  const input = body.value;
+  const checked = readMaterialInput(
+    typeof input === 'object' && !Array.isArray(input) ? input : null,
+  );
   if (!checked.ok) {
     return errorResponse(checked.code);
   }

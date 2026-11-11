@@ -19,12 +19,15 @@ export async function findWorkerdInspector(
       return { pid: Number(pid), parent: Number(parent), command };
     });
   const children = new Set([parentPid]);
-  for (let previous = -1; previous !== children.size;) {
-    previous = children.size;
+  while (true) {
+    const previous = children.size;
     for (const row of rows) {
       if (children.has(row.parent)) {
         children.add(row.pid);
       }
+    }
+    if (children.size === previous) {
+      break;
     }
   }
   const inodes = new Set<string>();

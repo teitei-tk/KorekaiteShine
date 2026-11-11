@@ -252,7 +252,10 @@ async function shutdown(state: State): Promise<boolean> {
     redirect: 'error',
     signal: AbortSignal.timeout(3000),
   });
-  for (let i = 0; i < 60 && alive(state.proxy); i++) {
+  for (const _ of Array(60)) {
+    if (!alive(state.proxy)) {
+      break;
+    }
     await delay(50);
   }
   const stopped = response.ok && !alive(state.proxy);
@@ -262,7 +265,7 @@ async function shutdown(state: State): Promise<boolean> {
 async function finish(directory: string, outcome: string, mark: Mark): Promise<void> {
   mark('finish/state');
   const state: State = JSON.parse(readFileSync(`${privateDir}/state.json`, 'utf8'));
-  let stopped = false;
+  const stoppedState = { stopped: false };
   try {
     try {
       mark('finish/action');
@@ -290,8 +293,8 @@ async function finish(directory: string, outcome: string, mark: Mark): Promise<v
       );
     } finally {
       const previous = mark('finish/shutdown');
-      stopped = await shutdown(state);
-      if (stopped) {
+      stoppedState.stopped = await shutdown(state);
+      if (stoppedState.stopped) {
         mark(previous);
       }
     }
@@ -303,7 +306,7 @@ async function finish(directory: string, outcome: string, mark: Mark): Promise<v
     rmSync(state.infoPath, { force: true });
     mark(previous);
   }
-  if (!stopped) {
+  if (!stoppedState.stopped) {
     throw new Error('公式終了API失敗');
   }
 }
@@ -313,10 +316,10 @@ export async function executeRuntime(
   extra: string,
   env: Record<string, string | undefined> = process.env,
 ): Promise<boolean> {
-  let target: RuntimeTarget = 'runtime/preflight';
+  const targetState = { target: 'runtime/preflight' as RuntimeTarget };
   const mark: Mark = (next) => {
-    const previous = target;
-    target = next;
+    const previous = targetState.target;
+    targetState.target = next;
     return previous;
   };
   try {
@@ -334,10 +337,10 @@ export async function executeRuntime(
     }
     return true;
   } catch {
-    const message = `公式レビュー未完了: ${target}。`;
+    const message = `公式レビュー未完了: ${targetState.target}。`;
     console.error(message);
     try {
-      writeStatusReport(env, 'failure', target, 'EXECUTION_FAILED');
+      writeStatusReport(env, 'failure', targetState.target, 'EXECUTION_FAILED');
       if (env.GITHUB_STEP_SUMMARY) {
         appendFileSync(env.GITHUB_STEP_SUMMARY, message + '\n');
       }

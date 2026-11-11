@@ -19,37 +19,39 @@ export function createNotificationRuntime() {
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime: LocalRuntime | undefined;
-  let startup: Promise<LocalRuntime> | undefined;
-  let state: 'new' | 'starting' | 'ready' | 'running' | 'failed' | 'closed' = 'new';
-  let stopping: Promise<void> | undefined;
+  const runtimeContext = {
+    runtime: undefined as LocalRuntime | undefined,
+    startup: undefined as Promise<LocalRuntime> | undefined,
+    state: 'new' as 'new' | 'starting' | 'ready' | 'running' | 'failed' | 'closed',
+    stopping: undefined as Promise<void> | undefined,
+  };
   return {
     async start() {
-      if (state !== 'new') {
+      if (runtimeContext.state !== 'new') {
         throw new Error('通知検査の環境は一度だけ起動できます。');
       }
-      state = 'starting';
+      runtimeContext.state = 'starting';
       try {
-        runtime = await (startup = startRuntime(config, 'dev', {
+        runtimeContext.runtime = await (runtimeContext.startup = startRuntime(config, 'dev', {
           manualDiagnostics: true,
           probeOnlyEvaluation: true,
         }));
-        if (stopping) {
+        if (runtimeContext.stopping) {
           throw new Error('通知検査の起動中に停止されました。');
         }
-        state = 'ready';
+        runtimeContext.state = 'ready';
       } catch (error) {
-        state = 'failed';
+        runtimeContext.state = 'failed';
         throw error;
       }
     },
     async run(run: (context: NotificationCase) => Promise<void>, signal?: AbortSignal) {
-      if (state !== 'ready' || !runtime || stopping) {
+      if (runtimeContext.state !== 'ready' || !runtimeContext.runtime || runtimeContext.stopping) {
         throw new Error('通知検査の環境が利用できません。失敗後のケースは実行しません。');
       }
-      state = 'running';
+      runtimeContext.state = 'running';
       const abort = () => {
-        state = 'failed';
+        runtimeContext.state = 'failed';
       };
       signal?.addEventListener('abort', abort, { once: true });
       try {
@@ -57,7 +59,7 @@ export function createNotificationRuntime() {
         const ids: string[] = [];
         await run({
           config,
-          runtime,
+          runtime: runtimeContext.runtime,
           newJobId() {
             const id = randomUUID();
             ids.push(id);
@@ -65,7 +67,7 @@ export function createNotificationRuntime() {
           },
         });
         signal?.throwIfAborted();
-        if (stopping) {
+        if (runtimeContext.stopping) {
           throw new Error('通知検査中に環境が停止されました。');
         }
         if (ids.length) {
@@ -86,31 +88,31 @@ export function createNotificationRuntime() {
           );
         }
         signal?.throwIfAborted();
-        if (stopping) {
+        if (runtimeContext.stopping) {
           throw new Error('通知検査の清掃中に環境が停止されました。');
         }
-        state = 'ready';
+        runtimeContext.state = 'ready';
       } catch (error) {
-        state = 'failed';
+        runtimeContext.state = 'failed';
         throw error;
       } finally {
         signal?.removeEventListener('abort', abort);
       }
     },
     stop(): Promise<void> {
-      return (stopping ??= (async () => {
-        const succeeded = state === 'ready';
-        state = 'closed';
+      return (runtimeContext.stopping ??= (async () => {
+        const succeeded = runtimeContext.state === 'ready';
+        runtimeContext.state = 'closed';
         // beforeAllの期限切れでも、起動中の所有プロセスを取り残さない。
-        if (startup) {
-          runtime = await startup.catch(() => undefined);
+        if (runtimeContext.startup) {
+          runtimeContext.runtime = await runtimeContext.startup.catch(() => undefined);
         }
-        if (!runtime) {
+        if (!runtimeContext.runtime) {
           return;
         }
         // 停止失敗時も証拠を削除せず、呼び出し側へそのまま伝える。
-        await runtime.stop();
-        const completion = await runtime.closed;
+        await runtimeContext.runtime.stop();
+        const completion = await runtimeContext.runtime.closed;
         if (completion.exitCode !== 0) {
           throw new Error('通知検査のWorkerが異常終了しました。');
         }

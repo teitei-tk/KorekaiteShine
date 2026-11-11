@@ -144,10 +144,10 @@ test('注入したDO保存後の障害が発生しなければ復旧検証を成
 
 test('応答喪失後の再送による重複受付を成功にしない', async () => {
   const fixture = scenarioFixture('success', 'response_loss');
-  let reads = 0;
-  fixture.replies.counts = () => Response.json({ jobs: 1, requests: ++reads });
+  const readsState = { reads: 0 };
+  fixture.replies.counts = () => Response.json({ jobs: 1, requests: ++readsState.reads });
   await fixture.fails('ACCEPTANCE_COUNTS_MISMATCH');
-  expect(reads).toBe(2);
+  expect(readsState.reads).toBe(2);
 });
 
 test('応答喪失後の再送前に重複ジョブがあれば失敗する', async () => {

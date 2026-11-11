@@ -15,15 +15,17 @@ test('ジョブのfailedをHTTP失敗と区別し、DLQ未受信の状態を保�
     lastErrorCode: 'AI_TEMPORARY',
     checks: { doPersistence: 'passed', consumerCompletion: 'not_expected', dlqReceipt: 'pending' },
   };
-  let requestedUrl = '';
+  const requestedUrlState = { requestedUrl: '' };
   const result = await getDiagnosticStatus(jobId, {
     baseUrl: 'http://localhost',
     fetcher: async (input) => {
-      requestedUrl = new Request(input).url;
+      requestedUrlState.requestedUrl = new Request(input).url;
       return Response.json(status);
     },
   });
-  expect(requestedUrl).toBe(`http://localhost/api/diagnostics/check-jobs/${jobId}`);
+  expect(requestedUrlState.requestedUrl).toBe(
+    `http://localhost/api/diagnostics/check-jobs/${jobId}`,
+  );
   expect(result).toEqual(status);
 });
 
@@ -37,7 +39,7 @@ test('202応答が失われても同じ冪等キーと入力で再送し、別�
   const keys: (string | null)[] = [];
   const bodies: object[] = [];
   const acceptedKeys = new Set<string>();
-  let requests = 0;
+  const requestsState = { requests: 0 };
   const fetcher: typeof fetch = vi.fn(async (input, init) => {
     const request = new Request(input, init);
     const idempotencyKey = request.headers.get('Idempotency-Key');
@@ -46,7 +48,7 @@ test('202応答が失われても同じ冪等キーと入力で再送し、別�
     if (idempotencyKey) {
       acceptedKeys.add(idempotencyKey);
     }
-    if (++requests === 1) {
+    if (++requestsState.requests === 1) {
       throw new TypeError('受付後に応答が失われました。');
     }
     return Response.json(accepted, { status: 202 });

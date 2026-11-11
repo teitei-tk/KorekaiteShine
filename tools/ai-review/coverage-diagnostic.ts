@@ -16,10 +16,10 @@ export function coverageDiagnostic(expected: string[], received: string[]): Cove
   const arrayValid = Array.isArray(received);
   const values = arrayValid ? received : [];
   const counts = new Map<string, number>();
-  let invalid = 0;
+  const invalidState = { invalid: 0 };
   for (const value of values) {
     if (typeof value !== 'string') {
-      invalid++;
+      invalidState.invalid++;
       continue;
     }
     counts.set(value, (counts.get(value) ?? 0) + 1);
@@ -34,7 +34,7 @@ export function coverageDiagnostic(expected: string[], received: string[]): Cove
     missing: missing.length,
     duplicates: [...counts.values()].reduce((n, c) => n + c - 1, 0),
     foreign: foreign.length,
-    invalid,
+    invalid: invalidState.invalid,
     missingIds: missing.slice(0, sample),
     duplicateIds: duplicateIds.slice(0, sample),
     foreignHashes: foreign

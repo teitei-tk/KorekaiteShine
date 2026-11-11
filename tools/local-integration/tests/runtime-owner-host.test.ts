@@ -63,16 +63,12 @@ test('起動前の停止後は遅れて届く開始要求を受け付けない',
 
 test('起動中に切断されたらreadyを送らず起動完了後に停止する', async () => {
   const fixture = await hostFixture();
-  let complete!: (runtime: LocalRuntime) => void;
-  vi.mocked(startRuntimeInProcess).mockReturnValue(
-    new Promise((resolve) => {
-      complete = resolve;
-    }),
-  );
+  const startup = Promise.withResolvers<LocalRuntime>();
+  vi.mocked(startRuntimeInProcess).mockReturnValue(startup.promise);
   fixture.start();
   fixture.channel.connected = false;
   fixture.events.emit('disconnect');
-  complete(fixture.runtime);
+  startup.resolve(fixture.runtime);
   await fixture.settle();
   expect(fixture.channel.send).not.toHaveBeenCalled();
   expect(fixture.runtime.stop).toHaveBeenCalledTimes(1);

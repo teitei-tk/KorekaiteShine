@@ -16,7 +16,7 @@ const raw = (status = 'in_progress', conclusion = '') =>
 it('状態変化だけ表示し成功時に監視を終える', async () => {
   const values = [raw(), raw(), raw('completed', 'success')];
   const output: string[] = [];
-  let waits = 0;
+  const waitsState = { waits: 0 };
   expect(
     await checkRun(
       '123',
@@ -24,12 +24,12 @@ it('状態変化だけ表示し成功時に監視を終える', async () => {
       () => values.shift()!,
       (s) => output.push(s),
       async () => {
-        waits++;
+        waitsState.waits++;
       },
     ),
   ).toBe(0);
   expect(output).toHaveLength(3);
-  expect(waits).toBe(2);
+  expect(waitsState.waits).toBe(2);
 });
 it('失敗箇所は固定ラベルで示し未知の名前・外部エラーを表示しない', async () => {
   const response = {
@@ -70,42 +70,41 @@ it('不正な状態・応答・IDを拒否する', async () => {
   for (const value of ['not json', '{}', raw('SECRET')]) {
     expect(() => runSnapshot(value)).toThrow();
   }
-  let called = false;
+  const calledState = { called: false };
   const output: string[] = [];
   expect(
     await checkRun(
       '123;SECRET',
       false,
       () => {
-        called = true;
+        calledState.called = true;
         return raw();
       },
       (s) => output.push(s),
     ),
   ).toBe(2);
-  expect(called).toBe(false);
+  expect(calledState.called).toBe(false);
   expect(output.join('\n')).not.toContain('SECRET');
 });
 it('監視上限で停止し、単発確認は待たない', async () => {
-  let reads = 0,
-    waits = 0;
+  const readsContext = { reads: 0, waits: 0 };
   const output: string[] = [];
   expect(
     await checkRun(
       '123',
       true,
       () => {
-        reads++;
+        readsContext.reads++;
         return raw();
       },
       (s) => output.push(s),
       async () => {
-        waits++;
+        readsContext.waits++;
       },
     ),
   ).toBe(2);
-  expect(reads).toBe(40);
-  expect(waits).toBe(39);
+  expect(readsContext.reads).toBe(40);
+  expect(readsContext.waits).toBe(39);
   expect(output).toHaveLength(3);
   expect(
     await checkRun(
@@ -144,20 +143,20 @@ it('CLIでghのstderrを表示せず、失敗を終了コードで返す', async
 
 it('期待コミットを含まない実行では成功の状態確認へ進まず終了コード3にする', async () => {
   const { checkRunCommand } = await import('./check-run.ts');
-  let checked = false;
+  const checkedState = { checked: false };
   const output: string[] = [];
   expect(
     await checkRunCommand(
       ['123', '--watch', '--expect-commit', 'a'.repeat(40)],
       () => ({ output: '修正版の検証対象外', eligible: false }),
       async () => {
-        checked = true;
+        checkedState.checked = true;
         return 0;
       },
       (s) => output.push(s),
     ),
   ).toBe(3);
-  expect(checked).toBe(false);
+  expect(checkedState.checked).toBe(false);
   expect(output).toContain('修正版の検証対象外');
 });
 it('実行版の取得失敗を成功扱いせず、外部エラーを出力しない', async () => {

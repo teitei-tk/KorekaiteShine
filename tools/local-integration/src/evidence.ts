@@ -29,11 +29,11 @@ export async function runWithEvidence(
   };
   await mkdir(dirname(input.resultPath), { recursive: true });
   await writeFile(input.resultPath, JSON.stringify(report, null, 2), { flag: 'wx' });
-  let failure: Error | undefined;
+  const failureState = { failure: undefined as Error | undefined };
   try {
     await run({
       observe: (values) => {
-        Object.assign(actual, values);
+        report.actual = { ...report.actual, ...values };
       },
       cleanup: (action) => {
         cleanups.push(action);
@@ -41,22 +41,22 @@ export async function runWithEvidence(
     });
   } catch (error) {
     report.failureCode = 'CASE_FAILED';
-    failure = error instanceof Error ? error : new Error('CASE_FAILED');
+    failureState.failure = error instanceof Error ? error : new Error('CASE_FAILED');
   } finally {
     for (const cleanup of cleanups.reverse()) {
       try {
-        await cleanup(!failure);
+        await cleanup(!failureState.failure);
       } catch {
         report.failureCode ??= 'CLEANUP_FAILED';
-        failure ??= new Error('CLEANUP_FAILED');
+        failureState.failure ??= new Error('CLEANUP_FAILED');
       }
     }
-    report.exitCode = failure ? 1 : 0;
+    report.exitCode = failureState.failure ? 1 : 0;
     report.finishedAt = Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
     report.durationMs = Math.round(performance.now() - started);
     await writeFile(input.resultPath, JSON.stringify(report, null, 2));
   }
-  if (failure) {
-    throw failure;
+  if (failureState.failure) {
+    throw failureState.failure;
   }
 }

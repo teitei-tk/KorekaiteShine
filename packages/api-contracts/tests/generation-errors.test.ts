@@ -1,3 +1,4 @@
+import { SystemError } from '../../../tools/testing/system-error.mts';
 import { readFile, writeFile } from 'node:fs/promises';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -27,7 +28,7 @@ test('必須の冪等キーが契約にない場合は検証コードを生成�
 });
 
 test('検証コードを書き込めなければ型宣言の出力へ進まず元のエラーを返す', async () => {
-  const failure = Object.assign(new Error('fixture write failure'), { code: 'EACCES' });
+  const failure = new SystemError('fixture write failure', 'EACCES');
   vi.mocked(writeFile).mockRejectedValueOnce(failure);
   await expect(import('../scripts/generate-diagnostics-validation.ts')).rejects.toBe(failure);
   expect(writeFile).toHaveBeenCalledTimes(1);

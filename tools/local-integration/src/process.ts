@@ -23,9 +23,9 @@ export async function runNodeCommand(input: {
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
   });
-  let output = '';
+  const output: string[] = [];
   const collect = (chunk: Buffer) => {
-    output += chunk.toString();
+    output.push(chunk.toString());
   };
   child.stdout.on('data', collect);
   child.stderr.on('data', collect);
@@ -34,31 +34,21 @@ export async function runNodeCommand(input: {
     child.once('error', reject);
     child.once('exit', resolve);
   });
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  // Promiseのexecutorで同期的に設定し、finallyで同じリスナーを解除する。
-  let onAbort!: () => void;
+  const { promise: interrupted, reject } = Promise.withResolvers<never>();
+  const onAbort = () => reject(aborted());
+  const timer = setTimeout(
+    () =>
+      reject(
+        new Error(`${input.label}がタイムアウトしました。${input.logPath}を確認してください。`),
+      ),
+    input.timeoutMs,
+  );
   try {
-    const code = await Promise.race([
-      exited,
-      new Promise<never>((_resolve, reject) => {
-        onAbort = () => reject(aborted());
-        input.signal?.addEventListener('abort', onAbort, { once: true });
-        if (input.signal?.aborted) {
-          onAbort();
-        }
-      }),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `${input.label}がタイムアウトしました。${input.logPath}を確認してください。`,
-              ),
-            ),
-          input.timeoutMs,
-        );
-      }),
-    ]);
+    input.signal?.addEventListener('abort', onAbort, { once: true });
+    if (input.signal?.aborted) {
+      onAbort();
+    }
+    const code = await Promise.race([exited, interrupted]);
     if (code !== 0) {
       throw new Error(`${input.label}失敗（${code}）。${input.logPath}を確認してください。`);
     }
@@ -69,7 +59,7 @@ export async function runNodeCommand(input: {
       await stopProcessGroup(child);
       await closed;
     } finally {
-      await writeFile(input.logPath, output);
+      await writeFile(input.logPath, output.join(''));
     }
   }
 }

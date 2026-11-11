@@ -14,8 +14,7 @@ export async function prepareReview(
   api?: Api,
   collectMaterial: typeof collect = collect,
 ): Promise<void> {
-  let targetId = 'gate';
-  let fallback: FailureReason = 'TARGET_FAILED';
+  const targetIdContext = { targetId: 'gate', fallback: 'TARGET_FAILED' as FailureReason };
   try {
     if (!api && !env.GH_TOKEN) {
       throw new ReviewFailure('AUTH_FAILED', 'GitHub認証がありません');
@@ -34,15 +33,15 @@ export async function prepareReview(
     }
     const pr = result.pr;
     if (mode === 'collect' && env.AI_REVIEW_MODE === 'review') {
-      targetId = 'collect';
-      fallback = 'INPUT_INVALID';
+      targetIdContext.targetId = 'collect';
+      targetIdContext.fallback = 'INPUT_INVALID';
       const directory = env.REVIEW_DIRECTORY;
       if (!directory) {
         throw new Error('資料ディレクトリがありません');
       }
       mkdirSync(directory, { recursive: true });
-      targetId = 'history';
-      fallback = 'HISTORY_FAILED';
+      targetIdContext.targetId = 'history';
+      targetIdContext.fallback = 'HISTORY_FAILED';
       const history = await loadSnapshot(client, pr.number);
       if (
         readInlineHistory(history.inline).some(
@@ -57,8 +56,8 @@ export async function prepareReview(
       ) {
         throw new Error('途中投稿があります。同じArtifactで投稿を再開してください');
       }
-      targetId = 'collect';
-      fallback = 'COLLECTION_FAILED';
+      targetIdContext.targetId = 'collect';
+      targetIdContext.fallback = 'COLLECTION_FAILED';
       collectMaterial(pr, directory, history, env.SOURCE_RUN_ID!);
     }
     appendFileSync(
@@ -67,20 +66,20 @@ export async function prepareReview(
     );
   } catch (error) {
     // 外部API・gitのメッセージでは分類せず、信頼済み処理の固定コードだけを表示する。
-    const reason = error instanceof ReviewFailure ? error.reason : fallback;
-    writeStatusReport(env, 'failure', targetId, reason);
+    const reason = error instanceof ReviewFailure ? error.reason : targetIdContext.fallback;
+    writeStatusReport(env, 'failure', targetIdContext.targetId, reason);
     if (env.GITHUB_OUTPUT) {
       appendFileSync(env.GITHUB_OUTPUT, 'allowed=false\n');
     }
     if (env.GITHUB_STEP_SUMMARY) {
       appendFileSync(
         env.GITHUB_STEP_SUMMARY,
-        `AIレビュー準備未完了: 完了0件。対象: ${targetId}、理由: ${reason}。WIF認証・レビュー生成・投稿へ進みません。\n`,
+        `AIレビュー準備未完了: 完了0件。対象: ${targetIdContext.targetId}、理由: ${reason}。WIF認証・レビュー生成・投稿へ進みません。\n`,
       );
     }
     throw new ReviewFailure(
       reason,
-      `AIレビュー準備が未完了です。対象: ${targetId}、理由: ${reason}。`,
+      `AIレビュー準備が未完了です。対象: ${targetIdContext.targetId}、理由: ${reason}。`,
     );
   }
 }

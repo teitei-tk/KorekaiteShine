@@ -11,8 +11,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
   const heard: number[] = [];
   const first: string[] = [];
   const second: string[] = [];
-  let now = 1;
-  let failSchedule = true;
+  const nowContext = { now: 1, failSchedule: true };
   try {
     await database.db.insert(interviews).values({
       interviewId: 'interview',
@@ -28,8 +27,8 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
     });
     const room = createInterviewRoom({
       schedule: async () => {
-        if (failSchedule) {
-          failSchedule = false;
+        if (nowContext.failSchedule) {
+          nowContext.failSchedule = false;
           throw new Error('一時的な保存失敗');
         }
       },
@@ -40,7 +39,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
           db: database.db,
           actorId: 'actor',
           interviewId: 'interview',
-          now: () => now,
+          now: () => nowContext.now,
           apiKey: 'fixture-key',
           responsesModel: 'mock',
           voice: 'marin',
@@ -54,10 +53,8 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
           },
           connect: (_options, callbacks) => {
             handlers.push(callbacks);
-            let resolve!: (value: LiveClosed) => void;
-            const closed = new Promise<LiveClosed>((done) => {
-              resolve = done;
-            });
+
+            const { promise: closed, resolve } = Promise.withResolvers<LiveClosed>();
             return {
               ready: Promise.resolve('upstream'),
               closed,
@@ -111,7 +108,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
     };
     await room.receive('first', frame(1));
     expect(heard).toEqual([2]);
-    now = 1001;
+    nowContext.now = 1001;
     await room.receive(
       'second',
       JSON.stringify({ type: 'takeover', commandId: 'take', generation: 1 }),
@@ -135,7 +132,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
     await handlers[2].onReady('three');
     await room.receive('first', frame(5));
     expect(heard).toEqual([2, 2, 2]);
-    now = 2001;
+    nowContext.now = 2001;
     await room.receive(
       'first',
       JSON.stringify({ type: 'finish', commandId: 'end', generation: 5 }),

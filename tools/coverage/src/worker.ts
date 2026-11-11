@@ -18,17 +18,16 @@ export async function readWorkerCoverage(
     new (url: string, options: { headers: Record<string, string> }): WebSocket;
   };
   const socket = new NodeWebSocket(url, { headers: { Origin: 'http://localhost' } });
-  let contextId: number | undefined;
-  let sequence = 0;
+  const contextIdContext = { contextId: undefined as number | undefined, sequence: 0 };
   socket.addEventListener('message', (event) => {
     const message: InspectorReply = JSON.parse(String(event.data));
     if (message.method === 'Runtime.executionContextCreated') {
-      contextId = message.params!.context.id;
+      contextIdContext.contextId = message.params!.context.id;
     }
   });
   const request = (method: string, params = {}) =>
     new Promise<InspectorReply>((resolve, reject) => {
-      const id = ++sequence;
+      const id = ++contextIdContext.sequence;
       const cleanup = () => {
         clearTimeout(timer);
         socket.removeEventListener('message', receive);
@@ -86,13 +85,13 @@ export async function readWorkerCoverage(
       );
     });
     await request('Runtime.enable');
-    if (contextId === undefined) {
+    if (contextIdContext.contextId === undefined) {
       throw new Error('Worker計測の実行コンテキストがありません');
     }
     const reply = await request('Runtime.evaluate', {
       expression: `JSON.stringify({ epoch: ${epoch?.start ? `(globalThis.__korekaiteCoverageEpoch = ${JSON.stringify(epoch.value)})` : 'globalThis.__korekaiteCoverageEpoch'}, data: globalThis.__coverage__ ?? {} })`,
       returnByValue: true,
-      contextId,
+      contextId: contextIdContext.contextId,
     });
     const snapshot = JSON.parse(reply.result!.result.value) as {
       epoch?: string;

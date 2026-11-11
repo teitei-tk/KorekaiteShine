@@ -148,9 +148,9 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
           detached: true,
         },
       );
-      let diagnostic = '';
+      const diagnosticState = { diagnostic: '' };
       child.stderr.on('data', (data: Buffer) => {
-        diagnostic += data.toString();
+        diagnosticState.diagnostic += data.toString();
       });
       const timer = setTimeout(() => {
         if (child.pid) {
@@ -165,7 +165,7 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
       child.once('close', (code) => {
         clearTimeout(timer);
         if (requests.length === 0) {
-          console.error(diagnostic);
+          console.error(diagnosticState.diagnostic);
         }
         resolve(code);
       });

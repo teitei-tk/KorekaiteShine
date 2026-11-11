@@ -102,12 +102,16 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
       dlqReceipt: 'not_expected',
     },
   };
-  let attemptStart = base + (restarts ? 60_000 : 0);
+  const attemptStartState = { attemptStart: base + (restarts ? 60_000 : 0) };
   const attempts = Array.from({ length: count }, (_, index) => {
     if (index > 0) {
-      attemptStart += [30_000, 120_000, 300_000][index - 1]! + 1;
+      attemptStartState.attemptStart += [30_000, 120_000, 300_000][index - 1]! + 1;
     }
-    return { attemptNumber: index + 1, startedAt: attemptStart, finishedAt: attemptStart + 1 };
+    return {
+      attemptNumber: index + 1,
+      startedAt: attemptStartState.attemptStart,
+      finishedAt: attemptStartState.attemptStart + 1,
+    };
   });
   const receipt = {
     queue:

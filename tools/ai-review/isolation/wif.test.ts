@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,8 +20,7 @@ function fixture(mode: 'ready' | 'failure' | 'wrong-pid' | 'no-shutdown') {
   const directory = mkdtempSync(join(tmpdir(), 'wif-probe-'));
   directories.push(directory);
   const info = join(directory, 'server.json');
-  let child: ReturnType<typeof spawn>;
-  const launch: Launch = (...args) => {
+  const launch = vi.fn<Launch>((...args) => {
     const [command, argv, options] = args;
     expect(command).toBe('/usr/local/bin/codex-responses-api-proxy');
     expect(argv).toContain('--github-oidc');
@@ -47,25 +46,24 @@ function fixture(mode: 'ready' | 'failure' | 'wrong-pid' | 'no-shutdown') {
         })));
       });
     `;
-    child = spawn(process.execPath, ['-e', source], options);
-    return child;
-  };
-  return { info, launch, child: () => child };
+    return spawn(process.execPath, ['-e', source], options);
+  });
+  return { info, launch, child: () => launch.mock.results[0]!.value };
 }
 describe('公式プロキシだけによる認証検証', () => {
   it('要求トークンをパイプだけで渡し、ready後に隔離検査し、GET shutdownで終了する', async () => {
     const f = fixture('ready');
-    let inspected = false;
+    const inspectedState = { inspected: false };
     await authenticateProxy(
       env,
       f.info,
       () => {
-        inspected = true;
+        inspectedState.inspected = true;
       },
       2000,
       f.launch,
     );
-    expect(inspected).toBe(true);
+    expect(inspectedState.inspected).toBe(true);
     expect(f.child().exitCode).toBe(0);
   });
   for (const mode of ['failure', 'wrong-pid', 'no-shutdown'] as const) {

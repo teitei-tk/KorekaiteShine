@@ -51,26 +51,27 @@ export function bodyValidationDetails(
   errors: ErrorObject[] | null | undefined,
 ): ValidationDetail[] {
   return (errors ?? []).map((error): ValidationDetail => {
-    let path = error.instancePath;
-    let code: ValidationDetail['code'] = 'INVALID_VALUE';
     const property =
       error.keyword === 'required'
         ? error.params.missingProperty
         : error.keyword === 'additionalProperties'
           ? error.params.additionalProperty
           : undefined;
-    if (typeof property === 'string') {
-      path += `/${property.replaceAll('~', '~0').replaceAll('/', '~1')}`;
-    }
-    if (error.keyword === 'required') {
-      code = 'REQUIRED';
-    }
-    if (error.keyword === 'additionalProperties') {
-      code = 'UNRECOGNIZED_FIELD';
-    }
-    if (error.keyword === 'pattern' || error.keyword === 'format') {
-      code = 'INVALID_FORMAT';
-    }
-    return { location: 'body', path, code, message: '入力項目を確認してください。' };
+    const path =
+      typeof property === 'string'
+        ? `${error.instancePath}/${property.replaceAll('~', '~0').replaceAll('/', '~1')}`
+        : error.instancePath;
+    const codes: Record<string, ValidationDetail['code']> = {
+      required: 'REQUIRED',
+      additionalProperties: 'UNRECOGNIZED_FIELD',
+      pattern: 'INVALID_FORMAT',
+      format: 'INVALID_FORMAT',
+    };
+    return {
+      location: 'body',
+      path,
+      code: Object.hasOwn(codes, error.keyword) ? codes[error.keyword] : 'INVALID_VALUE',
+      message: '入力項目を確認してください。',
+    };
   });
 }

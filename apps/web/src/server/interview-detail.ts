@@ -78,7 +78,7 @@ export async function interviewDetailRequest(
       )
       .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
       .limit(1);
-    let result: object | null = null;
+    const resultState = { result: null as object | null };
     if (job?.status === 'completed') {
       const [attempt] = await deps.db
         .select({ resultJson: jobAttempts.resultJson })
@@ -89,7 +89,7 @@ export async function interviewDetailRequest(
       if (!attempt?.resultJson) {
         return applicationFailure('UNAVAILABLE');
       }
-      result = JSON.parse(attempt.resultJson);
+      resultState.result = JSON.parse(attempt.resultJson);
     }
     const now = Temporal.Now.instant().epochMilliseconds;
     const start = Temporal.Instant.fromEpochMilliseconds(now)
@@ -115,7 +115,7 @@ export async function interviewDetailRequest(
       transcriptIncomplete: row.transcriptIncomplete,
       transcripts,
       playback,
-      evaluation: job ? { ...job, result } : null,
+      evaluation: job ? { ...job, result: resultState.result } : null,
     };
     if (!validateInterviewDetail(body)) {
       return applicationFailure('UNAVAILABLE');

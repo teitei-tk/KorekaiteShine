@@ -45,15 +45,15 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
         await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
-      let runtime: LocalRuntime | undefined;
+      const runtimeState = { runtime: undefined as LocalRuntime | undefined };
       evidence.cleanup(async () => {
-        await runtime?.stop();
+        await runtimeState.runtime?.stop();
       });
-      runtime = await startRuntime(config, 'dev', {
+      runtimeState.runtime = await startRuntime(config, 'dev', {
         manualDiagnostics: true,
         holdEvaluationBeforeConsume: true,
       });
-      const accepted = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+      const accepted = await fetch(`${runtimeState.runtime.baseUrl}/api/diagnostics/check-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
         body: JSON.stringify({ scenario: 'exhaust_retries' }),
@@ -92,13 +92,15 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
           ('${formalQueue}', '${randomUUID()}', '${jobId}', 'evaluation', 'failed', ${now}, ${now});
       `,
       ]);
-      await runtime.runScheduled();
+      await runtimeState.runtime.runScheduled();
       await expect
         .poll(
           async () =>
             Promise.all(
               [jobId, formalId].map(async (id) =>
-                (await fetch(`${runtime!.baseUrl}/api/check-object-test?jobId=${id}`)).json(),
+                (
+                  await fetch(`${runtimeState.runtime!.baseUrl}/api/check-object-test?jobId=${id}`)
+                ).json(),
               ),
             ),
           { timeout: 20_000, interval: 250 },
@@ -120,18 +122,20 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
         beforeRestart: { queues: [diagnosticQueue, formalQueue], sentWithoutReceiptVerified: true },
       });
       const stoppedAt = Temporal.Now.instant().epochMilliseconds;
-      await runtime.stop();
-      runtime = undefined;
-      runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+      await runtimeState.runtime.stop();
+      runtimeState.runtime = undefined;
+      runtimeState.runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
       await expect
         .poll(
           async () => {
-            await runtime!.runScheduled(AbortSignal.timeout(10_000));
+            await runtimeState.runtime!.runScheduled(AbortSignal.timeout(10_000));
             const diagnostic = await (
-              await fetch(`${runtime!.baseUrl}/api/diagnostics/check-jobs/${jobId}`)
+              await fetch(`${runtimeState.runtime!.baseUrl}/api/diagnostics/check-jobs/${jobId}`)
             ).json();
             const formal = await (
-              await fetch(`${runtime!.baseUrl}/api/formal-queue-test?jobId=${formalId}&view=dlq`)
+              await fetch(
+                `${runtimeState.runtime!.baseUrl}/api/formal-queue-test?jobId=${formalId}&view=dlq`,
+              )
             ).json();
             evidence.observe({
               afterRestart: {

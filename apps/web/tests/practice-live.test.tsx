@@ -28,11 +28,7 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
   }
   vi.stubGlobal('WebSocket', FakeSocket);
   const close = vi.fn();
-  let capture!: (bytes: ArrayBuffer) => void;
-  vi.mocked(openInterviewAudio).mockImplementation(async (_signal, captured) => {
-    capture = captured;
-    return { play: vi.fn(), stopPlayback: vi.fn(), close };
-  });
+  vi.mocked(openInterviewAudio).mockResolvedValue({ play: vi.fn(), stopPlayback: vi.fn(), close });
   const done = vi.fn();
   render(<PracticeLive id="one" onEnded={done} />);
   const state = (status: string, generation: number, canControl: boolean) =>
@@ -59,6 +55,7 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
   expect(openInterviewAudio).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: 'マイクを許可して開始' }));
   expect(JSON.parse(send.mock.lastCall![0])).toMatchObject({ type: 'start', generation: 0 });
+  const capture = vi.mocked(openInterviewAudio).mock.lastCall![1];
   capture(new ArrayBuffer(2));
   expect(send).toHaveBeenCalledTimes(1);
   state('active', 1, true);
@@ -222,15 +219,13 @@ test('マイクを拒否した場合は開始せず、許可待ちで画面を�
         }),
       ),
     );
-  let allow!: (audio: Awaited<ReturnType<typeof openInterviewAudio>>) => void;
-  let signal: AbortSignal | undefined;
+  const permission = Promise.withResolvers<Awaited<ReturnType<typeof openInterviewAudio>>>();
+  const signalState = { signal: undefined as AbortSignal | undefined };
   vi.mocked(openInterviewAudio)
     .mockRejectedValueOnce(new DOMException('拒否', 'NotAllowedError'))
     .mockImplementationOnce((request) => {
-      signal = request;
-      return new Promise((resolve) => {
-        allow = resolve;
-      });
+      signalState.signal = request;
+      return permission.promise;
     });
   const page = render(<PracticeLive id="mic" onEnded={() => {}} />);
   ready();
@@ -239,9 +234,9 @@ test('マイクを拒否した場合は開始せず、許可待ちで画面を�
   expect(peers[0].send).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: 'マイクを許可して開始' }));
   page.unmount();
-  expect(signal?.aborted).toBe(true);
+  expect(signalState.signal?.aborted).toBe(true);
   const close = vi.fn();
-  await act(async () => allow({ play: vi.fn(), stopPlayback: vi.fn(), close }));
+  await act(async () => permission.resolve({ play: vi.fn(), stopPlayback: vi.fn(), close }));
   expect(close).toHaveBeenCalledTimes(1);
   expect(peers[0].send).not.toHaveBeenCalled();
 });
@@ -455,27 +450,20 @@ test.each(['世代変更', 'ソケット終了', 'ユーザー中断'])(
   'マイクの準備完了までの%sを処理する',
   async (kind) => {
     const { audio, peer, state, click, page } = mountLive();
-    let allow!: (value: typeof audio) => void;
-    let deny!: () => void;
-    vi.mocked(openInterviewAudio).mockImplementationOnce(
-      () =>
-        new Promise((resolve, reject) => {
-          allow = resolve;
-          deny = reject;
-        }),
-    );
+    const permission = Promise.withResolvers<typeof audio>();
+    vi.mocked(openInterviewAudio).mockReturnValueOnce(permission.promise);
     state({ status: 'ready' });
     await click('マイクを許可して開始');
     if (kind === 'ユーザー中断') {
       page.unmount();
-      await act(async () => deny());
+      await act(async () => permission.reject());
     } else {
       if (kind === '世代変更') {
         state({ generation: 2 });
       } else {
         peer.readyState = 3;
       }
-      await act(async () => allow(audio));
+      await act(async () => permission.resolve(audio));
       expect(audio.close).toHaveBeenCalledOnce();
     }
     expect(peer.send).not.toHaveBeenCalled();
@@ -521,15 +509,8 @@ test('復帰期限を過ぎて実行されたタイマーでは接続しない',
 test.each([true, false])('再認証待ちに画面を閉じたら結果を破棄する（成功=%s）', async (success) => {
   vi.useFakeTimers();
   const { peers, peer, page } = mountLive();
-  let resolve!: (token: string) => void;
-  let reject!: () => void;
-  vi.mocked(sessionToken).mockImplementationOnce(
-    () =>
-      new Promise((ok, fail) => {
-        resolve = ok;
-        reject = fail;
-      }),
-  );
+  const token = Promise.withResolvers<string>();
+  vi.mocked(sessionToken).mockReturnValueOnce(token.promise);
   act(() => peer.onclose());
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
@@ -537,9 +518,9 @@ test.each([true, false])('再認証待ちに画面を閉じたら結果を破棄
   page.unmount();
   await act(async () => {
     if (success) {
-      resolve('token');
+      token.resolve('token');
     } else {
-      reject();
+      token.reject();
     }
   });
   expect(peers).toHaveLength(1);

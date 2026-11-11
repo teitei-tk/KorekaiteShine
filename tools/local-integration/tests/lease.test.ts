@@ -16,7 +16,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -60,13 +60,11 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
     });
     expect(complete.status).toBe(200);
     expect(await complete.json()).toBe(true);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('期限ちょうどから実行権の更新と結果保存を拒否し、失効した所有者を復活させない', async () => {
@@ -77,7 +75,7 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -120,13 +118,11 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
       INSERT INTO unchanged SELECT COUNT(*) FROM diagnostic_checks WHERE consumer_completion = 'pending';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('所有者が新しい世代へ交代した後は古い実行権の更新と保存を拒否する', async () => {
@@ -137,7 +133,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -199,13 +195,11 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
     });
     expect(complete.status).toBe(200);
     expect(await complete.json()).toBe(true);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、新しい実行権へ引き継ぐ', async () => {
@@ -216,7 +210,7 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -273,13 +267,11 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     expect(successor.ownerToken).not.toBe(lease.ownerToken);
     expect(await call('complete', startedAt + 240_000)).toBe(false);
     expect(await call('complete', startedAt + 240_000, successor)).toBe(true);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('停止した評価の期限切れ実行権を、再起動後のscheduledで回復する', async () => {
@@ -289,17 +281,21 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', { manualDiagnostics: true }),
+  };
   try {
-    const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
-      body: '{"scenario":"success"}',
-    });
+    const acceptedResponse = await fetch(
+      `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+        body: '{"scenario":"success"}',
+      },
+    );
     expect(acceptedResponse.status).toBe(202);
     const accepted = await acceptedResponse.json();
-    const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
+    const acquire = await fetch(`${runtimeContext.runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -310,7 +306,7 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     });
     expect(acquire.status).toBe(200);
     expect(await acquire.json()).toMatchObject({ attemptNumber: 1 });
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     // 待機時間を短縮し、停止中に期限と猶予が経過した状態を作る。
     const expiredAt = Temporal.Now.instant().epochMilliseconds - 31_000;
     await runDatabaseCommand(config, [
@@ -320,19 +316,26 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       UPDATE execution_slots SET lease_until = ${expiredAt};
     `,
     ]);
-    runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
+    runtimeContext.runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
+    await Promise.all([
+      runtimeContext.runtime.runScheduled(),
+      runtimeContext.runtime.runScheduled(),
+    ]);
     const status = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
+      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
     ).json();
     expect(status).toMatchObject({
       status: 'retry_wait',
       attemptCount: 1,
       lastErrorCode: 'EXECUTION_LEASE_EXPIRED',
     });
-    await runtime.runScheduled();
+    await runtimeContext.runtime.runScheduled();
     expect(
-      await (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json(),
+      await (
+        await fetch(
+          `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+        )
+      ).json(),
     ).toEqual(status);
     await runDatabaseCommand(config, [
       'execute',
@@ -347,21 +350,23 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     await expect
       .poll(
         async () =>
-          (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json(),
+          (
+            await fetch(
+              `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+            )
+          ).json(),
         { timeout: 40_000, interval: 250 },
       )
       .toMatchObject({ status: 'completed', attemptCount: 2 });
     const completed = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
+      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
     ).json();
     expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
       Temporal.Instant.from(status.nextAttemptAt).epochMilliseconds,
     );
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 90_000);

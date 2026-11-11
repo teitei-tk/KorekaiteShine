@@ -8,15 +8,15 @@ afterEach(() => {
 
 test('タイマーが期限より早く発火しても60秒経過するまでscheduledを呼ばない', () => {
   vi.useFakeTimers();
-  let now = 100;
-  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const nowState = { now: 100 };
+  vi.spyOn(performance, 'now').mockImplementation(() => nowState.now);
   const invocations: number[] = [];
   const stop = startScheduledInterval((elapsed) => invocations.push(elapsed), 60_000);
   try {
-    now = 60_099;
+    nowState.now = 60_099;
     vi.advanceTimersByTime(60_000);
     expect(invocations).toEqual([]);
-    now = 60_100;
+    nowState.now = 60_100;
     vi.advanceTimersByTime(1);
     expect(invocations).toEqual([60_000]);
   } finally {
@@ -43,18 +43,18 @@ test('壁時計が戻っても実経過時間で周期を保ち、停止後は�
 
 test('期限を大きく過ぎても追いつくための連続呼び出しを行わない', () => {
   vi.useFakeTimers();
-  let now = 0;
-  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const nowState = { now: 0 };
+  vi.spyOn(performance, 'now').mockImplementation(() => nowState.now);
   const invocations: number[] = [];
   const stop = startScheduledInterval((elapsed) => invocations.push(elapsed), 60_000);
   try {
-    now = 180_000;
+    nowState.now = 180_000;
     vi.advanceTimersByTime(60_000);
     expect(invocations).toEqual([180_000]);
-    now = 239_999;
+    nowState.now = 239_999;
     vi.advanceTimersByTime(59_999);
     expect(invocations).toEqual([180_000]);
-    now = 240_000;
+    nowState.now = 240_000;
     vi.advanceTimersByTime(1);
     expect(invocations).toEqual([180_000, 240_000]);
   } finally {

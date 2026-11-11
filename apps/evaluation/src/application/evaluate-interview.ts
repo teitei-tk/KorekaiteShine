@@ -52,18 +52,18 @@ function validEvidence(input: EvaluationSnapshot, value: InterviewEvaluation): b
     if (selected.length === 0 || selected.some((fragment) => !fragment)) {
       return false;
     }
-    let text = '';
-    for (let index = 0; index < selected.length; index += 1) {
-      const fragment = selected[index]!;
-      if (
-        fragment.speaker !== selected[0]!.speaker ||
-        (index > 0 && fragment.sequence !== selected[index - 1]!.sequence + 1)
-      ) {
-        return false;
-      }
-      text += fragment.content;
-    }
-    return text.includes(reference.quote);
+    const contiguous = selected.every(
+      (fragment, index) =>
+        fragment!.speaker === selected[0]!.speaker &&
+        (index === 0 || fragment!.sequence === selected[index - 1]!.sequence + 1),
+    );
+    return (
+      contiguous &&
+      selected
+        .map((fragment) => fragment!.content)
+        .join('')
+        .includes(reference.quote)
+    );
   }
   for (const axis of Object.values(value.axes)) {
     if ((axis.status === 'scored') !== (axis.score !== null) || !axis.evidence.every(valid)) {

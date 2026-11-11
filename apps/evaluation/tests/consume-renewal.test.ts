@@ -39,13 +39,8 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
   vi.mocked(acquireExecution).mockResolvedValue(lease);
   vi.mocked(renewExecution).mockResolvedValue(true);
   vi.mocked(completeExecution).mockResolvedValue(true);
-  let finish!: (result: EvaluationResult) => void;
-  const evaluate = vi.fn(
-    () =>
-      new Promise<EvaluationResult>((resolve) => {
-        finish = resolve;
-      }),
-  );
+  const pending = Promise.withResolvers<EvaluationResult>();
+  const evaluate = vi.fn(() => pending.promise);
   const db = {} as EvaluationDependencies['db'];
   const effects = { completed: vi.fn(() => []) };
   const result = consumeJob(
@@ -60,7 +55,7 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
   );
   await vi.advanceTimersByTimeAsync(30_000);
   expect(renewExecution).toHaveBeenCalledExactlyOnceWith(db, lease, 30_000);
-  finish({ ok: true, value: { summary: 'result' } });
+  pending.resolve({ ok: true, value: { summary: 'result' } });
   expect(await result).toEqual({ action: 'ack' });
   expect(completeExecution).toHaveBeenCalledExactlyOnceWith(
     db,

@@ -83,11 +83,13 @@ export function PracticeLive({
     const address = new URL(`/api/interviews/${encodeURIComponent(id)}/live`, window.location.href);
     address.protocol = address.protocol === 'https:' ? 'wss:' : 'ws:';
     const attempt = new AbortController();
-    let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let handshake: ReturnType<typeof setTimeout> | undefined;
-    let terminal = false;
+    const retryTimerContext = {
+      retryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+      handshake: undefined as ReturnType<typeof setTimeout> | undefined,
+      terminal: false,
+    };
     function disconnectedPeer() {
-      clearTimeout(handshake);
+      clearTimeout(retryTimerContext.handshake);
       const retry = reconnect.current;
       if (latest.current) {
         retry.resume = Boolean(
@@ -100,11 +102,11 @@ export function PracticeLive({
       setDisconnected(true);
       latest.current = null;
       setPending(false);
-      if (!terminal) {
+      if (!retryTimerContext.terminal) {
         const time = performance.now();
         retry.until ||= time + 60000;
         if (time + retry.delay < retry.until) {
-          retryTimer = setTimeout(() => {
+          retryTimerContext.retryTimer = setTimeout(() => {
             if (performance.now() < retry.until) {
               setRevision((value) => value + 1);
             }
@@ -134,14 +136,19 @@ export function PracticeLive({
       const windowLeft = reconnect.current.until
         ? reconnect.current.until - performance.now()
         : 10000;
-      handshake = setTimeout(() => peer.close(), Math.max(1, Math.min(10000, windowLeft)));
-      let header: Extract<InterviewServerEvent, { type: 'audio' }> | null = null;
+      retryTimerContext.handshake = setTimeout(
+        () => peer.close(),
+        Math.max(1, Math.min(10000, windowLeft)),
+      );
+      const headerState = {
+        header: null as Extract<InterviewServerEvent, { type: 'audio' }> | null,
+      };
       const saved = new Map<string, Transcript>();
       peer.onmessage = ({ data }: MessageEvent<string | ArrayBuffer>) => {
         try {
           if (typeof data !== 'string') {
-            const audio = header;
-            header = null;
+            const audio = headerState.header;
+            headerState.header = null;
             if (!audio || !(data instanceof ArrayBuffer) || audio.byteLength !== data.byteLength) {
               throw new Error();
             }
@@ -170,7 +177,7 @@ export function PracticeLive({
             return;
           }
           const event = JSON.parse(data);
-          if (header || !validateInterviewServerEvent(event)) {
+          if (headerState.header || !validateInterviewServerEvent(event)) {
             throw new Error();
           }
           switch (event.type) {
@@ -184,7 +191,7 @@ export function PracticeLive({
               ) {
                 release();
               }
-              clearTimeout(handshake);
+              clearTimeout(retryTimerContext.handshake);
               const resume =
                 reconnect.current.resume && performance.now() < reconnect.current.until;
               reconnect.current = { until: 0, delay: 1000, resume: false };
@@ -195,7 +202,7 @@ export function PracticeLive({
               setState(event);
               setNow(Temporal.Now.instant().epochMilliseconds);
               if (event.status === 'ended') {
-                terminal = true;
+                retryTimerContext.terminal = true;
                 ended.current();
               }
               break;
@@ -206,11 +213,11 @@ export function PracticeLive({
               }
               release();
               peer.close();
-              terminal = true;
+              retryTimerContext.terminal = true;
               removed.current?.();
               break;
             case 'audio':
-              header = event;
+              headerState.header = event;
               break;
             case 'transcript':
               saved.set(event.fragmentId, event);
@@ -245,8 +252,8 @@ export function PracticeLive({
     void connect();
     return () => {
       attempt.abort();
-      clearTimeout(retryTimer);
-      clearTimeout(handshake);
+      clearTimeout(retryTimerContext.retryTimer);
+      clearTimeout(retryTimerContext.handshake);
       const peer = socket.current;
       if (peer) {
         peer.onclose = null;

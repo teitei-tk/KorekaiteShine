@@ -20,6 +20,33 @@ function unescape(value: string): string {
     .replaceAll('&lt;', '<')
     .replaceAll('&amp;', '&');
 }
+function readFindings(body: string): FindingInput[] {
+  const marker = /^<!-- findings:v1:([A-Za-z0-9+/=]+) -->$/m.exec(body);
+  if (body.includes('<!-- findings:')) {
+    if (!marker) {
+      throw new Error('指摘履歴が不正です');
+    }
+    const value: FindingInput[] = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
+    return value;
+  } else {
+    // 旧集約コメントの固定レンダリング形式だけを移行する。
+    const pattern =
+      /^\*\*(P1|P2) — (.+):(\d+)\*\*\n\n発生条件: ([\s\S]*?)\n\n影響: ([\s\S]*?)\n\n修正方針: ([\s\S]*?)(?=\n\n\*\*P[12] — |\n\n未確認事項:|\n\n指摘がない場合も、不具合がないことを保証しません。)/gm;
+    const findings = [...body.matchAll(pattern)].map((m) => ({
+      priority: m[1] as 'P1' | 'P2',
+      path: unescape(m[2]),
+      line: Number(m[3]),
+      condition: unescape(m[4]),
+      impact: unescape(m[5]),
+      fix: unescape(m[6]),
+    }));
+    if ((body.match(/^\*\*P[12] — /gm) ?? []).length !== findings.length) {
+      throw new Error('旧指摘の読み取りに失敗しました');
+    }
+    return findings;
+  }
+}
+
 export function readHistory(comments: Comment[]): PriorFinding[] {
   const history: PriorFinding[] = [];
   for (const comment of comments.filter(ownComment)) {
@@ -30,32 +57,7 @@ export function readHistory(comments: Comment[]): PriorFinding[] {
     if (!revision || !Number.isSafeInteger(comment.id) || comment.id < 1) {
       throw new Error('過去のレビュー対象が不正です');
     }
-    const marker = /^<!-- findings:v1:([A-Za-z0-9+/=]+) -->$/m.exec(comment.body);
-    let rawFindings: FindingInput[];
-    if (comment.body.includes('<!-- findings:')) {
-      if (!marker) {
-        throw new Error('指摘履歴が不正です');
-      }
-      const value: FindingInput[] = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
-      rawFindings = value;
-    } else {
-      // 旧集約コメントの固定レンダリング形式だけを移行する。
-      const pattern =
-        /^\*\*(P1|P2) — (.+):(\d+)\*\*\n\n発生条件: ([\s\S]*?)\n\n影響: ([\s\S]*?)\n\n修正方針: ([\s\S]*?)(?=\n\n\*\*P[12] — |\n\n未確認事項:|\n\n指摘がない場合も、不具合がないことを保証しません。)/gm;
-      const findings = [...comment.body.matchAll(pattern)].map((m) => ({
-        priority: m[1] as 'P1' | 'P2',
-        path: unescape(m[2]),
-        line: Number(m[3]),
-        condition: unescape(m[4]),
-        impact: unescape(m[5]),
-        fix: unescape(m[6]),
-      }));
-      if ((comment.body.match(/^\*\*P[12] — /gm) ?? []).length !== findings.length) {
-        throw new Error('旧指摘の読み取りに失敗しました');
-      }
-      rawFindings = findings;
-    }
-    const findings = validFindings(rawFindings);
+    const findings = validFindings(readFindings(comment.body));
     findings.forEach((f, index) =>
       history.push({
         ...f,

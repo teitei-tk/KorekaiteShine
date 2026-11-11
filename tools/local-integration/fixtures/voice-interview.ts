@@ -22,12 +22,8 @@ export class MockInterviewObject extends InterviewObject {
     _options: Parameters<typeof createLiveConnection>[0],
     handlers: LiveHandlers,
   ) {
-    let resolve!: (result: LiveClosed) => void;
-    const closed = new Promise<LiveClosed>((done) => {
-      resolve = done;
-    });
-    let writes = Promise.resolve();
-    let number = 0;
+    const { promise: closed, resolve } = Promise.withResolvers<LiveClosed>();
+    const writesContext = { writes: Promise.resolve(), number: 0 };
     const ready = Promise.resolve().then(async () => {
       await handlers.onReady('mock-session');
       return 'mock-session';
@@ -37,11 +33,16 @@ export class MockInterviewObject extends InterviewObject {
       closed,
       request: () => true,
       abort: () => {
-        resolve({ complete: false, reason: 'ABORTED', upstreamReason: null, usageSeconds: null });
+        resolve({
+          complete: false,
+          reason: 'ABORTED',
+          upstreamReason: null,
+          usageSeconds: null,
+        });
       },
       sendAudio: () => {
-        const event_id = `mock-answer-${++number}`;
-        writes = writes.then(() =>
+        const event_id = `mock-answer-${++writesContext.number}`;
+        writesContext.writes = writesContext.writes.then(() =>
           handlers.onTranscript({
             type: 'session.input_transcript.delta',
             event_id,
@@ -54,7 +55,7 @@ export class MockInterviewObject extends InterviewObject {
       },
       close: async () => {
         await ready;
-        await writes;
+        await writesContext.writes;
         resolve({
           complete: true,
           reason: 'confirmed',

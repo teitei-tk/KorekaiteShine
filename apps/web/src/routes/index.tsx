@@ -11,21 +11,21 @@ export function InterviewPage() {
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    let active = true;
+    const activeState = { active: true };
     getInterviews(window.location.origin).then(
       (data) => {
-        if (active) {
+        if (activeState.active) {
           setResult(data);
         }
       },
       () => {
-        if (active) {
+        if (activeState.active) {
           setError('面接一覧を取得できませんでした。');
         }
       },
     );
     return () => {
-      active = false;
+      activeState.active = false;
     };
   }, [revision]);
   const statusLabels = {

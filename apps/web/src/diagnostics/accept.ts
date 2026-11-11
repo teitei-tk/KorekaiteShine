@@ -34,13 +34,14 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
       },
     ]);
   }
-  let input;
-  try {
-    if (body === null) {
-      throw new Error('本文を読み取れませんでした。');
+  const input = (() => {
+    try {
+      return body === null ? undefined : JSON.parse(body);
+    } catch {
+      return undefined;
     }
-    input = JSON.parse(body);
-  } catch {
+  })();
+  if (input === undefined) {
     return validationResponse(requestId, [
       {
         location: 'body',

@@ -20,8 +20,11 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   expect(window.voiceE2e).toBeUndefined();
   const track = { enabled: true, readyState: 'live' };
   navigator.mediaDevices = { getUserMedia: async () => ({ getAudioTracks: () => [track] }) };
-  let amplitude = 0;
-  const analyser = { fftSize: 8, getFloatTimeDomainData: (array) => array.fill(amplitude) };
+  const amplitudeState = { amplitude: 0 };
+  const analyser = {
+    fftSize: 8,
+    getFloatTimeDomainData: (array) => array.fill(amplitudeState.amplitude),
+  };
   class FakeNode {
     connect(dest) {
       return dest;
@@ -47,7 +50,7 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   node.context.currentTime = 0.1;
   vi.advanceTimersByTime(20);
   expect(window.voiceE2e.count).toBe(0);
-  amplitude = 0.1;
+  amplitudeState.amplitude = 0.1;
   node.context.currentTime = 0.2;
   vi.advanceTimersByTime(20);
   expect(window.voiceE2e.count).toBe(1);

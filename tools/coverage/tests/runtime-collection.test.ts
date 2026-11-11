@@ -21,7 +21,9 @@ test.each(['stop', 'kill-vite'] as const)(
     writeFileSync(configFile, JSON.stringify({ root, directory, run }));
     vi.stubEnv('KOREKAITE_COVERAGE_RUN', configFile);
     vi.stubEnv('KOREKAITE_COVERAGE_SUITE', 'fixture');
-    let runtime: Awaited<ReturnType<typeof startRuntime>> | undefined;
+    const runtimeState = {
+      runtime: undefined as Awaited<ReturnType<typeof startRuntime>> | undefined,
+    };
     try {
       const config = resolveRuntime({
         repositoryRoot: workspace,
@@ -29,20 +31,23 @@ test.each(['stop', 'kill-vite'] as const)(
         runId: 'coverage',
         parallelIndex: 0,
       });
-      runtime = await startRuntime(config);
-      expect((await fetch(`${runtime.baseUrl}/api/interviews`)).status).toBe(200);
+      runtimeState.runtime = await startRuntime(config);
+      expect((await fetch(`${runtimeState.runtime.baseUrl}/api/interviews`)).status).toBe(200);
       if (mode === 'kill-vite') {
         const rows = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid='], { encoding: 'utf8' })
           .trim()
           .split('\n')
           .map((row) => row.trim().split(/\s+/u).map(Number));
         const tree = new Set([process.pid]);
-        for (let previous = -1; previous !== tree.size;) {
-          previous = tree.size;
+        while (true) {
+          const previous = tree.size;
           for (const [pid, parent] of rows) {
             if (tree.has(parent)) {
               tree.add(pid);
             }
+          }
+          if (tree.size === previous) {
+            break;
           }
         }
         const vite = rows.find(
@@ -50,12 +55,12 @@ test.each(['stop', 'kill-vite'] as const)(
         );
         expect(vite).toBeDefined();
         process.kill(vite![0], 'SIGKILL');
-        expect(await runtime.closed).toEqual({ exitCode: 1 });
-        await expect(runtime.stop()).rejects.toThrow('予期せず終了');
+        expect(await runtimeState.runtime.closed).toEqual({ exitCode: 1 });
+        await expect(runtimeState.runtime.stop()).rejects.toThrow('予期せず終了');
       } else {
-        await runtime.stop();
+        await runtimeState.runtime.stop();
       }
-      runtime = undefined;
+      runtimeState.runtime = undefined;
       const records = readCaptures(directory);
       const web = records.flatMap((record) => record.files).find((file) => file.path === path);
       expect(
@@ -71,7 +76,7 @@ test.each(['stop', 'kill-vite'] as const)(
       expect(Object.values(web!.coverage.f).some((count) => count > 0)).toBe(true);
       expect(records.every((record) => record.status === 'complete')).toBe(true);
     } finally {
-      await runtime?.stop();
+      await runtimeState.runtime?.stop();
       vi.unstubAllEnvs();
       rmSync(workspace, { recursive: true, force: true });
     }

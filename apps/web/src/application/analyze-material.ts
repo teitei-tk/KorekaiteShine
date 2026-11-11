@@ -59,21 +59,24 @@ export async function analyzeMaterial(
   }
   const { markdown } = checked.value;
   const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const expired = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      reject(new Error('材料分析の待機期限を超えました。'));
-    }, 120_000);
-  });
-  let value: MaterialAnalysisCandidate | null;
-  try {
-    value = await Promise.race([deps.analyze(markdown, controller.signal), expired]);
-  } catch {
-    return { ok: false, code: 'AI_UNAVAILABLE' } as const;
-  } finally {
-    clearTimeout(timer);
+  const { promise: expired, reject: expire } = Promise.withResolvers<never>();
+  const timer = setTimeout(() => {
     controller.abort();
+    expire(new Error('材料分析の待機期限を超えました。'));
+  }, 120_000);
+  async function analyze() {
+    try {
+      return await Promise.race([deps.analyze(markdown, controller.signal), expired]);
+    } catch {
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+    }
+  }
+  const value = await analyze();
+  if (value === undefined) {
+    return { ok: false, code: 'AI_UNAVAILABLE' } as const;
   }
   if (!validateMaterialAnalysisResult(value)) {
     return { ok: false, code: 'INVALID_AI_RESULT' } as const;

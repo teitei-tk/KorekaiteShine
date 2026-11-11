@@ -31,15 +31,15 @@ test('保持プロセスを強制終了すると環境ロックを再取得で�
     { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
   );
   const stopped = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-  let stderr = '';
+  const stderrState = { stderr: '' };
   child.stderr!.on('data', (chunk: Buffer) => {
-    stderr += chunk.toString();
+    stderrState.stderr += chunk.toString();
   });
   try {
     await new Promise<void>((resolve, reject) => {
       child.once('message', () => resolve());
       child.once('error', reject);
-      child.once('exit', () => reject(new Error(stderr)));
+      child.once('exit', () => reject(new Error(stderrState.stderr)));
     });
     await expect(lockEnvironment(config)).rejects.toThrow('環境は使用中です');
     child.kill('SIGKILL');

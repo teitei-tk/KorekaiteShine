@@ -1,3 +1,4 @@
+import { SystemError } from '../testing/system-error.mts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openSync, readlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -98,7 +99,7 @@ vi.mock('node:net', async (original) => ({
 }));
 
 function denied(): never {
-  throw Object.assign(new Error('private fixture'), { code: 'EACCES' });
+  throw new SystemError('private fixture', 'EACCES');
 }
 
 beforeEach(() => {
@@ -118,9 +119,7 @@ beforeEach(() => {
   vi.spyOn(process, 'getgroups').mockReturnValue([1000]);
   vi.mocked(createConnection).mockImplementation(() => {
     const socket = new Socket();
-    queueMicrotask(() =>
-      socket.emit('error', Object.assign(new Error('private fixture'), { code: 'EACCES' })),
-    );
+    queueMicrotask(() => socket.emit('error', new SystemError('private fixture', 'EACCES')));
     return socket;
   });
 });

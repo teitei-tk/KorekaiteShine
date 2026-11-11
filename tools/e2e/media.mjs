@@ -47,26 +47,29 @@ export async function installMediaProbe(context) {
     AudioNode.prototype.connect = function (destination, ...options) {
       const result = connect.call(this, destination, ...options);
       if (destination === this.context.destination) {
-        let analyser = graphs.get(this.context);
-        if (!analyser) {
+        const analyserState = { analyser: graphs.get(this.context) };
+        if (!analyserState.analyser) {
           const ctx = this.context;
-          analyser = ctx.createAnalyser();
-          graphs.set(ctx, analyser);
-          const samples = new Float32Array(analyser.fftSize);
-          let previous = ctx.currentTime;
+          analyserState.analyser = ctx.createAnalyser();
+          graphs.set(ctx, analyserState.analyser);
+          const samples = new Float32Array(analyserState.analyser.fftSize);
+          const previousState = { previous: ctx.currentTime };
           const timer = setInterval(() => {
             if (ctx.state === 'closed') {
               return clearInterval(timer);
             }
-            analyser.getFloatTimeDomainData(samples);
-            if (ctx.currentTime > previous && samples.some((v) => Math.abs(v) > 0.002)) {
+            analyserState.analyser.getFloatTimeDomainData(samples);
+            if (
+              ctx.currentTime > previousState.previous &&
+              samples.some((v) => Math.abs(v) > 0.002)
+            ) {
               meter.count++;
               meter.lastSound = performance.now();
             }
-            previous = ctx.currentTime;
+            previousState.previous = ctx.currentTime;
           }, 20);
         }
-        connect.call(this, analyser);
+        connect.call(this, analyserState.analyser);
       }
       return result;
     };

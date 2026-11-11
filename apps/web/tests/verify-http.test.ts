@@ -17,19 +17,18 @@ async function run(args: string[], preload?: string) {
       timeout: 10000,
     },
   );
-  let stdout = '';
-  let stderr = '';
+  const stdoutContext = { stdout: '', stderr: '' };
   child.stdout.on('data', (chunk) => {
-    stdout += String(chunk);
+    stdoutContext.stdout += String(chunk);
   });
   child.stderr.on('data', (chunk) => {
-    stderr += String(chunk);
+    stdoutContext.stderr += String(chunk);
   });
   const code = await new Promise<number | null>((resolve, reject) => {
     child.once('error', reject);
     child.once('close', resolve);
   });
-  return { code, stdout, stderr };
+  return { code, stdout: stdoutContext.stdout, stderr: stdoutContext.stderr };
 }
 
 async function serve(page = '面接一覧') {

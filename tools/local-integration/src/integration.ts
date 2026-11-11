@@ -86,9 +86,17 @@ export interface IntegrationReport {
 class IntegrationFailure extends Error {
   readonly code: string;
 
-  constructor(code: string) {
+  readonly recoveryTiming?: {
+    restartedAt: number;
+    scheduledStartedAt: number | null;
+    scheduledElapsedMs: number | null;
+    attemptStartedAt: number;
+  };
+
+  constructor(code: string, recoveryTiming?: IntegrationFailure['recoveryTiming']) {
     super(`統合検証に失敗しました: ${code}`);
     this.code = code;
+    this.recoveryTiming = recoveryTiming;
   }
 }
 
@@ -285,14 +293,16 @@ export async function runDiagnosticScenario(input: {
   await mkdir(directory, { recursive: true });
   // 同じ実行ID/番号の証拠を、並行実行や再実行で上書きしない。
   await writeFile(resultPath, JSON.stringify(report, null, 2), { flag: 'wx' });
-  let runtime: LocalRuntime | undefined;
-  let failure: Error | undefined;
-  let stopScheduled: (() => void) | undefined;
-  let scheduledPending: Promise<void> | undefined;
-  let scheduledFailed = false;
+  const runtimeContext = {
+    runtime: undefined as LocalRuntime | undefined,
+    failure: undefined as Error | undefined,
+    stopScheduled: undefined as (() => void) | undefined,
+    scheduledPending: undefined as Promise<void> | undefined,
+    scheduledFailed: false,
+  };
   function startScheduled(activeRuntime: LocalRuntime): void {
-    stopScheduled = startScheduledInterval((elapsedMs) => {
-      if (scheduledPending || scheduledFailed) {
+    runtimeContext.stopScheduled = startScheduledInterval((elapsedMs) => {
+      if (runtimeContext.scheduledPending || runtimeContext.scheduledFailed) {
         return;
       }
       const invocation: IntegrationReport['scheduled']['invocations'][number] = {
@@ -302,32 +312,32 @@ export async function runDiagnosticScenario(input: {
         outcome: 'pending',
       };
       report.scheduled.invocations.push(invocation);
-      scheduledPending = activeRuntime
+      runtimeContext.scheduledPending = activeRuntime
         .runScheduled(AbortSignal.timeout(10_000))
         .then(() => {
           invocation.outcome = 'ok';
         })
         .catch(() => {
           invocation.outcome = 'failed';
-          scheduledFailed = true;
+          runtimeContext.scheduledFailed = true;
         })
         .finally(() => {
           invocation.completedAt = Temporal.Now.instant().epochMilliseconds;
-          scheduledPending = undefined;
+          runtimeContext.scheduledPending = undefined;
         });
     }, report.scheduled.intervalMs);
   }
   try {
     report.versions = await runtimeVersions();
-    runtime = await startRuntime(config, 'dev', {
+    runtimeContext.runtime = await startRuntime(config, 'dev', {
       manualDiagnostics: restarts,
       holdEvaluationBeforeConsume: input.fault === 'after_queue_send',
       stopAfterResultBeforeAck: input.fault === 'after_result_before_ack',
     });
     if (!restarts) {
-      startScheduled(runtime);
+      startScheduled(runtimeContext.runtime);
     }
-    const acceptanceUrl = `${runtime.baseUrl}/api/diagnostics/check-jobs`;
+    const acceptanceUrl = `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`;
     const idempotencyKey = randomUUID();
     const requestBody = JSON.stringify({ scenario: input.scenario });
     if (input.fault === 'response_loss') {
@@ -340,7 +350,7 @@ export async function runDiagnosticScenario(input: {
       if (report.actual.startHttpStatus !== 202) {
         throw new IntegrationFailure('ACCEPTANCE_CONTRACT');
       }
-      report.actual.acceptanceBeforeRetry = await acceptanceCounts(runtime.baseUrl);
+      report.actual.acceptanceBeforeRetry = await acceptanceCounts(runtimeContext.runtime.baseUrl);
       if (
         !isDeepStrictEqual(report.actual.acceptanceBeforeRetry, report.expected.acceptanceCounts)
       ) {
@@ -374,12 +384,15 @@ export async function runDiagnosticScenario(input: {
           ? "CREATE TRIGGER reject_integration_notification BEFORE INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_outbox_failure'); END;"
           : "CREATE TRIGGER reject_integration_notification BEFORE UPDATE OF sent_at ON job_outbox WHEN OLD.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_sent_failure'); END;",
       ]);
-      const initialization = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: accepted.jobId }),
-        signal: AbortSignal.timeout(10_000),
-      });
+      const initialization = await fetch(
+        `${runtimeContext.runtime.baseUrl}/api/check-object-test`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: accepted.jobId }),
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
       report.actual.initializationHttpStatus = initialization.status;
       await initialization.text();
       report.actual.faultObservedAt = Temporal.Now.instant().epochMilliseconds;
@@ -387,7 +400,7 @@ export async function runDiagnosticScenario(input: {
         throw new IntegrationFailure('FAULT_NOT_OBSERVED');
       }
       report.actual.beforeRestartFirstReceivedAt = await firstReceivedAt(
-        runtime.baseUrl,
+        runtimeContext.runtime.baseUrl,
         accepted.jobId,
       );
       if (input.fault === 'after_do_save' && report.actual.beforeRestartFirstReceivedAt !== null) {
@@ -398,7 +411,7 @@ export async function runDiagnosticScenario(input: {
       const receivedBy = performance.now() + 10_000;
       for (;;) {
         const receipt = await fetch(
-          `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
+          `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
           { signal: AbortSignal.timeout(10_000) },
         );
         const body = await receipt.json();
@@ -417,7 +430,10 @@ export async function runDiagnosticScenario(input: {
         await delay(100);
       }
       report.actual.queueBeforeRestart = true;
-      report.actual.dispatchBeforeRestart = await dispatchState(runtime.baseUrl, accepted.jobId);
+      report.actual.dispatchBeforeRestart = await dispatchState(
+        runtimeContext.runtime.baseUrl,
+        accepted.jobId,
+      );
       if (
         !isDeepStrictEqual(report.actual.dispatchBeforeRestart, {
           notifications: 1,
@@ -430,7 +446,7 @@ export async function runDiagnosticScenario(input: {
     }
     if (restarts) {
       const beforeResponse = await fetch(
-        `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+        `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
         {
           signal: AbortSignal.timeout(10_000),
         },
@@ -450,8 +466,8 @@ export async function runDiagnosticScenario(input: {
       }
       report.actual.beforeRestartStatus = before.status;
       report.actual.beforeRestartChecks = before.checks;
-      await runtime.stop();
-      runtime = undefined;
+      await runtimeContext.runtime.stop();
+      runtimeContext.runtime = undefined;
       const stoppedAt = Temporal.Now.instant().epochMilliseconds;
       if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
         await runDatabaseCommand(config, [
@@ -459,20 +475,20 @@ export async function runDiagnosticScenario(input: {
           'DROP TRIGGER reject_integration_notification;',
         ]);
       }
-      runtime = await startRuntime(config);
+      runtimeContext.runtime = await startRuntime(config);
       report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
       report.actual.restartCount = 1;
-      startScheduled(runtime);
+      startScheduled(runtimeContext.runtime);
     }
     const deadline =
       performance.now() +
       (input.scenario === 'exhaust_retries' ? 600_000 : restarts ? 120_000 : 60_000);
     for (;;) {
-      if (scheduledFailed) {
+      if (runtimeContext.scheduledFailed) {
         throw new IntegrationFailure('SCHEDULED_FAILED');
       }
       const response = await fetch(
-        `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+        `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
         { signal: AbortSignal.timeout(10_000) },
       );
       report.actual.statusHttpStatus = response.status;
@@ -510,7 +526,7 @@ export async function runDiagnosticScenario(input: {
     }
     if (input.fault === 'after_result_before_ack') {
       const retried = await waitForNativeRetry(
-        runtime.baseUrl,
+        runtimeContext.runtime.baseUrl,
         accepted.jobId,
         config.queues.diagnostics!.queue,
       );
@@ -520,19 +536,19 @@ export async function runDiagnosticScenario(input: {
       report.actual.queueRecovery = 'native_retry';
       report.actual.beforeRestartStatus = report.actual.status;
       report.actual.beforeRestartChecks = report.actual.checks;
-      stopScheduled?.();
-      await scheduledPending;
-      if (scheduledFailed) {
+      runtimeContext.stopScheduled?.();
+      await runtimeContext.scheduledPending;
+      if (runtimeContext.scheduledFailed) {
         throw new IntegrationFailure('SCHEDULED_FAILED');
       }
-      await runtime.stop();
-      runtime = undefined;
+      await runtimeContext.runtime.stop();
+      runtimeContext.runtime = undefined;
       const stoppedAt = Temporal.Now.instant().epochMilliseconds;
-      runtime = await startRuntime(config);
+      runtimeContext.runtime = await startRuntime(config);
       report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
       report.actual.restartCount = 1;
       const afterResponse = await fetch(
-        `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+        `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
         { signal: AbortSignal.timeout(10_000) },
       );
       const after = await afterResponse.json();
@@ -554,7 +570,7 @@ export async function runDiagnosticScenario(input: {
     }
     // 観測専用GETで、Consumerの直接呼出しではなく実Queue配送だったことを確認する。
     const receiptResponse = await fetch(
-      `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
+      `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       { signal: AbortSignal.timeout(10_000) },
     );
     const receipt = await receiptResponse.json();
@@ -573,7 +589,7 @@ export async function runDiagnosticScenario(input: {
     report.actual.queue = receipt.queue;
     report.actual.queueObserved = true;
     const attemptsResponse = await fetch(
-      `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}&view=attempts`,
+      `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}&view=attempts`,
       {
         signal: AbortSignal.timeout(10_000),
       },
@@ -602,14 +618,14 @@ export async function runDiagnosticScenario(input: {
       startedAt: attempt.startedAt,
       finishedAt: attempt.finishedAt,
     }));
-    for (let index = 1; index < report.attempts.length; index++) {
-      const elapsed = report.attempts[index]!.startedAt - report.attempts[index - 1]!.finishedAt;
-      if (elapsed < report.expected.retryDelaysMs[index - 1]!) {
+    for (const [index, next] of report.attempts.slice(1).entries()) {
+      const elapsed = next.startedAt - report.attempts[index]!.finishedAt;
+      if (elapsed < report.expected.retryDelaysMs[index]!) {
         throw new IntegrationFailure('RETRY_TOO_EARLY');
       }
     }
     if (input.fault === 'response_loss') {
-      report.actual.acceptanceAfterRetry = await acceptanceCounts(runtime.baseUrl);
+      report.actual.acceptanceAfterRetry = await acceptanceCounts(runtimeContext.runtime.baseUrl);
       if (
         !isDeepStrictEqual(report.actual.acceptanceAfterRetry, report.expected.acceptanceCounts)
       ) {
@@ -624,19 +640,17 @@ export async function runDiagnosticScenario(input: {
         report.attempts[0]!.startedAt < first.startedAt
       ) {
         // CIに成果物がなくても、どの時刻条件に違反したかを識別できる数値だけ残す。
-        throw Object.assign(new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH'), {
-          recoveryTiming: {
-            // 再起動経路では上でrestartを設定し、試行履歴も件数と形式を検証済み。
-            restartedAt: report.restart!.restartedAt,
-            scheduledStartedAt: first?.startedAt ?? null,
-            scheduledElapsedMs: first?.elapsedMs ?? null,
-            attemptStartedAt: report.attempts[0]!.startedAt,
-          },
+        throw new IntegrationFailure('RECOVERY_SCHEDULE_MISMATCH', {
+          // 再起動経路では上でrestartを設定し、試行履歴も件数と形式を検証済み。
+          restartedAt: report.restart!.restartedAt,
+          scheduledStartedAt: first?.startedAt ?? null,
+          scheduledElapsedMs: first?.elapsedMs ?? null,
+          attemptStartedAt: report.attempts[0]!.startedAt,
         });
       }
     }
     if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
-      const persisted = await firstReceivedAt(runtime.baseUrl, accepted.jobId);
+      const persisted = await firstReceivedAt(runtimeContext.runtime.baseUrl, accepted.jobId);
       if (
         persisted === null ||
         persisted < Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds ||
@@ -647,7 +661,10 @@ export async function runDiagnosticScenario(input: {
       report.actual.doFirstReceivedAt = persisted;
     }
     if (input.fault === 'after_queue_send') {
-      report.actual.dispatchAfterRestart = await dispatchState(runtime.baseUrl, accepted.jobId);
+      report.actual.dispatchAfterRestart = await dispatchState(
+        runtimeContext.runtime.baseUrl,
+        accepted.jobId,
+      );
       const dispatched = report.actual.dispatchAfterRestart;
       if (dispatched.notifications !== 1 || dispatched.unsent !== 0 || dispatched.deliveries < 2) {
         throw new IntegrationFailure('OUTBOX_RECOVERY_MISMATCH');
@@ -662,26 +679,27 @@ export async function runDiagnosticScenario(input: {
     }
     report.exitCode = 0;
   } catch (error) {
-    failure = error instanceof Error ? error : new Error('統合検証に失敗しました。');
+    runtimeContext.failure = error instanceof Error ? error : new Error('統合検証に失敗しました。');
     report.exitCode = 1;
     report.failureCode = error instanceof IntegrationFailure ? error.code : 'UNEXPECTED_ERROR';
   } finally {
-    stopScheduled?.();
-    await scheduledPending;
-    if (scheduledFailed) {
-      failure = new IntegrationFailure('SCHEDULED_FAILED');
+    runtimeContext.stopScheduled?.();
+    await runtimeContext.scheduledPending;
+    if (runtimeContext.scheduledFailed) {
+      runtimeContext.failure = new IntegrationFailure('SCHEDULED_FAILED');
       report.exitCode = 1;
       report.failureCode = 'SCHEDULED_FAILED';
     }
     try {
-      await runtime?.stop();
+      await runtimeContext.runtime?.stop();
       if (report.exitCode === 0) {
         // この関数はappEnv: 'test'で解決するため、ローカル状態の保存先が必ずある。
         await rm(config.stateDirectory!, { recursive: true, force: true });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       }
     } catch (error) {
-      failure = error instanceof Error ? error : new Error('統合検証の停止・破棄に失敗しました。');
+      runtimeContext.failure =
+        error instanceof Error ? error : new Error('統合検証の停止・破棄に失敗しました。');
       report.exitCode = 1;
       report.failureCode = 'CLEANUP_FAILED';
     }
@@ -690,8 +708,8 @@ export async function runDiagnosticScenario(input: {
     // 応答全体、要求本文、冪等キー、例外メッセージは記録しない。
     await writeFile(resultPath, `${JSON.stringify(report, null, 2)}\n`);
   }
-  if (failure) {
-    throw failure;
+  if (runtimeContext.failure) {
+    throw runtimeContext.failure;
   }
   return { report, resultPath };
 }

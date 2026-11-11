@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { mkdtemp, mkdir, symlink, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -62,7 +63,7 @@ test('DB管理用の依存参照が別のディレクトリを向いていれば
 
 test('DB管理用リンクの作成失敗を既存リンクの競合と誤分類しない', async () => {
   const { config } = await fixture();
-  const failure = Object.assign(new Error('fixture permission error'), { code: 'EACCES' });
+  const failure = new SystemError('fixture permission error', 'EACCES');
   vi.mocked(symlink).mockRejectedValueOnce(failure);
   await expect(runDatabaseCommand(config, ['migrate'])).rejects.toBe(failure);
 });

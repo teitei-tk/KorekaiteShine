@@ -14,16 +14,15 @@ test('元ソースに存在しないAPIは再起動・再ビルドで消え、�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime: LocalRuntime | undefined;
-  let succeeded = false;
+  const runtimeContext = { runtime: undefined as LocalRuntime | undefined };
   try {
-    runtime = await startRuntime(config, 'dev');
+    runtimeContext.runtime = await startRuntime(config, 'dev');
     await runDatabaseCommand(config, [
       'execute',
       "INSERT INTO connection_checks (writer, value) VALUES ('source-sync-sentinel', 'retained');",
     ]);
-    await runtime.stop();
-    runtime = undefined;
+    await runtimeContext.runtime.stop();
+    runtimeContext.runtime = undefined;
     for (const mode of ['dev', 'preview'] as const) {
       // 元ソースから削除されたAPIが、以前の生成用コピーに残った状態を再現する。
       await writeFile(
@@ -36,21 +35,19 @@ export const Route = createFileRoute('/api/obsolete-test')({
       if (mode === 'preview') {
         await buildRuntime(config);
       }
-      runtime = await startRuntime(config, mode);
-      const response = await fetch(`${runtime.baseUrl}/api/obsolete-test`);
+      runtimeContext.runtime = await startRuntime(config, mode);
+      const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/obsolete-test`);
       expect(response.status, mode).toBe(404);
       await runDatabaseCommand(config, [
         'execute',
         "CREATE TEMP TABLE one (count INTEGER CHECK (count = 1)); INSERT INTO one SELECT COUNT(*) FROM connection_checks WHERE writer = 'source-sync-sentinel' AND value = 'retained';",
       ]);
-      await runtime.stop();
-      runtime = undefined;
+      await runtimeContext.runtime.stop();
+      runtimeContext.runtime = undefined;
     }
-    succeeded = true;
   } finally {
-    await runtime?.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime?.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 120_000);

@@ -38,13 +38,7 @@ const interviewList = {
 };
 
 function pendingResponse() {
-  let resolve!: (response: Response) => void;
-  let reject!: (error: Error) => void;
-  const promise = new Promise<Response>((onResolve, onReject) => {
-    resolve = onResolve;
-    reject = onReject;
-  });
-  return { promise, resolve, reject };
+  return Promise.withResolvers<Response>();
 }
 
 test('取得した2件の内容と日本時間・材料・評価状態を表示する', async () => {

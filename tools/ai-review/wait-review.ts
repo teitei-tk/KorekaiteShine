@@ -54,7 +54,8 @@ async function latest<T extends { id: number; run_attempt: number }>(
   event: string,
   match: (run: T) => boolean,
 ): Promise<T | undefined> {
-  for (let page = 1; page <= 10; page++) {
+  for (const index of Array(10).keys()) {
+    const page = index + 1;
     const data = await api<{ workflow_runs: T[] }>(
       `${workflow ? `actions/workflows/${workflow}` : 'actions'}/runs?event=${event}&per_page=100&page=${page}`,
     );
@@ -151,16 +152,16 @@ export async function waitReview(
   },
 ): Promise<Exclude<Inspection, { status: 'pending' }>> {
   const deadline = clock.now() + clock.timeout;
-  let target = 'workflow';
+  const targetState = { target: 'workflow' };
   while (clock.now() < deadline) {
     const result = await inspectReview(api, revision);
     if (result.status !== 'pending') {
       return result;
     }
-    target = result.target;
+    targetState.target = result.target;
     await clock.sleep();
   }
-  return { status: 'failure', target, reason: 'TIMED_OUT' };
+  return { status: 'failure', target: targetState.target, reason: 'TIMED_OUT' };
 }
 export async function finishReview(
   api: ReadApi,

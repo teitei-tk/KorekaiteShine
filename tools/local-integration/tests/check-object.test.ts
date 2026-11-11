@@ -15,14 +15,15 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', { probeOnlyEvaluation: true }),
+  };
   try {
     await runDatabaseCommand(config, [
       'execute',
       "CREATE TRIGGER reject_notification BEFORE INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_outbox_failure'); END;",
     ]);
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"success"}',
@@ -30,7 +31,7 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
     expect(response.status).toBe(202);
     const accepted = await response.json();
     // 同じDOへ再度RPCし、障害中に初期化が完了できないことも確認する。
-    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+    const initialized = await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: accepted.jobId }),
@@ -42,20 +43,22 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
        INSERT INTO retained SELECT COUNT(*) FROM jobs WHERE status = 'pending';
        INSERT INTO retained SELECT COUNT(*) FROM job_outbox WHERE operation = 'initialize_do' AND sent_at IS NULL;`,
     ]);
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
-    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-    await runtime.runScheduled();
-    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    runtimeContext.runtime = await startRuntime(config, 'dev', {
+      probeOnlyEvaluation: true,
+    });
+    await runtimeContext.runtime.runScheduled();
+    const status = await fetch(
+      `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+    );
     expect(status.status).toBe(200);
     expect((await status.json()).checks.doPersistence).toBe('passed');
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('同じ診断ジョブでDOを二回初期化しても初回保存日時を維持する', async () => {
@@ -69,7 +72,7 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     manualDiagnostics: true,
     probeOnlyEvaluation: true,
   });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -94,13 +97,11 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     const repeated = await initialize();
     expect(repeated.status).toBe(200);
     expect(await repeated.json()).toEqual(saved);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DO保存確認と通知outboxを一体保存し、再初期化でも各1件を維持する', async () => {
@@ -114,7 +115,7 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
     manualDiagnostics: true,
     probeOnlyEvaluation: true,
   });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -123,7 +124,7 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (const _ of Array(2).keys()) {
       const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,13 +146,11 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
       `,
       ]);
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DO保存後にD1の通知記録が失敗しても、再起動後に初回日時を保って回復する', async () => {
@@ -161,13 +160,14 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-  });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', {
+      manualDiagnostics: true,
+      probeOnlyEvaluation: true,
+    }),
+  };
   try {
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"success"}',
@@ -175,7 +175,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     expect(response.status).toBe(202);
     const accepted = await response.json();
     const initialize = () =>
-      fetch(`${runtime.baseUrl}/api/check-object-test`, {
+      fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: accepted.jobId }),
@@ -197,9 +197,9 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
       INSERT INTO no_notification SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify';
     `,
     ]);
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_notification;']);
-    runtime = await startRuntime(config, 'dev', {
+    runtimeContext.runtime = await startRuntime(config, 'dev', {
       manualDiagnostics: true,
       probeOnlyEvaluation: true,
     });
@@ -213,19 +213,19 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     expect(Temporal.Instant.from(saved.firstReceivedAt).epochMilliseconds).toBeGreaterThanOrEqual(
       Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds,
     );
-    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    const status = await fetch(
+      `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+    );
     expect((await status.json()).checks.doPersistence).toBe('passed');
     await runDatabaseCommand(config, [
       'execute',
       `CREATE TEMP TABLE recovered_once (count INTEGER CHECK (count = 1)); INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify';`,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DOから送った2項目の通知が診断Queueを経由してEvaluationへ自動配送される', async () => {
@@ -239,7 +239,7 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     manualDiagnostics: true,
     probeOnlyEvaluation: true,
   });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -254,20 +254,20 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
       body: JSON.stringify({ jobId: accepted.jobId }),
     });
     expect(initialized.status).toBe(200);
-    let receipt = null;
+    const receiptState = { receipt: null };
     const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
-      receipt = await observed.json();
-      if (receipt !== null) {
+      receiptState.receipt = await observed.json();
+      if (receiptState.receipt !== null) {
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    expect(receipt).toEqual({
+    expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
       message: { schemaVersion: 1, jobId: accepted.jobId },
     });
@@ -278,13 +278,11 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     // ここでは配送先の確認だけ。評価処理の完了を偽装しない。
     expect((await status.json()).checks.consumerCompletion).toBe('pending');
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始する', async () => {
@@ -295,7 +293,7 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -304,32 +302,30 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    let receipt = null;
+    const receiptState = { receipt: null };
     const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
-      receipt = await observed.json();
-      if (receipt !== null) {
+      receiptState.receipt = await observed.json();
+      if (receiptState.receipt !== null) {
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    expect(receipt).toEqual({
+    expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
       message: { schemaVersion: 1, jobId: accepted.jobId },
     });
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     expect((await status.json()).checks.doPersistence).toBe('passed');
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('受付直後に停止してもEvaluationのscheduledイベントが初期化待ちを回復する', async () => {
@@ -339,39 +335,44 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-  });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', {
+      manualDiagnostics: true,
+      probeOnlyEvaluation: true,
+    }),
+  };
   try {
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    await runtime.stop();
-    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-    await runtime.runScheduled();
-    let receipt = null;
+    await runtimeContext.runtime.stop();
+    runtimeContext.runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
+    await runtimeContext.runtime.runScheduled();
+    const receiptState = { receipt: null };
     const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
-      receipt = await (
-        await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`)
+      receiptState.receipt = await (
+        await fetch(
+          `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
+        )
       ).json();
-      if (receipt !== null) {
+      if (receiptState.receipt !== null) {
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    expect(receipt).toEqual({
+    expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
       message: { schemaVersion: 1, jobId: accepted.jobId },
     });
-    await runtime.runScheduled();
-    const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
+    await runtimeContext.runtime.runScheduled();
+    const status = await fetch(
+      `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+    );
     expect((await status.json()).checks.doPersistence).toBe('passed');
     await runDatabaseCommand(config, [
       'execute',
@@ -382,13 +383,11 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
       INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('Queue送信後に送信済み記録が失敗しても、再起動後に同じ通知を再送できる', async () => {
@@ -398,11 +397,12 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-  });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', {
+      manualDiagnostics: true,
+      probeOnlyEvaluation: true,
+    }),
+  };
   const assertDeliveries = async (count: number) => {
     await expect
       .poll(
@@ -425,7 +425,7 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
       .toBe(true);
   };
   try {
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"success"}',
@@ -436,7 +436,7 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
       'execute',
       "CREATE TRIGGER reject_sent BEFORE UPDATE OF sent_at ON job_outbox WHEN OLD.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_sent_failure'); END;",
     ]);
-    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+    const initialized = await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: accepted.jobId }),
@@ -451,10 +451,10 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
       CREATE TABLE before_restart AS SELECT first_received_at FROM diagnostic_checks;
     `,
     ]);
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER reject_sent;']);
-    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-    await runtime.runScheduled();
+    runtimeContext.runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
+    await runtimeContext.runtime.runScheduled();
     await assertDeliveries(2);
     await runDatabaseCommand(config, [
       'execute',
@@ -466,13 +466,11 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
       INSERT INTO recovered_once SELECT COUNT(DISTINCT json_extract(value, '$.message.jobId')) FROM connection_checks WHERE writer LIKE 'queue-message:%';
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('遅延上限より先の通知は保留し、送信前の停止から期限到来後に回復する', async () => {
@@ -482,13 +480,14 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', {
-    manualDiagnostics: true,
-    probeOnlyEvaluation: true,
-  });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', {
+      manualDiagnostics: true,
+      probeOnlyEvaluation: true,
+    }),
+  };
   try {
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"success"}',
@@ -499,14 +498,14 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       'execute',
       `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Temporal.Now.instant().epochMilliseconds + 172_800_000} WHERE id = NEW.id; END;`,
     ]);
-    const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+    const initialized = await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: accepted.jobId }),
     });
     expect(initialized.status).toBe(200);
     const saved = await initialized.json();
-    await runtime.runScheduled();
+    await runtimeContext.runtime.runScheduled();
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -517,24 +516,28 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       INSERT INTO no_delivery SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'queue-message:%';
     `,
     ]);
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     await runDatabaseCommand(config, [
       'execute',
       "DROP TRIGGER defer_notification; UPDATE job_outbox SET scheduled_at = 0 WHERE operation = 'notify';",
     ]);
-    runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-    await runtime.runScheduled();
+    runtimeContext.runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
+    await runtimeContext.runtime.runScheduled();
     await expect
       .poll(
         async () =>
-          (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`)).json(),
+          (
+            await fetch(
+              `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
+            )
+          ).json(),
         { timeout: 5_000, interval: 100 },
       )
       .toEqual({
         queue: config.queues.diagnostics?.queue,
         message: { schemaVersion: 1, jobId: accepted.jobId },
       });
-    const repeated = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
+    const repeated = await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: accepted.jobId }),
@@ -549,11 +552,9 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

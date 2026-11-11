@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { ChildProcess } from 'node:child_process';
 import { afterEach, expect, test, vi } from 'vitest';
 import { stopProcessGroup } from '../src/process.ts';
@@ -9,7 +10,7 @@ test('猶予終了後の強制停止時に消えたプロセスを正常停止�
   Object.defineProperty(child, 'pid', { value: 12345 });
   vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
     if (signal === 'SIGKILL') {
-      throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+      throw new SystemError('gone', 'ESRCH');
     }
     return true;
   });
@@ -28,7 +29,7 @@ test('停止時の非Error例外も隠さず呼出し元へ返す', async () => 
 test('停止シグナル自体が拒否されたら終了済みとして扱わない', async () => {
   const child = new ChildProcess();
   Object.defineProperty(child, 'pid', { value: 12345 });
-  const error = Object.assign(new Error('denied'), { code: 'EPERM' });
+  const error = new SystemError('denied', 'EPERM');
   vi.spyOn(process, 'kill').mockImplementation(() => {
     throw error;
   });
@@ -40,7 +41,7 @@ test('生存確認のEPERMを終了済みと判断せず強制停止の期限ま
   Object.defineProperty(child, 'pid', { value: 12345 });
   const kill = vi.spyOn(process, 'kill').mockImplementation((_pid, signal) => {
     if (signal === 0) {
-      throw Object.assign(new Error('denied'), { code: 'EPERM' });
+      throw new SystemError('denied', 'EPERM');
     }
     return true;
   });

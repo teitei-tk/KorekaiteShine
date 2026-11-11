@@ -1,8 +1,13 @@
-import { remainingAudioMs } from '../server/repositories/audio-usage';
+import { dailyAudioDeadline, remainingAudioMs } from '../server/repositories/audio-usage';
 import { asc, eq } from 'void/db';
-import { transcriptFragments, type EvaluationConfiguration } from '@korekaite/database/interviews';
+import {
+  playbackReceipts,
+  transcriptFragments,
+  type EvaluationConfiguration,
+} from '@korekaite/database/interviews';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { canSendAudio, transitionInterview, type InterviewAction } from '../domain/interview-state';
+import { questionPlayback } from '../domain/question-playback';
 import { createLiveConnection } from '../server/live-connection';
 import {
   appendTranscript,
@@ -10,6 +15,7 @@ import {
   saveInterviewState,
   markTranscriptIncomplete,
   recordPlayback,
+  setPendingQuestionOperation,
 } from '../server/repositories/interviews';
 import { finishInterview } from '../server/repositories/finish-interview';
 import { buildLiveSession, InterviewContextLimitError } from './live-session';
@@ -57,7 +63,12 @@ async function awaitTranscript<T>(save: Promise<T>): Promise<T | null> {
 export function createInterviewSession(options: Options) {
   const { db, actorId, interviewId } = options;
   let pending: Promise<void> = Promise.resolve();
-  let current: { connection: Connection; generation: number; settled: Promise<void> } | null = null;
+  let current: {
+    connection: Connection;
+    generation: number;
+    settled: Promise<void>;
+    question: ReturnType<typeof questionPlayback> | null;
+  } | null = null;
   let discarded = false;
   let incomplete = false;
   let outputOffsetMs = 0;
@@ -78,9 +89,9 @@ export function createInterviewSession(options: Options) {
     }
     return row;
   }
-  async function transition(action: InterviewAction) {
+  async function transition(action: InterviewAction, now = options.now()) {
     const row = await read();
-    const next = transitionInterview(row, action, options.now());
+    const next = transitionInterview(row, action, now);
     if (next === row || row.status === 'ended') {
       return row;
     }
@@ -88,7 +99,10 @@ export function createInterviewSession(options: Options) {
     if (!saved) {
       throw new Error('面接状態の保存が競合しました。');
     }
-    await options.onState?.(saved, acceptedJob);
+    // 稼働確認だけのtickはD1の時刻だけを更新し、WebSocketへ状態を再送しない。
+    if (!(action.type === 'tick' && row.status === 'active' && saved.status === 'active')) {
+      await options.onState?.(saved, acceptedJob);
+    }
     return saved;
   }
   async function finalize() {
@@ -110,6 +124,17 @@ export function createInterviewSession(options: Options) {
     return acceptedJob;
   }
 
+  async function confirmQuestion(generation: number) {
+    const active = current;
+    if (
+      active?.generation === generation &&
+      active.question?.confirmed() &&
+      (await setPendingQuestionOperation(db, actorId, interviewId, generation, null, options.now()))
+    ) {
+      active.question = null;
+    }
+  }
+
   return {
     discard() {
       discarded = true;
@@ -124,8 +149,10 @@ export function createInterviewSession(options: Options) {
           return row;
         }
         if (row.streamGeneration !== null) {
-          await markTranscriptIncomplete(db, actorId, interviewId, options.now());
-          await transition({ type: 'disconnected', generation: row.generation });
+          // 停止時刻は観測できない。稼働を確認してD1に保存した時刻で区間を閉じる。
+          const disconnectedAt = row.status === 'active' ? row.updatedAt : options.now();
+          await markTranscriptIncomplete(db, actorId, interviewId, disconnectedAt);
+          await transition({ type: 'disconnected', generation: row.generation }, disconnectedAt);
           await transition({ type: 'closed', generation: row.streamGeneration });
         }
         const recovered = await transition({ type: 'tick' });
@@ -152,9 +179,17 @@ export function createInterviewSession(options: Options) {
           .from(transcriptFragments)
           .where(eq(transcriptFragments.interviewId, interviewId))
           .orderBy(asc(transcriptFragments.sequence));
+        let lastSequence = fragments.at(-1)?.sequence ?? 0;
         let session: ReturnType<typeof buildLiveSession>;
         try {
-          session = buildLiveSession(row, fragments, options);
+          const playback = await db
+            .select({
+              generation: playbackReceipts.generation,
+              audioOffsetMs: playbackReceipts.audioOffsetMs,
+            })
+            .from(playbackReceipts)
+            .where(eq(playbackReceipts.interviewId, interviewId));
+          session = buildLiveSession(row, fragments, options, playback);
         } catch (error) {
           if (!(error instanceof InterviewContextLimitError)) {
             throw error;
@@ -176,17 +211,21 @@ export function createInterviewSession(options: Options) {
         }
         const generation = connecting.generation;
         outputOffsetMs = 0;
+        const question = row.pendingQuestionOperation ? questionPlayback() : null;
         const connection = (options.connect ?? createLiveConnection)(
           { apiKey: options.apiKey, session },
           {
             onReady: () =>
               serial(async () => {
                 const now = options.now();
-                const remaining = await remainingAudioMs(db, actorId, now);
-                await transition({ type: 'ready', generation, deadline: now + remaining });
+                const deadline = await dailyAudioDeadline(db, actorId, now);
+                await transition({ type: 'ready', generation, deadline }, now);
               }),
             onTranscript: (event) =>
               serial(async () => {
+                if (current?.generation !== generation || discarded) {
+                  return;
+                }
                 const saved = await awaitTranscript(
                   appendTranscript(db, actorId, {
                     interviewId,
@@ -194,6 +233,11 @@ export function createInterviewSession(options: Options) {
                     generation,
                     sourceEventId: event.event_id,
                     speaker: event.type === 'session.input_transcript.delta' ? 'user' : 'assistant',
+                    startsQuestion:
+                      !!question &&
+                      !question.hasText &&
+                      event.type === 'session.output_transcript.delta' &&
+                      event.delta.trim().length > 0,
                     content: event.delta,
                     sourceStartMs: event.start_ms ?? null,
                     sourceEndMs: event.end_ms ?? null,
@@ -204,9 +248,18 @@ export function createInterviewSession(options: Options) {
                   incomplete = true;
                   throw new Error('文字起こしを保存できませんでした。');
                 }
+                if (question && saved.startsQuestion && saved.sequence > lastSequence) {
+                  question.hasText = true;
+                  await confirmQuestion(generation);
+                }
+                lastSequence = Math.max(lastSequence, saved.sequence);
                 options.onTranscript?.(saved);
               }),
             onAudio: (bytes, endOffsetMs) => {
+              if (current?.generation !== generation || discarded) {
+                return;
+              }
+              current.question?.output(bytes, endOffsetMs);
               outputOffsetMs = endOffsetMs;
               options.onAudio?.(generation, bytes, endOffsetMs);
             },
@@ -226,7 +279,11 @@ export function createInterviewSession(options: Options) {
             }
             if (result.reason === 'DIAL_FAILED') {
               options.onDialFailure?.();
-              if (before.status === 'connecting' && before.activeMs === 0) {
+              if (
+                before.status === 'connecting' &&
+                before.activeMs === 0 &&
+                !before.pendingQuestionOperation
+              ) {
                 current = null;
                 await transition({ type: 'start_failed', generation });
                 return;
@@ -247,7 +304,7 @@ export function createInterviewSession(options: Options) {
         // 失敗は操作のawaitで返す。非同期の接続失敗を未処理rejectionにしない。
         void connection.ready.catch(() => {});
         void settled.catch(() => {});
-        current = { connection, generation, settled };
+        current = { connection, generation, settled, question };
         return connecting;
       }),
     sendAudio: (generation: number, bytes: Uint8Array) =>
@@ -257,7 +314,8 @@ export function createInterviewSession(options: Options) {
           current &&
           current.generation === generation &&
           canSendAudio(row, generation, options.now()) &&
-          current.connection.sendAudio(bytes),
+          // 旧クライアントの入力も、新世代の質問を再生するまでは正常に受け流す。
+          (current.question !== null || current.connection.sendAudio(bytes)),
         );
       }),
     playback: (generation: number, audioOffsetMs: number) =>
@@ -265,23 +323,40 @@ export function createInterviewSession(options: Options) {
         if (!current || current.generation !== generation || audioOffsetMs > outputOffsetMs) {
           return false;
         }
-        return recordPlayback(db, actorId, {
+        const recorded = await recordPlayback(db, actorId, {
           interviewId,
           generation,
           audioOffsetMs,
           receivedAt: options.now(),
         });
+        if (recorded && current?.question) {
+          current.question.played(audioOffsetMs);
+          await confirmQuestion(generation);
+        }
+        return recorded;
       }),
-    request: (generation: number, operation: 'rephrase' | 'skip') =>
-      serial(async () => {
+    async request(generation: number, operation: 'rephrase' | 'skip') {
+      const active = await serial(async () => {
         const row = await read();
-        return Boolean(
-          current &&
-          current.generation === generation &&
-          canSendAudio(row, generation, options.now()) &&
-          current.connection.request(operation),
-        );
-      }),
+        const now = options.now();
+        if (
+          !current ||
+          current.generation !== generation ||
+          !canSendAudio(row, generation, now) ||
+          !(await setPendingQuestionOperation(db, actorId, interviewId, generation, operation, now))
+        ) {
+          return null;
+        }
+        await transition({ type: 'disconnected', generation }, now);
+        return current;
+      });
+      if (!active) {
+        return false;
+      }
+      void active.connection.close();
+      await active.settled;
+      return true;
+    },
     async tick() {
       const expired = await serial(async () => {
         const row = await transition({ type: 'tick' });

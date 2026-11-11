@@ -1,0 +1,1 @@
+ALTER TABLE `interviews` ADD `pending_question_operation` text;

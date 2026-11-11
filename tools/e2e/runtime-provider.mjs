@@ -18,6 +18,11 @@ function tone(frequency) {
 export async function startProvider() {
   const http = createServer((_request, response) => response.writeHead(404).end());
   const ws = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 });
+  const silent = new WeakSet();
+  let onHeldQuestion;
+  let openingMuted = false;
+  let openingChunks = 1;
+  const mutedReplies = new WeakSet();
   let refused = false;
   let turn = 0;
   http.on('upgrade', (request, socket, head) => {
@@ -33,6 +38,24 @@ export async function startProvider() {
     let voiced = 0;
     let quiet = 0;
     let answered = false;
+    let pendingTail = false;
+    function holdQuestion() {
+      if (!onHeldQuestion) {
+        return false;
+      }
+      pendingTail = true;
+      onHeldQuestion();
+      onHeldQuestion = undefined;
+      return true;
+    }
+    function flushTail() {
+      if (!pendingTail) {
+        return;
+      }
+      pendingTail = false;
+      transcript('output', '前の質問から遅れて届いた続きです。');
+      play(880);
+    }
     const send = (event) => peer.send(JSON.stringify(event));
     function transcript(speaker, delta) {
       const end = Math.floor(performance.now()) - startedAt;
@@ -46,16 +69,58 @@ export async function startProvider() {
     }
     function play(frequency) {
       // 実サービスと同じく音声deltaにはevent_idを付けない。
-      send({ type: 'session.output_audio.delta', delta: tone(frequency) });
+      send({
+        type: 'session.output_audio.delta',
+        delta:
+          mutedReplies.has(peer) && frequency !== 330
+            ? Buffer.alloc(sampleRate).toString('base64')
+            : tone(frequency),
+      });
     }
     peer.on('error', () => {});
     peer.on('message', (raw) => {
+      if (silent.has(peer)) {
+        return;
+      }
       const event = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
         startedAt = Math.floor(performance.now());
         send({ type: 'session.started', event_id: crypto.randomUUID(), session: { id: session } });
+        const material = event.session?.input?.[0]?.content[0]?.text;
+        const operation = material && JSON.parse(material).resume?.pendingQuestionOperation;
+        if (operation) {
+          if (holdQuestion()) {
+            return;
+          }
+          transcript(
+            'output',
+            operation === 'rephrase'
+              ? '具体的な役割は何ですか。'
+              : '他の手段をなぜ選びませんでしたか。',
+          );
+          play(440);
+          return;
+        }
         transcript('output', '取り組んだことを教えてください。');
-        play(330);
+        if (!openingMuted) {
+          for (let n = 0; n < openingChunks; n++) {
+            play(330);
+          }
+          openingChunks = 1;
+        }
+        openingMuted = false;
+      } else if (event.type === 'session.instructions.append') {
+        if (holdQuestion()) {
+          return;
+        }
+        transcript(
+          'output',
+          event.content.includes('言い換え')
+            ? '具体的な役割は何ですか。'
+            : '他の手段をなぜ選びませんでしたか。',
+        );
+        play(440);
+        flushTail();
       } else if (event.type === 'session.input_audio.append') {
         const pcm = Buffer.from(event.audio, 'base64');
         for (let i = 0; i + 1 < pcm.length; i += 2) {
@@ -75,6 +140,7 @@ export async function startProvider() {
           }
         }
       } else if (event.type === 'session.close') {
+        flushTail();
         send({
           type: 'session.closed',
           event_id: crypto.randomUUID(),
@@ -88,6 +154,27 @@ export async function startProvider() {
   await once(http, 'listening');
   return {
     url: `http://127.0.0.1:${http.address().port}/voice`,
+    holdNextQuestion() {
+      return new Promise((resolve) => {
+        onHeldQuestion = resolve;
+      });
+    },
+    extendNextOpening() {
+      openingChunks = 9;
+    },
+    omitNextOpening() {
+      openingMuted = true;
+    },
+    muteReplies() {
+      for (const peer of ws.clients) {
+        mutedReplies.add(peer);
+      }
+    },
+    silenceCurrentConnections() {
+      for (const peer of ws.clients) {
+        silent.add(peer);
+      }
+    },
     rejectDials(value) {
       refused = value;
     },

@@ -147,7 +147,10 @@ export function transitionInterview(
             : Math.min(state.deadline ?? Infinity, now + 30_000),
       };
     case 'pause':
-      if (state.status !== 'active' || state.activeSince === null) {
+      if (
+        state.status !== 'reconnecting' &&
+        (state.status !== 'active' || state.activeSince === null)
+      ) {
         throw new Error('面接を一時停止できない状態です。');
       }
       return {

@@ -10,6 +10,9 @@ import { evaluationConfiguration } from '../application/evaluation-configuration
 import { createLiveConnection, type LiveHandlers } from './live-connection';
 import { loadInterview } from './repositories/interviews';
 
+// 接続を失ったときに稼働確認前の時間を計上しないため、面接中のみ5秒ごとに記録する。
+const audioCheckpointMs = 5000;
+
 interface Bindings {
   DB: D1Database;
   APP_ENV: string;
@@ -88,7 +91,11 @@ export class InterviewObject extends DurableObject<Bindings> {
           if (deadline === null) {
             await this.ctx.storage.deleteAlarm();
           } else {
-            await this.ctx.storage.setAlarm(Math.max(now + 1, deadline));
+            const alarmAt =
+              state.status === 'active'
+                ? Math.min(state.updatedAt + audioCheckpointMs, deadline)
+                : deadline;
+            await this.ctx.storage.setAlarm(Math.max(now + 1, alarmAt));
           }
         },
       });
@@ -158,7 +165,11 @@ export class InterviewObject extends DurableObject<Bindings> {
     server.binaryType = 'arraybuffer';
     server.accept();
     try {
-      await room.attach(id, { send: (data) => server.send(data), close: () => server.close(1000) });
+      await room.attach(id, {
+        questionBoundaries: new URL(request.url).searchParams.has('questionBoundaries'),
+        send: (data) => server.send(data),
+        close: () => server.close(1000),
+      });
     } catch {
       server.close(1011);
       return new Response(null, { status: 503 });

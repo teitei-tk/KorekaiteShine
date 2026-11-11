@@ -13,6 +13,7 @@ import {
   jobAttempts,
   deletedJobs,
 } from '@korekaite/database/jobs';
+import { audioUsagePeriods } from '@korekaite/database/usage';
 import { deleteInterviewRequest } from '../src/server/delete-interview';
 import { createInterview } from '../src/server/repositories/interviews';
 
@@ -117,6 +118,40 @@ test('本人が評価中の面接を削除すると原文・実行履歴を消�
     expect(await database.db.select().from(deletedJobs)).toMatchObject([{ jobId: 'job' }]);
     expect(await createInterview(database.db, { ...material, actorId: 'actor' }, 12)).toBeNull();
     expect(discard).toHaveBeenCalledWith('actor', 'one');
+  } finally {
+    database.close();
+  }
+});
+
+test('停止したDOを復旧前に削除しても最後に確認した面接中の時間だけを残す', async () => {
+  const database = createTestDatabase();
+  try {
+    await database.db.insert(interviews).values({
+      interviewId: 'lost',
+      actorId: 'actor',
+      materialHash: 'hash',
+      themeTitle: '題',
+      themeHeading: '章',
+      themeExcerpt: '経験',
+      background: '',
+      status: 'active',
+      generation: 1,
+      streamGeneration: 1,
+      activeSince: 1000,
+      deadline: 1201000,
+      createdAt: 1000,
+      updatedAt: 61000,
+    });
+    const response = await deleteInterviewRequest(new Request('https://local.invalid'), 'lost', {
+      db: database.db,
+      actor: () => 'actor',
+      now: () => 601000,
+      discard: async () => {},
+    });
+    expect(response.status).toBe(204);
+    expect(await database.db.select().from(audioUsagePeriods)).toMatchObject([
+      { startedAt: 1000, endedAt: 61000 },
+    ]);
   } finally {
     database.close();
   }

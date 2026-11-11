@@ -52,6 +52,9 @@ export async function createInterview(
           revision: sql<Interview['revision']>`0`.as('revision'),
           generation: sql<Interview['generation']>`0`.as('generation'),
           streamGeneration: sql<Interview['streamGeneration']>`NULL`.as('stream_generation'),
+          pendingQuestionOperation: sql<Interview['pendingQuestionOperation']>`NULL`.as(
+            'pending_question_operation',
+          ),
           transcriptIncomplete: sql<Interview['transcriptIncomplete']>`0`.as(
             'transcript_incomplete',
           ),

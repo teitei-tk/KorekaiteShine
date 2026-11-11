@@ -82,6 +82,21 @@ export class MockInterviewObject extends InterviewObject {
     const url = runtime.baseUrl;
     return {
       url,
+      extendNextOpening() {
+        provider.extendNextOpening();
+      },
+      holdNextQuestion() {
+        return provider.holdNextQuestion();
+      },
+      omitNextOpening() {
+        provider.omitNextOpening();
+      },
+      muteReplies() {
+        provider.muteReplies();
+      },
+      silenceCurrentConnections() {
+        provider.silenceCurrentConnections();
+      },
       async rejectDials(value) {
         if (!provider) {
           throw new Error('接続拒否はPRプロファイル専用です。');

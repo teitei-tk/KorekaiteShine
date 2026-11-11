@@ -5,6 +5,7 @@ import {
   playbackCount,
   speak,
   waitForPlayback,
+  waitForOpening,
 } from '../media.mjs';
 
 afterEach(() => {
@@ -28,6 +29,7 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
     }
   }
   vi.stubGlobal('AudioNode', FakeNode);
+  vi.stubGlobal('AudioBufferSourceNode', class extends FakeNode {});
   await installMediaProbe(context);
   expect(() => window.voiceE2e.speak()).toThrow('マイク');
   await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -65,4 +67,24 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   expect(() => window.voiceE2e.speak()).toThrow('マイク');
   expect(vi.getTimerCount()).toBe(0);
   expect(fakeMediaArgs.join(' ')).toContain('answer.wav');
+});
+
+test('初回質問の100msだけでは通さず、模擬質問500msの再生終了を確認する', async () => {
+  vi.stubGlobal('window', {
+    voiceE2e: { count: 8, audibleSeconds: 0.1, completedSeconds: 0.1, lastSound: -1000 },
+  });
+  const page = {
+    evaluate: (fn) => fn(),
+    waitForFunction: async (fn, arg) => {
+      if (!fn(arg)) {
+        throw new Error('再生が不足');
+      }
+    },
+  };
+  await expect(waitForOpening(page, 0)).rejects.toThrow('再生が不足');
+  window.voiceE2e.audibleSeconds = 0.46;
+  window.voiceE2e.completedSeconds = 0.46;
+  await expect(waitForOpening(page, 0)).rejects.toThrow('再生が不足');
+  window.voiceE2e.completedSeconds = 0.5;
+  await expect(waitForOpening(page, 0)).resolves.toBeUndefined();
 });

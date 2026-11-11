@@ -29,6 +29,7 @@ vi.mock('../media.mjs', () => ({
   installMediaProbe: vi.fn(),
   playbackCount: vi.fn(() => 1),
   waitForQuiet: vi.fn(),
+  waitForOpening: vi.fn(),
   waitForPlayback: vi.fn(),
   speak: vi.fn(),
 }));
@@ -58,6 +59,7 @@ async function observer() {
     active = 0,
     generation = 1,
     refused = false;
+  let silent = false;
   const transcripts = [];
   vi.spyOn(performance, 'now').mockImplementation(() => time);
   delay.mockImplementation(async (ms) => {
@@ -71,6 +73,11 @@ async function observer() {
   };
   const settings = {
     url: 'http://127.0.0.1:4327',
+    omitNextOpening: vi.fn(),
+    muteReplies: vi.fn(),
+    silenceCurrentConnections: () => {
+      silent = true;
+    },
     rejectDials: (value) => {
       refused = value;
     },
@@ -138,9 +145,13 @@ async function observer() {
           button.click();
           generation++;
         }
+        if (name === 'マイクを許可して再開') {
+          generation++;
+          silent = false;
+        }
         started = time;
         emit({ type: 'state', interviewId: 'one', status: 'active' });
-      } else if (name === '一時停止' || name === '終了して評価する') {
+      } else if (['一時停止', '音声をつなぎ直す', '終了して評価する'].includes(name)) {
         close();
       }
     },
@@ -192,8 +203,10 @@ async function observer() {
     for (let n = 0; n < 3; n++) {
       input(voice);
     }
-    transcript('user');
-    transcript('assistant');
+    if (!silent) {
+      transcript('user');
+      transcript('assistant');
+    }
   });
   return { world, relay, client, server, input, output, page, context, emit, close, browser };
 }

@@ -11,7 +11,7 @@
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",
     "@korekaite/runtime-config": "workspace:*",
-    "void": "1.6.2"
+    "void": "1.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261109.1",

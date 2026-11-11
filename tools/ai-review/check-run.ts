@@ -116,14 +116,14 @@ export async function checkRun(
     emit('正の実行IDを指定してください。');
     return 2;
   }
-  let previous = '';
+  const previousState = { previous: '' };
   try {
     emit(`https://github.com/${REPOSITORY}/actions/runs/${id}`);
-    for (let attempt = 0; attempt < (watch ? 40 : 1); attempt++) {
+    for (const attempt of Array(watch ? 40 : 1).keys()) {
       const snapshot = runSnapshot(read(id));
-      if (snapshot.output !== previous) {
+      if (snapshot.output !== previousState.previous) {
         emit(snapshot.output);
-        previous = snapshot.output;
+        previousState.previous = snapshot.output;
       }
       if (snapshot.done) {
         return snapshot.ok ? 0 : 1;
@@ -147,21 +147,21 @@ export function parseRunArgs(args: string[]): { id: string; watch: boolean; expe
   if (!id || !/^[1-9][0-9]{0,17}$/.test(id)) {
     throw new Error('Invalid arguments');
   }
-  let watch = false;
-  let expected: string | undefined;
-  for (let i = 0; i < options.length; i++) {
-    if (options[i] === '--watch' && !watch) {
-      watch = true;
-    } else if (options[i] === '--expect-commit' && expected === undefined) {
-      expected = options[++i];
-      if (!expected || !/^[a-f0-9]{40}$/.test(expected)) {
+  const flags = { watch: false, expected: undefined as string | undefined };
+  const remaining = options.values();
+  for (const option of remaining) {
+    if (option === '--watch' && !flags.watch) {
+      flags.watch = true;
+    } else if (option === '--expect-commit' && flags.expected === undefined) {
+      flags.expected = remaining.next().value;
+      if (!flags.expected || !/^[a-f0-9]{40}$/.test(flags.expected)) {
         throw new Error('Invalid arguments');
       }
     } else {
       throw new Error('Invalid arguments');
     }
   }
-  return { id, watch, expected };
+  return { id, watch: flags.watch, expected: flags.expected };
 }
 export async function checkRunCommand(
   args: string[],
@@ -169,10 +169,14 @@ export async function checkRunCommand(
   check = checkRun,
   emit: (text: string) => void = console.log,
 ): Promise<number> {
-  let options: ReturnType<typeof parseRunArgs>;
-  try {
-    options = parseRunArgs(args);
-  } catch {
+  const options = (() => {
+    try {
+      return parseRunArgs(args);
+    } catch {
+      return null;
+    }
+  })();
+  if (!options) {
     emit('使い方: pnpm check:ai-run <実行ID> [--watch] [--expect-commit <40桁SHA>]');
     return 2;
   }

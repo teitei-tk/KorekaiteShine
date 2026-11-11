@@ -46,6 +46,8 @@ test('材料分析HTTPは認可・送信確認・容量・利用枠を通過し�
     [false, 'application/json', JSON.stringify(input), true, 403, 'FORBIDDEN'],
     [true, 'text/plain', JSON.stringify(input), true, 415, 'UNSUPPORTED_MEDIA_TYPE'],
     [true, 'application/json', '{broken', true, 400, 'INVALID_MATERIAL'],
+    [true, 'application/json', '42', true, 400, 'INVALID_MATERIAL'],
+    [true, 'application/json', '[]', true, 400, 'INVALID_MATERIAL'],
     [
       true,
       'application/json',
@@ -93,11 +95,11 @@ test('材料分析HTTPは認可・送信確認・容量・利用枠を通過し�
 test('本文サイズを申告ヘッダーに依存せず制限し、超過ストリームを中止する', async () => {
   const cancel = vi.fn();
   const encoder = new TextEncoder();
-  let sent = false;
+  const sentState = { sent: false };
   const body = new ReadableStream({
     pull(controller) {
-      if (!sent) {
-        sent = true;
+      if (!sentState.sent) {
+        sentState.sent = true;
         controller.enqueue(encoder.encode(' '.repeat(200_001)));
       } else {
         controller.enqueue(encoder.encode('{"markdown":"資料","confirmed":true}'));

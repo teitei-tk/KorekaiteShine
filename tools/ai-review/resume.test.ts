@@ -55,12 +55,11 @@ function fixture() {
     ],
     threads: [{ id: 'T1', root: 1, resolved: false }],
   };
-  let count = 0;
-  let failAfterWrite = false;
+  const countContext = { count: 0, failAfterWrite: false };
   const api: Api = async <T>(path: string, method = 'GET', body?: ApiBody) => {
     if (method === 'POST' && path !== 'graphql') {
-      count++;
-      const id = 10 + count;
+      countContext.count++;
+      const id = 10 + countContext.count;
       const text = body && 'body' in body ? body.body : '';
       if (path.endsWith('/replies')) {
         snapshot.inline.push({ ...snapshot.inline[0], id, body: text, in_reply_to_id: 1 });
@@ -76,8 +75,8 @@ function fixture() {
         });
         snapshot.threads.push({ id: `T${id}`, root: id, resolved: false });
       }
-      if (failAfterWrite) {
-        failAfterWrite = false;
+      if (countContext.failAfterWrite) {
+        countContext.failAfterWrite = false;
         throw new Error('response lost');
       }
       return { id } as T;
@@ -140,9 +139,9 @@ function fixture() {
     api,
     snapshot,
     artifact,
-    count: () => count,
+    count: () => countContext.count,
     lose: () => {
-      failAfterWrite = true;
+      countContext.failAfterWrite = true;
     },
   };
 }

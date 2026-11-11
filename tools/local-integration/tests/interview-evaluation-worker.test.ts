@@ -17,7 +17,7 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { interviewEvaluationMock: true });
-  let succeeded = false;
+
   try {
     const failedJobId = randomUUID();
     const now = Temporal.Now.instant().epochMilliseconds;
@@ -90,11 +90,9 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
       INSERT INTO assertion SELECT COUNT(*) FROM job_outbox WHERE job_id='${jobId}' AND sent_at IS NOT NULL;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
 }, 90000);

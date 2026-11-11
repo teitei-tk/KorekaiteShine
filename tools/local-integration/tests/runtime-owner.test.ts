@@ -60,7 +60,7 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
   const exited = new Promise<void>((resolve) => launcher.once('exit', () => resolve()));
   const descendants = new Set<number>();
   const groups = new Set<number>();
-  let succeeded = false;
+
   try {
     await Promise.race([
       once(launcher, 'message', { signal: AbortSignal.timeout(60_000) }),
@@ -70,12 +70,15 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
     ]);
     const rows = await processTable();
     const tree = new Set([launcher.pid!]);
-    for (let previous = -1; previous !== tree.size;) {
-      previous = tree.size;
+    while (true) {
+      const previous = tree.size;
       for (const row of rows) {
         if (tree.has(row.parent)) {
           tree.add(row.pid);
         }
+      }
+      if (tree.size === previous) {
+        break;
       }
     }
     for (const row of rows) {
@@ -93,22 +96,22 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
     await exited;
     const deadline = performance.now() + 15_000;
     for (;;) {
-      let release: (() => void) | undefined;
+      const releaseState = { release: undefined as (() => void) | undefined };
       try {
-        release = await lockEnvironment(config);
+        releaseState.release = await lockEnvironment(config);
       } catch (error) {
         if (!(error instanceof Error && error.message.includes('環境は使用中です'))) {
           throw error;
         }
       }
-      if (release) {
+      if (releaseState.release) {
         try {
           const alive = (await processTable()).filter(
             (row) => groups.has(row.group) && !row.state.startsWith('Z'),
           );
           expect(alive, '子ランタイムが動いている間は環境を再取得できません').toEqual([]);
         } finally {
-          release();
+          releaseState.release();
         }
         break;
       }
@@ -124,7 +127,6 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
         { timeout: 10_000 },
       )
       .toEqual([]);
-    succeeded = true;
   } finally {
     if (launcher.exitCode === null && launcher.signalCode === null) {
       launcher.kill('SIGKILL');
@@ -138,10 +140,9 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
         killOwned(row.pid);
       }
     }
-    if (succeeded) {
-      await rm(repositoryRoot, { recursive: true, force: true });
-    }
   }
+
+  await rm(repositoryRoot, { recursive: true, force: true });
 }, 90_000);
 
 test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロックを解放して失敗終了する', async () => {
@@ -156,32 +157,36 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
-  let output = '';
-  let errors = '';
+  const outputContext = { output: '', errors: '' };
   launcher.stdout.on('data', (chunk: Buffer) => {
-    output += chunk.toString();
+    outputContext.output += chunk.toString();
   });
   launcher.stderr.on('data', (chunk: Buffer) => {
-    errors += chunk.toString();
+    outputContext.errors += chunk.toString();
   });
   const exited = new Promise<number | null>((resolve) =>
     launcher.once('exit', (code) => resolve(code)),
   );
   const descendants = new Set<number>();
   const groups = new Set<number>();
-  let succeeded = false;
+
   try {
     await expect
-      .poll(() => output.includes('ローカルWeb: http://127.0.0.1:'), { timeout: 60_000 })
+      .poll(() => outputContext.output.includes('ローカルWeb: http://127.0.0.1:'), {
+        timeout: 60_000,
+      })
       .toBe(true);
     const rows = await processTable();
     const tree = new Set([launcher.pid!]);
-    for (let previous = -1; previous !== tree.size;) {
-      previous = tree.size;
+    while (true) {
+      const previous = tree.size;
       for (const row of rows) {
         if (tree.has(row.parent)) {
           tree.add(row.pid);
         }
+      }
+      if (tree.size === previous) {
+        break;
       }
     }
     for (const row of rows) {
@@ -199,7 +204,7 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
     killOwned([...groups][0]!);
     await expect.poll(() => launcher.exitCode, { timeout: 15_000 }).toBe(1);
     expect(await exited).toBe(1);
-    expect(errors).toContain('予期せず終了');
+    expect(outputContext.errors).toContain('予期せず終了');
     await expect
       .poll(
         async () =>
@@ -211,7 +216,6 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
       .toEqual([]);
     const release = await lockEnvironment(config);
     release();
-    succeeded = true;
   } finally {
     if (launcher.exitCode === null && launcher.signalCode === null) {
       launcher.kill('SIGKILL');
@@ -225,8 +229,7 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
         killOwned(row.pid);
       }
     }
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 90_000);

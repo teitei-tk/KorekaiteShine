@@ -138,10 +138,8 @@ export class InterviewObject extends DurableObject<Bindings> {
     if (!(await loadInterview(createPrimaryDb(this.env.DB), actorId, interviewId))) {
       return new Response(null, { status: 404 });
     }
-    let room: ReturnType<typeof createInterviewRoom>;
-    try {
-      room = await this.getRoom({ actorId, interviewId });
-    } catch {
+    const room = await this.getRoom({ actorId, interviewId }).catch(() => null);
+    if (!room) {
       return new Response(null, { status: 503 });
     }
     const pair = new WebSocketPair();
@@ -158,7 +156,10 @@ export class InterviewObject extends DurableObject<Bindings> {
     server.binaryType = 'arraybuffer';
     server.accept();
     try {
-      await room.attach(id, { send: (data) => server.send(data), close: () => server.close(1000) });
+      await room.attach(id, {
+        send: (data) => server.send(data),
+        close: () => server.close(1000),
+      });
     } catch {
       server.close(1011);
       return new Response(null, { status: 503 });

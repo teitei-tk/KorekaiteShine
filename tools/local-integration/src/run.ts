@@ -33,14 +33,14 @@ async function main(): Promise<void> {
     const runtime = await startRuntime(config, command === 'preview' ? 'preview' : 'dev', {
       port: command === 'dev' && config.environment === 'development' ? 63286 : 0,
     });
-    let stopping = false;
+    const stoppingState = { stopping: false };
     const scheduledAbort = new AbortController();
-    let scheduledPending: Promise<void> | undefined;
+    const scheduledPendingState = { scheduledPending: undefined as Promise<void> | undefined };
     const scheduledTimer = setInterval(() => {
-      if (stopping || scheduledPending) {
+      if (stoppingState.stopping || scheduledPendingState.scheduledPending) {
         return;
       }
-      scheduledPending = runtime
+      scheduledPendingState.scheduledPending = runtime
         .runScheduled(AbortSignal.any([scheduledAbort.signal, AbortSignal.timeout(10_000)]))
         .catch(() => {
           if (!scheduledAbort.signal.aborted) {
@@ -48,21 +48,21 @@ async function main(): Promise<void> {
           }
         })
         .finally(() => {
-          scheduledPending = undefined;
+          scheduledPendingState.scheduledPending = undefined;
         });
     }, 60_000);
     const stopScheduling = async () => {
       clearInterval(scheduledTimer);
       scheduledAbort.abort();
-      await scheduledPending;
+      await scheduledPendingState.scheduledPending;
     };
     console.log(`ローカルWeb: ${runtime.baseUrl}`);
     console.log('定期回復: 60秒周期');
     const stop = () => {
-      if (stopping) {
+      if (stoppingState.stopping) {
         return;
       }
-      stopping = true;
+      stoppingState.stopping = true;
       stopScheduling()
         .then(() => runtime.stop())
         .catch((error: Error) => {
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
         throw new Error('ローカルランタイムが予期せず終了しました。');
       }
     } finally {
-      stopping = true;
+      stoppingState.stopping = true;
       await stopScheduling();
       process.removeListener('SIGINT', stop);
       process.removeListener('SIGTERM', stop);

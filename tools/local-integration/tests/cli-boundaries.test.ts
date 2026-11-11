@@ -30,12 +30,10 @@ async function cliFixture(args: string[], env: NodeJS.ProcessEnv = {}) {
     once: events.once.bind(events),
     removeListener: events.removeListener.bind(events),
   };
-  let close!: (result: { exitCode: 0 | 1 }) => void;
+  const { promise: closed, resolve: close } = Promise.withResolvers<{ exitCode: 0 | 1 }>();
   const runtime: LocalRuntime = {
     baseUrl: 'http://cli.invalid',
-    closed: new Promise((resolve) => {
-      close = resolve;
-    }),
+    closed,
     stop: vi.fn(async () => {
       close({ exitCode: 0 });
     }),
@@ -107,15 +105,11 @@ test('previewを起動し二度の終了シグナルでも停止処理は一度�
 
 test('周期回復が長引いても重複実行せず完了後の周期で再開する', async () => {
   const fixture = await cliFixture(['dev']);
-  let complete!: () => void;
-  vi.mocked(fixture.runtime.runScheduled).mockReturnValueOnce(
-    new Promise((resolve) => {
-      complete = resolve;
-    }),
-  );
+  const scheduled = Promise.withResolvers<void>();
+  vi.mocked(fixture.runtime.runScheduled).mockReturnValueOnce(scheduled.promise);
   await vi.advanceTimersByTimeAsync(120_000);
   expect(fixture.runtime.runScheduled).toHaveBeenCalledTimes(1);
-  complete();
+  scheduled.resolve();
   await vi.advanceTimersByTimeAsync(60_000);
   expect(fixture.runtime.runScheduled).toHaveBeenCalledTimes(2);
   fixture.events.emit('SIGINT');

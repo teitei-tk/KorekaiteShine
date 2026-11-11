@@ -19,11 +19,7 @@ const completed = {
   checks: { doPersistence: 'passed', consumerCompletion: 'passed', dlqReceipt: 'not_expected' },
 };
 function pendingResponse() {
-  let resolve!: (response: Response) => void;
-  const promise = new Promise<Response>((accept) => {
-    resolve = accept;
-  });
-  return { promise, resolve };
+  return Promise.withResolvers<Response>();
 }
 const start = () => screen.getByRole<HTMLButtonElement>('button', { name: '新しい実行を開始' });
 const resend = () => screen.getByRole<HTMLButtonElement>('button', { name: '同じ実行を再送' });

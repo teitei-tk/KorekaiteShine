@@ -45,17 +45,13 @@ test('診断条件が存在しない場合は成功結果を作らず失敗を�
 
 test('DB応答の待機中に中断した場合も診断評価を実行しない', async () => {
   const controller = new AbortController();
-  let resolveQuery!: (rows: { scenario: 'success' }[]) => void;
+  const query = Promise.withResolvers<{ scenario: 'success' }[]>();
   boundary.select.mockReturnValue({ from: () => ({ where: boundary.where }) });
-  boundary.where.mockReturnValue(
-    new Promise((resolve) => {
-      resolveQuery = resolve;
-    }),
-  );
+  boundary.where.mockReturnValue(query.promise);
   const evaluate = await evaluator();
   const result = evaluate(jobId, 1, controller.signal);
   expect(boundary.where).toHaveBeenCalledTimes(1);
   controller.abort();
-  resolveQuery([{ scenario: 'success' }]);
+  query.resolve([{ scenario: 'success' }]);
   await expect(result).rejects.toThrow('評価は中止されました。');
 });

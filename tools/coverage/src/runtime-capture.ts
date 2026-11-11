@@ -41,18 +41,20 @@ export async function startRuntimeCapture(
     await Promise.all(
       workers.map(async ({ name, proxy, socket, capture, epoch }) => {
         try {
-          let parentAlive = true;
+          const parentAliveState = { parentAlive: true };
           try {
             process.kill(parentPid, 0);
           } catch (error) {
             if (error instanceof Error && 'code' in error && error.code === 'ESRCH') {
-              parentAlive = false;
+              parentAliveState.parentAlive = false;
             } else {
               throw error;
             }
           }
           capture.finish(
-            await readWorkerCoverage(parentAlive ? proxy : socket, { value: epoch }),
+            await readWorkerCoverage(parentAliveState.parentAlive ? proxy : socket, {
+              value: epoch,
+            }),
             'complete',
           );
         } catch (error) {

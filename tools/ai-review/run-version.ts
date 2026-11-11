@@ -69,7 +69,7 @@ export function runVersion(
     Array.isArray(original.pull_requests) && original.pull_requests.length === 1
       ? original.pull_requests[0]
       : undefined;
-  let targetKnown = false;
+  const targetKnownState = { targetKnown: false };
   if (
     pr &&
     Number.isSafeInteger(pr.number) &&
@@ -77,7 +77,7 @@ export function runVersion(
     sha(pr.head?.sha) &&
     sha(pr.base?.sha)
   ) {
-    targetKnown = true;
+    targetKnownState.targetKnown = true;
     lines.push(
       `レビュー対象PR: #${pr.number}`,
       `レビュー対象head SHA: ${pr.head.sha}`,
@@ -111,8 +111,8 @@ export function runVersion(
       ? '期待コミットを含む実行です（動作の成功は実行結果で確認してください）'
       : '修正版の検証対象外: 実行コードは期待コミットを含みません',
   );
-  if (!targetKnown) {
+  if (!targetKnownState.targetKnown) {
     lines.push('修正版の検証対象外: レビュー対象を特定できません');
   }
-  return { output: lines.join('\n'), eligible: eligible && targetKnown };
+  return { output: lines.join('\n'), eligible: eligible && targetKnownState.targetKnown };
 }

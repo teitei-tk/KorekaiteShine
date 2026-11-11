@@ -10,14 +10,16 @@ test('共有環境は未送信・送信失敗の通知をケース間で除去�
 }) => {
   const suite = createNotificationRuntime();
   await suite.start();
-  let previousUrl = '';
-  let directory = '';
-  let closed: Promise<{ exitCode: 0 | 1 }> | undefined;
+  const previousUrlContext = {
+    previousUrl: '',
+    directory: '',
+    closed: undefined as Promise<{ exitCode: 0 | 1 }> | undefined,
+  };
   try {
     await suite.run(async ({ config, runtime, newJobId }) => {
-      previousUrl = runtime.baseUrl;
-      directory = config.artifactDirectory;
-      closed = runtime.closed;
+      previousUrlContext.previousUrl = runtime.baseUrl;
+      previousUrlContext.directory = config.artifactDirectory;
+      previousUrlContext.closed = runtime.closed;
       const failedId = newJobId();
       const futureId = newJobId();
       await runDatabaseCommand(config, [
@@ -39,7 +41,7 @@ test('共有環境は未送信・送信失敗の通知をケース間で除去�
       expect(await response.json()).toMatchObject({ outboxSent: 0, outboxDeferred: 1 });
     }, signal);
     await suite.run(async ({ config, runtime }) => {
-      expect(runtime.baseUrl).toBe(previousUrl);
+      expect(runtime.baseUrl).toBe(previousUrlContext.previousUrl);
       const response = await fetch(
         `${runtime.baseUrl}/api/evaluation-test?action=dispatch&now=86400002`,
         { method: 'POST' },
@@ -58,6 +60,6 @@ test('共有環境は未送信・送信失敗の通知をケース間で除去�
   } finally {
     await suite.stop();
   }
-  expect(await closed).toEqual({ exitCode: 0 });
-  await expect(access(directory)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(await previousUrlContext.closed).toEqual({ exitCode: 0 });
+  await expect(access(previousUrlContext.directory)).rejects.toMatchObject({ code: 'ENOENT' });
 }, 60_000);

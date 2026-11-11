@@ -6,7 +6,7 @@ export const Route = createFileRoute('/api/batch-topology')({
   server: {
     handlers: {
       GET: async () => {
-        let rejected = false;
+        const rejectedState = { rejected: false };
         try {
           await db.batch([
             db.insert(connectionChecks).values({ writer: 'atomic', value: 'first' }),
@@ -19,13 +19,13 @@ export const Route = createFileRoute('/api/batch-topology')({
           ) {
             throw error;
           }
-          rejected = true;
+          rejectedState.rejected = true;
         }
         const rows = await db
           .select()
           .from(connectionChecks)
           .where(eq(connectionChecks.writer, 'atomic'));
-        return Response.json({ rejected, rows });
+        return Response.json({ rejected: rejectedState.rejected, rows });
       },
     },
   },

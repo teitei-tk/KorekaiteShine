@@ -67,8 +67,9 @@ export function createLocalAccess(environment: string, token: string) {
 }
 
 // 起動中のメモリだけに保持し、再起動時は画面がbootstrapを取り直す。
-let token: string | undefined;
+const tokenState = { token: undefined as string | undefined };
 export function localAccess(environment: string) {
-  token ??= crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
-  return createLocalAccess(environment, token);
+  tokenState.token ??=
+    crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  return createLocalAccess(environment, tokenState.token);
 }

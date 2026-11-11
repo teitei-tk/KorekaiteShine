@@ -7,19 +7,19 @@ import type { Api, Comment } from './github.ts';
 import { prFixture } from './policy.test.ts';
 it('投稿直前の最終照合でPRが閉じられた場合は通知しない', async () => {
   const f = fixture();
-  let reads = 0;
+  const readsState = { reads: 0 };
   const api: Api = async <T>(
     path: string,
     method?: string,
     body?: import('./github.ts').ApiBody,
   ) => {
-    if (path === 'pulls/7' && ++reads === 3) {
+    if (path === 'pulls/7' && ++readsState.reads === 3) {
       return { ...f.pr, state: 'closed' } as T;
     }
     return f.api<T>(path, method, body);
   };
   expect(await notifyFailure(api, 20, 1, f.directory)).toEqual({ status: 'skipped' });
-  expect(reads).toBe(3);
+  expect(readsState.reads).toBe(3);
   expect(f.posted).toEqual([]);
 });
 it('実行タイトルが欠落した応答を通知対象にしない', async () => {
@@ -68,14 +68,14 @@ it('上限件数のジョブ一覧は欠落の可能性があるため通知を�
 });
 
 it('不正な実行ID・試行番号はAPIを呼ばず拒否する', async () => {
-  let calls = 0;
+  const callsState = { calls: 0 };
   const api: Api = async () => {
-    calls++;
+    callsState.calls++;
     throw new Error('unexpected');
   };
   await expect(failureTarget(api, 0, 1)).rejects.toThrow('実行IDが不正');
   await expect(failureTarget(api, 20, 0)).rejects.toThrow('実行IDが不正');
-  expect(calls).toBe(0);
+  expect(callsState.calls).toBe(0);
 });
 
 it('元実行を確定できないタイトルや旧試行を通知しない', async () => {
@@ -131,9 +131,7 @@ function fixture(reason = 'OUTPUT_INVALID') {
   );
   const prior: Comment[] = [],
     posted: string[] = [];
-  let failPost = false,
-    changeOnComments = false,
-    commentReads = 0;
+  const failPostContext = { failPost: false, changeOnComments: false, commentReads: 0 };
   const api: Api = async <T>(
     path: string,
     method?: string,
@@ -142,7 +140,7 @@ function fixture(reason = 'OUTPUT_INVALID') {
     if (method) {
       expect(path).toBe('issues/7/comments');
       expect(method).toBe('POST');
-      if (failPost) {
+      if (failPostContext.failPost) {
         throw new Error('SECRET_EXTERNAL_ERROR');
       }
       if (!body || !('body' in body)) {
@@ -170,8 +168,8 @@ function fixture(reason = 'OUTPUT_INVALID') {
       return pr as T;
     }
     if (path.startsWith('issues/7/comments')) {
-      commentReads++;
-      if (changeOnComments && commentReads === 2) {
+      failPostContext.commentReads++;
+      if (failPostContext.changeOnComments && failPostContext.commentReads === 2) {
         pr.head.sha = 'c'.repeat(40);
       }
       return prior as T;
@@ -187,10 +185,10 @@ function fixture(reason = 'OUTPUT_INVALID') {
     prior,
     posted,
     setFailPost: () => {
-      failPost = true;
+      failPostContext.failPost = true;
     },
     setChange: () => {
-      changeOnComments = true;
+      failPostContext.changeOnComments = true;
     },
   };
 }

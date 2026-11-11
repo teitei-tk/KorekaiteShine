@@ -1,9 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["./tools/lint/immutable.mjs"],
   "categories": {
     "correctness": "error"
   },
   "rules": {
+    "immutable/no-let": "error",
+    "immutable/no-param-reassign": "error",
+    "immutable/no-object-assign": "error",
     "curly": ["error", "all"],
     "no-restricted-globals": [
       "error",

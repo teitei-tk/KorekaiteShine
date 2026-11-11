@@ -6,7 +6,7 @@ import { interviewHistoryRequest } from '../src/server/interview-history';
 test('本人の履歴だけを新しい順に返し、同時刻の面接もカーソルで重複なく取得する', async () => {
   const database = createTestDatabase();
   try {
-    for (let index = 0; index < 23; index += 1) {
+    for (const index of Array(23).keys()) {
       await database.db.insert(interviews).values({
         interviewId: `id-${String(index).padStart(2, '0')}`,
         actorId: index === 22 ? 'other' : 'actor',

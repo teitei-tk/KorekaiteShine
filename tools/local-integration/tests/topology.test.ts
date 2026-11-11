@@ -18,18 +18,16 @@ test('Webから別WorkerのDOを呼び、DOの保存値を読み戻せる', asyn
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/topology`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ saved: 'interview-do', environment: 'test' });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('DB管理CLIと3 Workersが同じD1を読み書きできる', async () => {
@@ -40,7 +38,7 @@ test('DB管理CLIと3 Workersが同じD1を読み書きできる', async () => {
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     await runDatabaseCommand(config, [
       'execute',
@@ -54,13 +52,11 @@ test('DB管理CLIと3 Workersが同じD1を読み書きできる', async () => {
       { writer: 'interview', value: 'shared' },
       { writer: 'web', value: 'shared' },
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('ローカルランタイムからEvaluationのscheduledイベントを起動できる', async () => {
@@ -71,19 +67,17 @@ test('ローカルランタイムからEvaluationのscheduledイベントを起�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     await runtime.runScheduled();
     const response = await fetch(`${runtime.baseUrl}/api/database-topology`);
     expect(response.status).toBe(200);
     expect(await response.json()).toContainEqual({ writer: 'scheduled', value: '* * * * *' });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('開発とテストを同時起動してもD1とViteキャッシュを共有しない', async () => {
@@ -105,7 +99,7 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
     }),
   ];
   const started = await Promise.allSettled(configs.map((config) => startRuntime(config)));
-  let succeeded = false;
+
   try {
     for (const result of started) {
       if (result.status === 'rejected') {
@@ -137,15 +131,13 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
         );
       }
     }
-    succeeded = true;
   } finally {
     await Promise.all(
       started.map((result) => (result.status === 'fulfilled' ? result.value.stop() : undefined)),
     );
-    if (succeeded) {
-      await rm(isolatedRoot, { recursive: true, force: true });
-    }
   }
+
+  await rm(isolatedRoot, { recursive: true, force: true });
 }, 120_000);
 
 test('D1 batchの途中で一意制約違反が起きると全体がロールバックされる', async () => {
@@ -156,18 +148,16 @@ test('D1 batchの途中で一意制約違反が起きると全体がロールバ
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/batch-topology`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ rejected: true, rows: [] });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('VoidのDB接続でfirst-primaryを指定し、保存後の値を読み戻す', async () => {
@@ -178,7 +168,7 @@ test('VoidのDB接続でfirst-primaryを指定し、保存後の値を読み戻�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/primary-topology`);
     expect(response.status).toBe(200);
@@ -186,13 +176,11 @@ test('VoidのDB接続でfirst-primaryを指定し、保存後の値を読み戻�
       constraints: ['first-primary'],
       rows: [{ writer: 'primary', value: 'saved' }],
     });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('停止後に同じ環境を再起動するとD1の保存値を維持する', async () => {
@@ -202,25 +190,22 @@ test('停止後に同じ環境を再起動するとD1の保存値を維持する
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config);
-  let succeeded = false;
+  const runtimeContext = { runtime: await startRuntime(config) };
   try {
     await runDatabaseCommand(config, [
       'execute',
       "INSERT INTO connection_checks (writer, value) VALUES ('restart', 'retained')",
     ]);
-    await runtime.stop();
-    runtime = await startRuntime(config);
-    const response = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    await runtimeContext.runtime.stop();
+    runtimeContext.runtime = await startRuntime(config);
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
     expect(response.status).toBe(200);
     expect(await response.json()).toContainEqual({ writer: 'restart', value: 'retained' });
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 120_000);
 
 test('3 Workersのビルド済み成果物でもWeb・DO・共有D1が接続できる', async () => {
@@ -232,7 +217,7 @@ test('3 Workersのビルド済み成果物でもWeb・DO・共有D1が接続で�
   });
   await buildRuntime(config);
   const runtime = await startRuntime(config, 'preview');
-  let succeeded = false;
+
   try {
     const topology = await fetch(`${runtime.baseUrl}/api/topology`);
     expect(topology.status).toBe(200);
@@ -244,30 +229,27 @@ test('3 Workersのビルド済み成果物でもWeb・DO・共有D1が接続で�
       { writer: 'interview', value: 'shared' },
       { writer: 'web', value: 'shared' },
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 120_000);
 
 test('明示したreset-seedだけが既存データを消して固定データを投入する', async () => {
   const runId = randomUUID();
   const config = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 0 });
-  let runtime = await startRuntime(config);
-  let succeeded = false;
+  const runtimeContext = { runtime: await startRuntime(config) };
   try {
     await runDatabaseCommand(config, [
       'execute',
       "INSERT INTO connection_checks (writer, value) VALUES ('temporary', 'remove-me')",
     ]);
-    const before = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    const before = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
     const beforeRows = await before.json();
     expect(beforeRows).toContainEqual({ writer: 'temporary', value: 'remove-me' });
     expect(beforeRows).not.toContainEqual({ writer: 'fixture', value: 'local-only' });
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     const seeded = spawnSync('pnpm', ['db:reset-seed'], {
       cwd: repositoryRoot,
       env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
@@ -275,8 +257,8 @@ test('明示したreset-seedだけが既存データを消して固定データ�
       timeout: 30_000,
     });
     expect(seeded.status, seeded.stderr).toBe(0);
-    runtime = await startRuntime(config);
-    const after = await fetch(`${runtime.baseUrl}/api/database-topology`);
+    runtimeContext.runtime = await startRuntime(config);
+    const after = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
     expect(after.status).toBe(200);
     expect(await after.json()).toEqual([
       { writer: 'evaluation', value: 'shared' },
@@ -284,20 +266,18 @@ test('明示したreset-seedだけが既存データを消して固定データ�
       { writer: 'interview', value: 'shared' },
       { writer: 'web', value: 'shared' },
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 120_000);
 
 test('起動中の環境では別プロセスのreset-seedを拒否しデータを維持する', async () => {
   const runId = randomUUID();
   const config = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 0 });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     await runDatabaseCommand(config, [
       'execute',
@@ -314,13 +294,11 @@ test('起動中の環境では別プロセスのreset-seedを拒否しデータ�
     const response = await fetch(`${runtime.baseUrl}/api/database-topology`);
     expect(response.status).toBe(200);
     expect(await response.json()).toContainEqual({ writer: 'active', value: 'retained' });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('生成したQueue検証コードを実Workerへimportし、入力を変換せず検証する', async () => {
@@ -332,7 +310,7 @@ test('生成したQueue検証コードを実Workerへimportし、入力を変換
   });
   const runtime = await startRuntime(config);
   const jobId = '7e318b72-f255-4f17-845b-714d487ae621';
-  let succeeded = false;
+
   try {
     for (const input of [
       { body: { schemaVersion: 1, jobId }, valid: true },
@@ -351,11 +329,9 @@ test('生成したQueue検証コードを実Workerへimportし、入力を変換
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual(input);
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

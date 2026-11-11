@@ -15,7 +15,7 @@ import {
 
 test('本番ビルドの4環境のモジュール・ルート・配信物・Worker設定に診断を含めない', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     const report = await verifyProductionArtifacts(project);
@@ -48,34 +48,30 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     interviewConfig.env.INTERVIEW_SESSION.exportName = 'UnexpectedObject';
     await writeFile(interviewConfigPath, JSON.stringify(interviewConfig));
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('本番の面接DO設定に不整合');
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90_000);
 
 test('監査記録にない配信ファイルを後から追加した場合も拒否する', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-extra-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     const extra = join(project, '.cloudflare/output/v0/workers/default/assets/extra');
     await mkdir(extra);
     await writeFile(join(extra, 'diagnostics.js'), 'export const scenario = "exhaust_retries";');
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('未記録の本番配信物');
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90_000);
 
 test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を作らない', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-http-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     // 本番識別子を使うビルドの検査用。接続先はこの一時ディレクトリのローカルSQLiteのみ。
@@ -146,17 +142,15 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
     } finally {
       await runtime.stop();
     }
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90_000);
 
 test('3 Workersの本番入口へ診断importを混入させると、未使用でも検査が拒否する', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-mutation-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     await verifyProductionArtifacts(project);
@@ -180,17 +174,15 @@ test('3 Workersの本番入口へ診断importを混入させると、未使用�
         await writeFile(path, original);
       }
     }
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90_000);
 
 test('本番入口へ計測ツールのimportが混入した場合は未使用でも拒否する', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-coverage-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     await verifyProductionArtifacts(project);
@@ -202,17 +194,15 @@ test('本番入口へ計測ツールのimportが混入した場合は未使用�
     await expect(verifyProductionArtifacts(project)).rejects.toThrow(
       '本番モジュールへ診断・検証コードが混入',
     );
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90000);
 
 test('本番成果物へ計測カウンターを挿入した場合も拒否する', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-counter-'));
-  let succeeded = false;
+
   try {
     const project = await buildProductionArtifacts(directory);
     const entry = join(project, 'interview.production.ts');
@@ -221,10 +211,8 @@ test('本番成果物へ計測カウンターを挿入した場合も拒否す�
     await expect(verifyProductionArtifacts(project)).rejects.toThrow(
       '本番配信物へ診断コードが混入',
     );
-    succeeded = true;
   } finally {
-    if (succeeded) {
-      await rm(directory, { recursive: true, force: true });
-    }
   }
+
+  await rm(directory, { recursive: true, force: true });
 }, 90000);

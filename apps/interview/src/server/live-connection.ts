@@ -1,3 +1,4 @@
+import { parseEvent } from '../domain/parse-event';
 import type { LiveStartEvent } from '@korekaite/api-contracts/events/live-start';
 import type { LiveTranscriptEvent } from '@korekaite/api-contracts/events/live';
 import type { LiveClientEvent } from '@korekaite/api-contracts/events/live-client';
@@ -43,9 +44,6 @@ export interface LiveHandlers {
   onTranscript(event: LiveTranscriptEvent): Promise<void>;
   onAudio(bytes: Uint8Array, endOffsetMs: number): void;
   onUsage(seconds: number, final: boolean): Promise<void>;
-}
-interface EventCandidate {
-  type?: string;
 }
 type Pending =
   | { kind: 'event'; data: string; bytes: number }
@@ -96,69 +94,73 @@ export function createLiveConnection(
   }
   const startMessage = JSON.stringify(start);
   const controller = new AbortController();
-  let socket: LiveSocket | undefined;
-  let started = false;
-  let finished = false;
-  let closing = false;
-  let terminalQueued = false;
-  let draining = false;
-  let pendingBytes = 0;
-  let outputBytes = 0;
-  let commandNumber = 0;
-  let usageSeconds: number | null = null;
-  let upstreamReason: LiveClosed['upstreamReason'] = null;
-  let closeTimer: ReturnType<typeof setTimeout> | undefined;
-  let resolveReady!: (id: string) => void;
-  let rejectReady!: (error: Error) => void;
-  let resolveClosed!: (result: LiveClosed) => void;
-  const ready = new Promise<string>((resolve, reject) => {
-    resolveReady = resolve;
-    rejectReady = reject;
-  });
+  const connection = {
+    socket: undefined as LiveSocket | undefined,
+    started: false,
+    finished: false,
+    closing: false,
+    terminalQueued: false,
+    draining: false,
+    pendingBytes: 0,
+    outputBytes: 0,
+    commandNumber: 0,
+    usageSeconds: null as number | null,
+    upstreamReason: null as LiveClosed['upstreamReason'],
+    closeTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+  };
+
+  const {
+    promise: ready,
+    resolve: resolveReady,
+    reject: rejectReady,
+  } = Promise.withResolvers<string>();
   // 呼出側が接続を取り消した場合も、未購読のready拒否を残さない。
   void ready.catch(() => undefined);
-  const closed = new Promise<LiveClosed>((resolve) => {
-    resolveClosed = resolve;
-  });
+  const { promise: closed, resolve: resolveClosed } = Promise.withResolvers<LiveClosed>();
   const queue: Pending[] = [];
   const startTimer = setTimeout(() => terminal('START_TIMEOUT'), 30_000);
 
   function closeSocket() {
-    if (socket && socket.readyState < 2) {
+    if (connection.socket && connection.socket.readyState < 2) {
       try {
-        socket.close(1000, 'session ended');
+        connection.socket.close(1000, 'session ended');
       } catch {
         /* 接続は既に失われている。 */
       }
     }
   }
   function finish(complete: boolean, reason: LiveClosed['reason']) {
-    if (finished) {
+    if (connection.finished) {
       return;
     }
-    finished = true;
-    closing = true;
+    connection.finished = true;
+    connection.closing = true;
     clearTimeout(startTimer);
-    clearTimeout(closeTimer);
+    clearTimeout(connection.closeTimer);
     controller.abort();
-    socket?.removeEventListener('message', receive);
-    socket?.removeEventListener('close', transportClosed);
-    socket?.removeEventListener('error', transportClosed);
+    connection.socket?.removeEventListener('message', receive);
+    connection.socket?.removeEventListener('close', transportClosed);
+    connection.socket?.removeEventListener('error', transportClosed);
     closeSocket();
     queue.length = 0;
     rejectReady(new Error('音声接続を開始できませんでした。'));
-    resolveClosed({ complete, reason, upstreamReason, usageSeconds });
+    resolveClosed({
+      complete,
+      reason,
+      upstreamReason: connection.upstreamReason,
+      usageSeconds: connection.usageSeconds,
+    });
   }
   function terminal(reason: LiveFailure) {
-    if (finished || terminalQueued) {
+    if (connection.finished || connection.terminalQueued) {
       return;
     }
-    terminalQueued = true;
-    closing = true;
+    connection.terminalQueued = true;
+    connection.closing = true;
     controller.abort();
     closeSocket();
     // 受付済みの保存を待つが、応答が途絶えた場合も接続終了を確定する。
-    closeTimer ??= setTimeout(() => finish(false, reason), 15_000);
+    connection.closeTimer ??= setTimeout(() => finish(false, reason), 15_000);
     queue.push({ kind: 'terminal', reason });
     void drain();
   }
@@ -166,7 +168,7 @@ export function createLiveConnection(
     terminal('TRANSPORT_CLOSED');
   }
   function receive(event: MessageEvent) {
-    if (finished || terminalQueued) {
+    if (connection.finished || connection.terminalQueued) {
       return;
     }
     if (typeof event.data !== 'string') {
@@ -178,23 +180,17 @@ export function createLiveConnection(
       return;
     }
     const bytes = new TextEncoder().encode(event.data).byteLength;
-    if (bytes > 262144 || pendingBytes + bytes > 1048576 || queue.length >= 256) {
+    if (bytes > 262144 || connection.pendingBytes + bytes > 1048576 || queue.length >= 256) {
       terminal('BUFFER_LIMIT');
       return;
     }
-    pendingBytes += bytes;
+    connection.pendingBytes += bytes;
     queue.push({ kind: 'event', data: event.data, bytes });
     void drain();
   }
   async function process(data: string) {
-    let candidate: EventCandidate | null;
-    try {
-      candidate = JSON.parse(data);
-    } catch {
-      finish(false, 'INVALID_EVENT');
-      return;
-    }
-    if (!candidate || typeof candidate !== 'object' || typeof candidate.type !== 'string') {
+    const candidate = parseEvent(data);
+    if (!candidate || !('type' in candidate) || typeof candidate.type !== 'string') {
       finish(false, 'INVALID_EVENT');
       return;
     }
@@ -208,19 +204,19 @@ export function createLiveConnection(
     }
     switch (candidate.type) {
       case 'session.started':
-        if (started || closing) {
+        if (connection.started || connection.closing) {
           return;
         }
         await handlers.onReady(candidate.session.id);
-        started = true;
+        connection.started = true;
         clearTimeout(startTimer);
-        if (!terminalQueued) {
+        if (!connection.terminalQueued) {
           resolveReady(candidate.session.id);
         }
         break;
       case 'session.input_transcript.delta':
       case 'session.output_transcript.delta':
-        if (!started || candidate.end_ms < candidate.start_ms) {
+        if (!connection.started || candidate.end_ms < candidate.start_ms) {
           finish(false, 'INVALID_EVENT');
           return;
         }
@@ -233,11 +229,11 @@ export function createLiveConnection(
         });
         break;
       case 'session.output_audio.delta': {
-        if (!started) {
+        if (!connection.started) {
           finish(false, 'INVALID_EVENT');
           return;
         }
-        if (closing) {
+        if (connection.closing) {
           return;
         }
         const binary = atob(candidate.delta);
@@ -246,16 +242,16 @@ export function createLiveConnection(
           return;
         }
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-        outputBytes += bytes.byteLength;
-        handlers.onAudio(bytes, Math.floor(outputBytes / 48));
+        connection.outputBytes += bytes.byteLength;
+        handlers.onAudio(bytes, Math.floor(connection.outputBytes / 48));
         break;
       }
       case 'session.usage.updated':
-        usageSeconds = Math.max(usageSeconds ?? 0, candidate.usage.seconds);
-        await handlers.onUsage(usageSeconds, false);
+        connection.usageSeconds = Math.max(connection.usageSeconds ?? 0, candidate.usage.seconds);
+        await handlers.onUsage(connection.usageSeconds, false);
         break;
       case 'session.closed':
-        if (!started) {
+        if (!connection.started) {
           finish(false, 'INVALID_EVENT');
           return;
         }
@@ -265,13 +261,13 @@ export function createLiveConnection(
           case 'content':
           case 'remote_hangup':
           case 'connection_lost':
-            upstreamReason = candidate.reason;
+            connection.upstreamReason = candidate.reason;
             break;
           default:
-            upstreamReason = 'unknown';
+            connection.upstreamReason = 'unknown';
         }
-        usageSeconds = Math.max(usageSeconds ?? 0, candidate.usage.seconds);
-        await handlers.onUsage(usageSeconds, true);
+        connection.usageSeconds = Math.max(connection.usageSeconds ?? 0, candidate.usage.seconds);
+        await handlers.onUsage(connection.usageSeconds, true);
         finish(true, 'confirmed');
         break;
       case 'error':
@@ -280,12 +276,12 @@ export function createLiveConnection(
     }
   }
   async function drain() {
-    if (draining) {
+    if (connection.draining) {
       return;
     }
-    draining = true;
+    connection.draining = true;
     try {
-      while (queue.length && !finished) {
+      while (queue.length && !connection.finished) {
         const item = queue.shift()!;
         if (item.kind === 'terminal') {
           finish(false, item.reason);
@@ -294,24 +290,29 @@ export function createLiveConnection(
         try {
           await process(item.data);
         } finally {
-          pendingBytes -= item.bytes;
+          connection.pendingBytes -= item.bytes;
         }
       }
     } catch {
       finish(false, 'HANDLER_FAILED');
     } finally {
-      draining = false;
+      connection.draining = false;
     }
   }
   function send(message: LiveClientEvent): boolean {
     if (!validateLiveClientEvent(message)) {
       return false;
     }
-    if (!socket || socket.readyState !== 1 || finished || terminalQueued) {
+    if (
+      !connection.socket ||
+      connection.socket.readyState !== 1 ||
+      connection.finished ||
+      connection.terminalQueued
+    ) {
       return false;
     }
     try {
-      socket.send(JSON.stringify(message));
+      connection.socket.send(JSON.stringify(message));
       return true;
     } catch {
       terminal('TRANSPORT_CLOSED');
@@ -322,20 +323,20 @@ export function createLiveConnection(
     .then(() => (handlers.dial ?? dialLiveSocket)(options.apiKey, controller.signal))
     .then(
       (connected) => {
-        socket = connected;
-        if (finished || terminalQueued) {
+        connection.socket = connected;
+        if (connection.finished || connection.terminalQueued) {
           try {
-            socket.accept();
+            connection.socket.accept();
           } finally {
             closeSocket();
           }
           return;
         }
-        socket.addEventListener('message', receive);
-        socket.addEventListener('close', transportClosed);
-        socket.addEventListener('error', transportClosed);
-        socket.accept();
-        socket.send(startMessage);
+        connection.socket.addEventListener('message', receive);
+        connection.socket.addEventListener('close', transportClosed);
+        connection.socket.addEventListener('error', transportClosed);
+        connection.socket.accept();
+        connection.socket.send(startMessage);
       },
       () => terminal('DIAL_FAILED'),
     )
@@ -345,8 +346,8 @@ export function createLiveConnection(
     closed,
     sendAudio(bytes: Uint8Array): boolean {
       if (
-        !started ||
-        closing ||
+        !connection.started ||
+        connection.closing ||
         bytes.byteLength === 0 ||
         bytes.byteLength % 2 !== 0 ||
         bytes.byteLength > 9600
@@ -359,7 +360,11 @@ export function createLiveConnection(
       });
     },
     request(operation: 'rephrase' | 'skip'): boolean {
-      if (!started || closing || (operation !== 'rephrase' && operation !== 'skip')) {
+      if (
+        !connection.started ||
+        connection.closing ||
+        (operation !== 'rephrase' && operation !== 'skip')
+      ) {
         return false;
       }
       const content =
@@ -368,21 +373,21 @@ export function createLiveConnection(
           : '現在の質問は見送ります。未回答を能力不足と決め付けず、同じテーマの別の観点を一つ質問してください。';
       return send({
         type: 'session.instructions.append',
-        event_id: `instruction-${++commandNumber}`,
+        event_id: `instruction-${++connection.commandNumber}`,
         delegation_id: null,
         content,
       });
     },
     close(): Promise<LiveClosed> {
-      if (finished || closing) {
+      if (connection.finished || connection.closing) {
         return closed;
       }
-      closing = true;
-      if (!started) {
+      connection.closing = true;
+      if (!connection.started) {
         terminal('ABORTED');
         return closed;
       }
-      closeTimer = setTimeout(() => finish(false, 'CLOSE_TIMEOUT'), 15_000);
+      connection.closeTimer = setTimeout(() => finish(false, 'CLOSE_TIMEOUT'), 15_000);
       send({ type: 'session.close' });
       return closed;
     },

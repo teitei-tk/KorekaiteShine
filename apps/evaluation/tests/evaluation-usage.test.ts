@@ -32,7 +32,7 @@ test('枠がない新規ジョブではAIを呼ばず、既存予約の再試行
   const database = createTestDatabase();
   const now = 1000;
   try {
-    for (let index = 0; index < 10; index += 1) {
+    for (const index of Array(10).keys()) {
       expect(
         await reserveEvaluation(database.db, { jobId: `job-${index}`, actorId: 'actor', now }),
       ).toBe(true);

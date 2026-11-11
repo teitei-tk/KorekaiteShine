@@ -16,7 +16,7 @@ test('存在しないジョブの通知は配送異常を保存してackし、�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     const response = await fetch(`${runtime.baseUrl}/api/evaluation-test`, {
@@ -38,13 +38,11 @@ test('存在しないジョブの通知は配送異常を保存してackし、�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('隔離記録を保存できない場合はackせずretryし、復旧後に保存してackする', async () => {
@@ -55,7 +53,7 @@ test('隔離記録を保存できない場合はackせずretryし、復旧後に
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     const deliver = async () => {
@@ -87,13 +85,11 @@ test('隔離記録を保存できない場合はackせずretryし、復旧後に
       'execute',
       `CREATE TEMP TABLE one (count INTEGER CHECK (count = 1)); INSERT INTO one SELECT COUNT(*) FROM delivery_anomalies WHERE code = 'JOB_NOT_FOUND';`,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('用途不一致の通知は隔離してackし、元ジョブと正常な回復通知を変更しない', async () => {
@@ -104,7 +100,7 @@ test('用途不一致の通知は隔離してackし、元ジョブと正常な�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     const outboxId = randomUUID();
@@ -137,13 +133,11 @@ test('用途不一致の通知は隔離してackし、元ジョブと正常な�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('削除済みジョブの遅延通知は記録してackし、ジョブを復元しない', async () => {
@@ -154,7 +148,7 @@ test('削除済みジョブの遅延通知は記録してackし、ジョブを�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     await runDatabaseCommand(config, [
@@ -182,13 +176,11 @@ test('削除済みジョブの遅延通知は記録してackし、ジョブを�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('不正形式と未対応版は本文IDで照会せず、区別して隔離する', async () => {
@@ -199,7 +191,7 @@ test('不正形式と未対応版は本文IDで照会せず、区別して隔離
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     // 契約検証より先にどちらかを照会すれば、D1エラーでretryになる。
@@ -239,13 +231,11 @@ test('不正形式と未対応版は本文IDで照会せず、区別して隔離
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('D1照会失敗を不在と判定せずretryし、隔離記録を作らない', async () => {
@@ -256,7 +246,7 @@ test('D1照会失敗を不在と判定せずretryし、隔離記録を作らな�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     await runDatabaseCommand(config, ['execute', 'ALTER TABLE jobs RENAME TO unavailable_jobs;']);
@@ -278,13 +268,11 @@ test('D1照会失敗を不在と判定せずretryし、隔離記録を作らな�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('保存後ack前の再配送は同じ記録を更新し、別メッセージIDは別記録にする', async () => {
@@ -295,7 +283,7 @@ test('保存後ack前の再配送は同じ記録を更新し、別メッセー�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const jobId = randomUUID();
     const messageId = randomUUID();
@@ -332,13 +320,11 @@ test('保存後ack前の再配送は同じ記録を更新し、別メッセー�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('隔離済み配送は用途が後から一致しても評価を自動実行しない', async () => {
@@ -349,7 +335,7 @@ test('隔離済み配送は用途が後から一致しても評価を自動実�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -392,13 +378,11 @@ test('隔離済み配送は用途が後から一致しても評価を自動実�
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('実ローカルQueueとDLQは同じ異常分類で隔離し、元ジョブと正常な通知を維持する', async () => {
@@ -409,7 +393,7 @@ test('実ローカルQueueとDLQは同じ異常分類で隔離し、元ジョブ
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const missingId = randomUUID();
     const deletedId = randomUUID();
@@ -481,11 +465,9 @@ test('実ローカルQueueとDLQは同じ異常分類で隔離し、元ジョブ
       INSERT INTO zero SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

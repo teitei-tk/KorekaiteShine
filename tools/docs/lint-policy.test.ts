@@ -67,3 +67,29 @@ it('型のunknownを拒否し、コメント・文字列中のunknownは許可�
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it('immutableルールで変数宣言・引数の書き換え・Object.assignを検査する', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lint-immutable-'));
+  try {
+    const file = join(dir, 'sample.ts');
+    for (const [source, rule] of [
+      ['export let value = 0;', 'no-let'],
+      ['export function f({ x }) { return () => x++; }', 'no-param-reassign'],
+      ['export const f = x => Object["assign"]({}, x);', 'no-object-assign'],
+      ['export const f = (x, Object) => Object.assign({}, { ...x });', ''],
+    ]) {
+      writeFileSync(file, source);
+      const result = spawnSync(
+        join(root, 'node_modules/.bin/oxlint'),
+        ['--config', join(root, '.oxlintrc.json'), '--no-ignore', file],
+        { cwd: root, encoding: 'utf8' },
+      );
+      expect(result.status).toBe(rule ? 1 : 0);
+      if (rule) {
+        expect(result.stdout).toContain(rule);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

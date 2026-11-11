@@ -20,7 +20,9 @@ if (config) {
   };
   const initial = global.__coverage__ ?? {};
   global.__coverage__ = createCounterJournal(`${capture.path}.events`, run.targets);
-  Object.assign(global.__coverage__, initial);
+  for (const [path, counters] of Object.entries(initial)) {
+    global.__coverage__[path] = counters;
+  }
   const targets = new Map(run.targets.map((target) => [target.path, target]));
   registerHooks({
     load(url, context, nextLoad) {

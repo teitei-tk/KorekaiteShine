@@ -37,25 +37,20 @@ export async function collectCoverage(options: {
     const capture = startCapture(run, command.suite, directory);
     const logPath = join(root, 'coverage', 'runs', run.runId, `${command.suite}.log`);
     const output = openSync(logPath, 'w');
-    let status: number | null;
-    try {
-      status = await new Promise<number | null>((resolve, reject) => {
-        const child = spawn(command.command, [...command.args], {
-          cwd: root,
-          stdio: ['ignore', output, output],
-          env: {
-            ...process.env,
-            KOREKAITE_COVERAGE_RUN: config,
-            KOREKAITE_COVERAGE_SUITE: command.suite,
-            NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${JSON.stringify(preload)}`,
-          },
-        });
-        child.once('error', reject);
-        child.once('close', resolve);
+    const status = await new Promise<number | null>((resolve, reject) => {
+      const child = spawn(command.command, [...command.args], {
+        cwd: root,
+        stdio: ['ignore', output, output],
+        env: {
+          ...process.env,
+          KOREKAITE_COVERAGE_RUN: config,
+          KOREKAITE_COVERAGE_SUITE: command.suite,
+          NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${JSON.stringify(preload)}`,
+        },
       });
-    } finally {
-      closeSync(output);
-    }
+      child.once('error', reject);
+      child.once('close', resolve);
+    }).finally(() => closeSync(output));
     capture.finish({}, status === 0 ? 'complete' : 'failed');
     if (status !== 0) {
       throw new Error(`計測suiteが失敗しました: ${command.suite} (${logPath})`);

@@ -6,10 +6,10 @@ const sampleRate = 24000;
 
 function tone(frequency) {
   const pcm = Buffer.alloc((sampleRate / 2) * 2);
-  for (let i = 0; i < pcm.length / 2; i++) {
+  for (const index of pcm.keys().take(pcm.length / 2)) {
     pcm.writeInt16LE(
-      Math.round(8000 * Math.sin((2 * Math.PI * frequency * i) / sampleRate)),
-      2 * i,
+      Math.round(8000 * Math.sin((2 * Math.PI * frequency * index) / sampleRate)),
+      2 * index,
     );
   }
   return pcm.toString('base64');
@@ -18,10 +18,9 @@ function tone(frequency) {
 export async function startProvider() {
   const http = createServer((_request, response) => response.writeHead(404).end());
   const ws = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 });
-  let refused = false;
-  let turn = 0;
+  const provider = { refused: false, turn: 0 };
   http.on('upgrade', (request, socket, head) => {
-    if (refused || request.url !== '/voice') {
+    if (provider.refused || request.url !== '/voice') {
       socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
       return;
     }
@@ -29,13 +28,10 @@ export async function startProvider() {
   });
   ws.on('connection', (peer) => {
     const session = crypto.randomUUID();
-    let startedAt;
-    let voiced = 0;
-    let quiet = 0;
-    let answered = false;
+    const turnState = { startedAt: undefined, voiced: 0, quiet: 0, answered: false };
     const send = (event) => peer.send(JSON.stringify(event));
     function transcript(speaker, delta) {
-      const end = Math.floor(performance.now()) - startedAt;
+      const end = Math.floor(performance.now()) - turnState.startedAt;
       send({
         type: `session.${speaker}_transcript.delta`,
         event_id: crypto.randomUUID(),
@@ -52,33 +48,33 @@ export async function startProvider() {
     peer.on('message', (raw) => {
       const event = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
-        startedAt = Math.floor(performance.now());
+        turnState.startedAt = Math.floor(performance.now());
         send({ type: 'session.started', event_id: crypto.randomUUID(), session: { id: session } });
         transcript('output', '取り組んだことを教えてください。');
         play(330);
       } else if (event.type === 'session.input_audio.append') {
         const pcm = Buffer.from(event.audio, 'base64');
-        for (let i = 0; i + 1 < pcm.length; i += 2) {
-          if (Math.abs(pcm.readInt16LE(i)) > 300) {
-            quiet = 0;
-            voiced++;
-          } else if (++quiet >= sampleRate / 5) {
-            answered = false;
-            voiced = 0;
+        for (const index of pcm.keys().take(Math.floor(pcm.length / 2))) {
+          if (Math.abs(pcm.readInt16LE(index * 2)) > 300) {
+            turnState.quiet = 0;
+            turnState.voiced++;
+          } else if (++turnState.quiet >= sampleRate / 5) {
+            turnState.answered = false;
+            turnState.voiced = 0;
           }
-          if (!answered && voiced >= sampleRate / 10) {
-            answered = true;
-            turn++;
-            transcript('input', `架空の経験についての回答${turn}です。`);
-            transcript('output', `回答${turn}についてもう少し教えてください。`);
-            play(660 + (turn - 1) * 110);
+          if (!turnState.answered && turnState.voiced >= sampleRate / 10) {
+            turnState.answered = true;
+            provider.turn++;
+            transcript('input', `架空の経験についての回答${provider.turn}です。`);
+            transcript('output', `回答${provider.turn}についてもう少し教えてください。`);
+            play(660 + (provider.turn - 1) * 110);
           }
         }
       } else if (event.type === 'session.close') {
         send({
           type: 'session.closed',
           event_id: crypto.randomUUID(),
-          usage: { seconds: (Math.floor(performance.now()) - startedAt) / 1000 },
+          usage: { seconds: (Math.floor(performance.now()) - turnState.startedAt) / 1000 },
           reason: 'close_requested',
         });
       }
@@ -89,7 +85,7 @@ export async function startProvider() {
   return {
     url: `http://127.0.0.1:${http.address().port}/voice`,
     rejectDials(value) {
-      refused = value;
+      provider.refused = value;
     },
     async stop() {
       for (const peer of ws.clients) {

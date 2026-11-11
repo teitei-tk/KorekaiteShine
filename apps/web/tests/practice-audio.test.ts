@@ -17,27 +17,24 @@ test('入力の世代ヘッダーとPCM16のバイト順を保ち、空・過大
 
 test('AudioWorkletは24kHzの入力を20msごとのPCM16に変換する', async () => {
   const send = vi.fn();
-  let create!: () => { process(inputs: Float32Array[][]): boolean };
+  type Processor = new () => { process(inputs: Float32Array[][]): boolean };
+  const register = vi.fn<(name: string, processor: Processor) => void>();
   vi.stubGlobal(
     'AudioWorkletProcessor',
     class {
       port = { postMessage: send };
     },
   );
-  vi.stubGlobal(
-    'registerProcessor',
-    (name: string, Processor: new () => ReturnType<typeof create>) => {
-      expect(name).toBe('interview-microphone');
-      create = () => new Processor();
-    },
-  );
+  vi.stubGlobal('registerProcessor', register);
   try {
     const workletModule = '../src/lib/microphone-worklet.js';
     await import(workletModule);
   } finally {
     vi.unstubAllGlobals();
   }
-  const processor = create();
+  const [name, Processor] = register.mock.lastCall!;
+  expect(name).toBe('interview-microphone');
+  const processor = new Processor();
   expect(processor.process([])).toBe(true);
   processor.process([[new Float32Array(128).fill(-1)]]);
   processor.process([[new Float32Array(128).fill(1)]]);
@@ -103,14 +100,16 @@ test('再生バッファの不正なサイズ、5秒の遅延、256個を超え�
   playback.play(new ArrayBuffer(98304), vi.fn());
   expect(() => playback.play(new ArrayBuffer(98304), vi.fn())).toThrow('追いついて');
   const queue = createPlayback(context as never);
-  for (let index = 0; index < 256; index++) {
+  for (const _ of Array(256).keys()) {
     queue.play(new ArrayBuffer(2), vi.fn());
   }
   expect(() => queue.play(new ArrayBuffer(2), vi.fn())).toThrow('追いついて');
 });
 
 function microphone(sampleRate = 24000) {
-  const track = Object.assign(new EventTarget(), { stop: vi.fn() });
+  const track = new (class extends EventTarget {
+    stop = vi.fn();
+  })();
   const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
   const input = { connect: vi.fn(), disconnect: vi.fn() };
   const port = { close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
@@ -166,15 +165,11 @@ test('マイク権限待ちの中断と非対応レートでトラックを解�
   const { track, stream, getUserMedia } = microphone(44100);
   try {
     const abort = new AbortController();
-    let allow!: (acquired: typeof stream) => void;
-    getUserMedia.mockReturnValueOnce(
-      new Promise((resolve) => {
-        allow = resolve;
-      }),
-    );
+    const permission = Promise.withResolvers<typeof stream>();
+    getUserMedia.mockReturnValueOnce(permission.promise);
     const opening = openInterviewAudio(abort.signal, vi.fn(), vi.fn());
     abort.abort();
-    allow(stream);
+    permission.resolve(stream);
     await expect(opening).rejects.toMatchObject({ name: 'AbortError' });
     await expect(
       openInterviewAudio(new AbortController().signal, vi.fn(), vi.fn()),

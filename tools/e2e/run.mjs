@@ -31,8 +31,7 @@ const { runConfiguration } = await loadConfiguration(
   },
   { cwd },
 );
-let count = 0;
-let incomplete = false;
+const countContext = { count: 0, incomplete: false };
 const names = new Map();
 const cases = new Map();
 const result = await runCucumber(runConfiguration, { cwd }, (message) => {
@@ -43,17 +42,17 @@ const result = await runCucumber(runConfiguration, { cwd }, (message) => {
     cases.set(message.testCase.id, names.get(message.testCase.pickleId));
   }
   if (message.testCaseStarted) {
-    count++;
+    countContext.count++;
     const { testCaseId } = message.testCaseStarted;
     console.log(`[${profile}] ${cases.get(testCaseId)}`);
   }
   if (message.testStepFinished && message.testStepFinished.testStepResult.status !== 'PASSED') {
-    incomplete = true;
+    countContext.incomplete = true;
   }
 });
-if (!count) {
+if (!countContext.count) {
   console.error('対象シナリオが0件です。');
 }
-if (!count || incomplete || !result.success) {
+if (!countContext.count || countContext.incomplete || !result.success) {
   process.exitCode = 1;
 }

@@ -11,19 +11,19 @@ vi.mock('@korekaite/database/connection', () => ({ createPrimaryDb: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 
 function database() {
-  const query = Object.assign(Promise.resolve([]), {
-    select: vi.fn(),
-    from: vi.fn(),
-    where: vi.fn(),
-    innerJoin: vi.fn(),
-    limit: vi.fn(),
-    insert: vi.fn(),
-    update: vi.fn(),
-    set: vi.fn(),
-    onConflictDoNothing: vi.fn(),
-    returning: vi.fn(),
-    batch: vi.fn(async () => [[], [], [{ attemptNumber: 1 }]]),
-  });
+  const query = new (class extends Promise<never[]> {
+    select = vi.fn();
+    from = vi.fn();
+    where = vi.fn();
+    innerJoin = vi.fn();
+    limit = vi.fn();
+    insert = vi.fn();
+    update = vi.fn();
+    set = vi.fn();
+    onConflictDoNothing = vi.fn();
+    returning = vi.fn();
+    batch = vi.fn(async () => [[], [], [{ attemptNumber: 1 }]]);
+  })((resolve) => resolve([]));
   for (const method of [
     query.select,
     query.from,

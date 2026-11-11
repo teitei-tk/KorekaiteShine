@@ -13,7 +13,7 @@
     "@js-temporal/polyfill": "0.5.1",
     "@korekaite/database": "workspace:*",
     "@korekaite/runtime-config": "workspace:*",
-    "void": "1.6.2"
+    "void": "1.7.0"
   },
   "devDependencies": {
     "@korekaite/api-contracts": "workspace:*",

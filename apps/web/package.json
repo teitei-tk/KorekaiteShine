@@ -24,7 +24,7 @@
     "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "void": "1.6.2"
+    "void": "1.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261109.1",

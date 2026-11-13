@@ -349,11 +349,11 @@ importers:
         specifier: 1.17.0
         version: 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))
       '@typespec/openapi':
-        specifier: 1.17.0
-        version: 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))
+        specifier: 1.18.0
+        version: 1.18.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))
       '@typespec/openapi3':
         specifier: 1.17.0
-        version: 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/openapi@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))))
+        version: 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/openapi@1.18.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))))
       json-schema-to-typescript:
         specifier: 16.0.0
         version: 16.0.0
@@ -2660,12 +2660,12 @@ packages:
       '@typespec/xml':
         optional: true
 
-  '@typespec/openapi@1.17.0':
-    resolution: {integrity: sha512-0ScXsaovyFZWJv0nnokGI25vK5nRvJ8KfxiKokyXyQrwzK51eb61P/yZr/cZDGjk/w/qKHz2Vz1OvVC4ztdQdA==}
+  '@typespec/openapi@1.18.0':
+    resolution: {integrity: sha512-b8zEqdZLqM2G6J0J0iACRfibVgVavBYib9qEqXkcJQSxT4QRKELMoa0LYia+qzmVwETq3is6xc6CcEU7RD/1JQ==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
-      '@typespec/compiler': ^1.17.0
-      '@typespec/http': ^1.17.0
+      '@typespec/compiler': ^1.18.0
+      '@typespec/http': ^1.18.0
 
   '@vitejs/plugin-react@6.3.0':
     resolution: {integrity: sha512-H9E955aVvD2F4zNHCw4eIZbIfF6xKldlh7MNu+hSU7xwQzh65lI/N+CJWqmfhi0PEjDXIt/H7T7J/4wU63KJiw==}
@@ -6317,7 +6317,7 @@ snapshots:
       '@typespec/compiler': 1.17.0(@types/node@26.6.6)
       yaml: 2.9.1
 
-  '@typespec/openapi3@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/openapi@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))))':
+  '@typespec/openapi3@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/json-schema@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))(@typespec/openapi@1.18.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))))':
     dependencies:
       '@scalar/json-magic': 0.13.5
       '@scalar/openapi-parser': 0.29.18
@@ -6326,12 +6326,12 @@ snapshots:
       '@typespec/asset-emitter': 0.79.3(@typespec/compiler@1.17.0(@types/node@26.6.6))
       '@typespec/compiler': 1.17.0(@types/node@26.6.6)
       '@typespec/http': 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))
-      '@typespec/openapi': 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))
+      '@typespec/openapi': 1.18.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))
       yaml: 2.9.1
     optionalDependencies:
       '@typespec/json-schema': 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))
 
-  '@typespec/openapi@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))':
+  '@typespec/openapi@1.18.0(@typespec/compiler@1.17.0(@types/node@26.6.6))(@typespec/http@1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6)))':
     dependencies:
       '@typespec/compiler': 1.17.0(@types/node@26.6.6)
       '@typespec/http': 1.17.0(@typespec/compiler@1.17.0(@types/node@26.6.6))

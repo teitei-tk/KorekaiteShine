@@ -4,6 +4,7 @@ import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts
 import {
   appendTranscript,
   markTranscriptIncomplete,
+  setPendingQuestionOperation,
   loadInterview,
   saveInterviewState,
   recordPlayback,
@@ -362,6 +363,31 @@ test('同時到着した原文と再生確認を一度だけ保存し、旧世�
         4,
       ),
     ).rejects.toThrow('設定');
+  } finally {
+    database.close();
+  }
+});
+
+test('未完了の質問操作は同じ音声接続で更新し、古い世代からは解除できない', async () => {
+  const database = await setup();
+  const write = (generation: number, operation: 'rephrase' | 'skip' | null, actorId = 'actor') =>
+    setPendingQuestionOperation(database.db, actorId, 'interview', generation, operation, 10);
+  try {
+    expect(
+      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
+    ).toBeNull();
+    expect(await write(1, 'rephrase')).toBe(true);
+    expect(await write(1, 'skip')).toBe(true);
+    expect(await write(2, null)).toBe(false);
+    expect(await write(1, null, 'other')).toBe(false);
+    expect(await loadInterview(database.db, 'actor', 'interview')).toMatchObject({
+      revision: 2,
+      pendingQuestionOperation: 'skip',
+    });
+    expect(await write(1, null)).toBe(true);
+    expect(
+      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
+    ).toBeNull();
   } finally {
     database.close();
   }

@@ -7,6 +7,7 @@ import {
   installMediaProbe,
   playbackCount,
   speak,
+  waitForOpening,
   waitForPlayback,
   waitForQuiet,
 } from './media.mjs';
@@ -51,7 +52,7 @@ Before(async function () {
     this.offline ? route.abort('internetdisconnected') : route.continue(),
   );
   // ブラウザと本物の Worker の間を透過転送し、回線障害のときだけ両端を閉じる。
-  await this.page.routeWebSocket('**/api/interviews/*/live', (client) => {
+  await this.page.routeWebSocket('**/api/interviews/*/live*', (client) => {
     if (this.offline) {
       client.close();
       return;
@@ -188,7 +189,7 @@ When('「マイクを許可して開始」でマイクを許可する', async fu
   await start(this);
 });
 When('面接中に質問に答える', async function () {
-  await waitForPlayback(this.page, this.openingPlayback);
+  await waitForOpening(this.page, this.openingPlayback);
   await answer(this);
 });
 Then('ブラウザで面接官の音声応答が再生される', async function () {
@@ -296,7 +297,7 @@ async function reconnect(world) {
 When('面接を開始して質問を聞き、答える', async function () {
   await start(this);
   this.segmentStart = performance.now();
-  await waitForPlayback(this.page, this.openingPlayback);
+  await waitForOpening(this.page, this.openingPlayback);
   await delay(2200);
   await answer(this);
   await heardAnswer(this);
@@ -333,7 +334,7 @@ Then('今日の利用時間は質問を聞いた時間を含む面接中の区�
 
 Given('会話を一往復して双方の発言が確定している', async function () {
   await start(this);
-  await waitForPlayback(this.page, this.openingPlayback);
+  await waitForOpening(this.page, this.openingPlayback);
   await answer(this);
   await heardAnswer(this);
   this.beforeCut = (await detail(this)).transcripts;
@@ -394,4 +395,173 @@ When('画面を再読み込みせず「再接続」を押して話す', async fu
 Then('同じ面接で新しい音声応答が再生される', async function () {
   await heardAnswer(this);
   checkConversation((await detail(this)).transcripts);
+});
+
+When('音声AIが接続を閉じずに回答を受け流す', async function () {
+  this.runtime.silenceCurrentConnections();
+  await answer(this);
+});
+async function recoverAudio() {
+  await this.page.getByRole('status').filter({ hasText: '面接官の音声を待っています' }).waitFor();
+  await button(this, '音声をつなぎ直す').click();
+  await status(this, '一時停止中').waitFor();
+  await button(this, 'マイクを許可して再開').click();
+  await status(this, '面接中').waitFor();
+}
+
+When('応答待ちの案内から音声をつなぎ直してもう一度話す', async function () {
+  await recoverAudio.call(this);
+  await answer(this);
+});
+
+When('音声AIが最初の質問の音声を送らずに面接が始まる', async function () {
+  this.runtime.omitNextOpening();
+  await start(this);
+});
+When('音声待ちの案内から再開して質問を聞き回答する', async function () {
+  await recoverAudio.call(this);
+  await waitForOpening(this.page, this.openingPlayback);
+  await answer(this);
+});
+When('次の回答には無音の音声と文字起こしだけが届く', async function () {
+  this.runtime.muteReplies();
+  await answer(this);
+});
+
+When('同じ面接を別のタブで開き「{word}」から引き継ぐ', async function (statusLabel) {
+  const page = await this.context.newPage();
+  const other = { page, events: [], id: this.id };
+  this.otherTab = other;
+  page.on('websocket', (socket) => {
+    socket.on('framereceived', ({ payload }) => {
+      if (typeof payload === 'string') {
+        other.events.push(JSON.parse(payload));
+      }
+    });
+  });
+  await page.goto(new URL('/practice', this.runtime.url).href);
+  await button(other, this.theme).first().click();
+  await status(other, '面接中').waitFor();
+  if (statusLabel === '一時停止中') {
+    await button(this, '一時停止').click();
+  }
+  await status(other, statusLabel).waitFor();
+  assert.equal(await button(other, 'マイクを許可して再開').isVisible(), false);
+  await button(other, 'このタブで引き継ぐ').click();
+  await button(other, '一時停止').waitFor();
+  await button(this, 'このタブで引き継ぐ').waitFor();
+});
+
+Then('新しい担当タブで回答して返答を聞ける', async function () {
+  await answer(this.otherTab);
+  await heardAnswer(this.otherTab);
+});
+
+When('回答せずに質問を言い換えて見送る', async function () {
+  await waitForOpening(this.page, this.openingPlayback);
+  for (const name of ['言い換えを依頼', '質問を見送る']) {
+    const before = await playbackCount(this.page);
+    await button(this, name).click();
+    await waitForPlayback(this.page, before);
+    await waitForQuiet(this.page);
+  }
+});
+Then('最後の質問だけが現在の質問になり、前の質問も会話に残る', async function () {
+  const heading = this.page.getByRole('heading', { name: '現在の質問' });
+  assert.equal(
+    await heading.evaluate((el) => el.nextElementSibling.textContent),
+    '他の手段をなぜ選びませんでしたか。',
+  );
+  for (const text of [
+    '取り組んだことを教えてください。',
+    '具体的な役割は何ですか。',
+    '他の手段をなぜ選びませんでしたか。',
+  ]) {
+    await this.page.getByRole('listitem').filter({ hasText: text }).waitFor();
+  }
+  assert.equal(this.events.filter((e) => e.type === 'transcript' && e.startsQuestion).length, 2);
+});
+When('最初の質問を聞いて応答しない音声AIに言い換えを依頼する', async function () {
+  await waitForOpening(this.page, this.openingPlayback);
+  this.runtime.holdNextQuestion();
+  await button(this, '言い換えを依頼').click();
+});
+When('長い質問を聞きながら返事をして音声AIが応答しなくなる', async function () {
+  this.runtime.extendNextOpening();
+  await start(this);
+  await waitForPlayback(this.page, this.openingPlayback);
+  this.runtime.silenceCurrentConnections();
+  const frames = this.voicedFrames;
+  await this.page.evaluate(() => window.voiceE2e.speak());
+  await waitForQuiet(this.page);
+  assert.ok(this.voicedFrames > frames);
+});
+
+When('「{word}」の返事を保留してから「{word}」を押す', async function (first, second) {
+  await waitForOpening(this.page, this.openingPlayback);
+  const held = this.runtime.holdNextQuestion();
+  this.beforeQuestion = await playbackCount(this.page);
+  await button(this, first).click();
+  await held;
+  await button(this, second).click();
+});
+
+When('見送りの返事を保留してから一時停止して再開する', async function () {
+  await waitForOpening(this.page, this.openingPlayback);
+  const held = this.runtime.holdNextQuestion();
+  this.beforeQuestion = await playbackCount(this.page);
+  await button(this, '質問を見送る').click();
+  await held;
+  await button(this, '一時停止').click();
+  await status(this, '一時停止中').waitFor();
+  await button(this, 'マイクを許可して再開').click();
+});
+
+async function hearQuestionAndAnswer(operation) {
+  const question =
+    operation === '質問を見送る'
+      ? '他の手段をなぜ選びませんでしたか。'
+      : '具体的な役割は何ですか。';
+  await this.page.getByText(question, { exact: true }).first().waitFor();
+  const heading = this.page.getByRole('heading', { name: '現在の質問' });
+  assert.equal(await heading.evaluate((el) => el.nextElementSibling.textContent), question);
+  await waitForPlayback(this.page, this.beforeQuestion);
+  await waitForQuiet(this.page);
+  const frequencies = await this.page.evaluate(() => window.voiceE2e.playedFrequencies);
+  assert.ok(
+    frequencies.some((hz) => Math.abs(hz - 440) < 12),
+    '新しい質問の音声',
+  );
+  assert.ok(
+    frequencies.every((hz) => Math.abs(hz - 880) > 12),
+    '旧接続の遅延音声',
+  );
+  const fragments = (await detail(this)).transcripts;
+  assert.equal(fragments.filter((entry) => entry.content === question).length, 1);
+  const generation = fragments.find((entry) => entry.content === question).generation;
+  assert.ok(
+    fragments.every(
+      (entry) => !entry.content.includes('遅れて届いた続き') || entry.generation < generation,
+    ),
+  );
+  await answer(this);
+  await heardAnswer(this);
+}
+Then('「{word}」の質問が単独で表示され音声を聞いて回答できる', hearQuestionAndAnswer);
+
+When('元のタブで見送りを受理した音声AIが返事を保留する', async function () {
+  await waitForOpening(this.page, this.openingPlayback);
+  const held = this.runtime.holdNextQuestion();
+  await button(this, '質問を見送る').click();
+  await held;
+});
+
+Then('新しい担当タブで見送り後の質問だけを聞いて回答できる', async function () {
+  this.otherTab.beforeQuestion = 0;
+  await hearQuestionAndAnswer.call(this.otherTab, '質問を見送る');
+  const frequencies = await this.otherTab.page.evaluate(() => window.voiceE2e.playedFrequencies);
+  assert.ok(
+    frequencies.every((hz) => Math.abs(hz - 330) > 12),
+    '新しい担当タブで最初の質問が繰り返された',
+  );
 });

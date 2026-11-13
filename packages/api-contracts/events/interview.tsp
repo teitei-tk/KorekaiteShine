@@ -38,6 +38,7 @@ model InterviewTranscriptEvent {
   @minValue(1) sequence: safeint;
   @minValue(1) generation: safeint;
   speaker: "user" | "assistant";
+  startsQuestion?: boolean;
   @maxLength(32768) content: string;
   sourceStartMs: float64 | null;
   sourceEndMs: float64 | null;

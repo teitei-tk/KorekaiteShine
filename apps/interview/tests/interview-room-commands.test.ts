@@ -5,7 +5,7 @@ import { AudioUsageLimitError } from '../src/application/interview-session';
 type Settings = Parameters<typeof createInterviewRoom>[0];
 type Hooks = Parameters<Settings['createSession']>[0];
 type State = Parameters<NonNullable<Hooks['onState']>>[0];
-function fixture() {
+function fixture(startsQuestion = false) {
   const row: State = {
     interviewId: 'i',
     actorId: 'actor',
@@ -19,6 +19,7 @@ function fixture() {
     status: 'ready',
     generation: 1,
     streamGeneration: null,
+    pendingQuestionOperation: null,
     activeMs: 0,
     activeSince: null,
     deadline: null,
@@ -33,6 +34,7 @@ function fixture() {
     fragmentId: 'f',
     generation: 1,
     sequence: 1,
+    startsQuestion,
     sourceEventId: 's',
     speaker: 'user' as const,
     content: '答え',
@@ -200,4 +202,56 @@ test('エラー送信時に削除された面接の状態を再配信しない',
   peer.send.mockImplementationOnce(() => room.discard('i'));
   await command('pause', 'old', 0);
   expect(events().at(-1)).toMatchObject({ type: 'deleted' });
+});
+
+test('保存済みの質問境界を新しい画面に再配信し、旧画面には従来の形式を返す', async () => {
+  const { room, peer, events } = fixture(true);
+  await room.attach('old', peer);
+  expect(events().find((event) => event.type === 'transcript')).not.toHaveProperty(
+    'startsQuestion',
+  );
+  peer.send.mockClear();
+  await room.attach('new', { ...peer, questionBoundaries: true });
+  expect(events().find((event) => event.type === 'transcript')).toMatchObject({
+    startsQuestion: true,
+  });
+});
+
+test('音声送信中にD1が再接続待ちになったら、担当タブへ現在の世代を通知する', async () => {
+  const { room, peer, session, row, events, command } = fixture();
+  await room.attach('peer', peer);
+  await command('start');
+  session.sendAudio.mockResolvedValue(false);
+  session.state = async () => ({ ...row, status: 'reconnecting', generation: 2 });
+  const frame = new ArrayBuffer(10);
+  new DataView(frame).setFloat64(0, 1);
+  await room.receive('peer', frame);
+  expect(events().at(-1)).toMatchObject({ type: 'state', status: 'reconnecting', generation: 2 });
+  session.state = async () => ({ ...row, status: 'active', generation: 1 });
+  await room.receive('peer', frame);
+  expect(events().at(-1)).toMatchObject({ type: 'error', code: 'UNAVAILABLE' });
+});
+
+test('質問操作IDの再送で二重接続せず、切替中にタブを閉じた場合は自動開始しない', async () => {
+  const { room, peer, session, row, command } = fixture();
+  await room.attach('peer', peer);
+  await command('start');
+  row.status = 'active';
+  await command('skip', 'skip');
+  await command('skip', 'skip');
+  expect(session.request).toHaveBeenCalledOnce();
+  expect(session.start).toHaveBeenCalledTimes(2);
+  const submission = {} as { settle: (accepted: boolean) => void };
+  session.request.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        submission.settle = resolve;
+      }),
+  );
+  const changing = command('rephrase', 'next');
+  await vi.waitFor(() => expect(session.request).toHaveBeenCalledTimes(2));
+  const left = room.detach('peer');
+  submission.settle(true);
+  await Promise.all([changing, left]);
+  expect(session.start).toHaveBeenCalledTimes(2);
 });

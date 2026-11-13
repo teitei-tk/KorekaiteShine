@@ -28,8 +28,13 @@ test('日付の境界で音声区間を切り、確定時は重複なく予約�
       createdAt: 100,
     });
     const window = { day: '2026-11-09', start: 200, end: 600, now: 700 };
-    expect(await usedAudioMs(fixture.db, 'actor', window)).toBe(2300);
     const owned = eq(interviews.interviewId, interviewId);
+    // 最終稼働確認が集計窓より前なら、未確定区間はまだ加算しない。
+    expect(await usedAudioMs(fixture.db, 'actor', window)).toBe(2000);
+    await fixture.db.update(interviews).set({ updatedAt: 400 }).where(owned);
+    expect(await usedAudioMs(fixture.db, 'actor', window)).toBe(2200);
+    await fixture.db.update(interviews).set({ updatedAt: 600 }).where(owned);
+    expect(await usedAudioMs(fixture.db, 'actor', window)).toBe(2300);
     await fixture.db.batch([
       closeAudioPeriod(fixture.db, owned, 700),
       closeAudioPeriod(fixture.db, owned, 700),

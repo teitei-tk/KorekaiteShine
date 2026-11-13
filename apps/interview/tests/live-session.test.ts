@@ -70,6 +70,14 @@ test('長い日本語の背景でも初回と再開を準備し、原本を保�
       fragments.length ? '負荷を測りました。' : '設計を担当。',
     );
   }
+  // 履歴が入力枠をほぼ使い切る場合は、最小の抜粋でも再開できない。
+  expect(() =>
+    buildLiveSession(
+      material,
+      [{ speaker: 'user', generation: 1, content: 'a'.repeat(7800) }],
+      settings,
+    ),
+  ).toThrow('文脈');
   expect(material.background).toBe('設計を担当。'.repeat(600));
 });
 

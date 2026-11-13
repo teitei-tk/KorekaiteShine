@@ -5,6 +5,7 @@ test('無音や短い物音では案内せず、発話後に応答が途絶え�
   const monitor = createResponseMonitor();
   const voice = new Int16Array(480).fill(1500).buffer;
   const quiet = new Int16Array(480).buffer;
+  monitor.capture(new ArrayBuffer(0), 0);
   monitor.capture(quiet, 0);
   monitor.capture(voice, 20);
   monitor.capture(quiet, 40);

@@ -221,6 +221,9 @@ test('音声送信中にD1が再接続待ちになったら、担当タブへ現
   new DataView(frame).setFloat64(0, 1);
   await room.receive('peer', frame);
   expect(events().at(-1)).toMatchObject({ type: 'state', status: 'reconnecting', generation: 2 });
+  session.state = async () => ({ ...row, status: 'active', generation: 1 });
+  await room.receive('peer', frame);
+  expect(events().at(-1)).toMatchObject({ type: 'error', code: 'UNAVAILABLE' });
 });
 
 test('質問操作IDの再送で二重接続せず、切替中にタブを閉じた場合は自動開始しない', async () => {

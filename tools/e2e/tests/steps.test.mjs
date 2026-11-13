@@ -61,6 +61,13 @@ async function observer() {
     refused = false;
   let silent = false;
   const transcripts = [];
+  const questions = {
+    言い換えを依頼: '具体的な役割は何ですか。',
+    質問を見送る: '他の手段をなぜ選びませんでしたか。',
+  };
+  let currentQuestion;
+  let held;
+  let receiveInOtherTab;
   vi.spyOn(performance, 'now').mockImplementation(() => time);
   delay.mockImplementation(async (ms) => {
     time += ms;
@@ -74,6 +81,11 @@ async function observer() {
   const settings = {
     url: 'http://127.0.0.1:4327',
     omitNextOpening: vi.fn(),
+    extendNextOpening: vi.fn(),
+    holdNextQuestion: () =>
+      new Promise((resolve) => {
+        held = resolve;
+      }),
     muteReplies: vi.fn(),
     silenceCurrentConnections: () => {
       silent = true;
@@ -116,9 +128,22 @@ async function observer() {
     },
     connectToServer: () => server,
   };
-  const emit = (event) => output(JSON.stringify(event));
+  page.on = (_event, listen) =>
+    listen({
+      on: (_frame, receive) => {
+        receiveInOtherTab = receive;
+        receive({ payload: Buffer.alloc(1) });
+      },
+    });
+  const emit = (event) => {
+    const payload = JSON.stringify(event);
+    output(payload);
+    receiveInOtherTab?.({ payload });
+  };
   const locator = (name) => ({
     waitFor: vi.fn(),
+    isVisible: async () => false,
+    evaluate: (fn) => fn({ nextElementSibling: { textContent: currentQuestion } }),
     first() {
       return this;
     },
@@ -132,6 +157,24 @@ async function observer() {
       document.body.append(field);
     },
     click: async () => {
+      if (questions[name]) {
+        generation++;
+        if (held) {
+          held();
+          held = undefined;
+          currentQuestion = questions[name];
+          transcript('assistant', '前の質問から遅れて届いた続きです。');
+          return;
+        }
+        currentQuestion = questions[name];
+        transcript('assistant', currentQuestion, true);
+        window.voiceE2e.playedFrequencies.push(440);
+      }
+      if (['このタブで引き継ぐ', 'マイクを許可して再開'].includes(name) && currentQuestion) {
+        generation++;
+        transcript('assistant', currentQuestion, true);
+        window.voiceE2e.playedFrequencies.push(440);
+      }
       if (name === 'マイクを許可して開始' && refused) {
         emit({ type: 'error', code: 'AUDIO_CONNECT_FAILED' });
         return;
@@ -181,17 +224,18 @@ async function observer() {
     expect(match).toBeDefined();
     return match;
   });
-  window.voiceE2e = { speaking: true };
+  window.voiceE2e = { speaking: true, playedFrequencies: [] };
   await hooks.before.call(world);
   const relay = page.routeWebSocket.mock.calls[0][1];
   relay(client);
   const voice = Buffer.alloc(12);
   voice.writeInt16LE(500, 10);
-  function transcript(speaker) {
+  function transcript(speaker, content = speaker, startsQuestion = false) {
     const event = {
       type: 'transcript',
       speaker,
-      content: speaker,
+      content,
+      startsQuestion,
       sequence: transcripts.length,
       fragmentId: String(transcripts.length),
       generation,
@@ -199,6 +243,7 @@ async function observer() {
     transcripts.push(event);
     emit(event);
   }
+  window.voiceE2e.speak = () => input(voice);
   speak.mockImplementation(async () => {
     for (let n = 0; n < 3; n++) {
       input(voice);
@@ -266,4 +311,50 @@ test('再生だけで発話への応答と判定せず、順序と発話フレ�
   await expect(hooks.steps.get('次の発話途中で回線が切れる').call(world)).rejects.toThrow(
     '音声フレーム',
   );
+});
+
+test('質問を切り替えた後の見出し・保存世代・音声を検査する', async () => {
+  const { world } = await observer();
+  const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+  await step('架空の経験Markdownからテーマを選び面接を準備した');
+  await step('回答せずに質問を言い換えて見送る');
+  await step('最後の質問だけが現在の質問になり、前の質問も会話に残る');
+  window.voiceE2e.playedFrequencies.push(880);
+  await expect(
+    step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る'),
+  ).rejects.toThrow('旧接続の遅延音声');
+});
+
+test.each(['質問を見送る', '言い換えを依頼'])(
+  '返答前に%sを選び、最後に選んだ質問を検査する',
+  async (next) => {
+    const { world } = await observer();
+    const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+    await step('架空の経験Markdownからテーマを選び面接を準備した');
+    await step('「{word}」の返事を保留してから「{word}」を押す', '言い換えを依頼', next);
+    await step('「{word}」の質問が単独で表示され音声を聞いて回答できる', next);
+  },
+);
+
+test.each(['面接中', '一時停止中'])(
+  '%sから別タブに引き継ぎ、新タブで音声と応答を検査する',
+  async (state) => {
+    const { world } = await observer();
+    const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+    await step('架空の経験Markdownからテーマを選び面接を準備した');
+    await step('元のタブで見送りを受理した音声AIが返事を保留する');
+    await step('同じ面接を別のタブで開き「{word}」から引き継ぐ', state);
+    await step('新しい担当タブで回答して返答を聞ける');
+    await step('新しい担当タブで見送り後の質問だけを聞いて回答できる');
+  },
+);
+
+test('応答待ちの一時停止と長い質問中の発話を検査する', async () => {
+  const { world } = await observer();
+  const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+  await step('架空の経験Markdownからテーマを選び面接を準備した');
+  await step('最初の質問を聞いて応答しない音声AIに言い換えを依頼する');
+  await step('見送りの返事を保留してから一時停止して再開する');
+  await step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る');
+  await step('長い質問を聞きながら返事をして音声AIが応答しなくなる');
 });

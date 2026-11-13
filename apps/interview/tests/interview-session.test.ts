@@ -850,6 +850,28 @@ async function lifecycleFixture() {
   return { database, session, options, close, handlers, abort };
 }
 
+test('接続準備中の再起動は稼働時間を増やさず元の接続期限内で復帰する', async () => {
+  const { database, session } = await lifecycleFixture();
+  try {
+    await database.db.update(interviews).set({
+      status: 'connecting',
+      generation: 1,
+      streamGeneration: 1,
+      deadline: 30_000,
+    });
+    expect(await session.recover()).toMatchObject({
+      status: 'reconnecting',
+      activeMs: 0,
+      updatedAt: 100,
+      deadline: 30_000,
+      streamGeneration: null,
+      transcriptIncomplete: true,
+    });
+  } finally {
+    database.close();
+  }
+});
+
 test('保存済みの終了・終了待ち・期限切れの面接を開始操作から回復する', async () => {
   for (const status of ['ending', 'ended', 'paused'] as const) {
     const { database, session } = await lifecycleFixture();
@@ -1051,6 +1073,8 @@ test('質問操作で旧接続を終了し、遅れた発言は元世代に保�
     expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);
     expect(sendAudio).not.toHaveBeenCalled();
     handlers[1].onAudio(new Uint8Array(12000).fill(23), 500);
+    // 続く音声が届いても、最初の可聴区間の再生確認だけで回答を解放できる。
+    handlers[1].onAudio(new Uint8Array(12000).fill(23), 750);
     expect(await session.playback(next.generation, 500)).toBe(true);
     expect((await session.state()).pendingQuestionOperation).toBeNull();
     expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);

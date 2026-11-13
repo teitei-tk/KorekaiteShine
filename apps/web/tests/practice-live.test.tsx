@@ -365,6 +365,37 @@ test('質問と発言を順番にまとめ、言い換え・スキップ・終�
 });
 
 const audioHeader = { type: 'audio', generation: 1, endOffsetMs: 20, byteLength: 2 };
+test('同じ操作中に連打しても質問切替は一度だけ送信する', () => {
+  const { state, peer } = mountLive();
+  state();
+  const rephrase = screen.getByRole('button', { name: '言い換えを依頼' });
+  act(() => {
+    rephrase.click();
+    rephrase.click();
+  });
+  expect(peer.send).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('rephrase');
+});
+
+test('質問切替の拒否後も、依頼済みの一時停止は現在の世代で送る', async () => {
+  const { state, click, peer, receive } = mountLive();
+  state();
+  await click('言い換えを依頼');
+  const { commandId } = JSON.parse(peer.send.mock.lastCall![0]);
+  await click('一時停止');
+  receive({ type: 'error', commandId, code: 'STALE_STATE' });
+  expect(peer.send).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 1 });
+});
+
+test('最初の音声を20秒待っても再生されなければ再接続の案内を出す', async () => {
+  vi.useFakeTimers();
+  const { state } = mountLive();
+  state();
+  await act(async () => vi.advanceTimersByTimeAsync(20_500));
+  expect(screen.getByText(/面接官の音声を待っています/)).toBeTruthy();
+});
+
 test('質問の切替前の音声を止め、新世代の質問の文字と再生完了までマイク送信を止める', async () => {
   const { state, click, audio, peer, receive, raw } = mountLive();
   state({ status: 'ready' });

@@ -15,7 +15,7 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { materialAnalysisMock: true });
-  let succeeded = false;
+
   try {
     expect((await fetch(`${runtime.baseUrl}/api/interview-history`)).status).toBe(403);
     const bootstrap = await fetch(`${runtime.baseUrl}/api/local-session`);
@@ -88,13 +88,11 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
         })
       ).status,
     ).toBe(403);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
 }, 90000);
 
 test('架空のAIキーは3 Workersに届き、生成設定・キャッシュ・ログ・状態に保存されない', async () => {

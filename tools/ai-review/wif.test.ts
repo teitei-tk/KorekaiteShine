@@ -70,24 +70,24 @@ it('クレーム確認だけではOpenAIへ通信しない', async () => {
   expect('accessToken' in result).toBe(false);
 });
 it('想定外のリポジトリのトークンは交換しない', async () => {
-  let calls = 0;
+  const callsState = { calls: 0 };
   const request = (async () => {
-    calls++;
+    callsState.calls++;
     return Response.json({ value: jwt('other/repo') });
   }) as typeof fetch;
   await expect(authenticate(env, 'claims', request, () => {})).rejects.toThrow();
-  expect(calls).toBe(1);
+  expect(callsState.calls).toBe(1);
 });
 it('エラー本文の秘密値を例外に含めない', async () => {
   const request = (async () => new Response('secret-value', { status: 403 })) as typeof fetch;
   await expect(authenticate(env, 'claims', request, () => {})).rejects.toThrow('HTTP 403');
 });
 it('廃止した独自交換モードでは通信を始めない', async () => {
-  let calls = 0;
+  const callsState = { calls: 0 };
   const request = (async () => {
-    calls++;
+    callsState.calls++;
     return Response.json({ value: jwt() });
   }) as typeof fetch;
   await expect(authenticate(env, 'review', request)).rejects.toThrow('WIFモードが不正');
-  expect(calls).toBe(0);
+  expect(callsState.calls).toBe(0);
 });

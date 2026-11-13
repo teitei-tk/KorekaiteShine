@@ -337,8 +337,7 @@ async function prepare(mode: string, runId: string): Promise<void> {
 
 async function finish(mode: string, outcome: string): Promise<void> {
   const state: State = JSON.parse(readFileSync(`${privateDir}/lifecycle.json`, 'utf8'));
-  let valid = false;
-  let stopped = false;
+  const validContext = { valid: false, stopped: false };
   try {
     const info = await readInfo(state.infoPath);
     const report: Report = existsSync(reportFile)
@@ -348,7 +347,7 @@ async function finish(mode: string, outcome: string): Promise<void> {
       const stat = statSync(file);
       return stat.uid === 0 && (stat.mode & 0o022) === 0;
     });
-    valid =
+    validContext.valid =
       alive(state.proxy) &&
       info.pid === state.proxy.pid &&
       protectedConfig &&
@@ -363,10 +362,13 @@ async function finish(mode: string, outcome: string): Promise<void> {
     const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
       signal: AbortSignal.timeout(3000),
     });
-    for (let attempt = 0; attempt < 60 && alive(state.proxy); attempt++) {
+    for (const _ of Array(60)) {
+      if (!alive(state.proxy)) {
+        break;
+      }
       await delay(50);
     }
-    stopped = response.ok && !alive(state.proxy);
+    validContext.stopped = response.ok && !alive(state.proxy);
   } finally {
     // 異常時も自分が開始した同一プロセスだけを停止する。公式shutdownの失敗は合格にしない。
     for (const child of [state.proxy, state.backend]) {
@@ -377,9 +379,14 @@ async function finish(mode: string, outcome: string): Promise<void> {
     rmSync(state.infoPath, { force: true });
   }
   console.log(
-    JSON.stringify({ stage: 'official-action-lifecycle', mode, result: valid, shutdown: stopped }),
+    JSON.stringify({
+      stage: 'official-action-lifecycle',
+      mode,
+      result: validContext.valid,
+      shutdown: validContext.stopped,
+    }),
   );
-  if (!valid || !stopped) {
+  if (!validContext.valid || !validContext.stopped) {
     throw new Error('official Action/proxy lifecycle failed');
   }
 }

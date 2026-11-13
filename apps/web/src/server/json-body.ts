@@ -12,28 +12,26 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
   ) {
     return { ok: false, code: 'UNSUPPORTED_MEDIA_TYPE' };
   }
-  if (!request.body) {
+  if (!request.body || request.body.locked) {
     return { ok: false, code: 'INVALID_REQUEST' };
   }
   const reader = request.body.getReader();
   const decoder = new TextDecoder('utf-8', { fatal: true });
-  let bytes = 0;
-  let source = '';
+  const body = { bytes: 0, text: '' };
   try {
     while (true) {
       const chunk = await reader.read();
       if (chunk.done) {
         break;
       }
-      bytes += chunk.value.byteLength;
-      if (bytes > maxBytes) {
+      body.bytes += chunk.value.byteLength;
+      if (body.bytes > maxBytes) {
         await reader.cancel();
         return { ok: false, code: 'REQUEST_TOO_LARGE' };
       }
-      source += decoder.decode(chunk.value, { stream: true });
+      body.text += decoder.decode(chunk.value, { stream: true });
     }
-    source += decoder.decode();
-    return { ok: true, value: JSON.parse(source) };
+    return { ok: true, value: JSON.parse(body.text + decoder.decode()) };
   } catch {
     await reader.cancel().catch(() => undefined);
     return { ok: false, code: 'INVALID_REQUEST' };

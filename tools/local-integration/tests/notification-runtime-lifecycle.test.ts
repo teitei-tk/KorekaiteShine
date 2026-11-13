@@ -9,12 +9,11 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
   '%sの失敗を保持し、後続ケースを拒否して証拠を消さず停止する',
   async (stage) => {
     const original = new Error(`injected ${stage}`);
-    let evidence = '';
-    let stops = 0;
+    const evidenceContext = { evidence: '', stops: 0 };
     const start = vi.spyOn(runtimeModule, 'startRuntime').mockImplementationOnce(async (config) => {
-      evidence = join(config.artifactDirectory, 'evidence.txt');
+      evidenceContext.evidence = join(config.artifactDirectory, 'evidence.txt');
       await mkdir(config.artifactDirectory, { recursive: true });
-      await writeFile(evidence, 'failure evidence');
+      await writeFile(evidenceContext.evidence, 'failure evidence');
       if (stage === 'start') {
         throw original;
       }
@@ -23,7 +22,7 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
         closed: Promise.resolve({ exitCode: 0 }),
         async runScheduled() {},
         async stop() {
-          stops++;
+          evidenceContext.stops++;
           if (stage === 'stop') {
             throw original;
           }
@@ -38,8 +37,8 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
     onTestFinished(async () => {
       start.mockRestore();
       database.mockRestore();
-      if (evidence) {
-        await rm(dirname(dirname(evidence)), { recursive: true, force: true });
+      if (evidenceContext.evidence) {
+        await rm(dirname(dirname(evidenceContext.evidence)), { recursive: true, force: true });
       }
     });
     const suite = createNotificationRuntime();
@@ -62,47 +61,43 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
     if (stage === 'stop') {
       await expect(suite.stop()).rejects.toBe(original);
     }
-    let called = false;
+    const calledState = { called: false };
     await expect(
       suite.run(async () => {
-        called = true;
+        calledState.called = true;
       }),
     ).rejects.toThrow();
-    expect(called).toBe(false);
+    expect(calledState.called).toBe(false);
     if (stage !== 'stop') {
       await suite.stop();
     }
-    expect(stops).toBe(stage === 'start' ? 0 : 1);
-    expect(await readFile(evidence, 'utf8')).toBe('failure evidence');
+    expect(evidenceContext.stops).toBe(stage === 'start' ? 0 : 1);
+    expect(await readFile(evidenceContext.evidence, 'utf8')).toBe('failure evidence');
   },
 );
 
 test('起動待ちの間に停止しても、後から起動したWorkerを停止して証拠を保持する', async () => {
-  let release = () => {};
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  let evidence = '';
-  let stops = 0;
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>();
+  const evidenceContext = { evidence: '', stops: 0 };
   const start = vi.spyOn(runtimeModule, 'startRuntime').mockImplementationOnce(async (config) => {
-    evidence = join(config.artifactDirectory, 'startup.txt');
+    evidenceContext.evidence = join(config.artifactDirectory, 'startup.txt');
     await mkdir(config.artifactDirectory, { recursive: true });
-    await writeFile(evidence, 'startup evidence');
+    await writeFile(evidenceContext.evidence, 'startup evidence');
     await gate;
     return {
       baseUrl: 'http://127.0.0.1:1',
       closed: Promise.resolve({ exitCode: 0 }),
       async runScheduled() {},
       async stop() {
-        stops++;
+        evidenceContext.stops++;
       },
     };
   });
   onTestFinished(async () => {
     release();
     start.mockRestore();
-    if (evidence) {
-      await rm(dirname(dirname(evidence)), { recursive: true, force: true });
+    if (evidenceContext.evidence) {
+      await rm(dirname(dirname(evidenceContext.evidence)), { recursive: true, force: true });
     }
   });
   const suite = createNotificationRuntime();
@@ -111,26 +106,25 @@ test('起動待ちの間に停止しても、後から起動したWorkerを停�
   release();
   await expect(starting).rejects.toThrow();
   await stopped;
-  expect(stops).toBe(1);
-  expect(await readFile(evidence, 'utf8')).toBe('startup evidence');
+  expect(evidenceContext.stops).toBe(1);
+  expect(await readFile(evidenceContext.evidence, 'utf8')).toBe('startup evidence');
 });
 
 test.each(['stop', 'abort'] as const)(
   '清掃待ち中の%s後に完了しても環境を再開しない',
   async (ending) => {
-    let release = () => {};
-    let entered = () => {};
+    const releaseContext = { release: () => {}, entered: () => {} };
     const cleaning = new Promise<void>((resolve) => {
-      entered = resolve;
+      releaseContext.entered = resolve;
     });
     const gate = new Promise<void>((resolve) => {
-      release = resolve;
+      releaseContext.release = resolve;
     });
-    let evidence = '';
+    const evidenceState = { evidence: '' };
     const start = vi.spyOn(runtimeModule, 'startRuntime').mockImplementationOnce(async (config) => {
-      evidence = join(config.artifactDirectory, 'cleanup.txt');
+      evidenceState.evidence = join(config.artifactDirectory, 'cleanup.txt');
       await mkdir(config.artifactDirectory, { recursive: true });
-      await writeFile(evidence, 'cleanup evidence');
+      await writeFile(evidenceState.evidence, 'cleanup evidence');
       return {
         baseUrl: 'http://127.0.0.1:1',
         closed: Promise.resolve({ exitCode: 0 }),
@@ -141,15 +135,15 @@ test.each(['stop', 'abort'] as const)(
     const database = vi
       .spyOn(runtimeModule, 'runDatabaseCommand')
       .mockImplementationOnce(async () => {
-        entered();
+        releaseContext.entered();
         await gate;
       });
     onTestFinished(async () => {
-      release();
+      releaseContext.release();
       start.mockRestore();
       database.mockRestore();
-      if (evidence) {
-        await rm(dirname(dirname(evidence)), { recursive: true, force: true });
+      if (evidenceState.evidence) {
+        await rm(dirname(dirname(evidenceState.evidence)), { recursive: true, force: true });
       }
     });
     const suite = createNotificationRuntime();
@@ -164,16 +158,16 @@ test.each(['stop', 'abort'] as const)(
     } else {
       controller.abort(new Error('test timed out'));
     }
-    release();
+    releaseContext.release();
     await expect(running).rejects.toThrow();
-    let called = false;
+    const calledState = { called: false };
     await expect(
       suite.run(async () => {
-        called = true;
+        calledState.called = true;
       }),
     ).rejects.toThrow();
-    expect(called).toBe(false);
+    expect(calledState.called).toBe(false);
     await suite.stop();
-    expect(await readFile(evidence, 'utf8')).toBe('cleanup evidence');
+    expect(await readFile(evidenceState.evidence, 'utf8')).toBe('cleanup evidence');
   },
 );

@@ -2,70 +2,73 @@
 const sampleRate = 24000;
 
 function meanSquare(samples: Int16Array) {
-  let power = 0;
-  for (const sample of samples) {
-    power += sample * sample;
-  }
-  return power / samples.length;
+  return samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length;
 }
 
 export function createResponseMonitor() {
-  let waitingSince: number | null = null;
-  let version = 0;
-  let inputPower = 0;
-  let inputSamples = 0;
-  let audibleSamples = 0;
+  const state = {
+    waitingSince: null as number | null,
+    version: 0,
+    inputPower: 0,
+    inputSamples: 0,
+    audibleSamples: 0,
+  };
 
   function reset() {
-    waitingSince = null;
-    version++;
-    inputPower = 0;
-    inputSamples = 0;
-    audibleSamples = 0;
+    state.waitingSince = null;
+    state.version++;
+    state.inputPower = 0;
+    state.inputSamples = 0;
+    state.audibleSamples = 0;
   }
 
   return {
     expectOpening(now: number) {
       reset();
-      waitingSince = now;
+      state.waitingSince = now;
     },
     capture(bytes: ArrayBuffer, now: number) {
       const samples = new Int16Array(bytes);
       const power = samples.length ? meanSquare(samples) : 0;
       if (power < 4 ** 2) {
-        inputPower = 0;
-        inputSamples = 0;
+        state.inputPower = 0;
+        state.inputSamples = 0;
         return;
       }
-      inputSamples += samples.length;
+      state.inputSamples += samples.length;
       // 回答の強弱（音量が2倍以上変化）で待機を延ばし、一定の背景音では延ばさない。
-      if (inputSamples >= sampleRate / 10 && (power > inputPower * 4 || power < inputPower / 4)) {
-        version++;
-        audibleSamples = 0;
-        inputPower = power;
-        waitingSince = now;
+      if (
+        state.inputSamples >= sampleRate / 10 &&
+        (power > state.inputPower * 4 || power < state.inputPower / 4)
+      ) {
+        state.version++;
+        state.audibleSamples = 0;
+        state.inputPower = power;
+        state.waitingSince = now;
       }
     },
-    playbackVersion: () => version,
-    played(bytes: ArrayBuffer, receivedVersion = version) {
-      if (waitingSince === null || receivedVersion !== version) {
+    playbackVersion: () => state.version,
+    played(bytes: ArrayBuffer, receivedVersion = state.version) {
+      if (state.waitingSince === null || receivedVersion !== state.version) {
         return;
       }
       const samples = new Int16Array(bytes);
-      for (let i = 0; i < samples.length; i += 480) {
-        const frame = samples.subarray(i, i + 480);
+      const position = { offset: 0 };
+      while (position.offset < samples.length) {
+        const frame = samples.subarray(position.offset, position.offset + 480);
+        position.offset += frame.length;
         if (meanSquare(frame) >= 32 ** 2) {
-          audibleSamples += frame.length;
+          state.audibleSamples += frame.length;
         }
       }
-      if (audibleSamples >= sampleRate / 4) {
+      if (state.audibleSamples >= sampleRate / 4) {
         reset();
         return true;
       }
       return false;
     },
     isWaitingTooLong(now: number) {
-      return waitingSince !== null && now - waitingSince >= 20_000;
+      return state.waitingSince !== null && now - state.waitingSince >= 20_000;
     },
     reset,
   };

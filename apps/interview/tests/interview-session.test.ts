@@ -20,13 +20,11 @@ const evaluation = {
 
 test('モック音声接続で開始し、終了中の最後の発言を保存して一度だけ評価を依頼する', async () => {
   const database = createTestDatabase();
-  let now = 10;
-  let handlers!: LiveHandlers;
-  let resolveClosed!: (value: LiveClosed) => void;
-  const closed = new Promise<LiveClosed>((resolve) => {
-    resolveClosed = resolve;
-  });
-  let closes = 0;
+  const nowState = { now: 10 };
+  const onConnect = vi.fn<(handlers: LiveHandlers) => void>();
+
+  const { promise: closed, resolve: resolveClosed } = Promise.withResolvers<LiveClosed>();
+  const closesState = { closes: 0 };
   const events: string[] = [];
   try {
     await database.db.insert(interviews).values({
@@ -45,7 +43,7 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
       db: database.db,
       actorId: 'actor',
       interviewId: 'interview',
-      now: () => now,
+      now: () => nowState.now,
       onState: async (state) => {
         events.push(state.status);
       },
@@ -58,7 +56,7 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
       evaluation,
       newJobId: () => '00000000-0000-4000-8000-000000000001',
       connect: (_options, callbacks) => {
-        handlers = callbacks;
+        onConnect(callbacks);
         return {
           ready: Promise.resolve('upstream'),
           closed,
@@ -66,7 +64,7 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
           request: () => true,
           abort: () => {},
           close: () => {
-            closes += 1;
+            closesState.closes += 1;
             void callbacks
               .onTranscript({
                 type: 'session.input_transcript.delta',
@@ -89,13 +87,14 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
       },
     });
     expect((await session.start()).status).toBe('connecting');
+    const [handlers] = onConnect.mock.lastCall!;
     await handlers.onReady('upstream');
     expect((await session.state()).status).toBe('active');
-    now = 1010;
+    nowState.now = 1010;
     const jobId = await session.finish();
     expect(jobId).toBe('00000000-0000-4000-8000-000000000001');
     expect(await session.finish()).toBe(jobId);
-    expect(closes).toBe(1);
+    expect(closesState.closes).toBe(1);
     expect(events).toContain('active');
     expect(events.indexOf('最後の回答です。')).toBeLessThan(events.indexOf('ended'));
     expect(events.at(-1)).toBe('ended');
@@ -106,7 +105,7 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
       fragments: [{ content: '最後の回答です。', sequence: 1 }],
     });
     expect((await session.state()).status).toBe('ended');
-    let evaluations = 0;
+    const evaluationsState = { evaluations: 0 };
     const axis = { status: 'unconfirmed', score: null, reason: '詳細は未確認です。', evidence: [] };
     const report = {
       summary: '説明の詳細を次回確認する。',
@@ -118,10 +117,10 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
       consistency: [],
     };
     const worker = createEvaluationWorker({
-      now: () => now,
+      now: () => nowState.now,
       newId: () => '00000000-0000-4000-8000-000000000002',
       generate: async (saved) => {
-        evaluations += 1;
+        evaluationsState.evaluations += 1;
         expect(saved.fragments[0].content).toBe('最後の回答です。');
         return report;
       },
@@ -145,25 +144,24 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
     };
     await worker.scheduled({}, env);
     expect(sent).toEqual([jobId]);
-    let acknowledgements = 0;
-    let retries = 0;
+    const acknowledgementsContext = { acknowledgements: 0, retries: 0 };
     const message = {
       id: 'message',
       body: { schemaVersion: 1 as const, jobId },
       ack: () => {
-        acknowledgements += 1;
+        acknowledgementsContext.acknowledgements += 1;
       },
       retry: () => {
-        retries += 1;
+        acknowledgementsContext.retries += 1;
       },
     };
     await worker.queue({ queue: 'unexpected', messages: [message] }, env);
-    expect(retries).toBe(1);
-    expect(evaluations).toBe(0);
+    expect(acknowledgementsContext.retries).toBe(1);
+    expect(evaluationsState.evaluations).toBe(0);
     await worker.queue({ queue: 'evaluation', messages: [message] }, env);
     await worker.queue({ queue: 'evaluation', messages: [{ ...message, id: 'redelivery' }] }, env);
-    expect(acknowledgements).toBe(2);
-    expect(evaluations).toBe(1);
+    expect(acknowledgementsContext.acknowledgements).toBe(2);
+    expect(evaluationsState.evaluations).toBe(1);
     const attempt = database.sqlite.prepare('SELECT result_json FROM job_attempts').get()!;
     expect(JSON.parse(String(attempt.result_json))).toEqual(report);
     expect(database.sqlite.prepare('SELECT status FROM jobs').get()).toEqual({
@@ -176,7 +174,7 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
 
 test('再起動で失われた接続は欠落を保存し、元の待機期限を延長せずに終了する', async () => {
   const database = createTestDatabase();
-  let now = 1010;
+  const nowState = { now: 1010 };
   try {
     await database.db.insert(interviews).values({
       interviewId: 'interview',
@@ -198,7 +196,7 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
       db: database.db,
       actorId: 'actor',
       interviewId: 'interview',
-      now: () => now,
+      now: () => nowState.now,
       apiKey: 'fixture-key',
       responsesModel: 'test-model',
       voice: 'marin' as const,
@@ -215,7 +213,7 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
       transcriptIncomplete: true,
       streamGeneration: null,
     });
-    now = 60010;
+    nowState.now = 60010;
     expect(await createInterviewSession(options).recover()).toMatchObject({ status: 'ended' });
     const [input] = await database.db.select().from(evaluationInputs);
     expect(input.inputJson.transcriptIncomplete).toBe(true);
@@ -227,7 +225,7 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
 
 test('一時停止で上流を閉じ、保存済み原文で再開して古い接続の音声を拒否する', async () => {
   const database = createTestDatabase();
-  let now = 10;
+  const nowState = { now: 10 };
   const callbacks: LiveHandlers[] = [];
   const contexts: string[] = [];
   try {
@@ -247,7 +245,7 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
       db: database.db,
       actorId: 'actor',
       interviewId: 'interview',
-      now: () => now,
+      now: () => nowState.now,
       apiKey: 'fixture-key',
       responsesModel: 'test-model',
       voice: 'marin',
@@ -256,10 +254,8 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
       connect: (options, handlers) => {
         callbacks.push(handlers);
         contexts.push(JSON.stringify(options.session.input));
-        let resolve!: (result: LiveClosed) => void;
-        const closed = new Promise<LiveClosed>((done) => {
-          resolve = done;
-        });
+
+        const { promise: closed, resolve } = Promise.withResolvers<LiveClosed>();
         return {
           ready: Promise.resolve('upstream'),
           closed,
@@ -287,14 +283,14 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
       start_ms: 0,
       end_ms: 1000,
     });
-    now = 1010;
+    nowState.now = 1010;
     expect(await session.pause()).toMatchObject({
       status: 'paused',
       activeMs: 1000,
       streamGeneration: null,
     });
     expect(await session.sendAudio(initial.generation, new Uint8Array(2))).toBe(false);
-    now = 2010;
+    nowState.now = 2010;
     const resumed = await session.start();
     expect(contexts[1]).toContain('比較しました。');
     await callbacks[1].onReady('second');
@@ -303,7 +299,7 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
     callbacks[1].onAudio(new Uint8Array(480), 10);
     expect(await session.playback(resumed.generation, 11)).toBe(false);
     expect(await session.playback(resumed.generation, 10)).toBe(true);
-    now = 3010;
+    nowState.now = 3010;
     expect(await session.disconnect(initial.generation)).toMatchObject({ status: 'active' });
     expect(await session.disconnect(resumed.generation)).toMatchObject({
       status: 'reconnecting',
@@ -324,13 +320,11 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
 
 test('面接の期限到達をアラームで処理し、ブラウザなしで評価依頼を保存する', async () => {
   const database = createTestDatabase();
-  let now = 10;
-  let callbacks!: LiveHandlers;
-  let resolve!: (value: LiveClosed) => void;
-  const closed = new Promise<LiveClosed>((done) => {
-    resolve = done;
-  });
-  let closes = 0;
+  const nowState = { now: 10 };
+  const onConnect = vi.fn<(handlers: LiveHandlers) => void>();
+
+  const { promise: closed, resolve } = Promise.withResolvers<LiveClosed>();
+  const closesState = { closes: 0 };
   try {
     await database.db.insert(interviews).values({
       interviewId: 'interview',
@@ -348,14 +342,14 @@ test('面接の期限到達をアラームで処理し、ブラウザなしで�
       db: database.db,
       actorId: 'actor',
       interviewId: 'interview',
-      now: () => now,
+      now: () => nowState.now,
       apiKey: 'fixture-key',
       responsesModel: 'test-model',
       voice: 'marin',
       evaluation,
       newJobId: () => '00000000-0000-4000-8000-000000000001',
       connect: (_options, handlers) => {
-        callbacks = handlers;
+        onConnect(handlers);
         return {
           ready: Promise.resolve('upstream'),
           closed,
@@ -363,7 +357,7 @@ test('面接の期限到達をアラームで処理し、ブラウザなしで�
           request: () => true,
           abort: () => {},
           close: () => {
-            closes += 1;
+            closesState.closes += 1;
             resolve({
               complete: true,
               reason: 'confirmed',
@@ -376,13 +370,14 @@ test('面接の期限到達をアラームで処理し、ブラウザなしで�
       },
     });
     await session.start();
-    await callbacks.onReady('upstream');
-    now = 1200009;
+    const [handlers] = onConnect.mock.lastCall!;
+    await handlers.onReady('upstream');
+    nowState.now = 1200009;
     expect((await session.tick()).status).toBe('active');
-    expect(closes).toBe(0);
-    now = 1200020;
+    expect(closesState.closes).toBe(0);
+    nowState.now = 1200020;
     expect(await session.tick()).toMatchObject({ status: 'ended', activeMs: 1200000 });
-    expect(closes).toBe(1);
+    expect(closesState.closes).toBe(1);
     expect(await database.db.select().from(evaluationInputs)).toHaveLength(1);
   } finally {
     database.close();
@@ -446,12 +441,10 @@ test('再開する文脈が上限を超えたら接続せず原文を固定し�
 
 test('日次上限は面接中の時刻で止まり、接続準備とAIの通知値を利用時間に足さない', async () => {
   const database = createTestDatabase();
-  let now = 1000;
-  let handlers!: LiveHandlers;
-  let resolveClosed!: (value: LiveClosed) => void;
-  const closed = new Promise<LiveClosed>((resolve) => {
-    resolveClosed = resolve;
-  });
+  const nowState = { now: 1000 };
+  const onConnect = vi.fn<(handlers: LiveHandlers) => void>();
+
+  const { promise: closed, resolve: resolveClosed } = Promise.withResolvers<LiveClosed>();
   try {
     await database.db.insert(usageReservations).values({
       reservationId: 'previous',
@@ -477,14 +470,14 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
       db: database.db,
       actorId: 'actor',
       interviewId: 'limited',
-      now: () => now,
+      now: () => nowState.now,
       newJobId: () => '00000000-0000-4000-8000-000000000011',
       apiKey: 'fixture',
       responsesModel: 'test-model',
       voice: 'marin',
       evaluation,
       connect: (_options, callbacks) => {
-        handlers = callbacks;
+        onConnect(callbacks);
         return {
           ready: Promise.resolve('upstream'),
           closed,
@@ -504,12 +497,13 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
       },
     });
     await session.start();
-    now = 4000;
+    nowState.now = 4000;
+    const [handlers] = onConnect.mock.lastCall!;
     await handlers.onReady('upstream');
     expect((await session.state()).deadline).toBe(34000);
     await handlers.onUsage(100, false);
     expect((await session.state()).status).toBe('active');
-    now = 35000;
+    nowState.now = 35000;
     expect((await session.tick()).status).toBe('ended');
     expect(await database.db.select().from(audioUsagePeriods)).toMatchObject([
       { startedAt: 4000, endedAt: 34000 },
@@ -522,8 +516,8 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
 test('深夜を越える前日残量は新日の面接を早期終了させない', async () => {
   const db = createTestDatabase();
   const midnight = Temporal.Instant.from('2026-11-11T00:00:00+09:00').epochMilliseconds;
-  let now = midnight - 30000;
-  let handlers!: LiveHandlers;
+  const clock = { now: midnight - 30000 };
+  const stream = {} as { handlers: LiveHandlers };
   try {
     await db.db.insert(usageReservations).values({
       reservationId: 'previous',
@@ -531,7 +525,7 @@ test('深夜を越える前日残量は新日の面接を早期終了させな�
       day: '2026-11-10',
       kind: 'audio',
       amount: 3510,
-      createdAt: now,
+      createdAt: clock.now,
     });
     await db.db.insert(interviews).values({
       interviewId: 'midnight',
@@ -542,21 +536,21 @@ test('深夜を越える前日残量は新日の面接を早期終了させな�
       themeExcerpt: '経験',
       background: '',
       status: 'ready',
-      createdAt: now,
-      updatedAt: now,
+      createdAt: clock.now,
+      updatedAt: clock.now,
     });
     const session = createInterviewSession({
       db: db.db,
       actorId: 'actor',
       interviewId: 'midnight',
-      now: () => now,
+      now: () => clock.now,
       apiKey: 'fixture',
       responsesModel: 'mock',
       voice: 'marin',
       evaluation,
       newJobId: () => '00000000-0000-4000-8000-000000000001',
       connect: (_options, callbacks) => {
-        handlers = callbacks;
+        stream.handlers = callbacks;
         return {
           ready: Promise.resolve('upstream'),
           closed: new Promise<LiveClosed>(() => {}),
@@ -568,11 +562,11 @@ test('深夜を越える前日残量は新日の面接を早期終了させな�
       },
     });
     await session.start();
-    await handlers.onReady('upstream');
-    expect((await session.state()).deadline).toBe(now + 1200000);
-    now = midnight + 60000;
+    await stream.handlers.onReady('upstream');
+    expect((await session.state()).deadline).toBe(clock.now + 1200000);
+    clock.now = midnight + 60000;
     expect((await session.tick()).status).toBe('active');
-    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3540000);
+    expect(await remainingAudioMs(db.db, 'actor', clock.now)).toBe(3540000);
   } finally {
     db.close();
   }
@@ -626,19 +620,15 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
   const database = createTestDatabase();
   const writes = await import('../src/server/repositories/interviews.ts');
   const append = writes.appendTranscript;
-  let release!: () => void;
-  const deferred = new Promise<void>((resolve) => {
-    release = resolve;
-  });
+
+  const { promise: deferred, resolve: release } = Promise.withResolvers<void>();
   const delayed = vi.spyOn(writes, 'appendTranscript').mockImplementationOnce(async (...args) => {
     await deferred;
     return append(...args);
   });
-  let handlers!: LiveHandlers;
-  let closed!: (result: LiveClosed) => void;
-  const ended = new Promise<LiveClosed>((resolve) => {
-    closed = resolve;
-  });
+  const onConnect = vi.fn<(handlers: LiveHandlers) => void>();
+
+  const { promise: ended, resolve: closed } = Promise.withResolvers<LiveClosed>();
   try {
     await database.db.insert(interviews).values({
       interviewId: 'slow',
@@ -663,7 +653,7 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
       voice: 'marin',
       evaluation,
       connect: (_options, callbacks) => {
-        handlers = callbacks;
+        onConnect(callbacks);
         return {
           ready: Promise.resolve('mock'),
           closed: ended,
@@ -683,6 +673,7 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
       },
     });
     await session.start();
+    const [handlers] = onConnect.mock.lastCall!;
     await handlers.onReady('mock');
     const failed = vi.fn();
     void handlers
@@ -827,10 +818,8 @@ async function lifecycleFixture() {
     voice: 'marin' as const,
     evaluation,
   };
-  let close!: (result: LiveClosed) => void;
-  const closed = new Promise<LiveClosed>((resolve) => {
-    close = resolve;
-  });
+
+  const { promise: closed, resolve: close } = Promise.withResolvers<LiveClosed>();
   const handlers: LiveHandlers[] = [];
   const abort = vi.fn();
   const session = createInterviewSession({
@@ -847,7 +836,7 @@ async function lifecycleFixture() {
       };
     },
   });
-  return { database, session, options, close, handlers, abort };
+  return { database, session, options, close: close, handlers, abort };
 }
 
 test('接続準備中の再起動は稼働時間を増やさず元の接続期限内で復帰する', async () => {

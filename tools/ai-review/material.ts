@@ -6,21 +6,21 @@ import { reviewHistory } from './history.ts';
 import { validateMetadata, type Metadata } from './artifact.ts';
 import { type Snapshot } from './snapshot.ts';
 export function changedLines(patch: string): number[] {
-  let line = 0;
+  const lineState = { line: 0 };
   const result: number[] = [];
   for (const text of patch.split('\n')) {
     const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
     if (hunk) {
-      line = Number(hunk[1]);
+      lineState.line = Number(hunk[1]);
       continue;
     }
-    if (!line) {
+    if (!lineState.line) {
       continue;
     }
     if (text.startsWith('+')) {
-      result.push(line++);
+      result.push(lineState.line++);
     } else if (text.startsWith(' ')) {
-      line++;
+      lineState.line++;
     }
   }
   return result;

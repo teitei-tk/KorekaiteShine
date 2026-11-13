@@ -63,8 +63,9 @@ Before(async function () {
       server.send(message);
       if (Buffer.isBuffer(message)) {
         // 先頭8バイトの世代番号に続く24 kHz PCM。音声そのものは記録しない。
-        for (let i = 8; i + 1 < message.length; i += 2) {
-          if (Math.abs(message.readInt16LE(i)) > 300) {
+        const pcm = message.subarray(8);
+        for (const index of pcm.keys().take(Math.floor(pcm.length / 2))) {
+          if (Math.abs(pcm.readInt16LE(index * 2)) > 300) {
             this.voicedFrames++;
             break;
           }
@@ -239,7 +240,7 @@ Given('今日の音声利用枠がすべて残っている', function () {
 });
 When('音声サービスとの接続が面接開始前に3回失敗する', async function () {
   await this.runtime.rejectDials(true);
-  for (let i = 0; i < 3; i++) {
+  for (const _ of Array(3).keys()) {
     const offset = this.events.length;
     await button(this, startButton).click();
     await this.page.getByText('音声AIへの接続に失敗しました。再度開始してください。').waitFor();

@@ -29,11 +29,13 @@ vi.mock('node:os', async (original) => ({
   networkInterfaces: vi.fn(),
 }));
 
-let handler: RequestListener;
+function receiver(): Server {
+  return vi.mocked(createServer).mock.results[0]!.value;
+}
 it('PIDがないまま期限を迎えても別プロセスを停止しない', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  timedOut = true;
-  childPid = undefined;
+  countContext.timedOut = true;
+  countContext.childPid = undefined;
   const pending = import('./startup.ts');
   const rejected = expect(pending).rejects.toThrow('offline startup timed out');
   await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce());
@@ -53,23 +55,23 @@ it('子プロセスのerrorイベントでタイマーを解放し設定を復�
     '/home/ai-review/.codex/config.toml',
     'original config',
   );
-  expect(server.close).toHaveBeenCalled();
+  expect(receiver().close).toHaveBeenCalled();
 });
 it('要求パスが欠落した応答を安全な接続先への到達と扱わない', async () => {
-  requestUrl = undefined;
+  countContext.requestUrl = undefined;
   await expect(import('./startup.ts')).rejects.toThrow('offline startup boundary failed');
   expect(console.log).toHaveBeenCalledWith(expect.stringContaining('"receiverReached":false'));
 });
 it('起動期限を超えたプロセス群を停止して設定を復元する', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  timedOut = true;
+  countContext.timedOut = true;
   const pending = import('./startup.ts');
   const rejected = expect(pending).rejects.toThrow('offline startup timed out');
   await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce());
   await vi.advanceTimersByTimeAsync(30_000);
   await rejected;
   expect(process.kill).toHaveBeenCalledWith(-12345, 'SIGKILL');
-  expect(server.close).toHaveBeenCalled();
+  expect(receiver().close).toHaveBeenCalled();
 });
 it('外部インターフェイスがある環境では起動検証を実行しない', async () => {
   vi.mocked(networkInterfaces).mockReturnValue({
@@ -95,42 +97,43 @@ it('Actionパスがなければ検証用ファイルを変更しない', async (
   expect(writeFileSync).not.toHaveBeenCalled();
 });
 it('受信器のアドレスが取得不能でも設定復元と終了を行う', async () => {
-  address = null;
+  address.mockReturnValue(null);
   await expect(import('./startup.ts')).rejects.toThrow('local receiver unavailable');
   expect(writeFileSync).toHaveBeenLastCalledWith(
     '/home/ai-review/.codex/config.toml',
     'original config',
   );
-  expect(server.close).toHaveBeenCalled();
+  expect(receiver().close).toHaveBeenCalled();
 });
 it('受信器に到達しなければ起動検証を失敗にし設定を復元する', async () => {
-  noRequest = true;
+  countContext.noRequest = true;
   await expect(import('./startup.ts')).rejects.toThrow('offline startup boundary failed');
   expect(console.error).toHaveBeenCalledWith('fixture diagnostic');
   expect(writeFileSync).toHaveBeenLastCalledWith(
     '/home/ai-review/.codex/config.toml',
     'original config',
   );
-  expect(server.close).toHaveBeenCalled();
+  expect(receiver().close).toHaveBeenCalled();
 });
-let count = 0;
-let canaries = false;
-let noRequest = false;
-let timedOut = false;
-let childPid: number | undefined;
-let requestUrl: string | undefined;
-let address: { port: number } | null;
-let server: Server;
+const countContext = {
+  count: 0,
+  canaries: false,
+  noRequest: false,
+  timedOut: false,
+  childPid: undefined as number | undefined,
+  requestUrl: undefined as string | undefined,
+};
+const address = vi.fn<() => { port: number } | null>();
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  count = 0;
-  canaries = false;
-  noRequest = false;
-  timedOut = false;
-  address = { port: 43210 };
-  childPid = 12345;
-  requestUrl = '/safe/responses';
+  countContext.count = 0;
+  countContext.canaries = false;
+  countContext.noRequest = false;
+  countContext.timedOut = false;
+  address.mockReturnValue({ port: 43210 });
+  countContext.childPid = 12345;
+  countContext.requestUrl = '/safe/responses';
   vi.spyOn(process, 'getuid').mockReturnValue(0);
   vi.spyOn(process, 'kill').mockReturnValue(true);
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -153,43 +156,41 @@ beforeEach(() => {
     ],
   });
   vi.mocked(readFileSync).mockReturnValue('original config');
-  vi.mocked(existsSync).mockImplementation(() => canaries);
+  vi.mocked(existsSync).mockImplementation(() => countContext.canaries);
   vi.mocked(rmSync).mockImplementation(() => {
-    canaries = false;
+    countContext.canaries = false;
   });
-  server = Object.assign(new EventEmitter(), {
-    listen: vi.fn((_port, _host, callback) => {
+  const server = new (class extends EventEmitter {
+    listen = vi.fn((_port, _host, callback) => {
       callback();
       return server;
-    }),
-    address: vi.fn(() => address),
-    closeAllConnections: vi.fn(),
-    close: vi.fn((callback) => {
+    });
+    address = address;
+    closeAllConnections = vi.fn();
+    close = vi.fn((callback) => {
       callback();
       return server;
-    }),
-  }) as object as Server;
-  vi.mocked(createServer).mockImplementation((callback) => {
-    handler = callback as RequestListener;
-    return server;
-  });
+    });
+  })() as object as Server;
+  vi.mocked(createServer).mockReturnValue(server);
   vi.mocked(spawn).mockImplementation(() => {
     const child = new ChildProcess();
-    Object.defineProperty(child, 'pid', { value: childPid });
+    Object.defineProperty(child, 'pid', { value: countContext.childPid });
     Object.defineProperty(child, 'stderr', { value: new PassThrough() });
-    const trusted = count++ === 0;
+    const trusted = countContext.count++ === 0;
     queueMicrotask(() => {
-      if (timedOut) {
+      if (countContext.timedOut) {
         return;
       }
-      if (!noRequest) {
+      if (!countContext.noRequest) {
+        const handler = vi.mocked(createServer).mock.lastCall![0] as RequestListener;
         handler.call(
           server,
-          { url: requestUrl, resume() {} } as IncomingMessage,
+          { url: countContext.requestUrl, resume() {} } as IncomingMessage,
           { writeHead: vi.fn(), end: vi.fn() } as object as ServerResponse,
         );
       }
-      canaries = trusted;
+      countContext.canaries = trusted;
       child.stderr!.emit('data', Buffer.from('fixture diagnostic'));
       child.emit('close', 1);
     });
@@ -212,5 +213,5 @@ it('trusted対照だけcanaryが起動しuntrustedでは起動しないことを
     '/home/ai-review/.codex/config.toml',
     'original config',
   );
-  expect(server.closeAllConnections).toHaveBeenCalledOnce();
+  expect(receiver().closeAllConnections).toHaveBeenCalledOnce();
 });

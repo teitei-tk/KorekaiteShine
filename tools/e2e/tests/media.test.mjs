@@ -22,8 +22,11 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   expect(window.voiceE2e).toBeUndefined();
   const track = { enabled: true, readyState: 'live' };
   navigator.mediaDevices = { getUserMedia: async () => ({ getAudioTracks: () => [track] }) };
-  let amplitude = 0;
-  const analyser = { fftSize: 8, getFloatTimeDomainData: (array) => array.fill(amplitude) };
+  const amplitudeState = { amplitude: 0 };
+  const analyser = {
+    fftSize: 8,
+    getFloatTimeDomainData: (array) => array.fill(amplitudeState.amplitude),
+  };
   class FakeNode {
     connect(dest) {
       return dest;
@@ -50,7 +53,7 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   node.context.currentTime = 0.1;
   vi.advanceTimersByTime(20);
   expect(window.voiceE2e.count).toBe(0);
-  amplitude = 0.1;
+  amplitudeState.amplitude = 0.1;
   node.context.currentTime = 0.2;
   vi.advanceTimersByTime(20);
   expect(window.voiceE2e.count).toBe(1);
@@ -113,7 +116,7 @@ test('再生予定のバッファのうち実際に再生済みの区間だけ�
   await installMediaProbe({ addInitScript: (fn) => fn() });
   const source = new Source();
   const samples = new Float32Array(4800);
-  for (let i = 0; i < 2400; i++) {
+  for (const i of samples.subarray(0, 2400).keys()) {
     samples[i] = Math.sin((2 * Math.PI * 440 * i) / 24000);
   }
   source.buffer = { sampleRate: 24000, getChannelData: () => samples };
@@ -123,6 +126,9 @@ test('再生予定のバッファのうち実際に再生済みの区間だけ�
   source.context.currentTime = 0.05;
   source.ended();
   expect(window.voiceE2e.playedFrequencies).toEqual([]);
+  source.start(1);
+  source.ended();
+  expect(window.voiceE2e.completedSeconds).toBeCloseTo(0.05);
   source.start(1);
   source.context.currentTime = 1.2;
   source.ended();

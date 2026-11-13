@@ -98,8 +98,8 @@ test('別の実行・リビジョン・形式・suiteの計測片を混入させ
     { suite: 'unknown' },
   ]) {
     const { run, records } = createMergeFixture();
-    Object.assign(records[0], patch);
-    expect(() => mergeMeasurements(run, records)).toThrow(
+    const invalid = [{ ...records[0], ...patch }, ...records.slice(1)] as typeof records;
+    expect(() => mergeMeasurements(run, invalid)).toThrow(
       '計測片の識別情報が一致しません: capture-0',
     );
   }

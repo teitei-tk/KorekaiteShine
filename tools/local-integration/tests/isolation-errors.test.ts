@@ -26,13 +26,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 afterEach(() => vi.resetAllMocks());
 
 test('並列起動の片方が失敗しても成功した側を停止し検査失敗を記録する', async () => {
-  let runDirectory = '';
-  let starts = 0;
+  const runDirectoryContext = { runDirectory: '', starts: 0 };
   const stop = vi.fn(async () => {});
   vi.mocked(startRuntime).mockImplementation(async (config) => {
-    runDirectory = dirname(dirname(config.artifactDirectory));
-    onTestFinished(() => rm(runDirectory, { recursive: true, force: true }));
-    if (starts++ === 0) {
+    runDirectoryContext.runDirectory = dirname(dirname(config.artifactDirectory));
+    onTestFinished(() => rm(runDirectoryContext.runDirectory, { recursive: true, force: true }));
+    if (runDirectoryContext.starts++ === 0) {
       throw new Error('private details');
     }
     return {
@@ -44,7 +43,7 @@ test('並列起動の片方が失敗しても成功した側を停止し検査�
   });
   await expect(runIsolationIntegration()).rejects.toThrow('private details');
   expect(stop).toHaveBeenCalledTimes(1);
-  const report = await readFile(join(runDirectory, '2/results.json'), 'utf8');
+  const report = await readFile(join(runDirectoryContext.runDirectory, '2/results.json'), 'utf8');
   expect(report).not.toContain('private details');
   expect(JSON.parse(report)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
 });

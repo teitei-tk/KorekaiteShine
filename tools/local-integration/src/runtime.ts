@@ -413,64 +413,64 @@ async function startUnlockedRuntime(
       detached: true,
     },
   );
-  let output = '';
-  let stopping = false;
-  let finishCoverage: (() => Promise<void>) | undefined;
+  const outputContext = {
+    output: '',
+    stopping: false,
+    finishCoverage: undefined as (() => Promise<void>) | undefined,
+  };
   const closed = new Promise<{ exitCode: 0 | 1 }>((resolve) => {
-    child.once('exit', () => resolve({ exitCode: stopping ? 0 : 1 }));
+    child.once('exit', () => resolve({ exitCode: outputContext.stopping ? 0 : 1 }));
     child.once('error', () => resolve({ exitCode: 1 }));
   });
   async function stop(): Promise<void> {
-    stopping = true;
-    await finishCoverage?.();
-    finishCoverage = undefined;
+    outputContext.stopping = true;
+    await outputContext.finishCoverage?.();
+    outputContext.finishCoverage = undefined;
     await stopProcessGroup(child);
-    await writeFile(join(config.artifactDirectory, 'runtime.log'), output);
+    await writeFile(join(config.artifactDirectory, 'runtime.log'), outputContext.output);
   }
   try {
-    // Promiseのexecutorで同期的に設定し、finallyで同じリスナーを解除する。
-    let onAbort!: () => void;
-    const baseUrl = await new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
-        45_000,
-      );
-      onAbort = () => {
+    const { promise: ready, resolve, reject } = Promise.withResolvers<string>();
+    const timeout = setTimeout(
+      () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
+      45_000,
+    );
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(new Error('ローカル起動を中断しました。'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+    }
+    const collect = (chunk: Buffer) => {
+      outputContext.output += chunk.toString();
+      const found = outputContext.output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+      if (found) {
         clearTimeout(timeout);
-        reject(new Error('ローカル起動を中断しました。'));
-      };
-      signal?.addEventListener('abort', onAbort, { once: true });
-      if (signal?.aborted) {
-        onAbort();
+        resolve(found[0]);
       }
-      const collect = (chunk: Buffer) => {
-        output += chunk.toString();
-        const found = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
-        if (found) {
-          clearTimeout(timeout);
-          resolve(found[0]);
-        }
-      };
-      child.stdout.on('data', collect);
-      child.stderr.on('data', collect);
-      child.once('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-      child.once('exit', (code) => {
-        clearTimeout(timeout);
-        reject(
-          new Error(
-            `ローカル起動失敗（${code}）。${join(config.artifactDirectory, 'runtime.log')}を確認してください。`,
-          ),
-        );
-      });
-    }).finally(() => signal?.removeEventListener('abort', onAbort));
+    };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    child.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once('exit', (code) => {
+      clearTimeout(timeout);
+      reject(
+        new Error(
+          `ローカル起動失敗（${code}）。${join(config.artifactDirectory, 'runtime.log')}を確認してください。`,
+        ),
+      );
+    });
+    const baseUrl = await ready.finally(() => signal?.removeEventListener('abort', onAbort));
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
     if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
       const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
-      finishCoverage = await startRuntimeCapture(
+      outputContext.finishCoverage = await startRuntimeCapture(
         child.pid!,
         baseUrl,
         Object.values(config.workers),

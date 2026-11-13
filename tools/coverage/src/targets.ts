@@ -19,33 +19,41 @@ export interface TargetEntry {
   reason: string;
 }
 
+function exclusionReason(path: string): string | undefined {
+  const parts = path.split('/');
+  const name = parts.at(-1)!;
+  if (!/\.[cm]?[jt]sx?$/u.test(name)) {
+    return '対象言語外';
+  } else if (/\.d\.[cm]?ts$/u.test(name)) {
+    return '型宣言';
+  } else if (/\.gen\.[cm]?[jt]sx?$/u.test(name)) {
+    return '生成物';
+  } else if (
+    /\.(test|spec)\.[cm]?[jt]sx?$/u.test(name) ||
+    /^vitest(?:\..+)?\.config\.[cm]?[jt]s$/u.test(name)
+  ) {
+    return 'テスト専用コード';
+  } else {
+    const excludedPart = parts.find(
+      (part, index) =>
+        directoryReasons.has(part) ||
+        (part === 'coverage' && !(index === 1 && parts[0] === 'tools')),
+    );
+    return excludedPart === 'coverage'
+      ? '作業用ファイル'
+      : directoryReasons.get(excludedPart ?? '');
+  }
+}
+
 /** 対象外も理由付きで保存し、対象集合をレビュー可能にする。 */
 export function describeTargets(paths: readonly string[]): TargetEntry[] {
   return [...new Set(paths)].sort().map((path) => {
-    const parts = path.split('/');
-    const name = parts.at(-1)!;
-    let reason: string | undefined;
-    if (!/\.[cm]?[jt]sx?$/u.test(name)) {
-      reason = '対象言語外';
-    } else if (/\.d\.[cm]?ts$/u.test(name)) {
-      reason = '型宣言';
-    } else if (/\.gen\.[cm]?[jt]sx?$/u.test(name)) {
-      reason = '生成物';
-    } else if (
-      /\.(test|spec)\.[cm]?[jt]sx?$/u.test(name) ||
-      /^vitest(?:\..+)?\.config\.[cm]?[jt]s$/u.test(name)
-    ) {
-      reason = 'テスト専用コード';
-    } else {
-      const excludedPart = parts.find(
-        (part, index) =>
-          directoryReasons.has(part) ||
-          (part === 'coverage' && !(index === 1 && parts[0] === 'tools')),
-      );
-      reason =
-        excludedPart === 'coverage' ? '作業用ファイル' : directoryReasons.get(excludedPart ?? '');
-    }
-    return { path, included: reason === undefined, reason: reason ?? '手書きTS/JS' };
+    const reason = exclusionReason(path);
+    return {
+      path,
+      included: reason === undefined,
+      reason: reason ?? '手書きTS/JS',
+    };
   });
 }
 

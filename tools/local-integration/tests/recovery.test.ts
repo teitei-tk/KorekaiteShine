@@ -15,14 +15,13 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config);
-  let succeeded = false;
+  const runtimeContext = { runtime: await startRuntime(config) };
   try {
     await runDatabaseCommand(config, [
       'execute',
       "CREATE TRIGGER reject_retry_sent BEFORE UPDATE OF sent_at ON job_outbox WHEN OLD.operation = 'notify' AND OLD.generation > 0 BEGIN SELECT RAISE(FAIL, 'simulated_sent_failure'); END;",
     ]);
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: '{"scenario":"retry_then_success"}',
@@ -30,11 +29,15 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
     expect(response.status).toBe(202);
     const accepted = await response.json();
     const status = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
+      (
+        await fetch(
+          `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
+        )
+      ).json();
     await expect
       .poll(status, { timeout: 8_000, interval: 100 })
       .toMatchObject({ status: 'retry_wait', attemptCount: 1 });
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     // 独立test DBだけで時刻を進め、配送と回復の接続を検証する。
     await runDatabaseCommand(config, [
       'execute',
@@ -44,15 +47,15 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
       UPDATE job_outbox SET scheduled_at = 0 WHERE operation = 'notify' AND sent_at IS NULL;
     `,
     ]);
-    runtime = await startRuntime(config);
-    await runtime.runScheduled();
+    runtimeContext.runtime = await startRuntime(config);
+    await runtimeContext.runtime.runScheduled();
     await expect.poll(status, { timeout: 8_000, interval: 100 }).toMatchObject({
       status: 'completed',
       attemptCount: 2,
       lastErrorCode: 'SIMULATED_AI_FAILURE',
       checks: { consumerCompletion: 'passed' },
     });
-    await runtime.runScheduled();
+    await runtimeContext.runtime.runScheduled();
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -61,13 +64,11 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
       INSERT INTO two SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify' AND sent_at IS NOT NULL;
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回目を実行する', async () => {
@@ -78,7 +79,7 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -118,13 +119,11 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
     expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
       nextAttemptAt,
     );
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('送信済みで未実行の期限到来通知を並行scheduledで回復し、評価は一度だけ実行する', async () => {
@@ -134,10 +133,11 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
     runId: randomUUID(),
     parallelIndex: 0,
   });
-  let runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
-  let succeeded = false;
+  const runtimeContext = {
+    runtime: await startRuntime(config, 'dev', { probeOnlyEvaluation: true }),
+  };
   try {
-    const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
+    const response = await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
       body: JSON.stringify({ scenario: 'success' }),
@@ -146,23 +146,32 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
     const { jobId } = await response.json();
     await expect
       .poll(
-        async () => (await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)).json(),
+        async () =>
+          (
+            await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)
+          ).json(),
         { timeout: 8_000, interval: 100 },
       )
       .toMatchObject({ message: { jobId } });
-    await runtime.stop();
+    await runtimeContext.runtime.stop();
     await runDatabaseCommand(config, [
       'execute',
       `UPDATE job_outbox SET scheduled_at = 0, sent_at = 0 WHERE job_id = '${jobId}' AND operation = 'notify';`,
     ]);
-    runtime = await startRuntime(config, 'dev');
-    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
+    runtimeContext.runtime = await startRuntime(config, 'dev');
+    await Promise.all([
+      runtimeContext.runtime.runScheduled(),
+      runtimeContext.runtime.runScheduled(),
+    ]);
     const status = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+      (await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
     await expect
       .poll(status, { timeout: 10_000, interval: 100 })
       .toMatchObject({ status: 'completed', attemptCount: 1 });
-    await Promise.all([runtime.runScheduled(), runtime.runScheduled()]);
+    await Promise.all([
+      runtimeContext.runtime.runScheduled(),
+      runtimeContext.runtime.runScheduled(),
+    ]);
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -174,11 +183,9 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
       INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
     `,
     ]);
-    succeeded = true;
   } finally {
-    await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
+    await runtimeContext.runtime.stop();
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

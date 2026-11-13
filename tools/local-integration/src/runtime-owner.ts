@@ -15,16 +15,16 @@ export type RuntimeOwnerMessage =
   | { type: 'error'; message: string };
 
 async function within<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timerState = { timer: undefined as ReturnType<typeof setTimeout> | undefined };
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(message)), milliseconds);
+        timerState.timer = setTimeout(() => reject(new Error(message)), milliseconds);
       }),
     ]);
   } finally {
-    clearTimeout(timer);
+    clearTimeout(timerState.timer);
   }
 }
 
@@ -71,7 +71,7 @@ export async function startOwnedRuntime(
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
   owner.stderr!.resume();
-  let failure: string | undefined;
+  const failureState = { failure: undefined as string | undefined };
   const closed = new Promise<number | null>((resolve) =>
     owner.once('close', (code) => resolve(code)),
   );
@@ -80,13 +80,17 @@ export async function startOwnedRuntime(
       if (message.type === 'ready') {
         resolve(message.baseUrl);
       } else if (message.type === 'error') {
-        failure = message.message;
+        failureState.failure = message.message;
         reject(new Error(message.message));
       }
     });
     owner.once('error', reject);
     owner.once('close', (code) =>
-      reject(new Error(failure ?? `ランタイム管理プロセスが起動前に終了しました（${code}）。`)),
+      reject(
+        new Error(
+          failureState.failure ?? `ランタイム管理プロセスが起動前に終了しました（${code}）。`,
+        ),
+      ),
     );
     const request: RuntimeOwnerRequest = { type: 'start', config, mode, options };
     owner.send(request, (error) => {
@@ -95,9 +99,9 @@ export async function startOwnedRuntime(
       }
     });
   });
-  let stopping: Promise<void> | undefined;
+  const stoppingState = { stopping: undefined as Promise<void> | undefined };
   function stop(): Promise<void> {
-    return (stopping ??= (async () => {
+    return (stoppingState.stopping ??= (async () => {
       if (owner.connected) {
         const request: RuntimeOwnerRequest = { type: 'stop' };
         owner.send(request, () => {});
@@ -108,14 +112,16 @@ export async function startOwnedRuntime(
         'ランタイムの停止確認が期限を超えました。管理プロセスで後処理を継続しています。',
       );
       if (code !== 0) {
-        throw new Error(failure ?? `ランタイム管理プロセスが異常終了しました（${code}）。`);
+        throw new Error(
+          failureState.failure ?? `ランタイム管理プロセスが異常終了しました（${code}）。`,
+        );
       }
     })());
   }
   try {
     const baseUrl = await within(ready, 120_000, 'ランタイム起動が120秒以内に完了しませんでした。');
     const completion = closed.then((code): { exitCode: 0 | 1 } => ({
-      exitCode: code === 0 && stopping !== undefined ? 0 : 1,
+      exitCode: code === 0 && stoppingState.stopping !== undefined ? 0 : 1,
     }));
     return connectLocalRuntime(baseUrl, stop, config.workers.evaluation, completion);
   } catch (error) {

@@ -32,10 +32,14 @@ export async function completedOutcome(
   if (run.conclusion === 'timed_out') {
     return { conclusion: 'timed_out', target: 'workflow', reason: 'TIMED_OUT' };
   }
-  let reports;
-  try {
-    reports = readStatusReports(directory, run.id, run.run_attempt);
-  } catch {
+  const reports = (() => {
+    try {
+      return readStatusReports(directory, run.id, run.run_attempt);
+    } catch {
+      return null;
+    }
+  })();
+  if (!reports) {
     return { conclusion: 'failure', target: 'artifact', reason: 'REPORT_INVALID' };
   }
   const failure = reports.find((r) => r.status === 'failure');
@@ -49,7 +53,7 @@ export async function completedOutcome(
   }
   if (run.conclusion !== 'success') {
     // 記録前の失敗（checkout、依存導入、Artifact取得など）にも安全な固定理由を付ける。
-    let target = 'workflow';
+    const targetState = { target: 'workflow' };
     try {
       const data = await api<{ jobs: { name: string; conclusion: string | null }[] }>(
         `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
@@ -60,15 +64,15 @@ export async function completedOutcome(
           ['gate', 'generate', 'publish'].includes(j.name),
       );
       if (job) {
-        target = job.name;
+        targetState.target = job.name;
       }
     } catch {
       /* 詳細取得失敗でも元実行の失敗を閉じる。 */
     }
     return {
       conclusion: 'failure',
-      target,
-      reason: target === 'publish' ? 'PUBLISH_FAILED' : 'EXECUTION_FAILED',
+      target: targetState.target,
+      reason: targetState.target === 'publish' ? 'PUBLISH_FAILED' : 'EXECUTION_FAILED',
     };
   }
   const skipped = reports.find(

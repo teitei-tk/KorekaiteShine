@@ -42,7 +42,6 @@ function fixture(startsQuestion = false) {
     sourceEndMs: null,
     receivedAt: 1,
   };
-  let hooks!: Hooks;
   const snapshot = async () => row;
   const session = {
     recover: snapshot,
@@ -57,11 +56,9 @@ function fixture(startsQuestion = false) {
     request: vi.fn(async () => true),
     sendAudio: vi.fn(async () => true),
   };
+  const createSession = vi.fn((_hooks: Hooks) => session);
   const room = createInterviewRoom({
-    createSession: (callbacks) => {
-      hooks = callbacks;
-      return session;
-    },
+    createSession,
     history: async () => [fragment],
     schedule: async () => {},
   });
@@ -78,7 +75,16 @@ function fixture(startsQuestion = false) {
         ...(type === 'playback' ? { audioOffsetMs: 1 } : {}),
       }),
     );
-  return { room, hooks, session, row, peer, events, command, fragment };
+  return {
+    room,
+    hooks: createSession.mock.lastCall![0],
+    session,
+    row,
+    peer,
+    events,
+    command,
+    fragment,
+  };
 }
 
 test('操作IDの再送・衝突・期限切れと状態に合わない操作を処理する', async () => {
@@ -89,7 +95,7 @@ test('操作IDの再送・衝突・期限切れと状態に合わない操作を
   await command('sync', 'same');
   await command('start', 'same');
   expect(events().at(-1)).toMatchObject({ code: 'INVALID_EVENT' });
-  for (let n = 0; n < 101; n++) {
+  for (const n of Array(101).keys()) {
     await command('sync', 'sync-' + n);
   }
   await command('start', 'same');
@@ -235,17 +241,17 @@ test('質問操作IDの再送で二重接続せず、切替中にタブを閉じ
   await command('skip', 'skip');
   expect(session.request).toHaveBeenCalledOnce();
   expect(session.start).toHaveBeenCalledTimes(2);
-  let settle!: (accepted: boolean) => void;
+  const submission = {} as { settle: (accepted: boolean) => void };
   session.request.mockImplementationOnce(
     () =>
       new Promise<boolean>((resolve) => {
-        settle = resolve;
+        submission.settle = resolve;
       }),
   );
   const changing = command('rephrase', 'next');
   await vi.waitFor(() => expect(session.request).toHaveBeenCalledTimes(2));
   const left = room.detach('peer');
-  settle(true);
+  submission.settle(true);
   await Promise.all([changing, left]);
   expect(session.start).toHaveBeenCalledTimes(2);
 });

@@ -33,11 +33,9 @@ test('登録したHTTP入口で本人を認証し、DBと面接DOへ接続する
   const forward = vi.fn<Bindings['INTERVIEW_SESSION']['getByName']>();
   const deliver = vi.fn<typeof fetch>();
   forward.mockReturnValue({ fetch: deliver });
-  Object.assign(env, {
-    APP_ENV: 'test',
-    DB: data.binding,
-    INTERVIEW_SESSION: { getByName: forward },
-  });
+  env.APP_ENV = 'test';
+  env.DB = data.binding;
+  env.INTERVIEW_SESSION = { getByName: forward };
   const bootstrap = await requestRoute(session, 'GET', '/api/local-session');
   const { operationToken } = await bootstrap.json();
   const headers = {

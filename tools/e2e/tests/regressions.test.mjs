@@ -15,13 +15,13 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 const { execute, temp } = vi.hoisted(() => ({ execute: vi.fn(), temp: vi.fn() }));
 vi.mock('node:child_process', () => ({ execFileSync: execute }));
 vi.mock('node:os', async (original) => ({ ...(await original()), tmpdir: temp }));
-let root;
+const rootState = { root: undefined };
 const originalArgs = process.argv;
 beforeEach(async () => {
-  root = realpathSync(
+  rootState.root = realpathSync(
     mkdtempSync(join((await vi.importActual('node:os')).tmpdir(), 'voice-snapshot-test-')),
   );
-  temp.mockReturnValue(root);
+  temp.mockReturnValue(rootState.root);
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -30,10 +30,10 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
   vi.resetModules();
-  rmSync(root, { recursive: true, force: true });
+  rmSync(rootState.root, { recursive: true, force: true });
 });
 function source(files) {
-  const dir = join(root, 'source');
+  const dir = join(rootState.root, 'source');
   mkdirSync(join(dir, 'packages/api-contracts/generated'), { recursive: true });
   for (const name of files.filter((name) => name !== 'deleted')) {
     const path = join(dir, name);
@@ -108,13 +108,13 @@ test.each(['missing', 'extra', 'subdir', 'symlink', 'bad-dependency', 'missing-p
     ];
     await expect(import('../regressions/snapshot.mjs')).rejects.toThrow();
     const { readdirSync } = await import('node:fs');
-    expect(readdirSync(root)).toEqual(['source']);
+    expect(readdirSync(rootState.root)).toEqual(['source']);
   },
 );
 test.each(['missing', 'unknown', 'outside', 'git', 'valid'])(
   '回帰パッチの適用先を制限し、事前検査を通して適用する (%s)',
   async (kind) => {
-    const dir = join(root, 'copy');
+    const dir = join(rootState.root, 'copy');
     mkdirSync(dir);
     if (kind === 'git') {
       mkdirSync(join(dir, '.git'));

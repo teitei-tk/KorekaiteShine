@@ -82,12 +82,12 @@ it('registryだけの確認ではパッケージを取得しない', () => {
 
 it('確認用の取得場所と空のキャッシュは成功時も失敗時も削除する', () => {
   for (const fail of [false, true]) {
-    let directory = '';
+    const directoryState = { directory: '' };
     const probe: CommandRunner = (program, args, cwd) => {
       if (args[0] === 'pack') {
-        directory = cwd ?? '';
-        expect(existsSync(directory)).toBe(true);
-        expect(args).toContain(`${directory}/cache`);
+        directoryState.directory = cwd ?? '';
+        expect(existsSync(directoryState.directory)).toBe(true);
+        expect(args).toContain(`${directoryState.directory}/cache`);
         if (fail) {
           throw new Error('command failed');
         }
@@ -99,7 +99,7 @@ it('確認用の取得場所と空のキャッシュは成功時も失敗時も�
     } else {
       checkGuard('download', probe);
     }
-    expect(directory).not.toBe('');
-    expect(existsSync(directory)).toBe(false);
+    expect(directoryState.directory).not.toBe('');
+    expect(existsSync(directoryState.directory)).toBe(false);
   }
 });

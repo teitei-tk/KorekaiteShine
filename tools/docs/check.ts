@@ -33,12 +33,11 @@ function parse(source: string) {
   const slugger = new GithubSlugger();
   const anchors = new Set<string>();
   const links: { url: string; line: number }[] = [];
-  let line = 1;
-  for (let index = 0; index < tokens.length; index++) {
-    const token = tokens[index];
+  const lineState = { line: 1 };
+  for (const [index, token] of tokens.entries()) {
     // 表のセルにはmapがないため、直近の行トークンの位置を使う。
     if (token.map) {
-      line = token.map[0] + 1;
+      lineState.line = token.map[0] + 1;
     }
     if (token.type === 'heading_open') {
       anchors.add(slugger.slug(plainText(tokens[index + 1]!.children!)));
@@ -52,7 +51,7 @@ function parse(source: string) {
               ? child.attrGet('src')
               : null;
         if (typeof url === 'string' && url) {
-          links.push({ url, line });
+          links.push({ url, line: lineState.line });
         }
       }
     }
@@ -65,8 +64,8 @@ function within(root: string, target: string) {
   return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-export async function checkLinks(root: string, files: string[]) {
-  root = await realpath(root);
+export async function checkLinks(directory: string, files: string[]) {
+  const root = await realpath(directory);
   const documents = new Map<string, ReturnType<typeof parse>>();
   const errors: string[] = [];
   async function document(file: string) {
@@ -92,7 +91,7 @@ export async function checkLinks(root: string, files: string[]) {
         const location = hash < 0 ? url : url.slice(0, hash);
         const fragment = hash < 0 ? '' : decodeURIComponent(url.slice(hash + 1));
         const filename = decodeURIComponent(location.split('?')[0]);
-        let target = filename
+        const target = filename
           ? path.resolve(
               filename.startsWith('/') ? root : path.dirname(source),
               filename.replace(/^\//, ''),
@@ -101,11 +100,11 @@ export async function checkLinks(root: string, files: string[]) {
         if (!within(root, target)) {
           throw new Error('リポジトリ外へのリンク');
         }
-        target = await realpath(target);
-        if (!within(root, target)) {
+        const resolved = await realpath(target);
+        if (!within(root, resolved)) {
           throw new Error('リポジトリ外を指すシンボリックリンク');
         }
-        const info = await stat(target);
+        const info = await stat(resolved);
         if (info.isDirectory()) {
           if (fragment) {
             throw new Error('ディレクトリへの見出しリンクは未対応');
@@ -113,10 +112,10 @@ export async function checkLinks(root: string, files: string[]) {
           continue;
         }
         if (fragment) {
-          if (!/\.md$/i.test(target)) {
+          if (!/\.md$/i.test(resolved)) {
             throw new Error('Markdown以外の見出しリンクは未対応');
           }
-          if (!(await document(target)).anchors.has(fragment)) {
+          if (!(await document(resolved)).anchors.has(fragment)) {
             throw new Error('見出しが存在しない');
           }
         }
@@ -135,8 +134,8 @@ export async function checkLinks(root: string, files: string[]) {
 }
 
 // 文書のコマンドは実行せず、明示的なpnpmスクリプト呼び出しだけを照合する。
-export async function checkCommands(root: string, files: string[]) {
-  root = await realpath(root);
+export async function checkCommands(directory: string, files: string[]) {
+  const root = await realpath(directory);
   const errors: string[] = [];
   // pnpm 12.15.0の --help にある組み込み操作と別名。更新時に一覧を照合する。
   // runとライフサイクルのスクリプト呼び出しは除く。pmは組み込み操作の明示指定。
@@ -270,21 +269,21 @@ export async function checkCommands(root: string, files: string[]) {
   for (const file of files) {
     const tokens = markdown.parse(await readFile(path.join(root, file), 'utf8'), {});
     const commands: { text: string; line: number }[] = [];
-    let line = 1;
+    const lineState = { line: 1 };
     for (const token of tokens) {
       if (token.map) {
-        line = token.map[0] + 1;
+        lineState.line = token.map[0] + 1;
       }
       if (token.type === 'inline') {
         for (const child of token.children!) {
           if (child.type === 'code_inline') {
-            commands.push({ text: child.content, line });
+            commands.push({ text: child.content, line: lineState.line });
           }
         }
       }
       if (token.type === 'fence' && /^(sh|shell|bash|zsh)$/.test(token.info.trim())) {
         token.content.split('\n').forEach((text, index) => {
-          commands.push({ text, line: line + index + 1 });
+          commands.push({ text, line: lineState.line + index + 1 });
         });
       }
     }
@@ -293,23 +292,16 @@ export async function checkCommands(root: string, files: string[]) {
       if (words.shift() !== 'pnpm') {
         continue;
       }
-      let directory = '.';
-      if (words[0] === '--dir') {
-        words.shift();
-        const value = words.shift();
-        if (!value || !/^[\w./-]+$/.test(value) || value.startsWith('-')) {
-          continue;
-        }
-        directory = value;
+      const directory = words[0] === '--dir' ? words.splice(0, 2)[1] : '.';
+      if (!directory || !/^[\w./-]+$/.test(directory) || directory.startsWith('-')) {
+        continue;
       }
       const explicitRun = words[0] === 'run' || words[0] === 'run-script';
       if (explicitRun) {
         words.shift();
       }
-      let script = words.shift();
-      if (!explicitRun && (script === 't' || script === 'tst')) {
-        script = 'test';
-      }
+      const command = words.shift();
+      const script = !explicitRun && (command === 't' || command === 'tst') ? 'test' : command;
       // 未対応オプション・シェル構文・説明用プレースホルダーは照合しない。
       if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/.test(script)) {
         continue;

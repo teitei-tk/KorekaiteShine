@@ -22,15 +22,12 @@ export async function withDiagnosticRuntime(
     probeOnlyEvaluation: true,
     ...options,
   });
-  let succeeded = false;
+
   try {
     await run(config, runtime);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    // 失敗時は原因調査のためログと状態を残す。
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+  // 失敗時は原因調査のためログと状態を残す。
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }

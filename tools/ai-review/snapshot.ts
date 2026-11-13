@@ -111,12 +111,12 @@ export async function loadSnapshot(api: Api, number: number): Promise<Snapshot> 
   const [issues, inline] = await Promise.all([comments(api, number), reviewComments(api, number)]);
   const threads: Thread[] = [];
   const seen = new Set<string>();
-  let cursor: string | null = null;
+  const cursorState = { cursor: null as string | null };
   for (;;) {
     const page: ThreadPage = await api('graphql', 'POST', {
       query:
         'query($number:Int!,$cursor:String){repository(owner:"teitei-tk",name:"KorekaiteShine"){pullRequest(number:$number){reviewThreads(first:100,after:$cursor){nodes{id isResolved comments(first:1){nodes{databaseId}}} pageInfo{hasNextPage endCursor}}}}}',
-      variables: { number, cursor },
+      variables: { number, cursor: cursorState.cursor },
     });
     const connection = page?.data?.repository?.pullRequest?.reviewThreads;
     if (
@@ -140,11 +140,15 @@ export async function loadSnapshot(api: Api, number: number): Promise<Snapshot> 
     if (!connection.pageInfo.hasNextPage) {
       break;
     }
-    cursor = connection.pageInfo.endCursor;
-    if (typeof cursor !== 'string' || !cursor || seen.has(cursor)) {
+    cursorState.cursor = connection.pageInfo.endCursor;
+    if (
+      typeof cursorState.cursor !== 'string' ||
+      !cursorState.cursor ||
+      seen.has(cursorState.cursor)
+    ) {
       throw new Error('履歴ページが進みません');
     }
-    seen.add(cursor);
+    seen.add(cursorState.cursor);
   }
   return normalizeSnapshot({ issues, inline, threads });
 }

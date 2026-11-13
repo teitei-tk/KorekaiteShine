@@ -113,21 +113,20 @@ test('削除対象のテーマを確認し、キャンセル時は記録を保�
     createdAt: 0,
     activeMs: 1,
   };
-  let removed = false;
-  let deleteAttempts = 0;
+  const removedContext = { removed: false, deleteAttempts: 0 };
   const fetcher = vi.fn<typeof fetch>(async (url, init) => {
     if (url === '/api/local-session') {
       return Response.json({ operationToken: 'a'.repeat(64) });
     }
     if (url === '/api/interview-history') {
-      return Response.json({ items: removed ? [] : [session], next: null });
+      return Response.json({ items: removedContext.removed ? [] : [session], next: null });
     }
     if (init?.method === 'DELETE') {
       expect(new Headers(init.headers).get('X-Interview-Token')).toBe('a'.repeat(64));
-      if (++deleteAttempts === 1) {
+      if (++removedContext.deleteAttempts === 1) {
         return new Response(null, { status: 503 });
       }
-      removed = true;
+      removedContext.removed = true;
       return new Response(null, { status: 204 });
     }
     return Response.json({
@@ -146,7 +145,7 @@ test('削除対象のテーマを確認し、キャンセル時は記録を保�
   await user.click(await screen.findByRole('button', { name: '記録の削除' }));
   expect(screen.getByText(/「架空の選択」の会話/)).toBeTruthy();
   await user.click(screen.getByRole('button', { name: 'キャンセル' }));
-  expect(removed).toBe(false);
+  expect(removedContext.removed).toBe(false);
   await user.click(screen.getByRole('button', { name: '記録の削除' }));
   await user.click(screen.getByRole('button', { name: 'この面接を削除する' }));
   expect((await screen.findByRole('alert')).textContent).toMatch(/削除の完了/);
@@ -156,18 +155,18 @@ test('削除対象のテーマを確認し、キャンセル時は記録を保�
 
 test('履歴のエラーから復帰し、前後のページを表示する', async () => {
   const user = userEvent.setup();
-  let calls = 0;
+  const callsState = { calls: 0 };
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
       if (url === '/api/local-session') {
         return Response.json({ operationToken: 'a'.repeat(64) });
       }
-      calls++;
-      if (calls === 1) {
+      callsState.calls++;
+      if (callsState.calls === 1) {
         throw 'offline';
       }
-      if (calls === 2) {
+      if (callsState.calls === 2) {
         throw new Error('サーバー停止中');
       }
       return Response.json({
@@ -195,8 +194,7 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
     createdAt: 10,
     activeMs: 2500,
   };
-  let fetched = 0;
-  let attempts = 0;
+  const fetchedContext = { fetched: 0, attempts: 0 };
   const jobId = '00000000-0000-4000-8000-000000000001';
   vi.stubGlobal(
     'fetch',
@@ -208,20 +206,20 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
         return Response.json({ items: [session], next: null });
       }
       if (init?.method === 'POST') {
-        attempts++;
-        if (attempts === 1) {
+        fetchedContext.attempts++;
+        if (fetchedContext.attempts === 1) {
           throw 'offline';
         }
-        if (attempts === 2) {
+        if (fetchedContext.attempts === 2) {
           throw new Error('再評価に失敗しました');
         }
         return Response.json({ jobId });
       }
-      fetched++;
-      if (fetched === 1) {
+      fetchedContext.fetched++;
+      if (fetchedContext.fetched === 1) {
         throw 'offline';
       }
-      if (fetched === 2) {
+      if (fetchedContext.fetched === 2) {
         throw new Error('詳細の取得失敗');
       }
       return Response.json({
@@ -234,10 +232,10 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
         playback: [],
         evaluation: {
           jobId,
-          status: fetched === 5 ? 'retry_wait' : 'failed',
+          status: fetchedContext.fetched === 5 ? 'retry_wait' : 'failed',
           attemptCount: 1,
-          nextAttemptAt: fetched === 5 ? 100 : null,
-          lastErrorCode: fetched === 3 ? null : 'AI_TIMEOUT',
+          nextAttemptAt: fetchedContext.fetched === 5 ? 100 : null,
+          lastErrorCode: fetchedContext.fetched === 3 ? null : 'AI_TIMEOUT',
           result: null,
         },
       });
@@ -266,13 +264,8 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
 
 test.each(['履歴', '詳細'])('%sの読取中に画面を閉じた後の成功と失敗を破棄する', async (kind) => {
   for (const succeeds of [true, false]) {
-    let resolve!: (result: Response) => void;
-    let reject!: () => void;
-    const pending = new Promise<Response>((ok, no) => {
-      resolve = ok;
-      reject = no;
-    });
-    let signal: AbortSignal | undefined;
+    const { promise: pending, resolve, reject } = Promise.withResolvers<Response>();
+    const signalState = { signal: undefined as AbortSignal | undefined };
     const session = {
       interviewId: 'one',
       theme: '面接',
@@ -295,7 +288,7 @@ test.each(['履歴', '詳細'])('%sの読取中に画面を閉じた後の成功
         if (url === '/api/local-session') {
           return Response.json({ operationToken: 'a'.repeat(64) });
         }
-        signal = init.signal;
+        signalState.signal = init.signal;
         return pending;
       }),
     );
@@ -303,9 +296,9 @@ test.each(['履歴', '詳細'])('%sの読取中に画面を閉じた後の成功
       kind === '履歴'
         ? render(<PracticeHistory onOpen={vi.fn()} />)
         : render(<PracticeRecord id="one" onDeleted={vi.fn()} />);
-    await waitFor(() => expect(signal).toBeDefined());
+    await waitFor(() => expect(signalState.signal).toBeDefined());
     page.unmount();
-    expect(signal?.aborted).toBe(true);
+    expect(signalState.signal?.aborted).toBe(true);
     await act(async () => {
       if (succeeds) {
         resolve(Response.json(kind === '履歴' ? { items: [], next: null } : detail));

@@ -58,15 +58,15 @@ test('上流の終了確認と通信欠落の理由を別に返す', async () =>
 function fakeSocket() {
   const events = new EventTarget();
   const send = vi.fn();
-  let readyState: 0 | 1 | 2 | 3 = 1;
+  const socketState = { readyState: 1 as 0 | 1 | 2 | 3 };
   const socket: LiveSocket = {
     get readyState() {
-      return readyState;
+      return socketState.readyState;
     },
     accept: vi.fn(),
     send,
     close: vi.fn(() => {
-      readyState = 3;
+      socketState.readyState = 3;
     }),
     addEventListener: events.addEventListener.bind(events),
     removeEventListener: events.removeEventListener.bind(events),
@@ -82,10 +82,8 @@ function fakeSocket() {
 
 test('開始確認まで音声を送らず、終了要求後の最後の原文保存を待って完了する', async () => {
   const fake = fakeSocket();
-  let save!: () => void;
-  const saved = new Promise<void>((resolve) => {
-    save = resolve;
-  });
+
+  const { promise: saved, resolve: save } = Promise.withResolvers<void>();
   const transcript = vi.fn(async (_event: LiveTranscriptEvent) => {
     await saved;
   });
@@ -131,12 +129,12 @@ test('開始確認まで音声を送らず、終了要求後の最後の原文�
       reason: 'close_requested',
       usage: { seconds: 3 },
     });
-    let complete = false;
+    const completeState = { complete: false };
     void closing.then(() => {
-      complete = true;
+      completeState.complete = true;
     });
     await vi.waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
-    expect(complete).toBe(false);
+    expect(completeState.complete).toBe(false);
     save();
     expect(await closing).toMatchObject({ complete: true, usageSeconds: 3 });
     expect(fake.socket.close).toHaveBeenCalledTimes(1);
@@ -151,10 +149,8 @@ test('開始期限後に接続が遅れて返っても、上流セッション�
   vi.useFakeTimers();
   try {
     const fake = fakeSocket();
-    let resolve!: (socket: LiveSocket) => void;
-    const pending = new Promise<LiveSocket>((done) => {
-      resolve = done;
-    });
+
+    const { promise: pending, resolve } = Promise.withResolvers<LiveSocket>();
     const connection = createLiveConnection(
       { apiKey: 'fixture-key', session },
       {
@@ -234,10 +230,8 @@ test('不正な上流イベントと保存失敗で停止し、外部のエラ�
 
 test('保存待ちの受信が上限を超えたら接続を止め、受付済みの保存を待つ', async () => {
   const fake = fakeSocket();
-  let save!: () => void;
-  const pending = new Promise<void>((resolve) => {
-    save = resolve;
-  });
+
+  const { promise: pending, resolve: save } = Promise.withResolvers<void>();
   const transcript = vi.fn(async (_event: LiveTranscriptEvent) => {
     await pending;
   });
@@ -263,7 +257,7 @@ test('保存待ちの受信が上限を超えたら接続を止め、受付済�
       end_ms: 1,
     });
     await vi.waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
-    for (let i = 0; i < 257; i++) {
+    for (const _ of Array(257).keys()) {
       fake.message({ type: 'response.event' });
     }
     expect(fake.socket.close).toHaveBeenCalledTimes(1);
@@ -295,7 +289,7 @@ test('PCMを順序付きで再生側へ渡し、利用時間は累計を足し�
     await connection.ready;
     expect(connection.sendAudio(new Uint8Array(1))).toBe(false);
     expect(connection.sendAudio(new Uint8Array(9602))).toBe(false);
-    for (let i = 0; i < 2; i++) {
+    for (const i of Array(2).keys()) {
       fake.message({
         type: 'session.output_audio.delta',
         // 音声deltaには上流からevent_idが付かない場合がある。
@@ -449,10 +443,8 @@ test('文字起こし保存の応答が止まっても終了要求から15秒で
   vi.useFakeTimers();
   try {
     const fake = fakeSocket();
-    let release!: () => void;
-    const saving = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+
+    const { promise: saving, resolve: release } = Promise.withResolvers<void>();
     const connection = createLiveConnection(
       { apiKey: 'fixture-key', session },
       {
@@ -610,10 +602,8 @@ test('開始の保存中に切断した場合は遅れて完了してもreadyを
   vi.useFakeTimers();
   try {
     const { fake, connection, handlers } = openFixture();
-    let release!: () => void;
-    const pending = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+
+    const { promise: pending, resolve: release } = Promise.withResolvers<void>();
     handlers.onReady.mockReturnValueOnce(pending);
     await vi.advanceTimersByTimeAsync(0);
     fake.message(started);
@@ -651,10 +641,8 @@ test('終了期限を過ぎて保存が失敗しても、確定した終了理�
   vi.useFakeTimers();
   try {
     const { fake, handlers, connection } = openFixture();
-    let fail!: (error: Error) => void;
-    const saving = new Promise<void>((_, reject) => {
-      fail = reject;
-    });
+
+    const { promise: saving, reject: fail } = Promise.withResolvers<void>();
     handlers.onTranscript.mockReturnValueOnce(saving);
     await vi.advanceTimersByTimeAsync(0);
     fake.message(started);

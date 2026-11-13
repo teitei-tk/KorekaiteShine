@@ -1,4 +1,5 @@
-import { beforeEach, afterEach, expect, test, vi } from 'vitest';
+import { SystemError } from '../../testing/system-error.mts';
+import { onTestFinished, afterEach, expect, test, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,8 +11,8 @@ import { createMergeFixture } from './fixtures/measurement.ts';
 
 vi.mock('../src/workerd-inspector.ts', () => ({ findWorkerdInspector: vi.fn() }));
 vi.mock('../src/worker.ts', () => ({ readWorkerCoverage: vi.fn() }));
-let root: string;
 test('Error以外の収集失敗もfailedとして保存する', async () => {
+  const directory = setup();
   const stop = await startRuntimeCapture(12345, 'http://fixture', ['worker']);
   vi.spyOn(process, 'kill').mockImplementation(() => {
     throw 'fixture failure';
@@ -23,9 +24,10 @@ test('Error以外の収集失敗もfailedとして保存する', async () => {
   });
 });
 test('親PIDの権限エラーをプロセス終了と誤判定せず失敗記録を残す', async () => {
+  const directory = setup();
   const stop = await startRuntimeCapture(12345, 'http://fixture', ['worker']);
   vi.spyOn(process, 'kill').mockImplementation(() => {
-    throw Object.assign(new Error('permission'), { code: 'EPERM' });
+    throw new SystemError('permission', 'EPERM');
   });
   await stop();
   expect(readCaptures(directory)[0]).toMatchObject({
@@ -33,10 +35,10 @@ test('親PIDの権限エラーをプロセス終了と誤判定せず失敗記�
     failure: 'worker: permission',
   });
 });
-let directory: string;
-beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'capture-failures-'));
-  directory = join(root, 'records');
+function setup() {
+  const root = mkdtempSync(join(tmpdir(), 'capture-failures-'));
+  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  const directory = join(root, 'records');
   const { run } = createMergeFixture();
   const config = join(root, 'run.json');
   writeFileSync(config, JSON.stringify({ run, directory }));
@@ -54,16 +56,17 @@ beforeEach(() => {
         : Response.json([{ id: 'worker', webSocketDebuggerUrl: 'ws://proxy/worker' }]),
     ),
   );
-});
+  return directory;
+}
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
-  rmSync(root, { recursive: true, force: true });
 });
 
 test('Inspectorプロキシの所在が不明なら計測開始を拒否する', async () => {
+  setup();
   vi.mocked(fetch).mockResolvedValue(new Response('missing'));
   await expect(startRuntimeCapture(12345, 'http://fixture', ['worker'])).rejects.toThrow(
     'Inspectorプロキシが見つかりません',
@@ -72,9 +75,10 @@ test('Inspectorプロキシの所在が不明なら計測開始を拒否する',
 });
 
 test('親の終了後は直接Inspectorから回収し完了記録を残す', async () => {
+  const directory = setup();
   const stop = await startRuntimeCapture(12345, 'http://fixture', ['worker']);
   vi.spyOn(process, 'kill').mockImplementation(() => {
-    throw Object.assign(new Error('gone'), { code: 'ESRCH' });
+    throw new SystemError('gone', 'ESRCH');
   });
   await stop();
   expect(readWorkerCoverage).toHaveBeenLastCalledWith('ws://direct/worker', {
@@ -84,6 +88,7 @@ test('親の終了後は直接Inspectorから回収し完了記録を残す', as
 });
 
 test('親が生存している間はプロキシ経由で回収する', async () => {
+  const directory = setup();
   const stop = await startRuntimeCapture(12345, 'http://fixture', ['worker']);
   vi.spyOn(process, 'kill').mockReturnValue(true);
   await stop();

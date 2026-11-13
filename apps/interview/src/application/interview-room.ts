@@ -1,3 +1,4 @@
+import { parseEvent } from '../domain/parse-event';
 import type {
   InterviewServerEvent,
   InterviewStateEvent,
@@ -27,14 +28,16 @@ export function createInterviewRoom(options: {
 }) {
   const peers = new Map<string, InterviewPeer>();
   const commands = new Map<string, Map<string, string>>();
-  let discarded = false;
-  let owner: string | null = null;
-  let state: State | null = null;
-  let jobId: string | null = null;
-  let pending = Promise.resolve();
-  let queuedBytes = 0;
-  let queuedEvents = 0;
-  let initialized: Promise<void> | undefined;
+  const room = {
+    discarded: false,
+    owner: null as string | null,
+    state: null as State | null,
+    jobId: null as string | null,
+    pending: Promise.resolve(),
+    queuedBytes: 0,
+    queuedEvents: 0,
+    initialized: undefined as Promise<void> | undefined,
+  };
 
   function send(id: string, event: InterviewServerEvent) {
     if (!validateInterviewServerEvent(event)) {
@@ -47,21 +50,21 @@ export function createInterviewRoom(options: {
     }
   }
   function sendState(id: string) {
-    if (!state) {
+    if (!room.state) {
       return;
     }
     const event: InterviewStateEvent = {
       type: 'state',
-      interviewId: state.interviewId,
-      status: state.status,
-      generation: state.generation,
-      activeMs: state.activeMs,
-      activeSince: state.activeSince,
-      deadline: state.deadline,
-      updatedAt: state.updatedAt,
-      canControl: owner === id && state.status !== 'ended',
-      transcriptIncomplete: state.transcriptIncomplete,
-      evaluationJobId: jobId,
+      interviewId: room.state.interviewId,
+      status: room.state.status,
+      generation: room.state.generation,
+      activeMs: room.state.activeMs,
+      activeSince: room.state.activeSince,
+      deadline: room.state.deadline,
+      updatedAt: room.state.updatedAt,
+      canControl: room.owner === id && room.state.status !== 'ended',
+      transcriptIncomplete: room.state.transcriptIncomplete,
+      evaluationJobId: room.jobId,
     };
     send(id, event);
   }
@@ -92,25 +95,25 @@ export function createInterviewRoom(options: {
   }
   const session = options.createSession({
     onDialFailure: () => {
-      if (owner) {
-        error(owner, null, 'AUDIO_CONNECT_FAILED');
+      if (room.owner) {
+        error(room.owner, null, 'AUDIO_CONNECT_FAILED');
       }
     },
     onState: async (next, acceptedJob) => {
-      if (discarded) {
+      if (room.discarded) {
         return;
       }
-      state = next;
-      jobId = acceptedJob;
+      room.state = next;
+      room.jobId = acceptedJob;
       await options.schedule(next);
       broadcastState();
     },
     onTranscript: transcript,
     onAudio: (generation, bytes, endOffsetMs) => {
-      if (!owner || state?.status !== 'active' || state.generation !== generation) {
+      if (!room.owner || room.state?.status !== 'active' || room.state.generation !== generation) {
         return;
       }
-      const id = owner;
+      const id = room.owner;
       send(id, { type: 'audio', generation, endOffsetMs, byteLength: bytes.byteLength });
       try {
         peers.get(id)?.send(bytes.slice().buffer);
@@ -120,25 +123,25 @@ export function createInterviewRoom(options: {
     },
   });
   function serial<T>(operation: () => Promise<T>): Promise<T> {
-    const result = pending.then(operation);
-    pending = result.then(
+    const result = room.pending.then(operation);
+    room.pending = result.then(
       () => {},
       () => {},
     );
     return result;
   }
   function initialize() {
-    initialized ??= (async () => {
-      state = await session.recover();
-      await options.schedule(state);
+    room.initialized ??= (async () => {
+      room.state = await session.recover();
+      await options.schedule(room.state);
     })().catch((error: Error) => {
-      initialized = undefined;
+      room.initialized = undefined;
       throw error;
     });
-    return initialized;
+    return room.initialized;
   }
   async function sync(id: string) {
-    state = await session.state();
+    room.state = await session.state();
     sendState(id);
     for (const fragment of await options.history()) {
       transcript(fragment, id);
@@ -164,16 +167,16 @@ export function createInterviewRoom(options: {
       send(id, { type: 'ack', commandId: event.commandId });
       return;
     }
-    state = await session.state();
-    if (event.type !== 'sync' && event.generation !== state.generation) {
+    room.state = await session.state();
+    if (event.type !== 'sync' && event.generation !== room.state.generation) {
       error(id, event.commandId, 'STALE_STATE');
       sendState(id);
       return;
     }
     if (
       !['sync', 'takeover'].includes(event.type) &&
-      owner !== id &&
-      !(owner === null && ['start', 'resume', 'finish'].includes(event.type))
+      room.owner !== id &&
+      !(room.owner === null && ['start', 'resume', 'finish'].includes(event.type))
     ) {
       error(id, event.commandId, 'NOT_OWNER');
       return;
@@ -185,24 +188,24 @@ export function createInterviewRoom(options: {
       case 'start':
       case 'resume':
         if (
-          (event.type === 'start' && state.status !== 'ready') ||
-          (event.type === 'resume' && !['paused', 'reconnecting'].includes(state.status))
+          (event.type === 'start' && room.state.status !== 'ready') ||
+          (event.type === 'resume' && !['paused', 'reconnecting'].includes(room.state.status))
         ) {
           error(id, event.commandId, 'STALE_STATE');
           return;
         }
-        owner = id;
+        room.owner = id;
         await session.start();
         break;
       case 'takeover':
-        if (['ending', 'ended'].includes(state.status)) {
+        if (['ending', 'ended'].includes(room.state.status)) {
           error(id, event.commandId, 'STALE_STATE');
           return;
         }
-        owner = null;
+        room.owner = null;
         broadcastState();
-        await session.disconnect(state.generation);
-        owner = id;
+        await session.disconnect(room.state.generation);
+        room.owner = id;
         await session.start();
         break;
       case 'pause':
@@ -224,7 +227,7 @@ export function createInterviewRoom(options: {
           return;
         }
         // 旧接続の終了待ちにタブが切れた場合は、次の担当タブの再開に任せる。
-        if (owner === id && peers.has(id) && !discarded) {
+        if (room.owner === id && peers.has(id) && !room.discarded) {
           await session.start();
         }
         break;
@@ -244,10 +247,10 @@ export function createInterviewRoom(options: {
     } catch {
       /* 切断済みでもサーバー側の停止を進める。 */
     }
-    const wasOwner = owner === id;
-    const generation = state?.generation;
+    const wasOwner = room.owner === id;
+    const generation = room.state?.generation;
     if (wasOwner) {
-      owner = null;
+      room.owner = null;
       broadcastState();
     }
     return serial(async () => {
@@ -260,7 +263,7 @@ export function createInterviewRoom(options: {
     async attach(id: string, peer: InterviewPeer) {
       return serial(async () => {
         await initialize();
-        if (discarded || peers.has(id) || peers.size >= 4) {
+        if (room.discarded || peers.has(id) || peers.size >= 4) {
           peer.close();
           throw new Error('面接の接続数が上限です。');
         }
@@ -279,30 +282,24 @@ export function createInterviewRoom(options: {
         error(id, null, 'INVALID_EVENT');
         return Promise.resolve();
       }
-      if (queuedEvents >= 64 || queuedBytes + bytes > 524288) {
+      if (room.queuedEvents >= 64 || room.queuedBytes + bytes > 524288) {
         return detach(id);
       }
-      queuedEvents += 1;
-      queuedBytes += bytes;
+      room.queuedEvents += 1;
+      room.queuedBytes += bytes;
       return serial(async () => {
         if (!peers.has(id)) {
           return;
         }
-        let commandId: string | null = null;
+        const commandIdState = { commandId: null as string | null };
         try {
           if (typeof data === 'string') {
-            let event: object | null;
-            try {
-              event = JSON.parse(data);
-            } catch {
-              error(id, null, 'INVALID_EVENT');
-              return;
-            }
+            const event = parseEvent(data);
             if (!validateInterviewClientEvent(event)) {
               error(id, null, 'INVALID_EVENT');
               return;
             }
-            commandId = event.commandId;
+            commandIdState.commandId = event.commandId;
             await command(id, event);
           } else {
             // PCM16の前に8byteのbig-endian float64で接続世代を付ける。
@@ -311,13 +308,13 @@ export function createInterviewRoom(options: {
               return;
             }
             const generation = new DataView(data).getFloat64(0);
-            if (owner !== id || !Number.isSafeInteger(generation) || generation < 1) {
+            if (room.owner !== id || !Number.isSafeInteger(generation) || generation < 1) {
               error(id, null, 'NOT_OWNER');
               return;
             }
             if (!(await session.sendAudio(generation, new Uint8Array(data, 8)))) {
-              state = await session.state();
-              if (state.generation !== generation || state.status !== 'active') {
+              room.state = await session.state();
+              if (room.state.generation !== generation || room.state.status !== 'active') {
                 sendState(id);
               } else {
                 error(id, null, 'UNAVAILABLE');
@@ -327,18 +324,18 @@ export function createInterviewRoom(options: {
         } catch (cause) {
           error(
             id,
-            commandId,
+            commandIdState.commandId,
             cause instanceof AudioUsageLimitError ? 'AUDIO_USAGE_LIMIT' : 'UNAVAILABLE',
           );
         }
       }).finally(() => {
-        queuedEvents -= 1;
-        queuedBytes -= bytes;
+        room.queuedEvents -= 1;
+        room.queuedBytes -= bytes;
       });
     },
     discard(interviewId: string) {
-      discarded = true;
-      owner = null;
+      room.discarded = true;
+      room.owner = null;
       session.discard();
       for (const [id, peer] of peers) {
         try {
@@ -350,17 +347,17 @@ export function createInterviewRoom(options: {
       }
       peers.clear();
       commands.clear();
-      state = null;
+      room.state = null;
     },
     detach,
     alarm: () =>
       serial(async () => {
         await initialize();
-        const before = state;
+        const before = room.state;
         const next = await session.tick();
         // 期限到達による遷移はonStateで通知・予約済み。稼働確認だけなら次回を予約する。
-        if (!discarded && state === before) {
-          state = next;
+        if (!room.discarded && room.state === before) {
+          room.state = next;
           await options.schedule(next);
         }
       }),

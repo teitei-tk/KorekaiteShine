@@ -4,18 +4,16 @@ export function startScheduledInterval(
   intervalMs: number,
 ): () => void {
   const started = performance.now();
-  let deadline = started + intervalMs;
-  let timer: ReturnType<typeof setTimeout>;
   const tick = () => {
     const now = performance.now();
-    if (now < deadline) {
-      timer = setTimeout(tick, Math.ceil(deadline - now));
+    if (now < schedule.deadline) {
+      schedule.timer = setTimeout(tick, Math.ceil(schedule.deadline - now));
       return;
     }
-    deadline = now + intervalMs;
-    timer = setTimeout(tick, intervalMs);
+    schedule.deadline = now + intervalMs;
+    schedule.timer = setTimeout(tick, intervalMs);
     callback(now - started);
   };
-  timer = setTimeout(tick, intervalMs);
-  return () => clearTimeout(timer);
+  const schedule = { deadline: started + intervalMs, timer: setTimeout(tick, intervalMs) };
+  return () => clearTimeout(schedule.timer);
 }

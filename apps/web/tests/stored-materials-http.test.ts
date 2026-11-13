@@ -6,7 +6,7 @@ import { usageReservations } from '@korekaite/database/usage';
 
 test('分析枠を確保してからAIへ送り、保存した候補を返し、上限ではAIを呼ばない', async () => {
   const database = createTestDatabase();
-  let sequence = 0;
+  const sequenceState = { sequence: 0 };
   const analyze = vi.fn(async () => ({
     themes: [{ title: '判断', heading: '本文', excerpt: '架空の経験' }],
   }));
@@ -20,7 +20,7 @@ test('分析枠を確保してからAIへ送り、保存した候補を返し、
     db: database.db,
     actor: () => 'actor',
     now: () => 1000,
-    newId: () => `analysis-${++sequence}`,
+    newId: () => `analysis-${++sequenceState.sequence}`,
     apiKey: 'fixture',
     model: 'mock',
     analyze,
@@ -36,7 +36,7 @@ test('分析枠を確保してからAIへ送り、保存した候補を返し、
       (await analyzeStoredMaterialRequest(request(), { ...deps, actor: () => '' })).status,
     ).toBe(503);
     expect(await database.db.select().from(usageReservations)).toHaveLength(0);
-    for (let index = 0; index < 10; index += 1) {
+    for (const _ of Array(10).keys()) {
       const response = await analyzeStoredMaterialRequest(request(), deps);
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({

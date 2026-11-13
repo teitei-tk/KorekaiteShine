@@ -80,12 +80,12 @@ it('69件の不一致でも診断のサンプルを制限しActions概要に内�
 });
 it('敵対的な1000通りの応答で集計・秘匿・診断の整合性を維持する', () => {
   const expected = Array.from({ length: 8 }, (_, i) => i.toString(16).padStart(16, '0'));
-  let seed = 12345;
+  const seedState = { seed: 12345 };
   const random = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed;
+    seedState.seed = (Math.imul(seedState.seed, 1664525) + 1013904223) >>> 0;
+    return seedState.seed;
   };
-  for (let n = 0; n < 1000; n++) {
+  for (const _ of Array(1000).keys()) {
     const values: (string | number | null)[] = Array.from({ length: random() % 80 }, () => {
       const i = random() % 12;
       return i < 8 ? expected[i] : i === 8 ? null : i === 9 ? 42 : `SECRET_${i}`;

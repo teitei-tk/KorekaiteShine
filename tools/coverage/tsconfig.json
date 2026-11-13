@@ -1,6 +1,15 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "ES2024.Promise",
+      "DOM",
+      "DOM.Iterable",
+      "DOM.AsyncIterable",
+      "WebWorker.ImportScripts",
+      "ScriptHost"
+    ],
     "module": "NodeNext",
     "strict": true,
     "skipLibCheck": true,

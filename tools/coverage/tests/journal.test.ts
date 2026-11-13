@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,7 +14,7 @@ import { instrumentSource } from '../src/instrument.ts';
 test('所有者への権限エラーを終了済みと誤判定しない', () => {
   const path = journalPath();
   writeFileSync(path, JSON.stringify({ type: 'start', pid: 12345 }) + '\n');
-  const failure = Object.assign(new Error('permission'), { code: 'EPERM' });
+  const failure = new SystemError('permission', 'EPERM');
   vi.spyOn(process, 'kill').mockImplementation(() => {
     throw failure;
   });

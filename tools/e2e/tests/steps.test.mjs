@@ -54,28 +54,26 @@ afterEach(() => {
 // 同じ受け入れ条件に模擬ブラウザの観測結果を与え、失敗を検知する側も検証する。
 async function observer() {
   const world = {};
-  let time = 0,
-    started = null,
-    active = 0,
-    generation = 1,
-    refused = false;
-  let silent = false;
+  const timeContext = { time: 0, started: null, active: 0, generation: 1, refused: false };
+  const questionState = {
+    silent: false,
+    currentQuestion: undefined,
+    held: undefined,
+    receiveInOtherTab: undefined,
+  };
   const transcripts = [];
   const questions = {
     言い換えを依頼: '具体的な役割は何ですか。',
     質問を見送る: '他の手段をなぜ選びませんでしたか。',
   };
-  let currentQuestion;
-  let held;
-  let receiveInOtherTab;
-  vi.spyOn(performance, 'now').mockImplementation(() => time);
+  vi.spyOn(performance, 'now').mockImplementation(() => timeContext.time);
   delay.mockImplementation(async (ms) => {
-    time += ms;
+    timeContext.time += ms;
   });
   const close = () => {
-    if (started !== null) {
-      active += time - started;
-      started = null;
+    if (timeContext.started !== null) {
+      timeContext.active += timeContext.time - timeContext.started;
+      timeContext.started = null;
     }
   };
   const settings = {
@@ -84,14 +82,14 @@ async function observer() {
     extendNextOpening: vi.fn(),
     holdNextQuestion: () =>
       new Promise((resolve) => {
-        held = resolve;
+        questionState.held = resolve;
       }),
     muteReplies: vi.fn(),
     silenceCurrentConnections: () => {
-      silent = true;
+      questionState.silent = true;
     },
     rejectDials: (value) => {
-      refused = value;
+      timeContext.refused = value;
     },
     stop: vi.fn(),
     restart: vi.fn(),
@@ -112,38 +110,38 @@ async function observer() {
   const context = { newPage: () => page, request: { get: async () => ({ status: () => 403 }) } };
   const browser = { newContext: () => context, close: vi.fn() };
   chromium.launch.mockResolvedValue(browser);
-  let input, output;
+  const inputContext = { input: undefined, output: undefined };
   const server = {
     send: vi.fn(),
     close,
     onMessage: (fn) => {
-      output = fn;
+      inputContext.output = fn;
     },
   };
   const client = {
     send: vi.fn(),
     close: vi.fn(),
     onMessage: (fn) => {
-      input = fn;
+      inputContext.input = fn;
     },
     connectToServer: () => server,
   };
   page.on = (_event, listen) =>
     listen({
       on: (_frame, receive) => {
-        receiveInOtherTab = receive;
+        questionState.receiveInOtherTab = receive;
         receive({ payload: Buffer.alloc(1) });
       },
     });
   const emit = (event) => {
     const payload = JSON.stringify(event);
-    output(payload);
-    receiveInOtherTab?.({ payload });
+    inputContext.output(payload);
+    questionState.receiveInOtherTab?.({ payload });
   };
   const locator = (name) => ({
     waitFor: vi.fn(),
     isVisible: async () => false,
-    evaluate: (fn) => fn({ nextElementSibling: { textContent: currentQuestion } }),
+    evaluate: (fn) => fn({ nextElementSibling: { textContent: questionState.currentQuestion } }),
     first() {
       return this;
     },
@@ -158,24 +156,27 @@ async function observer() {
     },
     click: async () => {
       if (questions[name]) {
-        generation++;
-        if (held) {
-          held();
-          held = undefined;
-          currentQuestion = questions[name];
+        timeContext.generation++;
+        if (questionState.held) {
+          questionState.held();
+          questionState.held = undefined;
+          questionState.currentQuestion = questions[name];
           transcript('assistant', '前の質問から遅れて届いた続きです。');
           return;
         }
-        currentQuestion = questions[name];
-        transcript('assistant', currentQuestion, true);
+        questionState.currentQuestion = questions[name];
+        transcript('assistant', questionState.currentQuestion, true);
         window.voiceE2e.playedFrequencies.push(440);
       }
-      if (['このタブで引き継ぐ', 'マイクを許可して再開'].includes(name) && currentQuestion) {
-        generation++;
-        transcript('assistant', currentQuestion, true);
+      if (
+        ['このタブで引き継ぐ', 'マイクを許可して再開'].includes(name) &&
+        questionState.currentQuestion
+      ) {
+        timeContext.generation++;
+        transcript('assistant', questionState.currentQuestion, true);
         window.voiceE2e.playedFrequencies.push(440);
       }
-      if (name === 'マイクを許可して開始' && refused) {
+      if (name === 'マイクを許可して開始' && timeContext.refused) {
         emit({ type: 'error', code: 'AUDIO_CONNECT_FAILED' });
         return;
       }
@@ -186,13 +187,13 @@ async function observer() {
           button.textContent = name;
           document.body.append(button);
           button.click();
-          generation++;
+          timeContext.generation++;
         }
         if (name === 'マイクを許可して再開') {
-          generation++;
-          silent = false;
+          timeContext.generation++;
+          questionState.silent = false;
         }
-        started = time;
+        timeContext.started = timeContext.time;
         emit({ type: 'state', interviewId: 'one', status: 'active' });
       } else if (['一時停止', '音声をつなぎ直す', '終了して評価する'].includes(name)) {
         close();
@@ -215,8 +216,8 @@ async function observer() {
       response('/api/interviews', 'GET', {}),
       response('/api/interviews', 'POST', { interviewId: 'one', theme: '題材' }),
       response('/api/interviews/one', 'GET', {
-        session: { interviewId: 'one', activeMs: active },
-        audioRemainingMs: 3600000 - active,
+        session: { interviewId: 'one', activeMs: timeContext.active },
+        audioRemainingMs: 3600000 - timeContext.active,
         transcripts: [...transcripts],
       }),
     ];
@@ -238,22 +239,34 @@ async function observer() {
       startsQuestion,
       sequence: transcripts.length,
       fragmentId: String(transcripts.length),
-      generation,
+      generation: timeContext.generation,
     };
     transcripts.push(event);
     emit(event);
   }
-  window.voiceE2e.speak = () => input(voice);
+  window.voiceE2e.speak = () => inputContext.input(voice);
   speak.mockImplementation(async () => {
-    for (let n = 0; n < 3; n++) {
-      input(voice);
+    for (const _ of Array(3).keys()) {
+      inputContext.input(voice);
     }
-    if (!silent) {
+    if (!questionState.silent) {
       transcript('user');
       transcript('assistant');
     }
   });
-  return { world, relay, client, server, input, output, page, context, emit, close, browser };
+  return {
+    world,
+    relay,
+    client,
+    server,
+    input: inputContext.input,
+    output: inputContext.output,
+    page,
+    context,
+    emit,
+    close,
+    browser,
+  };
 }
 
 test.each(scenarios.map((section) => [section.split('\n')[0], section]))(

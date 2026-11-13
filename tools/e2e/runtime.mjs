@@ -12,14 +12,13 @@ export async function startVoiceRuntime({ profile }) {
   const source = resolve(process.env.E2E_APP_ROOT);
   const root = await mkdtemp(join(tmpdir(), 'voice-e2e-'));
   const local = join(root, 'tools/local-integration');
-  let provider;
-  let runtime;
+  const providerContext = { provider: undefined, runtime: undefined };
   async function stop() {
     try {
-      await runtime?.stop();
+      await providerContext.runtime?.stop();
     } finally {
       try {
-        await provider?.stop();
+        await providerContext.provider?.stop();
       } finally {
         await rm(root, { recursive: true, force: true });
       }
@@ -42,9 +41,9 @@ export async function startVoiceRuntime({ profile }) {
     );
     await cp(join(source, 'tools/local-integration/package.json'), join(local, 'package.json'));
     const runtimePath = join(local, 'src/runtime.ts');
-    let options = {};
+    const optionsState = { options: {} };
     if (profile === 'pr') {
-      provider = await startProvider();
+      providerContext.provider = await startProvider();
       const fixture = join(local, 'fixtures/voice-interview.ts');
       const dial = `import { InterviewObject } from '../../../apps/interview/src/server/interview-object';
 import { createLiveConnection, dialLiveSocket } from '../../../apps/interview/src/server/live-connection';
@@ -52,12 +51,12 @@ export class MockInterviewObject extends InterviewObject {
   protected override connectLive(options, handlers) {
     if (this.env.APP_ENV !== 'test') throw new Error('テスト専用です。');
     return createLiveConnection(options, { ...handlers, dial: (key, signal) =>
-      dialLiveSocket(key, signal, (_url, init) => fetch(${JSON.stringify(provider.url)}, init)) });
+      dialLiveSocket(key, signal, (_url, init) => fetch(${JSON.stringify(providerContext.provider.url)}, init)) });
   }
 }
 `;
       await writeFile(fixture, dial);
-      options = {
+      optionsState.options = {
         materialAnalysisMock: true,
         interviewVoiceMock: true,
         interviewEvaluationMock: true,
@@ -78,35 +77,35 @@ export class MockInterviewObject extends InterviewObject {
       runId: crypto.randomUUID(),
       parallelIndex: 0,
     });
-    runtime = await startRuntime(config, 'dev', options);
-    const url = runtime.baseUrl;
+    providerContext.runtime = await startRuntime(config, 'dev', optionsState.options);
+    const url = providerContext.runtime.baseUrl;
     return {
       url,
       extendNextOpening() {
-        provider.extendNextOpening();
+        providerContext.provider.extendNextOpening();
       },
       holdNextQuestion() {
-        return provider.holdNextQuestion();
+        return providerContext.provider.holdNextQuestion();
       },
       omitNextOpening() {
-        provider.omitNextOpening();
+        providerContext.provider.omitNextOpening();
       },
       muteReplies() {
-        provider.muteReplies();
+        providerContext.provider.muteReplies();
       },
       silenceCurrentConnections() {
-        provider.silenceCurrentConnections();
+        providerContext.provider.silenceCurrentConnections();
       },
       async rejectDials(value) {
-        if (!provider) {
+        if (!providerContext.provider) {
           throw new Error('接続拒否はPRプロファイル専用です。');
         }
-        provider.rejectDials(value);
+        providerContext.provider.rejectDials(value);
       },
       async restart() {
-        await runtime.stop();
-        runtime = await startRuntime(config, 'dev', {
-          ...options,
+        await providerContext.runtime.stop();
+        providerContext.runtime = await startRuntime(config, 'dev', {
+          ...optionsState.options,
           port: Number(new URL(url).port),
         });
       },

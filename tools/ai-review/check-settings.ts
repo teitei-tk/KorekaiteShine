@@ -33,28 +33,21 @@ export function checkSettings(
     ) {
       throw new Error('Invalid response');
     }
-    let ok = true;
-    const lines = (Object.keys(checks) as Name[]).map((name) => {
+    const rows = (Object.keys(checks) as Name[]).map((name) => {
       const matches = data.filter((row) => row.name === name);
-      let status: string;
       if (!matches.length || (matches.length === 1 && !matches[0].value)) {
-        status = '未設定';
-        ok = false;
-      } else if (matches.length !== 1 || !checks[name](matches[0].value)) {
-        status = '形式不正';
-        ok = false;
-      } else if (expected[name] !== undefined) {
-        const equal = matches[0].value === expected[name];
-        status = equal ? '一致' : '不一致';
-        if (!equal) {
-          ok = false;
-        }
-      } else {
-        status = '形式OK・期待値未指定';
+        return { ok: false, line: `${name}: 未設定` };
       }
-      return `${name}: ${status}`;
+      if (matches.length !== 1 || !checks[name](matches[0].value)) {
+        return { ok: false, line: `${name}: 形式不正` };
+      }
+      if (expected[name] === undefined) {
+        return { ok: true, line: `${name}: 形式OK・期待値未指定` };
+      }
+      const ok = matches[0].value === expected[name];
+      return { ok, line: `${name}: ${ok ? '一致' : '不一致'}` };
     });
-    return { ok, output: lines.join('\n') };
+    return { ok: rows.every((row) => row.ok), output: rows.map((row) => row.line).join('\n') };
   } catch {
     return {
       ok: false,

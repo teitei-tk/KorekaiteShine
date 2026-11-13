@@ -17,7 +17,7 @@ test('同じ冪等キーの同時要求はローカルD1のジョブと初期化
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const key = randomUUID();
     const responses = await Promise.all(
@@ -52,13 +52,11 @@ test('同じ冪等キーの同時要求はローカルD1のジョブと初期化
       INSERT INTO acceptance_assertion SELECT COUNT(*) FROM diagnostic_requests;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('不正入力は契約どおりの詳細を返し、修正後に同じキーで受付できる', async () => {
@@ -73,7 +71,7 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     for (const fixture of diagnosticRequests.filter((entry) => entry.method === 'POST')) {
       const response = await fetch(`${runtime.baseUrl}${fixture.path}`, {
@@ -108,13 +106,11 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
       body: '{"scenario":"success"}',
     });
     expect(corrected.status).toBe(202);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('受付済みジョブの状態を必須null項目と観測結果付きで取得する', async () => {
@@ -127,7 +123,7 @@ test('受付済みジョブの状態を必須null項目と観測結果付きで�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -155,13 +151,11 @@ test('受付済みジョブの状態を必須null項目と観測結果付きで�
         dlqReceipt: 'not_expected',
       },
     });
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('状態取得は不正IDを400、参照範囲外を同じ404として返す', async () => {
@@ -174,7 +168,7 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const invalid = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/invalid`);
     expect(invalid.status).toBe(400);
@@ -210,13 +204,11 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
     ]);
     await expectNotFound(body.jobId);
     expect(requestIds.size).toBe(3);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('同じキーと入力の逐次再送はJSONの空白によらず元の受付を返す', async () => {
@@ -227,7 +219,7 @@ test('同じキーと入力の逐次再送はJSONの空白によらず元の受�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const key = randomUUID();
     const results = [];
@@ -245,13 +237,11 @@ test('同じキーと入力の逐次再送はJSONの空白によらず元の受�
       'execute',
       `CREATE TEMP TABLE replay_assertion (count INTEGER CHECK (count = 1)); INSERT INTO replay_assertion SELECT COUNT(*) FROM jobs; INSERT INTO replay_assertion SELECT COUNT(*) FROM job_outbox;`,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('同じキーで異なるscenarioを送ると409となり元のジョブを変更しない', async () => {
@@ -264,7 +254,7 @@ test('同じキーで異なるscenarioを送ると409となり元のジョブを
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const key = randomUUID();
     const post = (scenario: string) =>
@@ -294,13 +284,11 @@ test('同じキーで異なるscenarioを送ると409となり元のジョブを
       'execute',
       `CREATE TEMP TABLE conflict_assertion (count INTEGER CHECK (count = 1)); INSERT INTO conflict_assertion SELECT COUNT(*) FROM jobs; INSERT INTO conflict_assertion SELECT COUNT(*) FROM diagnostic_requests WHERE scenario = 'success'; INSERT INTO conflict_assertion SELECT COUNT(*) FROM job_outbox;`,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('終端ジョブへの同じキーの再送は再実行せず、新しいキーだけが新規受付となる', async () => {
@@ -311,7 +299,7 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const key = randomUUID();
     const post = (idempotencyKey: string) =>
@@ -353,13 +341,11 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
       'execute',
       `CREATE TEMP TABLE new_key_assertion (count INTEGER CHECK (count = 2)); INSERT INTO new_key_assertion SELECT COUNT(*) FROM jobs; INSERT INTO new_key_assertion SELECT COUNT(*) FROM job_outbox;`,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('D1障害は503で返し、内部例外を公開せずrequestIdでログを追跡できる', async () => {
@@ -372,7 +358,7 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     await runDatabaseCommand(config, [
       'execute',
@@ -409,13 +395,11 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     expect(log).toContain(failure.error.requestId);
     expect(log).toContain(readBody.error.requestId);
     expect(log).not.toContain('private_database_failure');
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('ヘッダー不正で本文を拒否した後も、次の要求へ契約どおり応答する', async () => {
@@ -426,9 +410,9 @@ test('ヘッダー不正で本文を拒否した後も、次の要求へ契約�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
-    for (let iteration = 0; iteration < 40; iteration++) {
+    for (const _ of Array(40).keys()) {
       const rejected = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -444,11 +428,9 @@ test('ヘッダー不正で本文を拒否した後も、次の要求へ契約�
       expect(next.status).toBe(400);
       await next.text();
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

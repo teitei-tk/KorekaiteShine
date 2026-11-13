@@ -161,7 +161,7 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
     await f.seed();
     f.env.OPENAI_API_KEY = 'fixture';
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    for (let i = 0; i < 4; i++) {
+    for (const _ of Array(4).keys()) {
       expect((await f.fetchObject()).status).toBe(101);
     }
     expect((await f.fetchObject()).status).toBe(503);
@@ -206,7 +206,7 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
 });
 
 test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが確認時刻を進める', async () => {
-  let handlers!: LiveHandlers;
+  const stream = {} as { handlers: LiveHandlers };
   const closed = new Promise<LiveClosed>(() => {});
   const f = fixture(
     class extends InterviewObject {
@@ -214,7 +214,7 @@ test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが�
         _options: Parameters<typeof createLiveConnection>[0],
         callbacks: LiveHandlers,
       ) {
-        handlers = callbacks;
+        stream.handlers = callbacks;
         return {
           ready: Promise.resolve('stream'),
           closed,
@@ -235,7 +235,7 @@ test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが�
       }),
     );
     await Promise.all(f.pending.splice(0));
-    await handlers.onReady('stream');
+    await stream.handlers.onReady('stream');
     const [active] = await f.database.db.select().from(interviews);
     expect(f.setAlarm).toHaveBeenLastCalledWith(active.updatedAt + 5000);
     const beforeMessages = f.sockets[0].send.mock.calls.length;

@@ -57,18 +57,18 @@ test('AIの例外と120秒の待機超過は生のエラーを返さず中止す
   ).toEqual({ ok: false, code: 'AI_UNAVAILABLE' });
   vi.useFakeTimers();
   try {
-    let signal: AbortSignal | undefined;
+    const signalState = { signal: undefined as AbortSignal | undefined };
     const pending = analyzeMaterial(input, {
       analyze: async (_markdown, received) => {
-        signal = received;
+        signalState.signal = received;
         return new Promise(() => {});
       },
     });
     await vi.advanceTimersByTimeAsync(119_999);
-    expect(signal?.aborted).toBe(false);
+    expect(signalState.signal?.aborted).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(await pending).toEqual({ ok: false, code: 'AI_UNAVAILABLE' });
-    expect(signal?.aborted).toBe(true);
+    expect(signalState.signal?.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
   } finally {
     vi.useRealTimers();

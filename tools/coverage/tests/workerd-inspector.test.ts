@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readlinkSync, readdirSync } from 'node:fs';
@@ -10,7 +11,7 @@ test('全候補の接続が失敗した場合はInspectorを発見したこと�
 });
 test('所有ソケットを読めない権限エラーを欠落扱いで隠さない', async () => {
   vi.mocked(readlinkSync).mockImplementation(() => {
-    throw Object.assign(new Error('permission'), { code: 'EPERM' });
+    throw new SystemError('permission', 'EPERM');
   });
   await expect(findWorkerdInspector(100, ['worker'])).rejects.toThrow('permission');
   expect(fetch).not.toHaveBeenCalled();
@@ -35,7 +36,7 @@ beforeEach(() => {
     if (String(path).endsWith('/2')) {
       return '/dev/null';
     }
-    throw Object.assign(new Error('disappeared'), { code: 'ENOENT' });
+    throw new SystemError('disappeared', 'ENOENT');
   });
   vi.mocked(readFileSync).mockReturnValue(
     'header\n' +

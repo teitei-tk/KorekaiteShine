@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,9 +72,7 @@ test('既存の保持確認ファイルを上書きせず内容を確認して�
 
 test('保持確認ファイルの作成拒否を隠さずロックを解放する', async () => {
   const fixture = await preparationFixture();
-  vi.mocked(writeFile).mockRejectedValueOnce(
-    Object.assign(new Error('denied'), { code: 'EACCES' }),
-  );
+  vi.mocked(writeFile).mockRejectedValueOnce(new SystemError('denied', 'EACCES'));
   expect((await fixture.run()).exitCode).toBe(1);
   expect(fixture.error).toHaveBeenCalledWith('denied');
   expect(fixture.release).toHaveBeenCalledTimes(1);

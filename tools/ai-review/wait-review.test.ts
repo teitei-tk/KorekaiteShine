@@ -58,10 +58,10 @@ it('仮想mergeのSHAが不正ならコミットを問い合わせない', async
 });
 it('一覧10ページの上限で停止し無期限に取得しない', async () => {
   const f = fixture();
-  let pages = 0;
+  const pagesState = { pages: 0 };
   const api: Api = async <T>(path: string) => {
     if (path.startsWith('actions/runs?')) {
-      pages++;
+      pagesState.pages++;
       return {
         workflow_runs: Array.from({ length: 100 }, (_, i) => ({
           ...f.source,
@@ -73,7 +73,7 @@ it('一覧10ページの上限で停止し無期限に取得しない', async ()
     return f.api<T>(path);
   };
   await expect(inspectReview(api, f.revision)).rejects.toThrow('取得上限');
-  expect(pages).toBe(10);
+  expect(pagesState.pages).toBe(10);
 });
 it('一覧内の実行IDが不正なら別の成功実行へ読み飛ばさない', async () => {
   const f = fixture();
@@ -226,12 +226,12 @@ it('マージコミットで起動した通常CIも両親を検証して照合�
 it('監視を有界にし、タイムアウトを成功にしない', async () => {
   const f = fixture();
   f.reviews.length = 0;
-  let now = 0;
+  const nowState = { now: 0 };
   expect(
     await waitReview(f.api, f.revision, {
-      now: () => now,
+      now: () => nowState.now,
       sleep: async () => {
-        now += 1000;
+        nowState.now += 1000;
       },
       timeout: 1500,
     }),

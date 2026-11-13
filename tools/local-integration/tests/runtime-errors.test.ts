@@ -1,3 +1,4 @@
+import { SystemError } from '../../testing/system-error.mts';
 import { ChildProcess, spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -78,7 +79,7 @@ test('previewには障害注入用オプションを渡せない', async () => {
 
 test('依存へのシンボリックリンク作成が拒否されたらロックを解放する', async () => {
   const fixture = await runtimeFixture();
-  vi.mocked(symlink).mockRejectedValueOnce(Object.assign(new Error('denied'), { code: 'EACCES' }));
+  vi.mocked(symlink).mockRejectedValueOnce(new SystemError('denied', 'EACCES'));
   await expect(startRuntimeInProcess(fixture.config)).rejects.toThrow('denied');
   expect(fixture.release).toHaveBeenCalledTimes(1);
 });

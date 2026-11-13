@@ -45,16 +45,18 @@ export function buildLiveSession(
   playback: readonly Playback[] = [],
 ): LiveSessionConfiguration {
   const history: LiveSessionConfiguration['input'] = [];
-  let previousGeneration: number | undefined;
-  let latestAssistantGeneration: number | null = null;
+  const turn = {
+    previousGeneration: undefined as number | undefined,
+    latestAssistantGeneration: null as number | null,
+  };
   for (const fragment of fragments) {
     const last = history.at(-1);
     if (fragment.speaker === 'assistant') {
-      latestAssistantGeneration = fragment.generation;
+      turn.latestAssistantGeneration = fragment.generation;
     }
     if (
       last?.role === fragment.speaker &&
-      previousGeneration === fragment.generation &&
+      turn.previousGeneration === fragment.generation &&
       !fragment.startsQuestion
     ) {
       last.content[0].text += fragment.content;
@@ -71,16 +73,16 @@ export function buildLiveSession(
         content: [{ type: 'output_text', text: fragment.content }],
       });
     }
-    previousGeneration = fragment.generation;
+    turn.previousGeneration = fragment.generation;
   }
   const resume =
     fragments.length || material.transcriptIncomplete || material.pendingQuestionOperation
       ? {
           transcriptIncomplete: material.transcriptIncomplete,
           pendingQuestionOperation: material.pendingQuestionOperation,
-          latestAssistantGeneration,
+          latestAssistantGeneration: turn.latestAssistantGeneration,
           confirmedOutputMsInGeneration:
-            playback.find((receipt) => receipt.generation === latestAssistantGeneration)
+            playback.find((receipt) => receipt.generation === turn.latestAssistantGeneration)
               ?.audioOffsetMs ?? null,
         }
       : undefined;
@@ -107,26 +109,30 @@ export function buildLiveSession(
     });
   }
   // モデルの入力にだけ抜粋を作る。保存原文・評価入力と直前までの発言は切り詰めない。
-  let high = Math.max(excerpt.length, background.length);
-  let text = materialText(high);
   if (history.length >= 128 || availableBytes <= 0) {
     throw new InterviewContextLimitError();
   }
-  if (encoder.encode(text).byteLength > availableBytes) {
-    let low = 1;
-    while (low < high) {
-      const middle = Math.ceil((low + high) / 2);
+  const bounds = { low: 1, high: Math.max(excerpt.length, background.length) };
+  const fullText = materialText(bounds.high);
+  function fitMaterial() {
+    if (encoder.encode(fullText).byteLength <= availableBytes) {
+      return fullText;
+    }
+    while (bounds.low < bounds.high) {
+      const middle = Math.ceil((bounds.low + bounds.high) / 2);
       if (encoder.encode(materialText(middle)).byteLength <= availableBytes) {
-        low = middle;
+        bounds.low = middle;
       } else {
-        high = middle - 1;
+        bounds.high = middle - 1;
       }
     }
-    text = materialText(low);
-    if (encoder.encode(text).byteLength > availableBytes) {
+    const selected = materialText(bounds.low);
+    if (encoder.encode(selected).byteLength > availableBytes) {
       throw new InterviewContextLimitError();
     }
+    return selected;
   }
+  const text = fitMaterial();
   const input: LiveSessionConfiguration['input'] = [
     { type: 'message', role: 'user', content: [{ type: 'input_text', text }] },
     ...history,

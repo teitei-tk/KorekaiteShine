@@ -14,18 +14,18 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
     return false;
   }
   const controller = new AbortController();
-  let stopped = false;
-  let stop!: () => void;
-  const cancelled = new Promise<false>((resolve) => {
-    stop = () => {
-      stopped = true;
-      controller.abort();
-      resolve(false);
-    };
-  });
-  let heartbeat: ReturnType<typeof setTimeout> | undefined;
-  let saveRetryTimer: ReturnType<typeof setTimeout> | undefined;
-  let endSaveWait: (() => void) | undefined;
+  const { promise: cancelled, resolve: cancel } = Promise.withResolvers<false>();
+  const execution = { stopped: false };
+  const stop = () => {
+    execution.stopped = true;
+    controller.abort();
+    cancel(false);
+  };
+  const timers = {
+    heartbeat: undefined as ReturnType<typeof setTimeout> | undefined,
+    saveRetryTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+    endSaveWait: undefined as (() => void) | undefined,
+  };
   const renew = async () => {
     if (deps.now() >= deps.deadline) {
       return stop();
@@ -37,37 +37,37 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
     } catch {
       return stop();
     }
-    if (!stopped) {
-      heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+    if (!execution.stopped) {
+      timers.heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
     }
   };
-  heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+  timers.heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
   const deadlineTimer = setTimeout(stop, deps.deadline - deps.now());
-  let aiTimer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<EvaluationResult>((resolve) => {
-    aiTimer = setTimeout(() => {
-      resolve({ ok: false, error: { code: 'AI_TIMEOUT', retryable: true } });
-      controller.abort();
-    }, executionTiming.aiTimeoutMs);
-  });
-  const execute = async () => {
-    let result: EvaluationResult;
+  const { promise: timeout, resolve: expire } = Promise.withResolvers<EvaluationResult>();
+  const aiTimer = setTimeout(() => {
+    expire({ ok: false, error: { code: 'AI_TIMEOUT', retryable: true } });
+    controller.abort();
+  }, executionTiming.aiTimeoutMs);
+  const evaluate = async (): Promise<EvaluationResult> => {
     try {
-      result = await Promise.race([deps.evaluate(controller.signal), timeout]);
+      return await Promise.race([deps.evaluate(controller.signal), timeout]);
     } catch {
-      result = { ok: false, error: { code: 'AI_EXCEPTION', retryable: true } };
+      return { ok: false, error: { code: 'AI_EXCEPTION', retryable: true } };
     }
+  };
+  const execute = async () => {
+    const result = await evaluate();
     clearTimeout(aiTimer);
-    while (!stopped && deps.now() < deps.deadline) {
+    while (!execution.stopped && deps.now() < deps.deadline) {
       try {
         return await deps.save(result);
       } catch {
-        if (stopped || deps.now() >= deps.deadline) {
+        if (execution.stopped || deps.now() >= deps.deadline) {
           return false;
         }
         await new Promise<void>((resolve) => {
-          endSaveWait = resolve;
-          saveRetryTimer = setTimeout(
+          timers.endSaveWait = resolve;
+          timers.saveRetryTimer = setTimeout(
             resolve,
             Math.min(executionTiming.saveRetryIntervalMs, deps.deadline - deps.now()),
           );
@@ -79,12 +79,12 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
   try {
     return await Promise.race([execute(), cancelled]);
   } finally {
-    stopped = true;
+    execution.stopped = true;
     clearTimeout(aiTimer);
-    clearTimeout(heartbeat);
+    clearTimeout(timers.heartbeat);
     clearTimeout(deadlineTimer);
-    clearTimeout(saveRetryTimer);
-    endSaveWait?.();
+    clearTimeout(timers.saveRetryTimer);
+    timers.endSaveWait?.();
     controller.abort();
   }
 }

@@ -33,9 +33,8 @@ async function fixture() {
   vi.stubEnv('KOREKAITE_COVERAGE_RUN', config);
   vi.stubEnv('KOREKAITE_COVERAGE_SUITE', 'unit');
   const finish = vi.fn();
-  let saved: typeof global.__coverage__;
+  const saved = global.__coverage__;
   vi.mocked(startCapture).mockImplementation(() => {
-    saved = global.__coverage__;
     delete global.__coverage__;
     return { path: join(root, 'record'), finish };
   });

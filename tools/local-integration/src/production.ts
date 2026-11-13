@@ -151,10 +151,10 @@ export async function startProductionPreview(
       detached: true,
     },
   );
-  let output = '';
+  const outputState = { output: '' };
   async function stop() {
     await stopProcessGroup(child);
-    await writeFile(join(project, 'preview.log'), output);
+    await writeFile(join(project, 'preview.log'), outputState.output);
   }
   try {
     const baseUrl = await new Promise<string>((resolve, reject) => {
@@ -163,8 +163,8 @@ export async function startProductionPreview(
         45_000,
       );
       const collect = (chunk: Buffer) => {
-        output += chunk.toString();
-        const match = output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+        outputState.output += chunk.toString();
+        const match = outputState.output.match(/http:\/\/127\.0\.0\.1:\d+/u);
         if (match) {
           clearTimeout(timeout);
           resolve(match[0]);
@@ -224,9 +224,9 @@ const forbiddenContent =
   /\/api\/diagnostics|exhaust_retries|SIMULATED_AI_FAILURE|DIAGNOSTIC_(?:QUEUE|DLQ)|CHECK_OBJECT|__coverage__/u;
 
 export async function verifyProductionArtifacts(
-  project: string,
+  directory: string,
 ): Promise<{ environments: string[]; routes: string[] }> {
-  project = await realpath(project);
+  const project = await realpath(directory);
   const environments = ['client', 'ssr', 'interview', 'evaluation'] as const;
   for (const environment of environments) {
     const audit: BuildAudit = JSON.parse(

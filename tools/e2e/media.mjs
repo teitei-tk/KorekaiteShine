@@ -57,9 +57,9 @@ export async function installMediaProbe(context) {
         if (this instanceof AudioBufferSourceNode && this.buffer) {
           const buffer = this.buffer;
           const start = this.start.bind(this);
-          let startedAt;
+          const playback = { startedAt: undefined };
           this.start = (when = 0, ...args) => {
-            startedAt = Math.max(this.context.currentTime, when);
+            playback.startedAt = Math.max(this.context.currentTime, when);
             return start(when, ...args);
           };
           this.addEventListener(
@@ -68,21 +68,26 @@ export async function installMediaProbe(context) {
               const samples = buffer.getChannelData(0);
               const rendered = Math.min(
                 samples.length,
-                Math.round((this.context.currentTime - startedAt) * buffer.sampleRate),
+                Math.max(
+                  0,
+                  Math.round((this.context.currentTime - playback.startedAt) * buffer.sampleRate),
+                ),
               );
               meter.completedSeconds += rendered / buffer.sampleRate;
               // 模擬AIは質問と遅延音声を別の周波数で返す。実際に再生した区間だけを識別する。
               if (rendered >= buffer.sampleRate / 10) {
-                let crossings = 0;
-                for (let i = 1; i < rendered; i++) {
-                  if (samples[i - 1] <= 0 && samples[i] > 0) {
-                    crossings++;
-                  }
-                }
+                const crossings = samples
+                  .subarray(0, rendered)
+                  .reduce(
+                    (count, sample, index) =>
+                      count + Number(index > 0 && samples[index - 1] <= 0 && sample > 0),
+                    0,
+                  );
                 meter.playedFrequencies.push((crossings * buffer.sampleRate) / rendered);
               }
               // 主スレッドの測定間隔が長引いても、再生済み区間の無音を発音時間に含めない。
-              for (let i = 0; i < rendered; i += 480) {
+              for (const frameIndex of samples.keys().take(Math.ceil(rendered / 480))) {
+                const i = frameIndex * 480;
                 const frame = samples.subarray(i, Math.min(i + 480, rendered));
                 if (frame.some((sample) => Math.abs(sample) > 0.002)) {
                   meter.audibleSeconds += frame.length / buffer.sampleRate;
@@ -92,26 +97,29 @@ export async function installMediaProbe(context) {
             { once: true },
           );
         }
-        let analyser = graphs.get(this.context);
-        if (!analyser) {
+        const analyserState = { analyser: graphs.get(this.context) };
+        if (!analyserState.analyser) {
           const ctx = this.context;
-          analyser = ctx.createAnalyser();
-          graphs.set(ctx, analyser);
-          const samples = new Float32Array(analyser.fftSize);
-          let previous = ctx.currentTime;
+          analyserState.analyser = ctx.createAnalyser();
+          graphs.set(ctx, analyserState.analyser);
+          const samples = new Float32Array(analyserState.analyser.fftSize);
+          const previousState = { previous: ctx.currentTime };
           const timer = setInterval(() => {
             if (ctx.state === 'closed') {
               return clearInterval(timer);
             }
-            analyser.getFloatTimeDomainData(samples);
-            if (ctx.currentTime > previous && samples.some((v) => Math.abs(v) > 0.002)) {
+            analyserState.analyser.getFloatTimeDomainData(samples);
+            if (
+              ctx.currentTime > previousState.previous &&
+              samples.some((v) => Math.abs(v) > 0.002)
+            ) {
               meter.count++;
               meter.lastSound = performance.now();
             }
-            previous = ctx.currentTime;
+            previousState.previous = ctx.currentTime;
           }, 20);
         }
-        connect.call(this, analyser);
+        connect.call(this, analyserState.analyser);
       }
       return result;
     };

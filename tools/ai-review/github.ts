@@ -71,15 +71,15 @@ export interface ReviewComment extends Comment {
   in_reply_to_id?: number;
 }
 async function pages<T>(api: Api, path: string): Promise<T[]> {
-  const result: T[] = [];
-  for (let page = 1; ; page++) {
-    const batch = await api<T[]>(`${path}?per_page=100&page=${page}`);
+  const batches: T[][] = [];
+  for (;;) {
+    const batch = await api<T[]>(`${path}?per_page=100&page=${batches.length + 1}`);
     if (!Array.isArray(batch)) {
       throw new Error('コメント応答が不正です');
     }
-    result.push(...batch);
+    batches.push(batch);
     if (batch.length < 100) {
-      return result;
+      return batches.flat();
     }
   }
 }

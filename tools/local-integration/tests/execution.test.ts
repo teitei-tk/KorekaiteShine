@@ -16,7 +16,7 @@ test('成功評価は実行権を取得し、試行1回の結果と完了を一�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -51,13 +51,11 @@ test('成功評価は実行権を取得し、試行1回の結果と完了を一�
       INSERT INTO released SELECT COUNT(*) FROM execution_slots;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('完了後の再配送は評価を再実行せずackする', async () => {
@@ -68,7 +66,7 @@ test('完了後の再配送は評価を再実行せずackする', async () => {
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const acceptedResponse = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -99,13 +97,11 @@ test('完了後の再配送は評価を再実行せずackする', async () => {
       INSERT INTO once SELECT COUNT(*) FROM job_attempts;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('同じジョブの同時配送は一つだけが評価し、有効な実行権を持つ重複配送をackする', async () => {
@@ -116,7 +112,7 @@ test('同じジョブの同時配送は一つだけが評価し、有効な実�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -163,13 +159,11 @@ test('同じジョブの同時配送は一つだけが評価し、有効な実�
       INSERT INTO executed_once SELECT COUNT(*) FROM jobs WHERE status = 'completed' AND attempt_count = 1;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('別ジョブが本人枠を使用中なら試行せず次回通知を保存してackする', async () => {
@@ -180,7 +174,7 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const accept = async () => {
       const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
@@ -239,13 +233,11 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
       ]);
       expect(await (await first).json()).toEqual({ action: 'ack' });
     }
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('一時失敗は次回通知を保存し、期限前には試行せず、2回目の成功後も最後のエラーを保持する', async () => {
@@ -256,7 +248,7 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -316,13 +308,11 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
       INSERT INTO twice SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'evaluation-call:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('全4回失敗した評価は30・120・300秒後に再試行し、失敗確定とDLQ送信待ちを保存する', async () => {
@@ -333,7 +323,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -342,10 +332,10 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
     });
     expect(response.status).toBe(202);
     const accepted = await response.json();
-    let now = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
+    const nowState = { now: Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds };
     const delays = [30_000, 120_000, 300_000];
     const deliver = async () => {
-      const delivered = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${now}`, {
+      const delivered = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${nowState.now}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schemaVersion: 1, jobId: accepted.jobId }),
@@ -355,7 +345,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
     };
     const getStatus = async () =>
       (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
-    for (let attempt = 1; attempt <= 4; attempt++) {
+    for (const attempt of [1, 2, 3, 4]) {
       await deliver();
       const status = await getStatus();
       expect(status.attemptCount).toBe(attempt);
@@ -365,7 +355,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
         dlqReceipt: 'pending',
       });
       if (attempt < 4) {
-        const next = now + delays[attempt - 1];
+        const next = nowState.now + delays[attempt - 1];
         expect(status).toMatchObject({
           status: 'retry_wait',
           finishedAt: null,
@@ -373,19 +363,19 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
             fractionalSecondDigits: 3,
           }),
         });
-        now = next - 1;
+        nowState.now = next - 1;
         await deliver();
         expect(await getStatus()).toEqual(status);
-        now = next;
+        nowState.now = next;
       } else {
         expect(status).toMatchObject({
           status: 'failed',
           nextAttemptAt: null,
-          finishedAt: Temporal.Instant.fromEpochMilliseconds(now).toString({
+          finishedAt: Temporal.Instant.fromEpochMilliseconds(nowState.now).toString({
             fractionalSecondDigits: 3,
           }),
         });
-        now += 1_000;
+        nowState.now += 1_000;
         await deliver();
         expect(await getStatus()).toEqual(status);
       }
@@ -404,13 +394,11 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
       INSERT INTO zero SELECT COUNT(*) FROM execution_slots;
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);
 
 test('Web受付からDO・ローカルQueue・評価Consumerを経てD1の成功結果まで自動で保存する', async () => {
@@ -421,7 +409,7 @@ test('Web受付からDO・ローカルQueue・評価Consumerを経てD1の成功
     parallelIndex: 0,
   });
   const runtime = await startRuntime(config);
-  let succeeded = false;
+
   try {
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
@@ -455,11 +443,9 @@ test('Web受付からDO・ローカルQueue・評価Consumerを経てD1の成功
       INSERT INTO one SELECT COUNT(*) FROM connection_checks WHERE writer LIKE 'queue-message:%';
     `,
     ]);
-    succeeded = true;
   } finally {
     await runtime.stop();
-    if (succeeded) {
-      await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
-    }
   }
+
+  await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
 }, 60_000);

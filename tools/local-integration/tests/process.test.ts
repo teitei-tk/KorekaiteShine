@@ -68,8 +68,7 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-abort-'));
   const pidPath = join(directory, 'pid');
   const controller = new AbortController();
-  let settled = false;
-  let pid = 0;
+  const settledContext = { settled: false, pid: 0 };
   const running = runNodeCommand({
     args: [
       '-e',
@@ -83,11 +82,11 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
     signal: controller.signal,
   }).then(
     () => {
-      settled = true;
+      settledContext.settled = true;
       return '';
     },
     (error: Error) => {
-      settled = true;
+      settledContext.settled = true;
       return error.message;
     },
   );
@@ -95,26 +94,26 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
     await expect
       .poll(async () => readFile(pidPath, 'utf8').catch(() => ''), { timeout: 5000 })
       .toMatch(/^\d+$/u);
-    pid = Number(await readFile(pidPath, 'utf8'));
+    settledContext.pid = Number(await readFile(pidPath, 'utf8'));
     controller.abort(new Error('private-abort-reason'));
-    await expect.poll(() => settled, { timeout: 3000 }).toBe(true);
+    await expect.poll(() => settledContext.settled, { timeout: 3000 }).toBe(true);
     const message = await running;
     expect(message).toContain('中断');
     expect(message).not.toContain('private-abort-reason');
-    let code = '';
+    const codeState = { code: '' };
     try {
-      process.kill(-pid, 0);
+      process.kill(-settledContext.pid, 0);
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
-        code = String(error.code);
+        codeState.code = String(error.code);
       }
     }
-    expect(code).toBe('ESRCH');
+    expect(codeState.code).toBe('ESRCH');
   } finally {
     controller.abort();
-    if (pid > 0) {
+    if (settledContext.pid > 0) {
       try {
-        process.kill(-pid, 'SIGKILL');
+        process.kill(-settledContext.pid, 'SIGKILL');
       } catch {
         /* 停止確認済みの場合は対象がない。 */
       }

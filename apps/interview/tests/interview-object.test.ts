@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { interviews, deletedInterviews } from '@korekaite/database/interviews';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
+import type { createLiveConnection, LiveClosed, LiveHandlers } from '../src/server/live-connection';
 import worker, { InterviewObject } from '../src/worker.local.ts';
 
 vi.mock('cloudflare:workers', () => ({
@@ -19,7 +20,7 @@ class Socket extends EventTarget {
   close = vi.fn();
   accept = vi.fn();
 }
-function fixture() {
+function fixture(ObjectType = InterviewObject) {
   const database = createTestDatabase();
   const setAlarm = vi.fn();
   const deleteAlarm = vi.fn();
@@ -69,7 +70,7 @@ function fixture() {
       setAlarm,
     },
   };
-  const object = new InterviewObject(
+  const object = new ObjectType(
     ctx as object as ConstructorParameters<typeof InterviewObject>[0],
     env as object as ConstructorParameters<typeof InterviewObject>[1],
   );
@@ -199,6 +200,53 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
     expect((await f.fetchObject('DELETE')).status).toBe(204);
     expect(f.data.size).toBe(0);
     expect(f.deleteAlarm).toHaveBeenCalled();
+  } finally {
+    f.database.close();
+  }
+});
+
+test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが確認時刻を進める', async () => {
+  const stream = {} as { handlers: LiveHandlers };
+  const closed = new Promise<LiveClosed>(() => {});
+  const f = fixture(
+    class extends InterviewObject {
+      protected override connectLive(
+        _options: Parameters<typeof createLiveConnection>[0],
+        callbacks: LiveHandlers,
+      ) {
+        stream.handlers = callbacks;
+        return {
+          ready: Promise.resolve('stream'),
+          closed,
+          sendAudio: () => true,
+          request: () => true,
+          abort: () => {},
+          close: () => closed,
+        };
+      }
+    },
+  );
+  try {
+    await f.seed();
+    expect((await f.fetchObject()).status).toBe(101);
+    f.sockets[0].dispatchEvent(
+      new MessageEvent('message', {
+        data: JSON.stringify({ type: 'start', generation: 0, commandId: 'start' }),
+      }),
+    );
+    await Promise.all(f.pending.splice(0));
+    await stream.handlers.onReady('stream');
+    const [active] = await f.database.db.select().from(interviews);
+    expect(f.setAlarm).toHaveBeenLastCalledWith(active.updatedAt + 5000);
+    const beforeMessages = f.sockets[0].send.mock.calls.length;
+    await vi.waitFor(async () => {
+      await f.object.alarm();
+      const [tick] = await f.database.db.select().from(interviews);
+      expect(tick.updatedAt).toBeGreaterThan(active.updatedAt);
+      expect(tick.activeSince).toBe(active.activeSince);
+      expect(f.sockets[0].send.mock.calls).toHaveLength(beforeMessages);
+      expect(f.setAlarm).toHaveBeenLastCalledWith(tick.updatedAt + 5000);
+    });
   } finally {
     f.database.close();
   }

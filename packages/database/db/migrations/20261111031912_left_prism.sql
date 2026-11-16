@@ -1,0 +1,1 @@
+ALTER TABLE `transcript_fragments` ADD `starts_question` integer DEFAULT false NOT NULL;

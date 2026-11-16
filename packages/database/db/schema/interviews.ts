@@ -21,6 +21,7 @@ export const interviews = sqliteTable(
     revision: integer('revision').notNull().default(0),
     generation: integer('generation').notNull().default(0),
     streamGeneration: integer('stream_generation'),
+    pendingQuestionOperation: text('pending_question_operation', { enum: ['rephrase', 'skip'] }),
     transcriptIncomplete: integer('transcript_incomplete', { mode: 'boolean' })
       .notNull()
       .default(false),
@@ -59,6 +60,7 @@ export const transcriptFragments = sqliteTable(
     sequence: integer('sequence').notNull(),
     generation: integer('generation').notNull(),
     sourceEventId: text('source_event_id').notNull(),
+    startsQuestion: integer('starts_question', { mode: 'boolean' }).notNull().default(false),
     speaker: text('speaker', { enum: ['user', 'assistant'] }).notNull(),
     content: text('content').notNull(),
     sourceStartMs: integer('source_start_ms'),
@@ -122,7 +124,9 @@ export interface EvaluationSnapshot {
     | 'background'
     | 'activeMs'
   >;
-  fragments: (typeof transcriptFragments.$inferSelect)[];
+  fragments: (Omit<typeof transcriptFragments.$inferSelect, 'startsQuestion'> & {
+    startsQuestion?: boolean;
+  })[];
   playback: (typeof playbackReceipts.$inferSelect)[];
   transcriptIncomplete: boolean;
   evaluation: EvaluationConfiguration;

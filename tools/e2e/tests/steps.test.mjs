@@ -29,6 +29,7 @@ vi.mock('../media.mjs', () => ({
   installMediaProbe: vi.fn(),
   playbackCount: vi.fn(() => 1),
   waitForQuiet: vi.fn(),
+  waitForOpening: vi.fn(),
   waitForPlayback: vi.fn(),
   speak: vi.fn(),
 }));
@@ -54,7 +55,17 @@ afterEach(() => {
 async function observer() {
   const world = {};
   const timeContext = { time: 0, started: null, active: 0, generation: 1, refused: false };
+  const questionState = {
+    silent: false,
+    currentQuestion: undefined,
+    held: undefined,
+    receiveInOtherTab: undefined,
+  };
   const transcripts = [];
+  const questions = {
+    言い換えを依頼: '具体的な役割は何ですか。',
+    質問を見送る: '他の手段をなぜ選びませんでしたか。',
+  };
   vi.spyOn(performance, 'now').mockImplementation(() => timeContext.time);
   delay.mockImplementation(async (ms) => {
     timeContext.time += ms;
@@ -67,6 +78,16 @@ async function observer() {
   };
   const settings = {
     url: 'http://127.0.0.1:4327',
+    omitNextOpening: vi.fn(),
+    extendNextOpening: vi.fn(),
+    holdNextQuestion: () =>
+      new Promise((resolve) => {
+        questionState.held = resolve;
+      }),
+    muteReplies: vi.fn(),
+    silenceCurrentConnections: () => {
+      questionState.silent = true;
+    },
     rejectDials: (value) => {
       timeContext.refused = value;
     },
@@ -105,9 +126,22 @@ async function observer() {
     },
     connectToServer: () => server,
   };
-  const emit = (event) => inputContext.output(JSON.stringify(event));
+  page.on = (_event, listen) =>
+    listen({
+      on: (_frame, receive) => {
+        questionState.receiveInOtherTab = receive;
+        receive({ payload: Buffer.alloc(1) });
+      },
+    });
+  const emit = (event) => {
+    const payload = JSON.stringify(event);
+    inputContext.output(payload);
+    questionState.receiveInOtherTab?.({ payload });
+  };
   const locator = (name) => ({
     waitFor: vi.fn(),
+    isVisible: async () => false,
+    evaluate: (fn) => fn({ nextElementSibling: { textContent: questionState.currentQuestion } }),
     first() {
       return this;
     },
@@ -121,6 +155,27 @@ async function observer() {
       document.body.append(field);
     },
     click: async () => {
+      if (questions[name]) {
+        timeContext.generation++;
+        if (questionState.held) {
+          questionState.held();
+          questionState.held = undefined;
+          questionState.currentQuestion = questions[name];
+          transcript('assistant', '前の質問から遅れて届いた続きです。');
+          return;
+        }
+        questionState.currentQuestion = questions[name];
+        transcript('assistant', questionState.currentQuestion, true);
+        window.voiceE2e.playedFrequencies.push(440);
+      }
+      if (
+        ['このタブで引き継ぐ', 'マイクを許可して再開'].includes(name) &&
+        questionState.currentQuestion
+      ) {
+        timeContext.generation++;
+        transcript('assistant', questionState.currentQuestion, true);
+        window.voiceE2e.playedFrequencies.push(440);
+      }
       if (name === 'マイクを許可して開始' && timeContext.refused) {
         emit({ type: 'error', code: 'AUDIO_CONNECT_FAILED' });
         return;
@@ -134,9 +189,13 @@ async function observer() {
           button.click();
           timeContext.generation++;
         }
+        if (name === 'マイクを許可して再開') {
+          timeContext.generation++;
+          questionState.silent = false;
+        }
         timeContext.started = timeContext.time;
         emit({ type: 'state', interviewId: 'one', status: 'active' });
-      } else if (name === '一時停止' || name === '終了して評価する') {
+      } else if (['一時停止', '音声をつなぎ直す', '終了して評価する'].includes(name)) {
         close();
       }
     },
@@ -166,17 +225,18 @@ async function observer() {
     expect(match).toBeDefined();
     return match;
   });
-  window.voiceE2e = { speaking: true };
+  window.voiceE2e = { speaking: true, playedFrequencies: [] };
   await hooks.before.call(world);
   const relay = page.routeWebSocket.mock.calls[0][1];
   relay(client);
   const voice = Buffer.alloc(12);
   voice.writeInt16LE(500, 10);
-  function transcript(speaker) {
+  function transcript(speaker, content = speaker, startsQuestion = false) {
     const event = {
       type: 'transcript',
       speaker,
-      content: speaker,
+      content,
+      startsQuestion,
       sequence: transcripts.length,
       fragmentId: String(transcripts.length),
       generation: timeContext.generation,
@@ -184,12 +244,15 @@ async function observer() {
     transcripts.push(event);
     emit(event);
   }
+  window.voiceE2e.speak = () => inputContext.input(voice);
   speak.mockImplementation(async () => {
     for (const _ of Array(3).keys()) {
       inputContext.input(voice);
     }
-    transcript('user');
-    transcript('assistant');
+    if (!questionState.silent) {
+      transcript('user');
+      transcript('assistant');
+    }
   });
   return {
     world,
@@ -261,4 +324,50 @@ test('再生だけで発話への応答と判定せず、順序と発話フレ�
   await expect(hooks.steps.get('次の発話途中で回線が切れる').call(world)).rejects.toThrow(
     '音声フレーム',
   );
+});
+
+test('質問を切り替えた後の見出し・保存世代・音声を検査する', async () => {
+  const { world } = await observer();
+  const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+  await step('架空の経験Markdownからテーマを選び面接を準備した');
+  await step('回答せずに質問を言い換えて見送る');
+  await step('最後の質問だけが現在の質問になり、前の質問も会話に残る');
+  window.voiceE2e.playedFrequencies.push(880);
+  await expect(
+    step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る'),
+  ).rejects.toThrow('旧接続の遅延音声');
+});
+
+test.each(['質問を見送る', '言い換えを依頼'])(
+  '返答前に%sを選び、最後に選んだ質問を検査する',
+  async (next) => {
+    const { world } = await observer();
+    const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+    await step('架空の経験Markdownからテーマを選び面接を準備した');
+    await step('「{word}」の返事を保留してから「{word}」を押す', '言い換えを依頼', next);
+    await step('「{word}」の質問が単独で表示され音声を聞いて回答できる', next);
+  },
+);
+
+test.each(['面接中', '一時停止中'])(
+  '%sから別タブに引き継ぎ、新タブで音声と応答を検査する',
+  async (state) => {
+    const { world } = await observer();
+    const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+    await step('架空の経験Markdownからテーマを選び面接を準備した');
+    await step('元のタブで見送りを受理した音声AIが返事を保留する');
+    await step('同じ面接を別のタブで開き「{word}」から引き継ぐ', state);
+    await step('新しい担当タブで回答して返答を聞ける');
+    await step('新しい担当タブで見送り後の質問だけを聞いて回答できる');
+  },
+);
+
+test('応答待ちの一時停止と長い質問中の発話を検査する', async () => {
+  const { world } = await observer();
+  const step = (name, ...args) => hooks.steps.get(name).call(world, ...args);
+  await step('架空の経験Markdownからテーマを選び面接を準備した');
+  await step('最初の質問を聞いて応答しない音声AIに言い換えを依頼する');
+  await step('見送りの返事を保留してから一時停止して再開する');
+  await step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る');
+  await step('長い質問を聞きながら返事をして音声AIが応答しなくなる');
 });

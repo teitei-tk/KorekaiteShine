@@ -16,6 +16,34 @@ export async function loadInterview(db: Database, actorId: string, interviewId: 
   return row ?? null;
 }
 
+export async function setPendingQuestionOperation(
+  db: Database,
+  actorId: string,
+  interviewId: string,
+  generation: number,
+  operation: typeof interviews.$inferSelect.pendingQuestionOperation,
+  now: number,
+): Promise<boolean> {
+  const [saved] = await db
+    .update(interviews)
+    .set({
+      pendingQuestionOperation: operation,
+      revision: sql`${interviews.revision} + 1`,
+      updatedAt: sql`max(${interviews.updatedAt}, ${now})`,
+    })
+    .where(
+      and(
+        eq(interviews.interviewId, interviewId),
+        eq(interviews.actorId, actorId),
+        eq(interviews.status, 'active'),
+        eq(interviews.generation, generation),
+        eq(interviews.streamGeneration, generation),
+      ),
+    )
+    .returning({ revision: interviews.revision });
+  return saved !== undefined;
+}
+
 export async function saveInterviewState(
   db: Database,
   actorId: string,
@@ -108,6 +136,7 @@ export async function appendTranscript(
               ),
             generation: sql<number>`${input.generation}`.as('generation'),
             sourceEventId: sql<string>`${input.sourceEventId}`.as('source_event_id'),
+            startsQuestion: sql<boolean>`${input.startsQuestion ? 1 : 0}`.as('starts_question'),
             speaker: sql<Fragment['speaker']>`${input.speaker}`.as('speaker'),
             content: sql<string>`${input.content}`.as('content'),
             sourceStartMs: sql<number | null>`${input.sourceStartMs ?? null}`.as('source_start_ms'),

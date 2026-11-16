@@ -43,7 +43,17 @@ test.each(['pr', 'live'])(
   '%s は固有データで起動し、同じポートで再起動し、停止時に掃除する',
   async (profile) => {
     const source = await fixture();
-    const provider = { url: 'http://127.0.0.1/voice', stop: vi.fn(), rejectDials: vi.fn() };
+    const held = Promise.resolve();
+    const provider = {
+      url: 'http://127.0.0.1/voice',
+      stop: vi.fn(),
+      rejectDials: vi.fn(),
+      extendNextOpening: vi.fn(),
+      omitNextOpening: vi.fn(),
+      muteReplies: vi.fn(),
+      silenceCurrentConnections: vi.fn(),
+      holdNextQuestion: vi.fn(() => held),
+    };
     startProvider.mockResolvedValue(provider);
     try {
       const runtime = await startVoiceRuntime({ profile });
@@ -55,6 +65,16 @@ test.each(['pr', 'live'])(
         expect(
           await readFile(join(root, 'tools/local-integration/fixtures/voice-interview.ts'), 'utf8'),
         ).toContain(provider.url);
+        for (const operation of [
+          'extendNextOpening',
+          'omitNextOpening',
+          'muteReplies',
+          'silenceCurrentConnections',
+        ]) {
+          runtime[operation]();
+          expect(provider[operation]).toHaveBeenCalledOnce();
+        }
+        expect(runtime.holdNextQuestion()).toBe(held);
         await runtime.rejectDials(true);
         expect(provider.rejectDials).toHaveBeenCalledWith(true);
       } else {

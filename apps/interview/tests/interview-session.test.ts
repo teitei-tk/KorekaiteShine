@@ -3,8 +3,10 @@ import { createLiveConnection } from '../src/server/live-connection.ts';
 import { audioUsagePeriods, usageReservations } from '@korekaite/database/usage';
 import { createEvaluationWorker } from '../../evaluation/src/worker.ts';
 import { expect, test, vi } from 'vitest';
+import { Temporal } from '@js-temporal/polyfill';
 import { interviews, evaluationInputs, transcriptFragments } from '@korekaite/database';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
+import { remainingAudioMs } from '../src/server/repositories/audio-usage';
 import { createInterviewSession } from '../src/application/interview-session.ts';
 import type { LiveHandlers, LiveClosed } from '../src/server/live-connection.ts';
 
@@ -206,16 +208,16 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
     };
     expect(await createInterviewSession(options).recover()).toMatchObject({
       status: 'reconnecting',
-      activeMs: 1000,
-      deadline: 61010,
+      activeMs: 0,
+      deadline: 60010,
       transcriptIncomplete: true,
       streamGeneration: null,
     });
-    nowState.now = 61010;
+    nowState.now = 60010;
     expect(await createInterviewSession(options).recover()).toMatchObject({ status: 'ended' });
     const [input] = await database.db.select().from(evaluationInputs);
     expect(input.inputJson.transcriptIncomplete).toBe(true);
-    expect(input.inputJson.interview.activeMs).toBe(1000);
+    expect(input.inputJson.interview.activeMs).toBe(0);
   } finally {
     database.close();
   }
@@ -511,6 +513,108 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
   }
 });
 
+test('深夜を越える前日残量は新日の面接を早期終了させない', async () => {
+  const db = createTestDatabase();
+  const midnight = Temporal.Instant.from('2026-11-11T00:00:00+09:00').epochMilliseconds;
+  const clock = { now: midnight - 30000 };
+  const stream = {} as { handlers: LiveHandlers };
+  try {
+    await db.db.insert(usageReservations).values({
+      reservationId: 'previous',
+      actorId: 'actor',
+      day: '2026-11-10',
+      kind: 'audio',
+      amount: 3510,
+      createdAt: clock.now,
+    });
+    await db.db.insert(interviews).values({
+      interviewId: 'midnight',
+      actorId: 'actor',
+      materialHash: 'h',
+      themeTitle: '題',
+      themeHeading: '見出し',
+      themeExcerpt: '経験',
+      background: '',
+      status: 'ready',
+      createdAt: clock.now,
+      updatedAt: clock.now,
+    });
+    const session = createInterviewSession({
+      db: db.db,
+      actorId: 'actor',
+      interviewId: 'midnight',
+      now: () => clock.now,
+      apiKey: 'fixture',
+      responsesModel: 'mock',
+      voice: 'marin',
+      evaluation,
+      newJobId: () => '00000000-0000-4000-8000-000000000001',
+      connect: (_options, callbacks) => {
+        stream.handlers = callbacks;
+        return {
+          ready: Promise.resolve('upstream'),
+          closed: new Promise<LiveClosed>(() => {}),
+          sendAudio: () => true,
+          request: () => true,
+          abort: () => {},
+          close: () => new Promise<LiveClosed>(() => {}),
+        };
+      },
+    });
+    await session.start();
+    await stream.handlers.onReady('upstream');
+    expect((await session.state()).deadline).toBe(clock.now + 1200000);
+    clock.now = midnight + 60000;
+    expect((await session.tick()).status).toBe('active');
+    expect(await remainingAudioMs(db.db, 'actor', clock.now)).toBe(3540000);
+  } finally {
+    db.close();
+  }
+});
+
+test('稼働確認が途絶えた面接を再起動しても停止9分を利用枠に計上せず再接続待ちを延長しない', async () => {
+  const db = createTestDatabase();
+  const start = Temporal.Instant.from('2026-11-11T12:00:00+09:00').epochMilliseconds;
+  const now = start + 600000;
+  try {
+    await db.db.insert(interviews).values({
+      interviewId: 'lost',
+      actorId: 'actor',
+      materialHash: 'h',
+      themeTitle: '題',
+      themeHeading: '見出し',
+      themeExcerpt: '経験',
+      background: '',
+      status: 'active',
+      generation: 1,
+      streamGeneration: 1,
+      activeSince: start,
+      createdAt: start,
+      updatedAt: start + 60000,
+      deadline: start + 1200000,
+    });
+    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3540000);
+    const session = createInterviewSession({
+      db: db.db,
+      interviewId: 'lost',
+      actorId: 'actor',
+      now: () => now,
+      apiKey: 'fixture',
+      responsesModel: 'mock',
+      voice: 'marin',
+      evaluation,
+      newJobId: () => '00000000-0000-4000-8000-000000000001',
+    });
+    expect(await session.recover()).toMatchObject({ status: 'ended', activeMs: 60000 });
+    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3540000);
+    expect(await db.db.select().from(audioUsagePeriods)).toMatchObject([
+      { startedAt: start, endedAt: start + 60000 },
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
 test('保存の応答が途絶えても欠落を示して終了し、遅れた書込みは固定入力を変更しない', async () => {
   vi.useFakeTimers();
   const database = createTestDatabase();
@@ -735,6 +839,28 @@ async function lifecycleFixture() {
   return { database, session, options, close: close, handlers, abort };
 }
 
+test('接続準備中の再起動は稼働時間を増やさず元の接続期限内で復帰する', async () => {
+  const { database, session } = await lifecycleFixture();
+  try {
+    await database.db.update(interviews).set({
+      status: 'connecting',
+      generation: 1,
+      streamGeneration: 1,
+      deadline: 30_000,
+    });
+    expect(await session.recover()).toMatchObject({
+      status: 'reconnecting',
+      activeMs: 0,
+      updatedAt: 100,
+      deadline: 30_000,
+      streamGeneration: null,
+      transcriptIncomplete: true,
+    });
+  } finally {
+    database.close();
+  }
+});
+
 test('保存済みの終了・終了待ち・期限切れの面接を開始操作から回復する', async () => {
   for (const status of ['ending', 'ended', 'paused'] as const) {
     const { database, session } = await lifecycleFixture();
@@ -788,7 +914,7 @@ test('開始後の重複接続を拒否し、終了済みの接続からの通�
       expect(await session.request(2, 'skip')).toBe(false);
       expect(await session.request(1, 'skip')).toBe(false);
       await handlers[0].onReady('upstream');
-      expect(await session.request(1, 'rephrase')).toBe(true);
+
       // 保存済み発言に時刻がない上流実装でも原文は保持する。
       await handlers[0].onTranscript({
         type: 'session.output_transcript.delta',
@@ -864,6 +990,117 @@ test('上流の終了待ちで面接が削除された場合は終了要求へ�
     });
     await expect(finishing).rejects.toThrow('面接が見つかりません');
     expect(await database.db.select().from(evaluationInputs)).toHaveLength(0);
+  } finally {
+    database.close();
+  }
+});
+
+test('質問操作で旧接続を終了し、遅れた発言は元世代に保存して新接続の質問から分離する', async () => {
+  const { database, options } = await lifecycleFixture();
+  const handlers: LiveHandlers[] = [];
+  const closing: ((value: LiveClosed) => void)[] = [];
+  const audio = vi.fn();
+  const request = vi.fn();
+  const sendAudio = vi.fn(() => true);
+  const session = createInterviewSession({
+    ...options,
+    onAudio: audio,
+    connect: (_options, hooks) => {
+      handlers.push(hooks);
+      const closed = new Promise<LiveClosed>((resolve) => closing.push(resolve));
+      return {
+        ready: Promise.resolve('stream'),
+        closed,
+        sendAudio,
+        request,
+        abort: () => {},
+        close: () => closed,
+      };
+    },
+  });
+  const text = (id: string, delta: string) => ({
+    type: 'session.output_transcript.delta' as const,
+    event_id: id,
+    delta,
+    start_ms: 0,
+    end_ms: 10,
+  });
+  try {
+    const first = await session.start();
+    await handlers[0].onReady('old');
+    const switching = session.request(first.generation, 'skip');
+    await vi.waitFor(async () =>
+      expect(await session.state()).toMatchObject({
+        status: 'reconnecting',
+        pendingQuestionOperation: 'skip',
+      }),
+    );
+    expect(await session.request(first.generation, 'rephrase')).toBe(false);
+    await handlers[0].onTranscript(text('tail', '古い質問の末尾'));
+    closing[0]({
+      complete: true,
+      reason: 'confirmed',
+      upstreamReason: 'close_requested',
+      usageSeconds: 0,
+    });
+    expect(await switching).toBe(true);
+    expect(request).not.toHaveBeenCalled();
+    const next = await session.start();
+    await handlers[1].onReady('new');
+    handlers[0].onAudio(new Uint8Array(480), 10);
+    expect(audio).not.toHaveBeenCalled();
+    await handlers[0].onTranscript(text('late', '終了後の旧入力'));
+    await handlers[1].onTranscript(text('fresh', '新しい質問'));
+    expect(await database.db.select().from(transcriptFragments)).toMatchObject([
+      { generation: first.generation, content: '古い質問の末尾', startsQuestion: false },
+      { generation: next.generation, content: '新しい質問', startsQuestion: true },
+    ]);
+    expect((await session.state()).pendingQuestionOperation).toBe('skip');
+    handlers[1].onAudio(new Uint8Array(12000), 250);
+    expect(await session.playback(next.generation, 250)).toBe(true);
+    expect((await session.state()).pendingQuestionOperation).toBe('skip');
+    expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);
+    expect(sendAudio).not.toHaveBeenCalled();
+    handlers[1].onAudio(new Uint8Array(12000).fill(23), 500);
+    // 続く音声が届いても、最初の可聴区間の再生確認だけで回答を解放できる。
+    handlers[1].onAudio(new Uint8Array(12000).fill(23), 750);
+    expect(await session.playback(next.generation, 500)).toBe(true);
+    expect((await session.state()).pendingQuestionOperation).toBeNull();
+    expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);
+    expect(sendAudio).toHaveBeenCalledOnce();
+  } finally {
+    database.close();
+  }
+});
+
+test('見送り再開で音声が先に再生されても空白の文字だけでは確定せず、最初の本文で入力を解放する', async () => {
+  const { database, session, handlers } = await lifecycleFixture();
+  try {
+    await database.db.update(interviews).set({ pendingQuestionOperation: 'skip' });
+    const active = await session.start();
+    await handlers[0].onReady('resume');
+    handlers[0].onAudio(new Uint8Array(12000).fill(20), 250);
+    expect(await session.playback(active.generation, 250)).toBe(true);
+    await handlers[0].onTranscript({
+      type: 'session.output_transcript.delta',
+      event_id: 'blank',
+      delta: '　 ',
+      start_ms: 0,
+      end_ms: 100,
+    });
+    expect((await session.state()).pendingQuestionOperation).toBe('skip');
+    await handlers[0].onTranscript({
+      type: 'session.output_transcript.delta',
+      event_id: 'text',
+      delta: '新しい質問です。',
+      start_ms: 100,
+      end_ms: 200,
+    });
+    expect((await session.state()).pendingQuestionOperation).toBeNull();
+    expect(await database.db.select().from(transcriptFragments)).toMatchObject([
+      { content: '　 ', startsQuestion: false },
+      { content: '新しい質問です。', startsQuestion: true },
+    ]);
   } finally {
     database.close();
   }

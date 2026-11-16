@@ -7,7 +7,7 @@ import type { createPrimaryDb } from './connection.ts';
 export function closeAudioPeriod(
   db: ReturnType<typeof createPrimaryDb>,
   match: ReturnType<typeof and>,
-  now: number,
+  now: number | ReturnType<typeof sql<number>>,
 ) {
   return db
     .insert(audioUsagePeriods)
@@ -38,7 +38,7 @@ export async function usedAudioMs(
   const row = await db.get<{ ms: number }>(sql`SELECT
     (SELECT coalesce(sum(min(ended_at,${end})-max(started_at,${start})),0) FROM ${audioUsagePeriods}
       WHERE actor_id=${actorId} AND ended_at>${start} AND started_at<${end})
-    + (SELECT coalesce(sum(max(0,min(coalesce(deadline,${now}),${now},${end})-max(active_since,${start}))),0) FROM ${interviews}
+    + (SELECT coalesce(sum(max(0,min(coalesce(deadline,${now}),${now},${end},updated_at)-max(active_since,${start}))),0) FROM ${interviews}
       WHERE actor_id=${actorId} AND status='active' AND active_since IS NOT NULL)
     + (SELECT 1000*coalesce(sum(amount),0) FROM ${usageReservations}
       WHERE actor_id=${actorId} AND kind='audio' AND day=${day}) AS ms`);

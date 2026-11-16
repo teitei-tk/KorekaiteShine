@@ -75,6 +75,13 @@ test('切断後は1分待ち、引き継ぎ前の世代から届くイベント�
     deadline: 71_000,
   });
   expect(transitionInterview(disconnected, { type: 'tick' }, 71_000).status).toBe('ending');
+  expect(transitionInterview(disconnected, { type: 'pause' }, 15_000)).toMatchObject({
+    status: 'paused',
+    activeMs: 10_000,
+    activeSince: null,
+    deadline: 315_000,
+  });
+  expect(transitionInterview(disconnected, { type: 'pause' }, 71_000).status).toBe('ending');
   const takeover = transitionInterview(active, { type: 'takeover' }, 11_000);
   expect(takeover).toMatchObject({ status: 'connecting', generation: 2, activeMs: 10_000 });
   expect(transitionInterview(takeover, { type: 'ready', generation: 1 }, 12_000)).toEqual(takeover);

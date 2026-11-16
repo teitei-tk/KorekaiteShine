@@ -16,6 +16,7 @@ type SessionOptions = Parameters<typeof createInterviewSession>[0];
 type Hooks = Pick<SessionOptions, 'onState' | 'onTranscript' | 'onAudio' | 'onDialFailure'>;
 type Fragment = Parameters<NonNullable<SessionOptions['onTranscript']>>[0];
 export interface InterviewPeer {
+  questionBoundaries?: boolean;
   send(data: string | ArrayBuffer): void;
   close(): void;
 }
@@ -84,7 +85,12 @@ export function createInterviewRoom(options: {
       sourceEndMs: fragment.sourceEndMs,
     };
     for (const id of target ? [target] : peers.keys()) {
-      send(id, event);
+      send(
+        id,
+        fragment.startsQuestion && peers.get(id)?.questionBoundaries
+          ? { ...event, startsQuestion: true }
+          : event,
+      );
     }
   }
   const session = options.createSession({
@@ -220,6 +226,10 @@ export function createInterviewRoom(options: {
           error(id, event.commandId, 'STALE_STATE');
           return;
         }
+        // 旧接続の終了待ちにタブが切れた場合は、次の担当タブの再開に任せる。
+        if (room.owner === id && peers.has(id) && !room.discarded) {
+          await session.start();
+        }
         break;
     }
     cache.set(event.commandId, encoded);
@@ -298,13 +308,17 @@ export function createInterviewRoom(options: {
               return;
             }
             const generation = new DataView(data).getFloat64(0);
-            if (
-              room.owner !== id ||
-              !Number.isSafeInteger(generation) ||
-              generation < 1 ||
-              !(await session.sendAudio(generation, new Uint8Array(data, 8)))
-            ) {
+            if (room.owner !== id || !Number.isSafeInteger(generation) || generation < 1) {
               error(id, null, 'NOT_OWNER');
+              return;
+            }
+            if (!(await session.sendAudio(generation, new Uint8Array(data, 8)))) {
+              room.state = await session.state();
+              if (room.state.generation !== generation || room.state.status !== 'active') {
+                sendState(id);
+              } else {
+                error(id, null, 'UNAVAILABLE');
+              }
             }
           }
         } catch (cause) {
@@ -339,9 +353,13 @@ export function createInterviewRoom(options: {
     alarm: () =>
       serial(async () => {
         await initialize();
-        room.state = await session.tick();
-        await options.schedule(room.state);
-        broadcastState();
+        const before = room.state;
+        const next = await session.tick();
+        // 期限到達による遷移はonStateで通知・予約済み。稼働確認だけなら次回を予約する。
+        if (!room.discarded && room.state === before) {
+          room.state = next;
+          await options.schedule(next);
+        }
       }),
   };
 }

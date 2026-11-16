@@ -34,11 +34,11 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
-    "@typespec/compiler": "1.17.0",
-    "@typespec/http": "1.17.0",
-    "@typespec/json-schema": "1.17.0",
-    "@typespec/openapi": "1.17.0",
-    "@typespec/openapi3": "1.17.0",
+    "@typespec/compiler": "1.18.0",
+    "@typespec/http": "1.18.0",
+    "@typespec/json-schema": "1.18.0",
+    "@typespec/openapi": "1.18.0",
+    "@typespec/openapi3": "1.18.0",
     "json-schema-to-typescript": "16.0.0",
     "typescript": "7.0.2",
     "vitest": "5.1.0"

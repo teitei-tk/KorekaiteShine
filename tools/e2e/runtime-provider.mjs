@@ -18,7 +18,15 @@ function tone(frequency) {
 export async function startProvider() {
   const http = createServer((_request, response) => response.writeHead(404).end());
   const ws = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 });
-  const provider = { refused: false, turn: 0 };
+  const silent = new WeakSet();
+  const mutedReplies = new WeakSet();
+  const provider = {
+    refused: false,
+    turn: 0,
+    onHeldQuestion: undefined,
+    openingMuted: false,
+    openingChunks: 1,
+  };
   http.on('upgrade', (request, socket, head) => {
     if (provider.refused || request.url !== '/voice') {
       socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
@@ -28,7 +36,30 @@ export async function startProvider() {
   });
   ws.on('connection', (peer) => {
     const session = crypto.randomUUID();
-    const turnState = { startedAt: undefined, voiced: 0, quiet: 0, answered: false };
+    const turnState = {
+      startedAt: undefined,
+      voiced: 0,
+      quiet: 0,
+      answered: false,
+      pendingTail: false,
+    };
+    function holdQuestion() {
+      if (!provider.onHeldQuestion) {
+        return false;
+      }
+      turnState.pendingTail = true;
+      provider.onHeldQuestion();
+      provider.onHeldQuestion = undefined;
+      return true;
+    }
+    function flushTail() {
+      if (!turnState.pendingTail) {
+        return;
+      }
+      turnState.pendingTail = false;
+      transcript('output', '前の質問から遅れて届いた続きです。');
+      play(880);
+    }
     const send = (event) => peer.send(JSON.stringify(event));
     function transcript(speaker, delta) {
       const end = Math.floor(performance.now()) - turnState.startedAt;
@@ -42,16 +73,56 @@ export async function startProvider() {
     }
     function play(frequency) {
       // 実サービスと同じく音声deltaにはevent_idを付けない。
-      send({ type: 'session.output_audio.delta', delta: tone(frequency) });
+      send({
+        type: 'session.output_audio.delta',
+        delta:
+          mutedReplies.has(peer) && frequency !== 330
+            ? Buffer.alloc(sampleRate).toString('base64')
+            : tone(frequency),
+      });
     }
     peer.on('error', () => {});
     peer.on('message', (raw) => {
+      if (silent.has(peer)) {
+        return;
+      }
       const event = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
         turnState.startedAt = Math.floor(performance.now());
         send({ type: 'session.started', event_id: crypto.randomUUID(), session: { id: session } });
+        const material = event.session?.input?.[0]?.content[0]?.text;
+        const operation = material && JSON.parse(material).resume?.pendingQuestionOperation;
+        if (operation) {
+          if (holdQuestion()) {
+            return;
+          }
+          transcript(
+            'output',
+            operation === 'rephrase'
+              ? '具体的な役割は何ですか。'
+              : '他の手段をなぜ選びませんでしたか。',
+          );
+          play(440);
+          return;
+        }
         transcript('output', '取り組んだことを教えてください。');
-        play(330);
+        if (!provider.openingMuted) {
+          Array.from({ length: provider.openingChunks }).forEach(() => play(330));
+          provider.openingChunks = 1;
+        }
+        provider.openingMuted = false;
+      } else if (event.type === 'session.instructions.append') {
+        if (holdQuestion()) {
+          return;
+        }
+        transcript(
+          'output',
+          event.content.includes('言い換え')
+            ? '具体的な役割は何ですか。'
+            : '他の手段をなぜ選びませんでしたか。',
+        );
+        play(440);
+        flushTail();
       } else if (event.type === 'session.input_audio.append') {
         const pcm = Buffer.from(event.audio, 'base64');
         for (const index of pcm.keys().take(Math.floor(pcm.length / 2))) {
@@ -71,6 +142,7 @@ export async function startProvider() {
           }
         }
       } else if (event.type === 'session.close') {
+        flushTail();
         send({
           type: 'session.closed',
           event_id: crypto.randomUUID(),
@@ -84,6 +156,27 @@ export async function startProvider() {
   await once(http, 'listening');
   return {
     url: `http://127.0.0.1:${http.address().port}/voice`,
+    holdNextQuestion() {
+      return new Promise((resolve) => {
+        provider.onHeldQuestion = resolve;
+      });
+    },
+    extendNextOpening() {
+      provider.openingChunks = 9;
+    },
+    omitNextOpening() {
+      provider.openingMuted = true;
+    },
+    muteReplies() {
+      for (const peer of ws.clients) {
+        mutedReplies.add(peer);
+      }
+    },
+    silenceCurrentConnections() {
+      for (const peer of ws.clients) {
+        silent.add(peer);
+      }
+    },
     rejectDials(value) {
       provider.refused = value;
     },

@@ -52,7 +52,7 @@ export async function deleteInterviewRequest(
   const now = deps.now();
   try {
     await db.batch([
-      closeAudioPeriod(db, owner, now),
+      closeAudioPeriod(db, owner, sql<number>`min(${now}, ${interviews.updatedAt})`),
       db
         .insert(deletedInterviews)
         .select(

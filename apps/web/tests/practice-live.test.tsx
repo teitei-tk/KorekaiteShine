@@ -64,7 +64,17 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
   await user.click(screen.getByRole('button', { name: '一時停止' }));
   expect(close).toHaveBeenCalled();
   expect(JSON.parse(send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 1 });
-  state('ended', 2, false);
+  state('paused', 2, true);
+  await user.click(screen.getByRole('button', { name: 'マイクを許可して再開' }));
+  close.mockClear();
+  // 終了確認が遅れた旧接続から、同じ世代の一時停止状態が再通知される。
+  state('paused', 2, true);
+  expect(close).not.toHaveBeenCalled();
+  state('active', 3, true);
+  const resumedCapture = vi.mocked(openInterviewAudio).mock.lastCall![1];
+  resumedCapture(new ArrayBuffer(2));
+  expect(new DataView(send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+  state('ended', 4, false);
   expect(done).toHaveBeenCalledTimes(1);
 });
 
@@ -283,6 +293,29 @@ function mountLive() {
   return { peers, peer, audio, page, deleted, raw, receive, state, click };
 }
 
+test('通話中の引き継ぎは旧接続の再開待ちを経ても、新担当のマイクを維持する', async () => {
+  const { state, click, audio, peer } = mountLive();
+  state({ canControl: false });
+  await click('このタブで引き継ぐ');
+  const [, capture] = vi.mocked(openInterviewAudio).mock.lastCall!;
+  state({ status: 'reconnecting', generation: 2, canControl: false });
+  capture(new ArrayBuffer(2));
+  expect(peer.send).toHaveBeenCalledTimes(1);
+  state({ status: 'connecting', generation: 3 });
+  state({ status: 'active', generation: 3 });
+  expect(audio.close).not.toHaveBeenCalled();
+  capture(new ArrayBuffer(2));
+  expect(new DataView(peer.send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+});
+
+test('非担当タブで一時停止中に選べる音声操作は引き継ぎだけ', async () => {
+  const { state, click, peer } = mountLive();
+  state({ status: 'paused', canControl: false });
+  expect(screen.queryByRole('button', { name: 'マイクを許可して再開' })).toBeNull();
+  await click('このタブで引き継ぐ');
+  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('takeover');
+});
+
 test('質問と発言を順番にまとめ、言い換え・スキップ・終了を送る', async () => {
   vi.useFakeTimers();
   const { receive, state, click, peer } = mountLive();
@@ -311,19 +344,163 @@ test('質問と発言を順番にまとめ、言い換え・スキップ・終�
   }
   expect(screen.getByText('現在の質問').nextElementSibling?.textContent).toBe('なぜですか');
   expect(screen.getAllByRole('listitem')).toHaveLength(3);
-  for (const [name, type] of [
-    ['言い換えを依頼', 'rephrase'],
-    ['質問を見送る', 'skip'],
-    ['終了して評価する', 'finish'],
-  ]) {
-    await click(name);
-    expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type, generation: 1 });
-  }
+  await click('言い換えを依頼');
+  const rephrase = JSON.parse(peer.send.mock.lastCall![0]);
+  expect(rephrase).toMatchObject({ type: 'rephrase', generation: 1 });
+  await click('質問を見送る');
+  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('rephrase');
+  receive({ type: 'error', commandId: rephrase.commandId, code: 'STALE_STATE' });
+  await click('質問を見送る');
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'skip', generation: 1 });
+  await click('終了して評価する');
+  state({ generation: 2, status: 'reconnecting' });
+  state({ generation: 3, status: 'connecting' });
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'finish', generation: 3 });
   receive({ type: 'ack', commandId: 'ack' });
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
 const audioHeader = { type: 'audio', generation: 1, endOffsetMs: 20, byteLength: 2 };
+test('同じ操作中に連打しても質問切替は一度だけ送信する', () => {
+  const { state, peer } = mountLive();
+  state();
+  const rephrase = screen.getByRole('button', { name: '言い換えを依頼' });
+  act(() => {
+    rephrase.click();
+    rephrase.click();
+  });
+  expect(peer.send).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('rephrase');
+});
+
+test('質問切替の拒否後も、依頼済みの一時停止は現在の世代で送る', async () => {
+  const { state, click, peer, receive } = mountLive();
+  state();
+  await click('言い換えを依頼');
+  const { commandId } = JSON.parse(peer.send.mock.lastCall![0]);
+  await click('一時停止');
+  receive({ type: 'error', commandId, code: 'STALE_STATE' });
+  expect(peer.send).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 1 });
+});
+
+test('最初の音声を20秒待っても再生されなければ再接続の案内を出す', async () => {
+  vi.useFakeTimers();
+  const { state } = mountLive();
+  state();
+  await act(async () => vi.advanceTimersByTimeAsync(20_500));
+  expect(screen.getByText(/面接官の音声を待っています/)).toBeTruthy();
+});
+
+test('質問の切替前の音声を止め、新世代の質問の文字と再生完了までマイク送信を止める', async () => {
+  const { state, click, audio, peer, receive, raw } = mountLive();
+  state({ status: 'ready' });
+  await click('マイクを許可して開始');
+  state();
+  const [, capture] = vi.mocked(openInterviewAudio).mock.lastCall!;
+  await click('言い換えを依頼');
+  expect(audio.stopPlayback).toHaveBeenCalledOnce();
+  peer.send.mockClear();
+  capture(new ArrayBuffer(2));
+  receive(audioHeader);
+  raw(new ArrayBuffer(2));
+  expect(audio.play).not.toHaveBeenCalled();
+  state({ status: 'reconnecting', generation: 2 });
+  expect(audio.close).not.toHaveBeenCalled();
+  state({ status: 'connecting', generation: 3 });
+  state({ generation: 3 });
+  capture(new ArrayBuffer(2));
+  expect(peer.send).not.toHaveBeenCalled();
+  const question = new Int16Array(6000).fill(512).buffer;
+  receive({ ...audioHeader, generation: 3, byteLength: question.byteLength });
+  raw(question);
+  act(() => audio.play.mock.lastCall![1]());
+  peer.send.mockClear();
+  capture(new ArrayBuffer(2));
+  expect(peer.send).not.toHaveBeenCalled();
+  receive({
+    type: 'transcript',
+    speaker: 'assistant',
+    generation: 3,
+    sequence: 1,
+    fragmentId: 'q3',
+    content: '次の質問',
+    sourceStartMs: null,
+    sourceEndMs: null,
+  });
+  capture(new ArrayBuffer(2));
+  expect(new DataView(peer.send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+});
+
+test('質問切替中の一時停止はすぐマイクを解放し、新世代の面接中に一度だけ停止を送る', async () => {
+  const { state, click, audio, peer } = mountLive();
+  state({ status: 'ready' });
+  await click('マイクを許可して開始');
+  state();
+  await click('質問を見送る');
+  await click('一時停止');
+  expect(audio.close).toHaveBeenCalledOnce();
+  peer.send.mockClear();
+  state({ status: 'reconnecting', generation: 2 });
+  state({ status: 'connecting', generation: 3 });
+  expect(peer.send).not.toHaveBeenCalled();
+  state({ generation: 3 });
+  state({ generation: 3 });
+  expect(peer.send).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 3 });
+});
+
+test('質問切替中に一時停止を押して新接続に失敗しても、再開待ちの世代を一時停止する', async () => {
+  const { state, click, audio, peer, receive } = mountLive();
+  state({ status: 'ready' });
+  await click('マイクを許可して開始');
+  state();
+  await click('質問を見送る');
+  state({ status: 'reconnecting', generation: 2 });
+  await click('一時停止');
+  expect(audio.close).toHaveBeenCalledOnce();
+  peer.send.mockClear();
+  state({ status: 'connecting', generation: 3 });
+  receive({ type: 'error', commandId: null, code: 'AUDIO_CONNECT_FAILED' });
+  state({ status: 'reconnecting', generation: 4 });
+  state({ status: 'reconnecting', generation: 4 });
+  expect(peer.send).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 4 });
+  state({ status: 'paused', generation: 5 });
+  expect(screen.getByRole('button', { name: 'マイクを許可して再開' })).toBeTruthy();
+  expect(audio.close).toHaveBeenCalledOnce();
+});
+
+test('新世代で言い換えの返答が届く前でも質問を見送れる', async () => {
+  const { state, click, peer } = mountLive();
+  state();
+  await click('言い換えを依頼');
+  state({ status: 'reconnecting', generation: 2 });
+  state({ status: 'connecting', generation: 3 });
+  state({ generation: 3 });
+  await click('質問を見送る');
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'skip', generation: 3 });
+});
+
+test('切替先で音声だけが届いても、20秒後に文字待ちと復帰操作を表示する', async () => {
+  vi.useFakeTimers();
+  const { state, click, audio, receive, raw, peer } = mountLive();
+  state({ status: 'ready' });
+  await click('マイクを許可して開始');
+  state();
+  await click('言い換えを依頼');
+  state({ status: 'reconnecting', generation: 2 });
+  state({ status: 'connecting', generation: 3 });
+  state({ generation: 3 });
+  const question = new Int16Array(6000).fill(512).buffer;
+  receive({ ...audioHeader, generation: 3, byteLength: question.byteLength });
+  raw(question);
+  act(() => audio.play.mock.lastCall![1]());
+  await act(async () => vi.advanceTimersByTimeAsync(20500));
+  expect(screen.getByText(/質問の文字がまだ届いていません/)).toBeTruthy();
+  await click('音声をつなぎ直す');
+  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 3 });
+});
 test('担当タブで再生した音声だけを受領し、再生中の世代や担当変更を検知する', async () => {
   const { peer, audio, receive, state, raw, click } = mountLive();
   state({ canControl: false });
@@ -414,7 +591,7 @@ test.each(['AUDIO_CONNECT_FAILED', 'AUDIO_USAGE_LIMIT', 'INVALID_EVENT', 'NOT_OW
   'サーバーのエラー %s と担当状態に応じてマイクを解放する',
   async (code) => {
     const { audio, receive, state, click } = mountLive();
-    state({ status: 'paused', canControl: false });
+    state({ status: 'reconnecting', canControl: false });
     await click('マイクを許可して再開');
     if (code !== 'NOT_OWNER') {
       state();

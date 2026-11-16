@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,6 +51,24 @@ test('台帳作成後に元ソースが変更された場合は実行を拒否�
   const child = item.execute("import('./value.mjs')");
   expect(child.status).toBe(1);
   expect(child.stderr).toContain('計測対象が変更されています: value.mjs');
+});
+
+test('シンボリックリンク経由のルートでも実ファイルのカウンターを回収する', () => {
+  const item = fixture('value.mjs', 'export const value = 1;');
+  const linkedRoot = join(item.root, 'linked');
+  symlinkSync(item.root, linkedRoot, 'dir');
+  writeFileSync(
+    item.config,
+    JSON.stringify({
+      root: linkedRoot,
+      directory: item.directory,
+      run: item.run,
+    }),
+  );
+  const child = item.execute("import('./value.mjs')");
+  expect(child.stderr).toBe('');
+  expect(child.status).toBe(0);
+  expect(readCaptures(item.directory)[0].files[0]?.coverage.s['0']).toBe(1);
 });
 
 test('終了前にカウンターが失われても空の収集記録を残す', () => {

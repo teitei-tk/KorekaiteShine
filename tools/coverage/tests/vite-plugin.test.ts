@@ -1,7 +1,35 @@
 import { runInNewContext } from 'node:vm';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { coveragePlugin } from '../src/vite-plugin.ts';
 import { createMergeFixture } from './fixtures/measurement.ts';
+
+test('リンク経由の原本とコピー先をViteが実パスへ解決しても計測する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'coverage-plugin-'));
+  try {
+    const root = join(directory, 'repo');
+    const copy = join(directory, 'copy');
+    mkdirSync(root);
+    mkdirSync(copy);
+    const linkedRoot = join(directory, 'linked-repo');
+    const linkedCopy = join(directory, 'linked-copy');
+    symlinkSync(root, linkedRoot, 'dir');
+    symlinkSync(copy, linkedCopy, 'dir');
+    const { run, target, path } = createMergeFixture();
+    const source = target.coverage.inputSourceMap!.sourcesContent![0]!;
+    const plugin = coveragePlugin(linkedRoot, run, [{ from: linkedCopy, to: linkedRoot }]);
+    expect(plugin.transform(source, join(realpathSync(root), path))?.code).toContain(
+      '__coverage__',
+    );
+    expect(plugin.transform(source, join(realpathSync(copy), path))?.code).toContain(
+      '__coverage__',
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test('台帳作成後の原本変更をVite変換で拒否する', () => {
   const { run, target, path } = createMergeFixture();

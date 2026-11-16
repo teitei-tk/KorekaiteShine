@@ -2,6 +2,7 @@ import { SystemError } from '../../testing/system-error.mts';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readlinkSync, readdirSync } from 'node:fs';
+import { platform } from 'node:os';
 import { findWorkerdInspector } from '../src/workerd-inspector.ts';
 test('全候補の接続が失敗した場合はInspectorを発見したことにしない', async () => {
   vi.mocked(fetch).mockRejectedValue(new Error('not inspector'));
@@ -18,6 +19,7 @@ test('所有ソケットを読めない権限エラーを欠落扱いで隠さ�
 });
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+vi.mock('node:os', () => ({ platform: vi.fn() }));
 vi.mock('node:fs', async (original) => ({
   ...(await original<typeof import('node:fs')>()),
   readFileSync: vi.fn(),
@@ -25,6 +27,7 @@ vi.mock('node:fs', async (original) => ({
   readdirSync: vi.fn(),
 }));
 beforeEach(() => {
+  vi.mocked(platform).mockReturnValue('linux');
   vi.mocked(execFileSync).mockReturnValue('200 100 node\n300 200 workerd\n400 99 workerd');
   vi.mocked(readdirSync).mockReturnValue(['1', '2', '3'] as object as ReturnType<
     typeof readdirSync
@@ -54,6 +57,25 @@ beforeEach(() => {
       Response.json([{ id: 'core:user:worker', webSocketDebuggerUrl: 'ws://fixture/worker' }]),
     ),
   );
+});
+
+test('macOSでは子孫workerdだけの待受ポートをlsofから探索する', async () => {
+  vi.mocked(platform).mockReturnValue('darwin');
+  vi.mocked(execFileSync)
+    .mockReturnValueOnce('200 100 node\n300 200 /bin/workerd\n400 99 /bin/workerd\n500 300 workerd')
+    .mockReturnValueOnce('p300\nfc4\nn127.0.0.1:10001\np500\nf5\nn[::1]:10002\n');
+  vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
+  expect(await findWorkerdInspector(100, ['worker'])).toEqual([
+    { id: 'core:user:worker', webSocketDebuggerUrl: 'ws://fixture/worker' },
+  ]);
+  expect(execFileSync).toHaveBeenLastCalledWith(
+    'lsof',
+    ['-nP', '-a', '-p', '300,500', '-iTCP', '-sTCP:LISTEN', '-Fn'],
+    { encoding: 'utf8' },
+  );
+  expect(fetch).toHaveBeenNthCalledWith(2, 'http://127.0.0.1:10002/json/list', expect.any(Object));
+  expect(readFileSync).not.toHaveBeenCalled();
+  expect(readdirSync).not.toHaveBeenCalled();
 });
 afterEach(() => {
   vi.resetAllMocks();

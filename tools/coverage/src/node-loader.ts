@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { registerHooks } from 'node:module';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,13 +24,14 @@ if (config) {
     global.__coverage__[path] = counters;
   }
   const targets = new Map(run.targets.map((target) => [target.path, target]));
+  const physicalRoot = realpathSync(root);
   registerHooks({
     load(url, context, nextLoad) {
       const loaded = nextLoad(url, context);
       if (!url.startsWith('file:')) {
         return loaded;
       }
-      const path = relative(root, fileURLToPath(url));
+      const path = relative(physicalRoot, realpathSync(fileURLToPath(url)));
       const target = targets.get(path);
       if (!target) {
         return loaded;

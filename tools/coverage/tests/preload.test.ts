@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { prepareRun } from '../src/prepare.ts';
 import { readCaptures } from '../src/capture.ts';
 import { createNodePreload } from '../src/preload.ts';
 
-test('Node起動時のローダー自身の実行を原本のカウンターへ記録する', () => {
+test.each([false, true])('リンク経由%sでもNode起動時のローダー自身を計測する', (linked) => {
   const root = fileURLToPath(new URL('../../../', import.meta.url));
   const directory = mkdtempSync(join(tmpdir(), 'coverage-preload-'));
   try {
@@ -16,7 +16,11 @@ test('Node起動時のローダー自身の実行を原本のカウンターへ�
     const { run } = prepareRun(root, [path], 'revision', ['node']);
     const config = join(directory, 'run.json');
     writeFileSync(config, JSON.stringify({ root, directory: join(directory, 'records'), run }));
-    const preload = createNodePreload(root, run, directory);
+    const linkedDirectory = join(directory, 'linked');
+    if (linked) {
+      symlinkSync(directory, linkedDirectory, 'dir');
+    }
+    const preload = createNodePreload(root, run, linked ? linkedDirectory : directory);
     const child = spawnSync(process.execPath, ['--import', preload, '-e', '0'], {
       encoding: 'utf8',
       env: {

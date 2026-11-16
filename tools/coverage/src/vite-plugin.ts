@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { existsSync, realpathSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { instrumentSource } from './instrument.ts';
 import type { CoverageRun } from './merge.ts';
@@ -9,6 +10,13 @@ export function coveragePlugin(
   run: CoverageRun,
   aliases: readonly { from: string; to: string }[] = [],
 ) {
+  // Viteが解決した実パスに合わせる。仮想ディレクトリの対応付けも維持する。
+  const physical = (path: string) => (existsSync(path) ? realpathSync(path) : resolve(path));
+  const physicalRoot = physical(root);
+  const physicalAliases = aliases.map(({ from, to }) => ({
+    from: physical(from),
+    to: physical(to),
+  }));
   const targets = new Map(run.targets.map((target) => [target.path, target]));
   return {
     name: 'korekaite-test-coverage',
@@ -18,8 +26,11 @@ export function coveragePlugin(
       if (new URLSearchParams(query).has('url')) {
         return;
       }
-      const alias = aliases.find(({ from }) => file.startsWith(from + '/'));
-      const path = relative(root, alias ? resolve(alias.to, relative(alias.from, file)) : file);
+      const alias = physicalAliases.find(({ from }) => file.startsWith(from + '/'));
+      const path = relative(
+        physicalRoot,
+        alias ? resolve(alias.to, relative(alias.from, file)) : file,
+      );
       const target = targets.get(path);
       if (!target) {
         return;

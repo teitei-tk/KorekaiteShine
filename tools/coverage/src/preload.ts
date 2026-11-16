@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { instrumentSource } from './instrument.ts';
@@ -7,11 +7,12 @@ import type { CoverageRun } from './merge.ts';
 /** 起動前に必要なローダーだけを生成し、原本のマップで自己計測する。 */
 export function createNodePreload(root: string, run: CoverageRun, directory: string): string {
   const original = new URL('./node-loader.ts', import.meta.url);
-  const path = relative(root, fileURLToPath(original));
+  const path = relative(realpathSync(root), fileURLToPath(original));
   if (!run.targets.some((target) => target.path === path)) {
     return original.href;
   }
-  const generated = pathToFileURL(join(directory, 'node-loader.mjs'));
+  // Nodeがimport時に正規化するURLと、resolveフックの比較先を一致させる。
+  const generated = pathToFileURL(join(realpathSync(directory), 'node-loader.mjs'));
   writeFileSync(generated, instrumentSource(path, readFileSync(original, 'utf8')).code);
   const bootstrap = pathToFileURL(join(directory, 'node-preload.mjs'));
   writeFileSync(

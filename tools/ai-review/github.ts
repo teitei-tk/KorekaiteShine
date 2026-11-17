@@ -45,7 +45,6 @@ export function githubApi<Body extends object = ApiBody>(token: string): Api<Bod
     if (!response.ok) {
       throw new Error(`GitHub API HTTP ${response.status}`);
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub transportには実行時のTが存在しない。各callerの既存validator/許可リストで構造を検査する。
     return parseJson(await response.text()) as T;
   };
 }
@@ -93,7 +92,6 @@ export function reviewComments(api: Api, number: number): Promise<ReviewComment[
 }
 export function ownComment(c: Comment): boolean {
   return (
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     c.user?.login === 'github-actions[bot]' && c.user.type === 'Bot' && c.body.startsWith(MARKER)
   );
 }
@@ -110,11 +108,8 @@ export async function target(api: Api, runId: number): Promise<TargetResult> {
     run.event !== 'pull_request' ||
     run.conclusion !== 'success' ||
     !isSourceCi(run.path) ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.repository?.id !== 1_426_899_426 ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.head_repository?.id !== 1_426_899_426 ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.pull_requests?.length !== 1
   ) {
     return { status: 'excluded' };
@@ -128,7 +123,6 @@ export async function target(api: Api, runId: number): Promise<TargetResult> {
     return { status: 'excluded' };
   }
   const [tested] = run.pull_requests;
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
   if (tested.head?.sha !== pr.head.sha || tested.base?.sha !== pr.base.sha) {
     return { status: 'excluded' };
   }

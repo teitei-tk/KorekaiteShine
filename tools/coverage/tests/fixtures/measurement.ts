@@ -1,5 +1,4 @@
 import { readCoverageData } from '../../src/schema.ts';
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
 import { instrumentSource } from '../../src/instrument.ts';

@@ -85,11 +85,9 @@ function fixture() {
         countContext.failAfterWrite = false;
         throw new Error('response lost');
       }
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { id } as T;
     }
     if (path === 'pulls/7') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         number: 7,
         user: { id: 1_324_680, type: 'User' },
@@ -100,15 +98,12 @@ function fixture() {
       } as T;
     }
     if (path.startsWith('issues/')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return structuredClone(snapshot.issues) as T;
     }
     if (path.startsWith('pulls/7/comments?')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return structuredClone(snapshot.inline) as T;
     }
     if (path === 'graphql') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         data: {
           repository: {
@@ -282,7 +277,6 @@ it('出力改竄・旧形式・別生成元・確認漏れを拒否する', asyn
 it('投稿直前に対象が変われば書き込まない', async () => {
   const f = fixture();
   const api: Api = async <T>(path: string, method?: string, body?: ApiBody) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     path === 'pulls/7' ? ({ number: 7, state: 'closed' } as T) : f.api<T>(path, method, body);
   await expect(publishArtifact(api, f.artifact)).resolves.toBe('TARGET_CHANGED');
   expect(f.count()).toBe(0);
@@ -300,7 +294,6 @@ it.each(['failure', 'cancelled', 'timed_out'])(
       directory = mkdtempSync(join(tmpdir(), 'resume-flow-'));
     const api: Api = async <T>(path: string, method?: string, body?: ApiBody) => {
       if (path === 'actions/runs/20') {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           id: 20,
           run_attempt: 1,
@@ -315,7 +308,6 @@ it.each(['failure', 'cancelled', 'timed_out'])(
         } as T;
       }
       if (path === 'actions/runs/12') {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           id: 12,
           run_attempt: 1,
@@ -329,7 +321,6 @@ it.each(['failure', 'cancelled', 'timed_out'])(
         } as T;
       }
       if (path === 'actions/runs/20/attempts/1/jobs?per_page=100') {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },

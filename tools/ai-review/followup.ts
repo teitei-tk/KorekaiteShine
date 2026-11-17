@@ -24,7 +24,6 @@ export function latestFollowupStatus(
       return marker?.[1] === original.id;
     })
     .toSorted((a, b) => b.id - a.id);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
   if (!latest) {
     return undefined;
   }

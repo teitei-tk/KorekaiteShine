@@ -21,7 +21,6 @@ test('停止時の非Error例外も隠さず呼出し元へ返す', async () => 
   const child = new ChildProcess();
   Object.defineProperty(child, 'pid', { value: 12_345 });
   vi.spyOn(process, 'kill').mockImplementation(() => {
-    // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外をthrowされたときの処理を検証する故障fixture。
     throw 'private failure';
   });
   await expect(stopProcessGroup(child)).rejects.toBe('private failure');

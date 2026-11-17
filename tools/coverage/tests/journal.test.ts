@@ -1,5 +1,4 @@
 import { parse } from '../src/schema.ts';
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { SystemError } from '../../testing/system-error.mts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

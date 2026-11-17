@@ -69,7 +69,6 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
       try {
         return await deps.save(result);
       } catch {
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         if (execution.stopped || deps.now() >= deps.deadline) {
           return false;
         }

@@ -41,8 +41,9 @@ export function PracticeLive({
   const socket = useRef<WebSocket | null>(null);
   const latest = useRef<State | null>(null);
   const media = useRef<Awaited<ReturnType<typeof openInterviewAudio>> | null>(null);
-  // oxlint-disable-next-line react/hook-use-state -- 接続をまたいで同じ監視オブジェクトを保持し、setterは使用しない。
-  const [responseMonitor] = useState(createResponseMonitor);
+  const responseMonitorRef = useRef<ReturnType<typeof createResponseMonitor> | null>(null);
+  responseMonitorRef.current ??= createResponseMonitor();
+  const responseMonitor = responseMonitorRef.current;
   const questionChange = useRef<{
     generation: number;
     commandId: string;
@@ -129,7 +130,6 @@ export function PracticeLive({
       }),
     );
   }
-  /* oxlint-disable react-hooks/exhaustive-deps -- 接続はid/revisionで所有する。イベント処理は最新値をrefから読み、renderごとの関数再生成では再接続しない。 */
   useEffect(() => {
     setState(null);
     setDisconnected(false);
@@ -206,7 +206,6 @@ export function PracticeLive({
         header: null as Extract<InterviewServerEvent, { type: 'audio' }> | null,
       };
       const saved = new Map<string, Transcript>();
-      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       peer.onmessage = ({ data }: MessageEvent<string | ArrayBuffer>) => {
         try {
           if (typeof data !== 'string') {
@@ -250,7 +249,6 @@ export function PracticeLive({
           if (headerState.header || !validateInterviewServerEvent(event)) {
             throw new Error('音声接続のイベント形式が不正です。');
           }
-          // oxlint-disable-next-line eslint/default-case -- validatorが保証するイベントunionの分岐を列挙する。
           switch (event.type) {
             case 'state': {
               if (event.interviewId !== id) {
@@ -339,7 +337,6 @@ export function PracticeLive({
                 acceptQuestion();
               }
               saved.set(event.fragmentId, event);
-              // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象。ここで生成した一時配列だけを変更する。
               setFragments([...saved.values()].sort((a, b) => a.sequence - b.sequence));
               break;
             }
@@ -385,13 +382,10 @@ export function PracticeLive({
           peer.close();
         }
       };
-      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       peer.onclose = () => {
-        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onclose = null;
         disconnectedPeer();
       };
-      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       peer.onerror = () => {
         setError('面接画面とローカルサーバーの接続が切れました。');
       };
@@ -403,11 +397,8 @@ export function PracticeLive({
       clearTimeout(retryTimerContext.handshake);
       const peer = socket.current;
       if (peer) {
-        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onclose = null;
-        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onmessage = null;
-        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onerror = null;
         peer.close();
       }
@@ -416,7 +407,6 @@ export function PracticeLive({
       socket.current = null;
     };
   }, [id, revision, responseMonitor, releaseMedia]);
-  /* oxlint-enable react-hooks/exhaustive-deps */
   useEffect(() => {
     if ((state?.status !== 'active' && !changingQuestion) || disconnected) {
       return undefined;
@@ -488,7 +478,6 @@ export function PracticeLive({
         setError('マイクの使用許可と入力機器を確認してください。');
       }
     } finally {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!permission.current || permission.current === controller) {
         setPending(false);
       }
@@ -539,10 +528,7 @@ export function PracticeLive({
       });
     }
   }
-  const question = [...turns]
-    // oxlint-disable-next-line unicorn/no-array-reverse -- ES2022対象。ここで生成した一時配列だけを変更する。
-    .reverse()
-    .find((turn) => turn.speaker === 'assistant');
+  const question = [...turns].reverse().find((turn) => turn.speaker === 'assistant');
   return (
     <section>
       <h3>音声面接</h3>

@@ -30,7 +30,6 @@ export type Measurement = {
 
 function validateCounts(file: CoverageTarget): void {
   const { s, f, b, statementMap, fnMap, branchMap } = file.coverage;
-  // eslint-disable-next-line unicorn/no-array-sort -- ES2022 libの利用側へ公開するため、新規生成した局所配列だけを整列する。
   const keys = (value: object) => Object.keys(value).sort();
   if (
     !isDeepStrictEqual(keys(s), keys(statementMap)) ||

@@ -9,22 +9,23 @@ export async function requireDiagnosticInitialization(
   jobId: string,
 ): Promise<void> {
   const db = createPrimaryDb(binding);
-  const [job] = await db
-    .select({ jobId: jobs.jobId })
-    .from(jobs)
-    .innerJoin(jobOutbox, eq(jobOutbox.jobId, jobs.jobId))
-    .where(
-      and(
-        eq(jobs.jobId, jobId),
-        eq(jobs.purpose, 'diagnostics'),
-        eq(jobs.actorId, 'local-developer'),
-        eq(jobOutbox.operation, 'initialize_do'),
-        eq(jobOutbox.purpose, 'diagnostics'),
-        notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
-      ),
-    )
-    .limit(1);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const job = (
+    await db
+      .select({ jobId: jobs.jobId })
+      .from(jobs)
+      .innerJoin(jobOutbox, eq(jobOutbox.jobId, jobs.jobId))
+      .where(
+        and(
+          eq(jobs.jobId, jobId),
+          eq(jobs.purpose, 'diagnostics'),
+          eq(jobs.actorId, 'local-developer'),
+          eq(jobOutbox.operation, 'initialize_do'),
+          eq(jobOutbox.purpose, 'diagnostics'),
+          notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
+        ),
+      )
+      .limit(1)
+  ).at(0);
   if (!job) {
     throw new Error('診断の初期化対象を確認できません。');
   }
@@ -128,8 +129,7 @@ export async function confirmDiagnosticInitialization(
         ),
       ),
   ]);
-  const [confirmation] = await confirmed;
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const confirmation = (await confirmed).at(0);
   if (!confirmation) {
     throw new Error('DO保存の観測結果を確定できません。');
   }
@@ -137,26 +137,27 @@ export async function confirmDiagnosticInitialization(
 
 export async function pendingCheckNotification(binding: D1Database, jobId: string) {
   const db = createPrimaryDb(binding);
-  const [pending] = await db
-    .select({ id: jobOutbox.id, jobId: jobOutbox.jobId })
-    .from(jobOutbox)
-    .innerJoin(jobs, eq(jobs.jobId, jobOutbox.jobId))
-    .where(
-      and(
-        eq(jobOutbox.jobId, jobId),
-        eq(jobOutbox.operation, 'notify'),
-        eq(jobOutbox.purpose, 'diagnostics'),
-        eq(jobOutbox.generation, 0),
-        isNull(jobOutbox.sentAt),
-        lte(jobOutbox.scheduledAt, Temporal.Now.instant().epochMilliseconds),
-        eq(jobs.purpose, 'diagnostics'),
-        eq(jobs.actorId, 'local-developer'),
-        eq(jobs.status, 'pending'),
-        notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
-      ),
-    )
-    .limit(1);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const pending = (
+    await db
+      .select({ id: jobOutbox.id, jobId: jobOutbox.jobId })
+      .from(jobOutbox)
+      .innerJoin(jobs, eq(jobs.jobId, jobOutbox.jobId))
+      .where(
+        and(
+          eq(jobOutbox.jobId, jobId),
+          eq(jobOutbox.operation, 'notify'),
+          eq(jobOutbox.purpose, 'diagnostics'),
+          eq(jobOutbox.generation, 0),
+          isNull(jobOutbox.sentAt),
+          lte(jobOutbox.scheduledAt, Temporal.Now.instant().epochMilliseconds),
+          eq(jobs.purpose, 'diagnostics'),
+          eq(jobs.actorId, 'local-developer'),
+          eq(jobs.status, 'pending'),
+          notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
+        ),
+      )
+      .limit(1)
+  ).at(0);
   return pending ?? null;
 }
 

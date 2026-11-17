@@ -43,7 +43,6 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
     expect(events.filter((e) => e.type === 'session.output_audio.delta')).toHaveLength(3);
     // RFC 6455の予約ビットを立てたフレームでサーバー側errorを発生させる。
     const closed = once(client, 'close');
-    // oxlint-disable-next-line eslint/no-underscore-dangle -- wsの低水準socketで意図的に壊れたフレームを送る。
     client._socket.write(Buffer.from([0xc1, 0x80, 0, 0, 0, 0]));
     await closed;
     const open = new WebSocket(url);

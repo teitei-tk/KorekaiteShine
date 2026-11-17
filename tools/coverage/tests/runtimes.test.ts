@@ -1,5 +1,4 @@
 import { readCoverageData, parse } from '../src/schema.ts';
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { createCoverageMap } from '@vitest/istanbul-lib-coverage';

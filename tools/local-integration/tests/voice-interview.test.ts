@@ -57,7 +57,6 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     expect(creation.status).toBe(200);
     const events: InterviewServerEvent[] = [];
     // NodeのWebSocketではブラウザが自動付与するCookieとOriginを明示する。
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Node26のWebSocket headers拡張がDOM型にないため追加する。
     const LocalSocket = WebSocket as typeof WebSocket & {
       new (url: string, init: { headers: Record<string, string> }): WebSocket;
     };
@@ -155,7 +154,6 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       })
       .toBe(true);
     const ended = events
-      // oxlint-disable-next-line unicorn/prefer-array-find -- ES2022型設定ではfindLastを使用できないため、末尾一致を明示する。
       .filter((event) => event.type === 'state' && event.status === 'ended')
       .at(-1);
     if (ended?.type !== 'state' || !ended.evaluationJobId) {

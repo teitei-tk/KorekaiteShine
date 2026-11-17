@@ -34,7 +34,8 @@
     "rule": "eslint/class-methods-use-this",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/complexity",
@@ -59,7 +60,8 @@
     "rule": "eslint/default-case",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/default-case-last",
@@ -159,7 +161,7 @@
     "category": "pedantic",
     "typeAware": false,
     "status": "scoped",
-    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/max-depth",
@@ -206,7 +208,8 @@
     "rule": "eslint/new-cap",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-alert",
@@ -237,7 +240,8 @@
     "rule": "eslint/no-bitwise",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-caller",
@@ -432,7 +436,7 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "JsonInputのdraft欠損/falsyを既存どおり分類する明示Booleanとstrict-boolean-expressionsの混在型制約を両立する局所例外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-extra-label",
@@ -757,7 +761,7 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-ternary",
@@ -776,7 +780,8 @@
     "rule": "eslint/no-throw-literal",
     "category": "pedantic",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-unassigned-vars",
@@ -802,7 +807,8 @@
     "rule": "eslint/no-underscore-dangle",
     "category": "suspicious",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-unexpected-multiline",
@@ -880,7 +886,8 @@
     "rule": "eslint/no-use-before-define",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/no-useless-assignment",
@@ -1002,7 +1009,8 @@
     "rule": "eslint/prefer-destructuring",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "eslint/prefer-exponentiation-operator",
@@ -1245,7 +1253,7 @@
     "category": "restriction",
     "typeAware": false,
     "status": "scoped",
-    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "import/no-cycle",
@@ -1361,7 +1369,7 @@
     "category": "restriction",
     "typeAware": false,
     "status": "scoped",
-    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "jest/consistent-test-it",
@@ -2525,7 +2533,8 @@
     "rule": "promise/always-return",
     "category": "suspicious",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "promise/avoid-new",
@@ -2538,7 +2547,8 @@
     "rule": "promise/catch-or-return",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "promise/no-callback-in-promise",
@@ -2606,7 +2616,8 @@
     "rule": "promise/prefer-catch",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "promise/spec-only",
@@ -2654,7 +2665,8 @@
     "rule": "react/exhaustive-deps",
     "category": "correctness",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "react/exhaustive-effect-dependencies",
@@ -2855,7 +2867,8 @@
     "rule": "react/no-array-index-key",
     "category": "perf",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "react/no-children-prop",
@@ -3181,7 +3194,7 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/ban-ts-comment",
@@ -3224,7 +3237,7 @@
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/consistent-type-assertions",
@@ -3236,27 +3249,29 @@
     "rule": "typescript/consistent-type-definitions",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/consistent-type-exports",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/consistent-type-imports",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/dot-notation",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/explicit-function-return-type",
@@ -3290,14 +3305,14 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-base-to-string",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-confusing-non-null-assertion",
@@ -3310,14 +3325,14 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-deprecated",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-duplicate-enum-values",
@@ -3330,7 +3345,7 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-dynamic-delete",
@@ -3373,28 +3388,28 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-for-in-array",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-generated-empty-object-type",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-implied-eval",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-import-type-side-effects",
@@ -3412,14 +3427,15 @@
     "rule": "typescript/no-invalid-void-type",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-meaningless-void-operator",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-misused-new",
@@ -3432,21 +3448,21 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-misused-spread",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-mixed-enums",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-namespace",
@@ -3477,7 +3493,7 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-require-imports",
@@ -3489,7 +3505,8 @@
     "rule": "typescript/no-restricted-types",
     "category": "restriction",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-this-alias",
@@ -3502,14 +3519,14 @@
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-condition",
     "category": "nursery",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-parameter-property-assignment",
@@ -3522,28 +3539,28 @@
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-template-expression",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-type-arguments",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-type-assertion",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-type-constraint",
@@ -3556,35 +3573,35 @@
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unnecessary-type-parameters",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-argument",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-assignment",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-call",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-declaration-merging",
@@ -3597,14 +3614,14 @@
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-enum-comparison",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-function-type",
@@ -3617,35 +3634,35 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-return",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-type-assertion",
     "category": "suspicious",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-unsafe-unary-minus",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-useless-default-assignment",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/no-useless-empty-export",
@@ -3670,14 +3687,14 @@
     "category": "restriction",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/only-throw-error",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/parameter-properties",
@@ -3702,7 +3719,7 @@
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-for-of",
@@ -3721,7 +3738,7 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-literal-enum-member",
@@ -3740,28 +3757,28 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-optional-chain",
     "category": "nursery",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-promise-reject-errors",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-readonly",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-readonly-parameter-types",
@@ -3775,28 +3792,28 @@
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-regexp-exec",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-return-this-type",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-string-starts-ends-with",
     "category": "style",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/prefer-ts-expect-error",
@@ -3816,14 +3833,14 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/require-array-sort-compare",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/require-await",
@@ -3837,42 +3854,42 @@
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/restrict-template-expressions",
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/return-await",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/strict-boolean-expressions",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/strict-void-return",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/switch-exhaustiveness-check",
     "category": "pedantic",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/triple-slash-reference",
@@ -3885,7 +3902,7 @@
     "category": "correctness",
     "typeAware": true,
     "status": "scoped",
-    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "typescript/unified-signatures",
@@ -4057,13 +4074,15 @@
     "rule": "unicorn/no-array-reverse",
     "category": "suspicious",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/no-array-sort",
     "category": "suspicious",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/no-await-expression-member",
@@ -4264,7 +4283,8 @@
     "rule": "unicorn/no-unreadable-array-destructuring",
     "category": "style",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/no-unreadable-iife",
@@ -4350,13 +4370,15 @@
     "rule": "unicorn/prefer-add-event-listener",
     "category": "suspicious",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/prefer-array-find",
     "category": "perf",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/prefer-array-flat",
@@ -4416,7 +4438,8 @@
     "rule": "unicorn/prefer-code-point",
     "category": "pedantic",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/prefer-date-now",
@@ -4458,7 +4481,8 @@
     "rule": "unicorn/prefer-event-target",
     "category": "pedantic",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/prefer-export-from",
@@ -4669,7 +4693,8 @@
     "rule": "unicorn/prefer-top-level-await",
     "category": "pedantic",
     "typeAware": false,
-    "status": "enabled"
+    "status": "scoped",
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "unicorn/prefer-type-error",
@@ -4742,42 +4767,42 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/consistent-test-filename",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/consistent-test-it",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/consistent-vitest-vi",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/expect-expect",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/hoisted-apis-on-top",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/max-expects",
@@ -4791,28 +4816,28 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-alias-methods",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-commented-out-tests",
     "category": "suspicious",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-conditional-expect",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-conditional-in-test",
@@ -4826,28 +4851,28 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-disabled-tests",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-duplicate-hooks",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-focused-tests",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-hooks",
@@ -4861,7 +4886,7 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-import-node-test",
@@ -4882,133 +4907,133 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-large-snapshots",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-mocks-import",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-restricted-matchers",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-restricted-vi-methods",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-standalone-expect",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-test-prefixes",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-test-return-statement",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/no-unneeded-async-expect-function",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/padding-around-after-all-blocks",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/padding-around-test-blocks",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-called-exactly-once-with",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-called-once",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-called-times",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-called-with",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-comparison-matcher",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-describe-function-title",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-each",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-equality-matcher",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-expect-assertions",
@@ -5022,28 +5047,28 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-expect-type-of",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-hooks-in-order",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-hooks-on-top",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-import-in-mock",
@@ -5057,7 +5082,7 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-lowercase-title",
@@ -5071,7 +5096,7 @@
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-mock-return-shorthand",
@@ -5085,91 +5110,91 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-spy-on",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-strict-boolean-matchers",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-strict-equal",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-be",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-be-falsy",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-be-object",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-be-truthy",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-contain",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-have-been-called-times",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-to-have-length",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/prefer-todo",
     "category": "style",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/require-awaited-expect-poll",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/require-hook",
@@ -5183,7 +5208,7 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/require-mock-type-parameters",
@@ -5204,7 +5229,7 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/require-top-level-describe",
@@ -5218,35 +5243,35 @@
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/valid-expect",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/valid-expect-in-promise",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/valid-title",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vitest/warn-todo",
     "category": "correctness",
     "typeAware": false,
     "status": "scoped",
-    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+    "reason": "通常は有効。外部API・実行環境・テストの契約上必要な具体的な適用範囲と理由をscoped-exceptions.jsonに記録し、設定と双方向に照合する。"
   },
   {
     "rule": "vue/component-definition-name-casing",

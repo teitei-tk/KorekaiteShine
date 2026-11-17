@@ -99,7 +99,6 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
     const saved = await readJson(first);
     expect(saved).toEqual({
       jobId: accepted.jobId,
-      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherを期待値に埋め込む。実データの型断定ではない。
       firstReceivedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
     });
     const repeated = await initialize();

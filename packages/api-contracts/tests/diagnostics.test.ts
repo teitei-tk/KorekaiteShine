@@ -58,7 +58,6 @@ test('診断の開始と状態取得で成功・エラー・必須ヘッダー�
   const get = objectAt(document, 'paths', '/api/diagnostics/check-jobs/{jobId}', 'get');
   expect(start).toBeDefined();
   expect(get).toBeDefined();
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、Object.keysが作成した配列だけを整列する。
   expect(Object.keys(objectAt(start.responses)).sort()).toEqual([
     '202',
     '400',
@@ -67,7 +66,6 @@ test('診断の開始と状態取得で成功・エラー・必須ヘッダー�
     '500',
     '503',
   ]);
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、Object.keysが作成した配列だけを整列する。
   expect(Object.keys(objectAt(get.responses)).sort()).toEqual(['200', '400', '404', '500', '503']);
   expect(start.parameters).toContainEqual(
     expect.objectContaining({ in: 'header', name: 'Idempotency-Key', required: true }),

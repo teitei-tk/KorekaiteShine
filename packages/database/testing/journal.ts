@@ -1,4 +1,3 @@
-/* oxlint-disable typescript/no-restricted-types -- migration履歴のJSON境界を検証する。追加メタデータは変更せず保持する。 */
 type Journal = Record<string, unknown> & { entries: (Record<string, unknown> & { tag: string })[] };
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

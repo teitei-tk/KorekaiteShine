@@ -12,7 +12,6 @@ import { Route as live } from '../src/routes/api.interviews.$interviewId.live';
 import { Route as materials } from '../src/routes/api.materials.analyze';
 import type { Bindings } from '../src/server/interview-runtime';
 
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
 const { env } = vi.hoisted(() => ({ env: {} as Bindings }));
 vi.mock('cloudflare:workers', () => ({ env }));
 afterEach(() => vi.unstubAllGlobals());
@@ -26,7 +25,6 @@ function requestRoute(route: ApiRoute, method: string, path: string, options?: R
     request: Request;
     params: { interviewId: string };
   }) => Response | Promise<Response>;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 実際にimportしたTanStack Routeの登録済handlerをテストから呼ぶため、非公開metadata形状を局所的に表現する。
   const { server } = route.options as { server: { handlers: Record<string, Handler> } };
   return server.handlers[method]({ request, params: { interviewId: 'one' } });
 }

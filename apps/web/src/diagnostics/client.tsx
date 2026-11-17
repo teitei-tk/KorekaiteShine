@@ -13,7 +13,6 @@ export async function getDiagnosticStatus(
   { baseUrl, fetcher = fetch }: { baseUrl: string; fetcher?: typeof fetch },
 ): Promise<components['schemas']['CheckStatus']> {
   const client = createClient<paths>({ baseUrl, fetch: fetcher });
-  // oxlint-disable-next-line eslint/new-cap -- openapi-fetchの生成HTTPメソッド名に従う。
   const { data, response } = await client.GET('/api/diagnostics/check-jobs/{jobId}', {
     params: { path: { jobId } },
   });
@@ -52,7 +51,6 @@ export function createDiagnosticRun(
   const client = createClient<paths>({ baseUrl, fetch: fetcher });
   return {
     async start(): Promise<components['schemas']['CheckAccepted']> {
-      // oxlint-disable-next-line eslint/new-cap -- openapi-fetchの生成HTTPメソッド名に従う。
       const { data, error, response } = await client.POST('/api/diagnostics/check-jobs', {
         params: { header: { 'Idempotency-Key': key } },
         body: { scenario },

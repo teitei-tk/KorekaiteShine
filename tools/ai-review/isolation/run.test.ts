@@ -34,12 +34,9 @@ vi.mock('../isolation-probe.ts', async (original) => ({
 }));
 
 function closedAllServers() {
-  return (
-    vi
-      .mocked(createServer)
-      // oxlint-disable-next-line typescript/no-unsafe-member-access -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
-      .mock.results.every(({ value: server }) => vi.mocked(server.close).mock.calls.length === 1)
-  );
+  return vi
+    .mocked(createServer)
+    .mock.results.every(({ value: server }) => vi.mocked(server.close).mock.calls.length === 1);
 }
 it('検査後に受信器へ接続できなければ隔離成功としない', async () => {
   vi.mocked(createConnection).mockImplementationOnce(() => {
@@ -62,13 +59,11 @@ it('root権限やActionパスがなければ受け入れ検査を開始しない
   expect(createServer).not.toHaveBeenCalled();
 });
 it('Actionの非ゼロ終了を受け入れ成功にしない', async () => {
-  // oxlint-disable-next-line eslint/no-use-before-define -- Vitestが初期化後に呼ぶ遅延コールバック。
   statusContext.status = 1;
   await expect(import('./run.ts')).rejects.toThrow('isolation acceptance failed');
   expect(closedAllServers()).toBe(true);
 });
 it('Actionの完了中にrunnerが置換された場合は拒否する', async () => {
-  // oxlint-disable-next-line eslint/no-use-before-define -- Vitestが初期化後に呼ぶ遅延コールバック。
   statusContext.changed = true;
   await expect(import('./run.ts')).rejects.toThrow('runner process changed during probe');
 });
@@ -101,7 +96,6 @@ it('github検証で実runnerがなければ成功扱いしない', async () => {
   expect(spawn).not.toHaveBeenCalled();
 });
 it('受信器のアドレス不明時は両受信器を閉じて失敗する', async () => {
-  // oxlint-disable-next-line eslint/no-use-before-define -- Vitestが初期化後に呼ぶ遅延コールバック。
   address.mockReturnValue(null);
   await expect(import('./run.ts')).rejects.toThrow('listener not ready');
   expect(closedAllServers()).toBe(true);
@@ -143,7 +137,6 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {
     /* この実装では追加の処理を行わない。 */
   });
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
   vi.mocked(readdirSync).mockReturnValue(['101', '102', 'self'] as object as ReturnType<
     typeof readdirSync
   >);
@@ -167,18 +160,14 @@ beforeEach(() => {
   vi.mocked(createServer).mockImplementation((callback) => {
     const socket = new Socket();
     vi.spyOn(socket, 'end').mockImplementation(() => socket);
-    // oxlint-disable-next-line unicorn/prefer-event-target, typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
     const server = new (class extends EventEmitter {
       listen = vi.fn((...args) => {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
         (callback as (socket: Socket) => void)(socket);
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
         (args.at(-1) as () => void)();
         return server;
       });
       address = address;
       close = vi.fn((callback) => {
-        // oxlint-disable-next-line typescript/no-unsafe-call -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
         callback();
         return server;
       });

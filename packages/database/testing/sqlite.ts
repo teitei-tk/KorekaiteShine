@@ -31,7 +31,6 @@ export function createTestDatabase() {
       }
       return {
         success: true,
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- D1のgeneric契約をSQLiteで代替する。呼出側のSQL選択型を返す。
         results: results as T[],
         meta: {
           changes: Number(count.count),
@@ -52,7 +51,6 @@ export function createTestDatabase() {
     }
     async first<T>(column?: string): Promise<T | null> {
       const row = sqlite.prepare(this.query).get(...this.values);
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- D1のgeneric first契約。選択列の型は呼出側が指定する。
       return (row ? (column === undefined ? row : row[column]) : null) as T | null;
     }
     raw<T>(options: { columnNames: true }): Promise<[string[], ...T[]]>;
@@ -60,7 +58,6 @@ export function createTestDatabase() {
     async raw<T>(options?: { columnNames?: boolean }): Promise<T[] | [string[], ...T[]]> {
       const statement = sqlite.prepare(this.query);
       statement.setReturnArrays(true);
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- D1のgeneric raw契約。選択列の型は呼出側が指定する。
       const rows = statement.all(...this.values) as T[];
       return options?.columnNames
         ? [statement.columns().map((column) => column.name), ...rows]
@@ -95,7 +92,6 @@ export function createTestDatabase() {
     exec: async () => {
       throw new Error('テストのSQL準備にはsqliteを使ってください。');
     },
-    // oxlint-disable-next-line typescript/no-deprecated -- D1Databaseの既存公開interfaceを満たすだけで呼び出しは拒否する。
     dump: async () => {
       throw new Error('dumpは代替しません。');
     },

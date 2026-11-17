@@ -95,5 +95,4 @@ async function startCli(): Promise<void> {
     process.exitCode = 1;
   }
 }
-// eslint-disable-next-line unicorn/prefer-top-level-await -- 長時間CLIのimport完了を待たせると、呼出側の停止シグナル登録と検証がdeadlockする。
 void startCli();

@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -23,14 +23,14 @@ export async function reserveEvaluation(
     ) < ${usageLimits.evaluationsPerDay}
     ON CONFLICT DO NOTHING
   `);
-  const [saved] = await db
-    .select()
-    .from(usageReservations)
-    .where(eq(usageReservations.reservationId, reservationId));
+  const saved = (
+    await db
+      .select()
+      .from(usageReservations)
+      .where(eq(usageReservations.reservationId, reservationId))
+  ).at(0);
   // 再試行は初回の予約を引き継ぐ。翌日の新規枠をもう一度消費しない。
-  // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果と非同期状態の変化を真偽値へ正規化する。
   return Boolean(
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/no-unnecessary-type-conversion, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     saved && saved.actorId === input.actorId && saved.kind === 'evaluation' && saved.amount === 1,
   );
 }

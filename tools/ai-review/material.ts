@@ -82,7 +82,6 @@ export function collectFromGit(
   const paths = git('diff', '--name-only', '-z', '--no-renames', ancestor, pr.head.sha)
     .split('\0')
     .filter(Boolean);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Object.create(null)は空の辞書を生成する標準API。継承プロパティや外部入力は存在せず、代入値はnumber[]で検査する。
   const lines = Object.create(null) as Record<string, number[]>;
   for (const path of paths) {
     lines[path] = changedLines(

@@ -206,7 +206,6 @@ export function createLiveConnection(
       finish(false, 'INVALID_EVENT');
       return;
     }
-    // oxlint-disable-next-line eslint/default-case -- validatorが保証するイベントunionの分岐を列挙する。
     switch (candidate.type) {
       case 'session.started': {
         if (connection.started || connection.closing) {
@@ -248,7 +247,6 @@ export function createLiveConnection(
           finish(false, 'INVALID_EVENT');
           return;
         }
-        // oxlint-disable-next-line unicorn/prefer-code-point -- Base64のバイナリ文字列を1 byteずつ変換する。
         const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
         connection.outputBytes += bytes.byteLength;
         handlers.onAudio(bytes, Math.floor(connection.outputBytes / 48));
@@ -332,9 +330,7 @@ export function createLiveConnection(
   }
   void Promise.resolve()
     .then(() => (handlers.dial ?? dialLiveSocket)(options.apiKey, controller.signal))
-    // oxlint-disable-next-line promise/prefer-catch -- 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     .then(
-      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       (connected) => {
         connection.socket = connected;
         if (connection.finished || connection.terminalQueued) {
@@ -373,7 +369,6 @@ export function createLiveConnection(
       }
       return send({
         type: 'session.input_audio.append',
-        // oxlint-disable-next-line unicorn/prefer-code-point -- Base64のバイナリ文字列を1 byteずつ変換する。
         audio: btoa(String.fromCharCode(...bytes)),
       });
     },
@@ -381,7 +376,6 @@ export function createLiveConnection(
       if (
         !connection.started ||
         connection.closing ||
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         (operation !== 'rephrase' && operation !== 'skip')
       ) {
         return false;

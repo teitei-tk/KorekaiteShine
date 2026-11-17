@@ -1,4 +1,3 @@
-/* oxlint-disable eslint/max-classes-per-file, eslint/class-methods-use-this -- Web Audio APIの複数の偽実装を同じfixtureに置き、公開instanceメソッドを再現する。 */
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import {
   installMediaProbe,

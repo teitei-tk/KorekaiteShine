@@ -42,7 +42,6 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
   vi.mocked(completeExecution).mockResolvedValue(true);
   const pending = Promise.withResolvers<EvaluationResult>();
   const evaluate = vi.fn(() => pending.promise);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   const db = {} as EvaluationDependencies['db'];
   const effects = { completed: vi.fn(() => []) };
   const result = consumeJob(
@@ -92,7 +91,6 @@ test('実行権が取れず終端・実行中・枠待ちのいずれでもな�
         expectedPurpose: 'evaluation',
         kind: 'normal',
       },
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
       { db: {} as EvaluationDependencies['db'], now: () => 0, newId: () => 'owner', evaluate },
     ),
   ).toEqual({ action: 'retry', delaySeconds: 30 });
@@ -119,7 +117,6 @@ test('取得した実行権の期限に既に達していた場合は評価せ�
         expectedPurpose: 'evaluation',
         kind: 'normal',
       },
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
       { db: {} as EvaluationDependencies['db'], now: () => 0, newId: () => 'owner', evaluate },
     ),
   ).toEqual({ action: 'retry', delaySeconds: 30 });

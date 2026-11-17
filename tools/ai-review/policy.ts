@@ -34,7 +34,6 @@ export function eligible(value: JsonInput | undefined): value is PullRequest {
     pr.base.repo.id === REPOSITORY_ID &&
     pr.base.ref === 'main' &&
     pr.state === 'open' &&
-    // oxlint-disable-next-line no-extra-boolean-cast -- 混在するJsonInputの意図したfalsy判定を明示し、strict-boolean-expressionsと両立する。
     !Boolean(pr.draft) &&
     typeof pr.number === 'number' &&
     Number.isSafeInteger(pr.number) &&

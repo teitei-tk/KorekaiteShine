@@ -17,7 +17,6 @@ afterEach(() => {
 async function hostFixture() {
   vi.resetModules();
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  // oxlint-disable-next-line unicorn/prefer-event-target -- Nodeのprocess IPCを模擬するためEventEmitterのon/emit契約を使う。
   const events = new EventEmitter();
   const channel = {
     connected: true,

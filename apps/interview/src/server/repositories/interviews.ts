@@ -9,11 +9,12 @@ type Fragment = typeof transcriptFragments.$inferSelect;
 type NewFragment = Omit<typeof transcriptFragments.$inferInsert, 'sequence'>;
 
 export async function loadInterview(db: Database, actorId: string, interviewId: string) {
-  const [row] = await db
-    .select()
-    .from(interviews)
-    .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)));
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const row = (
+    await db
+      .select()
+      .from(interviews)
+      .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)))
+  ).at(0);
   return row ?? null;
 }
 
@@ -25,24 +26,25 @@ export async function setPendingQuestionOperation(
   operation: typeof interviews.$inferSelect.pendingQuestionOperation,
   now: number,
 ): Promise<boolean> {
-  const [saved] = await db
-    .update(interviews)
-    .set({
-      pendingQuestionOperation: operation,
-      revision: sql`${interviews.revision} + 1`,
-      updatedAt: sql`max(${interviews.updatedAt}, ${now})`,
-    })
-    .where(
-      and(
-        eq(interviews.interviewId, interviewId),
-        eq(interviews.actorId, actorId),
-        eq(interviews.status, 'active'),
-        eq(interviews.generation, generation),
-        eq(interviews.streamGeneration, generation),
-      ),
-    )
-    .returning({ revision: interviews.revision });
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const saved = (
+    await db
+      .update(interviews)
+      .set({
+        pendingQuestionOperation: operation,
+        revision: sql`${interviews.revision} + 1`,
+        updatedAt: sql`max(${interviews.updatedAt}, ${now})`,
+      })
+      .where(
+        and(
+          eq(interviews.interviewId, interviewId),
+          eq(interviews.actorId, actorId),
+          eq(interviews.status, 'active'),
+          eq(interviews.generation, generation),
+          eq(interviews.streamGeneration, generation),
+        ),
+      )
+      .returning({ revision: interviews.revision })
+  ).at(0);
   return saved !== undefined;
 }
 
@@ -83,7 +85,6 @@ export async function saveInterviewState(
       ? (await db.batch([closeAudioPeriod(db, guard, state.updatedAt), update]))[1]
       : await update;
 
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
   return saved ?? null;
 }
 
@@ -106,7 +107,6 @@ export async function appendTranscript(
   input: NewFragment,
 ): Promise<Fragment | null> {
   const interview = await loadInterview(db, actorId, input.interviewId);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!interview) {
     return null;
   }
@@ -115,8 +115,7 @@ export async function appendTranscript(
     eq(transcriptFragments.generation, input.generation),
     eq(transcriptFragments.sourceEventId, input.sourceEventId),
   );
-  const [existing] = await db.select().from(transcriptFragments).where(identity);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const existing = (await db.select().from(transcriptFragments).where(identity)).at(0);
   if (existing) {
     return sameFragment(existing, input);
   }
@@ -162,12 +161,11 @@ export async function appendTranscript(
       })
       .where(and(eligible, sql`changes() = 1`)),
   ]);
-  // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
-  if (inserted[0]) {
-    return inserted[0];
+  const fragment = inserted.at(0);
+  if (fragment) {
+    return fragment;
   }
-  const [replayed] = await db.select().from(transcriptFragments).where(identity);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const replayed = (await db.select().from(transcriptFragments).where(identity)).at(0);
   return replayed ? sameFragment(replayed, input) : null;
 }
 
@@ -185,7 +183,6 @@ export async function recordPlayback(
     return false;
   }
   const interview = await loadInterview(db, actorId, input.interviewId);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!interview) {
     return false;
   }
@@ -193,8 +190,7 @@ export async function recordPlayback(
     eq(playbackReceipts.interviewId, input.interviewId),
     eq(playbackReceipts.generation, input.generation),
   );
-  const [existing] = await db.select().from(playbackReceipts).where(identity);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const existing = (await db.select().from(playbackReceipts).where(identity)).at(0);
   if (existing && existing.audioOffsetMs >= input.audioOffsetMs) {
     return true;
   }
@@ -236,8 +232,7 @@ export async function recordPlayback(
   if (written.length > 0) {
     return true;
   }
-  const [replayed] = await db.select().from(playbackReceipts).where(identity);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/no-unnecessary-type-conversion, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const replayed = (await db.select().from(playbackReceipts).where(identity)).at(0);
   return Boolean(replayed && replayed.audioOffsetMs >= input.audioOffsetMs);
 }
 
@@ -250,22 +245,23 @@ export async function markTranscriptIncomplete(
   if (!Number.isSafeInteger(now) || now < 0) {
     throw new Error('記録時刻が不正です。');
   }
-  const [saved] = await db
-    .update(interviews)
-    .set({
-      transcriptIncomplete: true,
-      revision: sql`${interviews.revision} + 1`,
-      updatedAt: sql`max(${interviews.updatedAt}, ${now})`,
-    })
-    .where(
-      and(
-        eq(interviews.interviewId, interviewId),
-        eq(interviews.actorId, actorId),
-        ne(interviews.status, 'ended'),
-      ),
-    )
-    .returning();
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const saved = (
+    await db
+      .update(interviews)
+      .set({
+        transcriptIncomplete: true,
+        revision: sql`${interviews.revision} + 1`,
+        updatedAt: sql`max(${interviews.updatedAt}, ${now})`,
+      })
+      .where(
+        and(
+          eq(interviews.interviewId, interviewId),
+          eq(interviews.actorId, actorId),
+          ne(interviews.status, 'ended'),
+        ),
+      )
+      .returning()
+  ).at(0);
   if (!saved) {
     throw new Error('会話の欠落情報を保存できませんでした。');
   }

@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- JSON境界はunknownで受け、実行時検証後にのみ公開する。 */
 export type JsonValue =
   | null
   | boolean

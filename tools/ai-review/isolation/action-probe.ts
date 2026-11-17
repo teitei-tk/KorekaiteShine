@@ -54,9 +54,7 @@ const result = spawnSync(
   ],
   { encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] },
 );
-// oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
 process.stdout.write(result.stdout ?? '');
-// oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
 process.stderr.write(result.stderr ?? '');
 if (result.error || result.status !== 0) {
   process.exit(1);

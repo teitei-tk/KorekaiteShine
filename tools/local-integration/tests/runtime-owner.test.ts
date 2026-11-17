@@ -12,7 +12,6 @@ import { resolveRuntime } from '@korekaite/runtime-config';
 import { lockEnvironment } from '../src/lock.ts';
 
 async function processTable() {
-  // oxlint-disable-next-line typescript/strict-void-return -- Node execFileはpromisify対応のoverloadを公開する標準API。
   const { stdout } = await promisify(execFile)('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], {
     timeout: 5000,
   });

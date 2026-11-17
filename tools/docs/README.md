@@ -11,7 +11,7 @@ pnpmはルートの[package.json](../../package.json)の`packageManager`で固�
 
 `pnpm check`はNode.js設定の整合性・Lint・整形確認・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。型検査とVitestはアプリ・共有パッケージ・ツールを依存順に直列検査します。固定版Vitestがロックファイル変更時に共有キャッシュを削除するため、パッケージ間の同時削除を避けます。AIレビューの設定は[専用手順](../../docs/runbooks/ai-review.md)を参照してください。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
 
-リポジトリ全体にoxlintとoxfmtを使用します。ルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。設定はルートの[.oxlintrc.json](../../.oxlintrc.json)と[.oxfmtrc.json](../../.oxfmtrc.json)、固定バージョンはルートの[package.json](../../package.json)で管理します。各ツールの対応ファイルを対象とし、依存・生成物などGitの除外対象は検査しません。自動生成の`pnpm-lock.yaml`と`.github/workflows/actions.lock`は整形対象から除外し、それぞれ専用ツールで管理します。oxlintは全カテゴリと適用可能なpluginを型情報付きで検査し、警告も終了コードを失敗にします。固定版ルールの分類漏れと理由付き例外をtools/lintの台帳で管理します。型検査はtsrsを使用し、Compiler API用TypeScriptは保持します。`pnpm lint`・`pnpm typecheck`・`pnpm test`は契約とrouteTreeを先に生成します。通常CIはlint・typecheck・build・テストを別runnerで並列実行します。詳細は[CI高速化の設計](../../docs/superpowers/specs/2026-11-17-ci-acceleration-design.md)を参照してください。検査では整形の書き換えを行いません。
+リポジトリ全体にoxlintとoxfmtを使用します。ルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。設定はルートの[.oxlintrc.json](../../.oxlintrc.json)と[.oxfmtrc.json](../../.oxfmtrc.json)、固定バージョンはルートの[package.json](../../package.json)で管理します。各ツールの対応ファイルを対象とし、依存・生成物などGitの除外対象は検査しません。自動生成の`pnpm-lock.yaml`と`.github/workflows/actions.lock`は整形対象から除外し、それぞれ専用ツールで管理します。oxlintは全カテゴリと適用可能なpluginを型情報付きで検査し、警告も終了コードを失敗にします。固定版ルールの分類漏れと理由付き例外をtools/lintの台帳で管理します。[局所例外台帳](../lint/scoped-exceptions.json)は具体的なファイル・規則・理由を設定と双方向照合します。inline抑制は別検査で禁止します。型検査はtsrsを使用し、Compiler API用TypeScriptは保持します。`pnpm lint`・`pnpm typecheck`・`pnpm test`は契約とrouteTreeを先に生成します。通常CIはlint・typecheck・build・テストを別runnerで並列実行します。詳細は[CI高速化の設計](../../docs/superpowers/specs/2026-11-17-ci-acceleration-design.md)を参照してください。検査では整形の書き換えを行いません。
 
 ネットワークとGitHub認証が必要なActions検証は`pnpm check:actions`に分けます。CIのActions検証ジョブはNode.js・pnpmの準備に依存しないよう、同じ`gh actions-lock --verify`を直接実行します。
 
@@ -138,7 +138,7 @@ gh actions-lock --verify
 
 ## 型の禁止ルール
 
-`pnpm lint`はoxlintの`typescript/no-restricted-types`で、リポジトリ内の`unknown`型を拒否します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
+`pnpm lint`はoxlintの`typescript/no-restricted-types`で、通常の業務コードにある`unknown`型を拒否します。JSON・IPC・Inspector等の未検証入力を受ける境界だけは、実行時の構造検証が必要なため[局所例外台帳](../lint/scoped-exceptions.json)に限定して許可します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
 
 外部入力には具体的な入力型を付け、実行時の形式検証を維持してください。型アサーションだけではJSONやAPI応答を検証したことになりません。
 

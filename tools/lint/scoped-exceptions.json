@@ -1,0 +1,1198 @@
+[
+  {
+    "files": ["tools/e2e/tests/media.test.mjs"],
+    "rules": {
+      "class-methods-use-this": "off"
+    },
+    "reason": "Web Audio APIの複数の偽実装を同じfixtureに置き、公開instanceメソッドを再現する。"
+  },
+  {
+    "files": [
+      "tools/local-integration/fixtures/evaluation.ts",
+      "tools/local-integration/fixtures/interview.ts"
+    ],
+    "rules": {
+      "class-methods-use-this": "off"
+    },
+    "reason": "Worker RPCはinstance methodを名前で解決するためstatic化できない。"
+  },
+  {
+    "files": ["apps/web/tests/practice-audio.test.ts"],
+    "rules": {
+      "class-methods-use-this": "off"
+    },
+    "reason": "テスト対象のインスタンスAPIを置換する部分モックで、共有fixtureから値を返す。"
+  },
+  {
+    "files": ["apps/interview/src/server/interview-object.ts"],
+    "rules": {
+      "class-methods-use-this": "off"
+    },
+    "reason": "診断用サブクラスが接続実装を差し替えるprotected拡張点。"
+  },
+  {
+    "files": [
+      "apps/interview/src/application/interview-room.ts",
+      "apps/interview/src/server/live-connection.ts",
+      "apps/web/src/components/practice-live.tsx"
+    ],
+    "rules": {
+      "default-case": "off"
+    },
+    "reason": "validatorが保証するイベントunionの分岐を列挙する。"
+  },
+  {
+    "files": ["apps/interview/src/domain/interview-state.ts"],
+    "rules": {
+      "default-case": "off"
+    },
+    "reason": "判別unionの全分岐を列挙する。"
+  },
+  {
+    "files": ["tools/e2e/tests/media.test.mjs"],
+    "rules": {
+      "max-classes-per-file": "off"
+    },
+    "reason": "Web Audio APIの複数の偽実装を同じfixtureに置き、公開instanceメソッドを再現する。"
+  },
+  {
+    "files": [
+      "apps/interview/tests/interview-object.test.ts",
+      "apps/web/tests/practice-audio.test.ts",
+      "apps/web/tests/practice-live.test.tsx"
+    ],
+    "rules": {
+      "max-classes-per-file": "off"
+    },
+    "reason": "各テストの異なるSocket・Worker・Audio API代替を同一suite内に閉じ込める。"
+  },
+  {
+    "files": ["apps/web/src/diagnostics/client.tsx", "apps/web/src/lib/interviews.ts"],
+    "rules": {
+      "new-cap": [
+        "error",
+        {
+          "capIsNewExceptions": ["GET", "POST"]
+        }
+      ]
+    },
+    "reason": "openapi-fetchの生成HTTPメソッド名に従う。"
+  },
+  {
+    "files": ["tools/ai-review/runtime.ts"],
+    "rules": {
+      "no-bitwise": "off"
+    },
+    "reason": "POSIX modeの実行bitを保持する標準のmask演算。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/lifecycle.ts", "tools/ai-review/isolation/model.ts"],
+    "rules": {
+      "no-bitwise": "off"
+    },
+    "reason": "Unix権限のgroup/other書込みビットをマスクして保護を確認する。"
+  },
+  {
+    "files": ["tools/ai-review/coverage-diagnostic.test.ts"],
+    "rules": {
+      "no-bitwise": "off"
+    },
+    "reason": "固定seedの32bit疑似乱数を再現し、1000入力の検査を決定的にする。"
+  },
+  {
+    "files": ["tools/ai-review/isolation-probe-boundaries.test.ts"],
+    "rules": {
+      "no-throw-literal": "off"
+    },
+    "reason": "Error以外の例外の秘匿を検証するため、意図的に文字列を投げる。"
+  },
+  {
+    "files": ["tools/coverage/tests/runtime-capture-errors.test.ts"],
+    "rules": {
+      "no-throw-literal": "off"
+    },
+    "reason": "Error以外の失敗を保存する分岐の回帰fixture。"
+  },
+  {
+    "files": ["apps/web/tests/practice-history.test.tsx"],
+    "rules": {
+      "no-throw-literal": "off"
+    },
+    "reason": "Error以外の拒否値も安全に扱えることを意図的に検査する。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/evidence.test.ts",
+      "tools/local-integration/tests/process-errors.test.ts"
+    ],
+    "rules": {
+      "no-throw-literal": "off"
+    },
+    "reason": "Error以外をthrowされたときの処理を検証する故障fixture。"
+  },
+  {
+    "files": ["tools/coverage/src/node-loader.ts", "tools/coverage/src/vitest-setup.ts"],
+    "rules": {
+      "no-underscore-dangle": "off"
+    },
+    "reason": "Istanbulが生成する既定のグローバル名との互換性を維持する。"
+  },
+  {
+    "files": [
+      "tools/coverage/tests/measurement.test.ts",
+      "tools/coverage/tests/node-loader-hooks.test.ts"
+    ],
+    "rules": {
+      "no-underscore-dangle": "off"
+    },
+    "reason": "Istanbulの標準グローバル名を検証する。"
+  },
+  {
+    "files": ["tools/e2e/tests/provider.test.mjs"],
+    "rules": {
+      "no-underscore-dangle": "off"
+    },
+    "reason": "wsの低水準socketで意図的に壊れたフレームを送る。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/run.test.ts", "tools/ai-review/isolation/startup.test.ts"],
+    "rules": {
+      "no-use-before-define": "off"
+    },
+    "reason": "Vitestが初期化後に呼ぶ遅延コールバック。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/lifecycle.ts", "tools/ai-review/isolation/run.ts"],
+    "rules": {
+      "prefer-destructuring": "off"
+    },
+    "reason": "Linux /proc statの固定フィールド番号で起動時刻を読む。"
+  },
+  {
+    "files": [
+      "apps/interview/src/application/interview-room.ts",
+      "apps/interview/src/application/interview-session.ts",
+      "apps/interview/src/server/live-connection.ts",
+      "apps/web/src/components/practice-record.tsx",
+      "apps/web/src/lib/practice-audio.ts",
+      "apps/web/src/routes/index.tsx"
+    ],
+    "rules": {
+      "promise/always-return": "off"
+    },
+    "reason": "終端の副作用コールバックであり、値は後続へ渡さない。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-record.tsx", "apps/web/src/routes/index.tsx"],
+    "rules": {
+      "promise/catch-or-return": "off"
+    },
+    "reason": "thenの第2引数で拒否を処理する終端のUI更新。 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-record.tsx", "apps/web/src/routes/index.tsx"],
+    "rules": {
+      "promise/prefer-catch": "off"
+    },
+    "reason": "thenの第2引数で拒否を処理する終端のUI更新。 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/process.test.ts",
+      "tools/local-integration/tests/runtime-errors.test.ts"
+    ],
+    "rules": {
+      "promise/prefer-catch": "off"
+    },
+    "reason": "成功と拒否を別々の観測値へ変換し、成功処理の例外を拒否結果へ混ぜない。"
+  },
+  {
+    "files": [
+      "apps/interview/src/application/interview-room.ts",
+      "apps/interview/src/application/interview-session.ts",
+      "apps/interview/src/server/live-connection.ts"
+    ],
+    "rules": {
+      "promise/prefer-catch": "off"
+    },
+    "reason": "成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-live.tsx"],
+    "rules": {
+      "react/exhaustive-deps": "off"
+    },
+    "reason": "WebSocketの接続寿命をid・revisionで制御し、renderごとに再生成するcommand/begin/releaseの追加による再接続を防ぐ。イベント内で参照する可変状態はref経由で取得する。既存の接続・世代更新回帰テストで検証する。"
+  },
+  {
+    "files": [
+      "apps/web/src/components/practice-preparation.tsx",
+      "apps/web/src/components/practice-record.tsx"
+    ],
+    "rules": {
+      "react/no-array-index-key": "off"
+    },
+    "reason": "状態を持たない表示専用の行。重複する本文も別々に表示する。"
+  },
+  {
+    "files": ["apps/interview/src/domain/interview-state.ts"],
+    "rules": {
+      "typescript/consistent-return": "off"
+    },
+    "reason": "判別unionの全分岐がInterviewStateを返す。"
+  },
+  {
+    "files": ["apps/web/src/router.tsx"],
+    "rules": {
+      "typescript/consistent-type-definitions": "off"
+    },
+    "reason": "TanStackの宣言マージにはinterfaceが必要。 TanStack Startの宣言マージにはinterfaceが必要。"
+  },
+  {
+    "files": ["apps/web/src/worker-env.d.ts"],
+    "rules": {
+      "typescript/consistent-type-imports": "off"
+    },
+    "reason": "ambient moduleの宣言はscriptとして保つ。トップレベルimportへの変換は既存moduleの拡張へ変わり、cloudflare:workersの型契約を変える。"
+  },
+  {
+    "files": ["packages/database/testing/sqlite.ts"],
+    "rules": {
+      "typescript/no-deprecated": "off"
+    },
+    "reason": "D1Databaseの既存公開interfaceを満たすだけで呼び出しは拒否する。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/cli-boundaries.test.ts",
+      "tools/local-integration/tests/notification-runtime-lifecycle.test.ts"
+    ],
+    "rules": {
+      "typescript/no-invalid-void-type": "off"
+    },
+    "reason": "Promise.withResolvers<void>は値を返さない標準Promiseの型引数。"
+  },
+  {
+    "files": [
+      "apps/interview/tests/interview-session.test.ts",
+      "apps/interview/tests/live-connection.test.ts"
+    ],
+    "rules": {
+      "typescript/no-invalid-void-type": "off"
+    },
+    "reason": "標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。"
+  },
+  {
+    "files": ["apps/interview/src/application/live-session.ts"],
+    "rules": {
+      "typescript/no-misused-spread": "off"
+    },
+    "reason": "UTF-16コード単位ではなくUnicodeコードポイント単位で長さを制限する。"
+  },
+  {
+    "files": ["apps/web/src/diagnostics/errors.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "Ajvの任意のparams値を文字列か検証する境界。"
+  },
+  {
+    "files": ["tools/local-integration/src/database.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "CLI/テスト境界の配列を実行時検証する。"
+  },
+  {
+    "files": ["tools/local-integration/src/runtime-owner.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "IPC境界で通知の形状を検証する。"
+  },
+  {
+    "files": ["tools/local-integration/src/records.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "JSON/IPC境界はunknownを全フィールド検証して公開する。"
+  },
+  {
+    "files": ["tools/docs/input.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "JSON/YAMLの入力境界だけを表し、利用前に構造を検証する。"
+  },
+  {
+    "files": ["tools/ci/src/json.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "JSON境界はunknownで受け、実行時検証後にのみ公開する。"
+  },
+  {
+    "files": ["tools/coverage/src/worker.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "Reflect.constructの外部値はinstanceofで検証する。"
+  },
+  {
+    "files": ["tools/ci/src/results.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "artifact境界を実行時検証する。"
+  },
+  {
+    "files": ["tools/coverage/src/journal.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "journalは外部JSON境界として検証する。"
+  },
+  {
+    "files": ["packages/database/testing/journal.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "migration履歴のJSON境界を検証する。追加メタデータは変更せず保持する。"
+  },
+  {
+    "files": ["apps/evaluation/src/server/repositories/job-execution.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "動的なD1 batch結果を配列か検証する境界。"
+  },
+  {
+    "files": ["tools/ci/src/schema.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "外部artifactのunknownを全フィールド検証してから公開する。"
+  },
+  {
+    "files": ["tools/ci/src/history.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "履歴artifactはunknownとして受け、全フィールドを検証する。"
+  },
+  {
+    "files": ["tools/coverage/src/schema.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "計測JSON・VM・Inspectorをunknownとして検証し、外部値のcastを避ける。"
+  },
+  {
+    "files": [
+      "apps/evaluation/src/application/evaluate-interview.ts",
+      "apps/evaluation/src/application/run-evaluation-attempt.ts",
+      "apps/evaluation/src/domain/retry-policy.ts",
+      "apps/interview/src/server/live-connection.ts",
+      "apps/web/src/diagnostics/accept.ts",
+      "apps/web/src/diagnostics/page.tsx"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": [
+      "apps/web/src/components/practice-live.tsx",
+      "apps/web/src/server/repositories/materials.ts"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": [
+      "apps/evaluation/src/diagnostics/consume.ts",
+      "apps/interview/src/application/interview-session.ts"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": ["apps/interview/src/server/repositories/interviews.ts"],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。 DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": [
+      "apps/evaluation/src/server/openai-interview-evaluator.ts",
+      "apps/web/src/server/openai-material-analyzer.ts"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "JSONオブジェクトの未定義プロパティを実行時に除外する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/model.ts"],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "argvは実行時に欠損するため検査を維持する。"
+  },
+  {
+    "files": [
+      "tools/ai-review/isolation/action-probe.ts",
+      "tools/ai-review/isolation/lifecycle.ts",
+      "tools/ai-review/isolation/run.ts"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "argvや外部プロセスの返値は実行時に欠損するためガードを維持する。"
+  },
+  {
+    "files": ["tools/local-integration/tests/helpers/notification-runtime.ts"],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "await中に別の呼出しが停止状態を変更し得る。"
+  },
+  {
+    "files": ["tools/ai-review/followup.ts"],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/wif.test.ts"],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "実際の子プロセスの欠損状態を検査する。"
+  },
+  {
+    "files": [
+      "tools/ai-review/failure-notify.ts",
+      "tools/ai-review/github.ts",
+      "tools/ai-review/snapshot.ts",
+      "tools/ai-review/wait-review.ts"
+    ],
+    "rules": {
+      "typescript/no-unnecessary-condition": "off"
+    },
+    "reason": "汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。"
+  },
+  {
+    "files": ["apps/interview/src/application/interview-session.ts"],
+    "rules": {
+      "typescript/no-unnecessary-type-conversion": "off"
+    },
+    "reason": "DBの空結果と非同期状態の変化を真偽値へ正規化する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。"
+  },
+  {
+    "files": [
+      "apps/evaluation/tests/repository-confirmation.test.ts",
+      "apps/web/tests/material-repository.test.ts",
+      "apps/web/tests/stored-materials-http.test.ts"
+    ],
+    "rules": {
+      "typescript/no-unsafe-assignment": "off"
+    },
+    "reason": "Vitestの非対称matcherはany型だが、この値は期待値専用で業務データとして使用しない。"
+  },
+  {
+    "files": ["tools/ai-review/material-collect.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-assignment": "off"
+    },
+    "reason": "Vitestの非対称matcherは期待値専用で、実行時の環境入力には使用しない。"
+  },
+  {
+    "files": ["tools/local-integration/tests/check-object.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-assignment": "off"
+    },
+    "reason": "Vitestの非対称matcherを期待値に埋め込む。実データの型断定ではない。"
+  },
+  {
+    "files": ["packages/api-contracts/tests/generation-errors.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-assignment": "off"
+    },
+    "reason": "このテストで生成したESMを読み込む。直後にexportの存在と3入力のboolean応答を検証する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/run.test.ts", "tools/ai-review/isolation/startup.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-call": "off"
+    },
+    "reason": "NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/run.test.ts", "tools/ai-review/isolation/wif.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-member-access": "off"
+    },
+    "reason": "NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/startup.test.ts", "tools/ai-review/isolation/wif.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-return": "off"
+    },
+    "reason": "NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。"
+  },
+  {
+    "files": ["packages/database/src/connection.ts"],
+    "rules": {
+      "typescript/no-unsafe-return": "off"
+    },
+    "reason": "Proxyの通常プロパティは元のD1 bindingへそのまま転送する。"
+  },
+  {
+    "files": ["packages/database/testing/sqlite.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "D1のgeneric契約をSQLiteで代替する。呼出側のSQL選択型を返す。 D1のgeneric first契約。選択列の型は呼出側が指定する。 D1のgeneric raw契約。選択列の型は呼出側が指定する。"
+  },
+  {
+    "files": ["packages/api-contracts/json.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "JSON.parseの成功結果はJSON値。業務型への断定は行わない。"
+  },
+  {
+    "files": ["tools/ai-review/json.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "JSON.parse成功値のJSON文法にだけ型を付ける。業務型へ断定しない。"
+  },
+  {
+    "files": ["tools/local-integration/tests/voice-interview.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "Node26のWebSocket headers拡張がDOM型にないため追加する。"
+  },
+  {
+    "files": [
+      "tools/ai-review/isolation/entrypoints.test.ts",
+      "tools/ai-review/isolation/run.test.ts",
+      "tools/ai-review/isolation/startup.test.ts"
+    ],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。"
+  },
+  {
+    "files": ["tools/ai-review/material.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "Object.create(null)は空の辞書を生成する標準API。継承プロパティや外部入力は存在せず、代入値はnumber[]で検査する。"
+  },
+  {
+    "files": [
+      "apps/evaluation/tests/check-object-storage.test.ts",
+      "apps/evaluation/tests/consume-renewal.test.ts",
+      "apps/evaluation/tests/database-connection.test.ts",
+      "apps/evaluation/tests/database-seed.test.ts",
+      "apps/evaluation/tests/diagnostic-consume-errors.test.ts",
+      "apps/evaluation/tests/dispatch-guards.test.ts",
+      "apps/evaluation/tests/local-worker-errors.test.ts",
+      "apps/evaluation/tests/recovery-errors.test.ts",
+      "apps/evaluation/tests/repository-confirmation.test.ts",
+      "apps/interview/tests/check-object-notification.test.ts",
+      "apps/interview/tests/interview-object.test.ts",
+      "apps/web/tests/diagnostics.test.ts",
+      "apps/web/tests/practice-audio.test.ts"
+    ],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。"
+  },
+  {
+    "files": ["apps/web/tests/practice-api-routes.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。 実際にimportしたTanStack Routeの登録済handlerをテストから呼ぶため、非公開metadata形状を局所的に表現する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/model.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "このファイル内で構築した固定JSON fixtureの複製。外部入力ではない。"
+  },
+  {
+    "files": ["apps/evaluation/tests/worker-delivery.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。"
+  },
+  {
+    "files": ["apps/interview/tests/live-connection.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "型外の操作名を意図的に注入し、実行時の拒否を検査する。"
+  },
+  {
+    "files": ["apps/interview/tests/interview-session.test.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "時刻欠損の上流イベントを意図的に注入し、原文保存の防御動作を検査する。"
+  },
+  {
+    "files": [
+      "tools/ai-review/check-cli-boundaries.test.ts",
+      "tools/ai-review/check-status.test.ts",
+      "tools/ai-review/failure-notify.test.ts",
+      "tools/ai-review/github-errors.test.ts",
+      "tools/ai-review/github.test.ts",
+      "tools/ai-review/prepare.test.ts",
+      "tools/ai-review/resume.test.ts",
+      "tools/ai-review/snapshot.test.ts",
+      "tools/ai-review/wait-review.test.ts"
+    ],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。"
+  },
+  {
+    "files": ["tools/ai-review/github.ts"],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "汎用GitHub transportには実行時のTが存在しない。各callerの既存validator/許可リストで構造を検査する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation-probe-boundaries.test.ts"],
+    "rules": {
+      "typescript/only-throw-error": "off"
+    },
+    "reason": "Error以外の例外の秘匿を検証するため、意図的に文字列を投げる。"
+  },
+  {
+    "files": ["tools/coverage/tests/runtime-capture-errors.test.ts"],
+    "rules": {
+      "typescript/only-throw-error": "off"
+    },
+    "reason": "Error以外の失敗を保存する分岐の回帰fixture。"
+  },
+  {
+    "files": ["apps/web/tests/practice-history.test.tsx"],
+    "rules": {
+      "typescript/only-throw-error": "off"
+    },
+    "reason": "Error以外の拒否値も安全に扱えることを意図的に検査する。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/evidence.test.ts",
+      "tools/local-integration/tests/process-errors.test.ts"
+    ],
+    "rules": {
+      "typescript/only-throw-error": "off"
+    },
+    "reason": "Error以外をthrowされたときの処理を検証する故障fixture。"
+  },
+  {
+    "files": [
+      "apps/evaluation/src/server/openai-interview-evaluator.ts",
+      "apps/web/src/server/openai-material-analyzer.ts"
+    ],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": [
+      "apps/interview/src/application/interview-session.ts",
+      "apps/web/src/components/practice-live.tsx",
+      "apps/web/src/server/repositories/materials.ts"
+    ],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": ["apps/interview/src/server/repositories/interviews.ts"],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。 DBの空結果・外部入力・非同期更新を実行時に検査する。"
+  },
+  {
+    "files": ["tools/local-integration/tests/helpers/notification-runtime.ts"],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "await中に別の呼出しが停止状態を変更し得る。"
+  },
+  {
+    "files": ["tools/ai-review/followup.ts"],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。"
+  },
+  {
+    "files": [
+      "tools/ai-review/failure-notify.ts",
+      "tools/ai-review/snapshot.ts",
+      "tools/ai-review/wait-review.ts"
+    ],
+    "rules": {
+      "typescript/strict-boolean-expressions": "off"
+    },
+    "reason": "汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。"
+  },
+  {
+    "files": ["tools/local-integration/tests/runtime-owner.test.ts"],
+    "rules": {
+      "typescript/strict-void-return": "off"
+    },
+    "reason": "Node execFileはpromisify対応のoverloadを公開する標準API。"
+  },
+  {
+    "files": [
+      "tools/ai-review/isolation/entrypoints.test.ts",
+      "tools/ai-review/isolation/startup.test.ts",
+      "tools/ai-review/isolation/wif-boundaries.test.ts"
+    ],
+    "rules": {
+      "typescript/unbound-method": "off"
+    },
+    "reason": "Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。"
+  },
+  {
+    "files": ["tools/ai-review/runtime-boundaries.test.ts"],
+    "rules": {
+      "typescript/unbound-method": "off"
+    },
+    "reason": "spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。"
+  },
+  {
+    "files": ["tools/local-integration/src/evidence.ts"],
+    "rules": {
+      "unicorn/no-array-reverse": "off"
+    },
+    "reason": "ES2022利用側向けに新しい局所コピーだけを反転する。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-live.tsx"],
+    "rules": {
+      "unicorn/no-array-reverse": "off"
+    },
+    "reason": "ES2022対象。ここで生成した一時配列だけを変更する。"
+  },
+  {
+    "files": ["tools/ai-review/snapshot.test.ts"],
+    "rules": {
+      "unicorn/no-array-reverse": "off"
+    },
+    "reason": "ES2022対象を維持し、コピーした入力配列のみ逆順にする。"
+  },
+  {
+    "files": ["tools/coverage/src/merge.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022 libの利用側へ公開するため、新規生成した局所配列だけを整列する。"
+  },
+  {
+    "files": ["tools/local-integration/src/production.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022利用側向けにreaddirが生成した局所配列だけを整列する。"
+  },
+  {
+    "files": ["tools/local-integration/tests/development-snapshot.test.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022型設定の共有テスト。生成した一時配列だけを整列する。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-live.tsx", "apps/web/src/server/interviews.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022対象。ここで生成した一時配列だけを変更する。"
+  },
+  {
+    "files": [
+      "packages/api-contracts/tests/diagnostics.test.ts",
+      "packages/api-contracts/tests/materials.test.ts"
+    ],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022対象を維持し、Object.keysが作成した配列だけを整列する。"
+  },
+  {
+    "files": ["apps/web/tests/interviews.test.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022対象を維持し、新しいテスト配列だけを整列する。 ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/end-to-end.test.ts",
+      "tools/local-integration/tests/production-artifacts.test.ts",
+      "tools/local-integration/tests/run-test-suite.test.ts"
+    ],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。"
+  },
+  {
+    "files": ["apps/evaluation/tests/database-schema.test.ts"],
+    "rules": {
+      "unicorn/no-array-sort": "off"
+    },
+    "reason": "ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。"
+  },
+  {
+    "files": ["apps/evaluation/src/server/repositories/job-execution.ts"],
+    "rules": {
+      "unicorn/no-unreadable-array-destructuring": "off"
+    },
+    "reason": "D1 batchのSQL実行順に対応する結果の位置を維持する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/run.ts", "tools/ai-review/isolation/startup.ts"],
+    "rules": {
+      "unicorn/no-unreadable-array-destructuring": "off"
+    },
+    "reason": "Node CLIの固定位置引数を読み取る。"
+  },
+  {
+    "files": ["apps/web/src/components/practice-live.tsx", "apps/web/src/lib/practice-audio.ts"],
+    "rules": {
+      "unicorn/prefer-add-event-listener": "off"
+    },
+    "reason": "単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。"
+  },
+  {
+    "files": ["tools/local-integration/tests/voice-interview.test.ts"],
+    "rules": {
+      "unicorn/prefer-array-find": "off"
+    },
+    "reason": "ES2022型設定ではfindLastを使用できないため、末尾一致を明示する。"
+  },
+  {
+    "files": ["apps/interview/src/server/live-connection.ts"],
+    "rules": {
+      "unicorn/prefer-code-point": "off"
+    },
+    "reason": "Base64のバイナリ文字列を1 byteずつ変換する。"
+  },
+  {
+    "files": ["tools/ai-review/isolation/run.test.ts", "tools/ai-review/isolation/startup.test.ts"],
+    "rules": {
+      "unicorn/prefer-event-target": "off"
+    },
+    "reason": "NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。"
+  },
+  {
+    "files": [
+      "tools/local-integration/tests/cli-boundaries.test.ts",
+      "tools/local-integration/tests/runtime-owner-host.test.ts"
+    ],
+    "rules": {
+      "unicorn/prefer-event-target": "off"
+    },
+    "reason": "Nodeのprocess IPCを模擬するためEventEmitterのon/emit契約を使う。"
+  },
+  {
+    "files": ["tools/local-integration/src/run.ts"],
+    "rules": {
+      "unicorn/prefer-top-level-await": "off"
+    },
+    "reason": "長時間CLIのimport完了を待たせると、呼出側の停止シグナル登録と検証がdeadlockする。"
+  },
+  {
+    "files": ["tools/ai-review/policy.ts"],
+    "rules": {
+      "no-extra-boolean-cast": "off"
+    },
+    "reason": "未検証JSONのdraftは混合unionであり、strict-boolean-expressionsに従いBooleanで真偽値へ正規化してから既存のtruthiness判定を維持する。"
+  },
+  {
+    "files": ["tools/api-codegen/compatibility.test.ts"],
+    "rules": {
+      "vitest/consistent-each-for": "off",
+      "vitest/consistent-test-filename": "off",
+      "vitest/consistent-test-it": "off",
+      "vitest/consistent-vitest-vi": "off",
+      "vitest/expect-expect": "off",
+      "vitest/hoisted-apis-on-top": "off",
+      "vitest/max-expects": "off",
+      "vitest/max-nested-describe": "off",
+      "vitest/no-alias-methods": "off",
+      "vitest/no-commented-out-tests": "off",
+      "vitest/no-conditional-expect": "off",
+      "vitest/no-conditional-in-test": "off",
+      "vitest/no-conditional-tests": "off",
+      "vitest/no-disabled-tests": "off",
+      "vitest/no-duplicate-hooks": "off",
+      "vitest/no-focused-tests": "off",
+      "vitest/no-hooks": "off",
+      "vitest/no-identical-title": "off",
+      "vitest/no-import-node-test": "off",
+      "vitest/no-importing-vitest-globals": "off",
+      "vitest/no-interpolation-in-snapshots": "off",
+      "vitest/no-large-snapshots": "off",
+      "vitest/no-mocks-import": "off",
+      "vitest/no-restricted-matchers": "off",
+      "vitest/no-restricted-vi-methods": "off",
+      "vitest/no-standalone-expect": "off",
+      "vitest/no-test-prefixes": "off",
+      "vitest/no-test-return-statement": "off",
+      "vitest/no-unneeded-async-expect-function": "off",
+      "vitest/padding-around-after-all-blocks": "off",
+      "vitest/padding-around-test-blocks": "off",
+      "vitest/prefer-called-exactly-once-with": "off",
+      "vitest/prefer-called-once": "off",
+      "vitest/prefer-called-times": "off",
+      "vitest/prefer-called-with": "off",
+      "vitest/prefer-comparison-matcher": "off",
+      "vitest/prefer-describe-function-title": "off",
+      "vitest/prefer-each": "off",
+      "vitest/prefer-equality-matcher": "off",
+      "vitest/prefer-expect-assertions": "off",
+      "vitest/prefer-expect-resolves": "off",
+      "vitest/prefer-expect-type-of": "off",
+      "vitest/prefer-hooks-in-order": "off",
+      "vitest/prefer-hooks-on-top": "off",
+      "vitest/prefer-import-in-mock": "off",
+      "vitest/prefer-importing-vitest-globals": "off",
+      "vitest/prefer-lowercase-title": "off",
+      "vitest/prefer-mock-promise-shorthand": "off",
+      "vitest/prefer-mock-return-shorthand": "off",
+      "vitest/prefer-snapshot-hint": "off",
+      "vitest/prefer-spy-on": "off",
+      "vitest/prefer-strict-boolean-matchers": "off",
+      "vitest/prefer-strict-equal": "off",
+      "vitest/prefer-to-be": "off",
+      "vitest/prefer-to-be-falsy": "off",
+      "vitest/prefer-to-be-object": "off",
+      "vitest/prefer-to-be-truthy": "off",
+      "vitest/prefer-to-contain": "off",
+      "vitest/prefer-to-have-been-called-times": "off",
+      "vitest/prefer-to-have-length": "off",
+      "vitest/prefer-todo": "off",
+      "vitest/require-awaited-expect-poll": "off",
+      "vitest/require-hook": "off",
+      "vitest/require-local-test-context-for-concurrent-snapshots": "off",
+      "vitest/require-mock-type-parameters": "off",
+      "vitest/require-test-timeout": "off",
+      "vitest/require-to-throw-message": "off",
+      "vitest/require-top-level-describe": "off",
+      "vitest/valid-describe-callback": "off",
+      "vitest/valid-expect": "off",
+      "vitest/valid-expect-in-promise": "off",
+      "vitest/valid-title": "off",
+      "vitest/warn-todo": "off"
+    },
+    "reason": "Node標準node:testで実行するCompiler API互換性検査。Vitest固有APIを適用しない。"
+  },
+  {
+    "files": ["**/*.js", "**/*.mjs", "**/*.cjs"],
+    "rules": {
+      "typescript/await-thenable": "off",
+      "typescript/consistent-return": "off",
+      "typescript/consistent-type-exports": "off",
+      "typescript/dot-notation": "off",
+      "typescript/no-array-delete": "off",
+      "typescript/no-base-to-string": "off",
+      "typescript/no-confusing-void-expression": "off",
+      "typescript/no-deprecated": "off",
+      "typescript/no-duplicate-type-constituents": "off",
+      "typescript/no-floating-promises": "off",
+      "typescript/no-for-in-array": "off",
+      "typescript/no-generated-empty-object-type": "off",
+      "typescript/no-implied-eval": "off",
+      "typescript/no-meaningless-void-operator": "off",
+      "typescript/no-misused-promises": "off",
+      "typescript/no-misused-spread": "off",
+      "typescript/no-mixed-enums": "off",
+      "typescript/no-redundant-type-constituents": "off",
+      "typescript/no-unnecessary-boolean-literal-compare": "off",
+      "typescript/no-unnecessary-condition": "off",
+      "typescript/no-unnecessary-qualifier": "off",
+      "typescript/no-unnecessary-template-expression": "off",
+      "typescript/no-unnecessary-type-arguments": "off",
+      "typescript/no-unnecessary-type-assertion": "off",
+      "typescript/no-unnecessary-type-conversion": "off",
+      "typescript/no-unnecessary-type-parameters": "off",
+      "typescript/no-unsafe-argument": "off",
+      "typescript/no-unsafe-assignment": "off",
+      "typescript/no-unsafe-call": "off",
+      "typescript/no-unsafe-enum-assignment": "off",
+      "typescript/no-unsafe-enum-comparison": "off",
+      "typescript/no-unsafe-member-access": "off",
+      "typescript/no-unsafe-return": "off",
+      "typescript/no-unsafe-type-assertion": "off",
+      "typescript/no-unsafe-unary-minus": "off",
+      "typescript/no-useless-default-assignment": "off",
+      "typescript/non-nullable-type-assertion-style": "off",
+      "typescript/only-throw-error": "off",
+      "typescript/prefer-find": "off",
+      "typescript/prefer-includes": "off",
+      "typescript/prefer-nullish-coalescing": "off",
+      "typescript/prefer-optional-chain": "off",
+      "typescript/prefer-promise-reject-errors": "off",
+      "typescript/prefer-readonly": "off",
+      "typescript/prefer-readonly-parameter-types": "off",
+      "typescript/prefer-reduce-type-parameter": "off",
+      "typescript/prefer-regexp-exec": "off",
+      "typescript/prefer-return-this-type": "off",
+      "typescript/prefer-string-starts-ends-with": "off",
+      "typescript/promise-function-async": "off",
+      "typescript/related-getter-setter-pairs": "off",
+      "typescript/require-array-sort-compare": "off",
+      "typescript/require-await": "off",
+      "typescript/restrict-plus-operands": "off",
+      "typescript/restrict-template-expressions": "off",
+      "typescript/return-await": "off",
+      "typescript/strict-boolean-expressions": "off",
+      "typescript/strict-void-return": "off",
+      "typescript/switch-exhaustiveness-check": "off",
+      "typescript/unbound-method": "off",
+      "typescript/use-unknown-in-catch-callback-variable": "off"
+    },
+    "reason": "allowJs/checkJs対象外で型情報を供給しないJSツール。型依存規則だけ適用外にし、構文検査とimmutable規則は維持する。"
+  },
+  {
+    "files": ["tools/local-integration/fixtures/api.*.ts"],
+    "rules": {
+      "typescript/await-thenable": "off",
+      "typescript/consistent-return": "off",
+      "typescript/consistent-type-exports": "off",
+      "typescript/dot-notation": "off",
+      "typescript/no-array-delete": "off",
+      "typescript/no-base-to-string": "off",
+      "typescript/no-confusing-void-expression": "off",
+      "typescript/no-deprecated": "off",
+      "typescript/no-duplicate-type-constituents": "off",
+      "typescript/no-floating-promises": "off",
+      "typescript/no-for-in-array": "off",
+      "typescript/no-generated-empty-object-type": "off",
+      "typescript/no-implied-eval": "off",
+      "typescript/no-meaningless-void-operator": "off",
+      "typescript/no-misused-promises": "off",
+      "typescript/no-misused-spread": "off",
+      "typescript/no-mixed-enums": "off",
+      "typescript/no-redundant-type-constituents": "off",
+      "typescript/no-unnecessary-boolean-literal-compare": "off",
+      "typescript/no-unnecessary-condition": "off",
+      "typescript/no-unnecessary-qualifier": "off",
+      "typescript/no-unnecessary-template-expression": "off",
+      "typescript/no-unnecessary-type-arguments": "off",
+      "typescript/no-unnecessary-type-assertion": "off",
+      "typescript/no-unnecessary-type-conversion": "off",
+      "typescript/no-unnecessary-type-parameters": "off",
+      "typescript/no-unsafe-argument": "off",
+      "typescript/no-unsafe-assignment": "off",
+      "typescript/no-unsafe-call": "off",
+      "typescript/no-unsafe-enum-assignment": "off",
+      "typescript/no-unsafe-enum-comparison": "off",
+      "typescript/no-unsafe-member-access": "off",
+      "typescript/no-unsafe-return": "off",
+      "typescript/no-unsafe-type-assertion": "off",
+      "typescript/no-unsafe-unary-minus": "off",
+      "typescript/no-useless-default-assignment": "off",
+      "typescript/non-nullable-type-assertion-style": "off",
+      "typescript/only-throw-error": "off",
+      "typescript/prefer-find": "off",
+      "typescript/prefer-includes": "off",
+      "typescript/prefer-nullish-coalescing": "off",
+      "typescript/prefer-optional-chain": "off",
+      "typescript/prefer-promise-reject-errors": "off",
+      "typescript/prefer-readonly": "off",
+      "typescript/prefer-readonly-parameter-types": "off",
+      "typescript/prefer-reduce-type-parameter": "off",
+      "typescript/prefer-regexp-exec": "off",
+      "typescript/prefer-return-this-type": "off",
+      "typescript/prefer-string-starts-ends-with": "off",
+      "typescript/promise-function-async": "off",
+      "typescript/related-getter-setter-pairs": "off",
+      "typescript/require-array-sort-compare": "off",
+      "typescript/require-await": "off",
+      "typescript/restrict-plus-operands": "off",
+      "typescript/restrict-template-expressions": "off",
+      "typescript/return-await": "off",
+      "typescript/strict-boolean-expressions": "off",
+      "typescript/strict-void-return": "off",
+      "typescript/switch-exhaustiveness-check": "off",
+      "typescript/unbound-method": "off",
+      "typescript/use-unknown-in-catch-callback-variable": "off"
+    },
+    "reason": "生成先のEnv binding・相対importを参照するルートテンプレート。生成元配置では解決できない型依存規則のみ対象外とし、生成先buildで検証する。"
+  },
+  {
+    "files": ["tools/e2e/**/*.mjs"],
+    "rules": {
+      "new-cap": [
+        "error",
+        {
+          "capIsNewExceptions": ["Before", "After", "Given", "When", "Then", "setWorldConstructor"]
+        }
+      ]
+    },
+    "reason": "Cucumber公式の関数API名をconstructorと区別する。"
+  },
+  {
+    "files": ["apps/web/src/lib/microphone-worklet.js", "apps/web/src/worker-env.d.ts"],
+    "rules": {
+      "import/unambiguous": "off"
+    },
+    "reason": "AudioWorklet入口とCloudflare ambient moduleはmodule化できないscriptである。"
+  },
+  {
+    "files": ["tools/ai-review/workflow.test.ts"],
+    "rules": {
+      "no-template-curly-in-string": "off"
+    },
+    "reason": "GitHub Actions expressionをそのまま文字列として照合するテスト。"
+  },
+  {
+    "files": [".pnpmfile.cjs"],
+    "rules": {
+      "import/unambiguous": "off",
+      "import/no-commonjs": "off"
+    },
+    "reason": "pnpmの公式CommonJS hook入口。"
+  },
+  {
+    "files": ["tools/local-integration/fixtures/interview.ts"],
+    "rules": {
+      "max-classes-per-file": "off"
+    },
+    "reason": "Worker RPCの診断用instance classを一つの入口に配置する。"
+  }
+]

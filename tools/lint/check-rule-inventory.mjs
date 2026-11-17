@@ -12,6 +12,20 @@ const rules = JSON.parse(
 );
 const configuration = JSON.parse(readFileSync('.oxlintrc.json', 'utf8'));
 const exceptions = JSON.parse(readFileSync('tools/lint/rule-exceptions.json', 'utf8'));
+const scopedExceptions = JSON.parse(readFileSync('tools/lint/scoped-exceptions.json', 'utf8'));
+const scopedKey = (files, rule, value) => JSON.stringify([files.toSorted(), rule, value]);
+const configuredScopes = new Set(
+  configuration.overrides.flatMap((override) =>
+    Object.entries(override.rules ?? {}).map(([rule, value]) =>
+      scopedKey(override.files, rule, value),
+    ),
+  ),
+);
+const documentedScopes = new Set(
+  scopedExceptions.flatMap((entry) =>
+    Object.entries(entry.rules).map(([rule, value]) => scopedKey(entry.files, rule, value)),
+  ),
+);
 const inventory = JSON.parse(
   readFileSync(process.argv[2] ?? 'tools/lint/rule-inventory.json', 'utf8'),
 );
@@ -20,6 +34,20 @@ const current = new Map(rules.map((rule) => [key(rule), rule]));
 const recorded = new Map(inventory.map((rule) => [rule.rule, rule]));
 const severity = (value) => (Array.isArray(value) ? value[0] : value);
 const errors = [
+  ...[...configuredScopes].flatMap((entry) =>
+    documentedScopes.has(entry) ? [] : [`局所例外の理由がありません: ${entry}`],
+  ),
+  ...[...documentedScopes].flatMap((entry) =>
+    configuredScopes.has(entry) ? [] : [`設定に存在しない局所例外: ${entry}`],
+  ),
+  ...scopedExceptions.flatMap((entry) =>
+    typeof entry.reason === 'string' &&
+    entry.reason.trim() &&
+    entry.files.length > 0 &&
+    Object.keys(entry.rules).length > 0
+      ? []
+      : ['局所例外の対象・規則・理由が不正です'],
+  ),
   ...Object.entries(configuration.rules).flatMap(([rule, value]) =>
     severity(value) === 'off' && !exceptions[rule] ? [`例外理由がありません: ${rule}`] : [],
   ),

@@ -130,20 +130,16 @@ export async function loadSnapshot(api: Api, number: number): Promise<Snapshot> 
         'query($number:Int!,$cursor:String){repository(owner:"teitei-tk",name:"KorekaiteShine"){pullRequest(number:$number){reviewThreads(first:100,after:$cursor){nodes{id isResolved comments(first:1){nodes{databaseId}}} pageInfo{hasNextPage endCursor}}}}}',
       variables: { number, cursor: cursorState.cursor },
     });
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     const connection = page?.data?.repository?.pullRequest?.reviewThreads;
     if (
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       page?.errors?.length ||
       !connection ||
       !Array.isArray(connection.nodes) ||
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       typeof connection.pageInfo?.hasNextPage !== 'boolean'
     ) {
       throw new Error('Resolve状態を取得できません');
     }
     for (const node of connection.nodes) {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       if (!node || !Array.isArray(node.comments?.nodes) || node.comments.nodes.length !== 1) {
         throw new Error('スレッド元が不明です');
       }

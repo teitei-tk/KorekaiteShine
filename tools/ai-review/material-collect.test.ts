@@ -79,7 +79,6 @@ it('Git資料収集は固定remoteと無効化したhooksを使い一時出力�
       'https://github.com/teitei-tk/KorekaiteShine.git',
     ]),
     expect.objectContaining({
-      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherは期待値専用で、実行時の環境入力には使用しない。
       env: expect.objectContaining({ GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: '/dev/null' }),
     }),
   );

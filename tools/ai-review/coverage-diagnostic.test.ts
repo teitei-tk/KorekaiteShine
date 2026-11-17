@@ -86,7 +86,6 @@ it('敵対的な1000通りの応答で集計・秘匿・診断の整合性を維
   const expected = Array.from({ length: 8 }, (_, i) => i.toString(16).padStart(16, '0'));
   const seedState = { seed: 12_345 };
   const random = () => {
-    // oxlint-disable-next-line eslint/no-bitwise -- 固定seedの32bit疑似乱数を再現し、1000入力の検査を決定的にする。
     seedState.seed = (Math.imul(seedState.seed, 1_664_525) + 1_013_904_223) >>> 0;
     return seedState.seed;
   };

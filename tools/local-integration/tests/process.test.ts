@@ -82,7 +82,6 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
     label: '中断検証',
     timeoutMs: 30_000,
     signal: controller.signal,
-    // oxlint-disable-next-line promise/prefer-catch -- 成功と拒否を別々の観測値へ変換し、成功処理の例外を拒否結果へ混ぜない。
   }).then(
     () => {
       settledContext.settled = true;

@@ -26,11 +26,9 @@ const run = {
 };
 const api: Api = async <T>(path: string) => {
   if (path === 'actions/runs/1') {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return run as T;
   }
   if (path === 'graphql') {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return {
       data: {
         repository: {
@@ -42,11 +40,9 @@ const api: Api = async <T>(path: string) => {
     } as T;
   }
   if (path === 'pulls/7') {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return pr as T;
   }
   if (path.includes('/comments?')) {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return [] as T;
   }
   throw new Error('Unexpected fixture path');
@@ -95,11 +91,9 @@ it.each(['same', 'old-head', 'old-base', 'human', 'ineligible'])(
       };
       const client: Api = async <T>(path: string) => {
         if (path === 'pulls/7' && scenario === 'ineligible') {
-          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
           return { ...pr, base: { ...pr.base, ref: 'other' } } as T;
         }
         if (path.startsWith('issues/7/comments?')) {
-          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
           return [
             {
               id: 1,

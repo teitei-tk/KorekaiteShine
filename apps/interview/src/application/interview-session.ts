@@ -80,9 +80,7 @@ export function createInterviewSession(options: Options) {
 
   function serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = lifecycle.pending.then(operation);
-    // oxlint-disable-next-line promise/prefer-catch -- 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     lifecycle.pending = result.then(
-      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       () => {
         /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
       },
@@ -94,7 +92,6 @@ export function createInterviewSession(options: Options) {
   }
   async function read() {
     const row = await loadInterview(db, actorId, interviewId);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!row) {
       throw new Error('面接が見つかりません。');
     }
@@ -107,7 +104,6 @@ export function createInterviewSession(options: Options) {
       return row;
     }
     const saved = await saveInterviewState(db, actorId, next, row.revision);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!saved) {
       throw new Error('面接状態の保存が競合しました。');
     }
@@ -255,9 +251,7 @@ export function createInterviewSession(options: Options) {
                       event.type === 'session.output_transcript.delta' &&
                       event.delta.trim().length > 0,
                     content: event.delta,
-                    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
                     sourceStartMs: event.start_ms ?? null,
-                    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
                     sourceEndMs: event.end_ms ?? null,
                     receivedAt: options.now(),
                   }),
@@ -333,9 +327,7 @@ export function createInterviewSession(options: Options) {
     sendAudio: (generation: number, bytes: Uint8Array) =>
       serial(async () => {
         const row = await read();
-        // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果と非同期状態の変化を真偽値へ正規化する。
         return Boolean(
-          // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。
           lifecycle.current?.generation === generation &&
           canSendAudio(row, generation, options.now()) &&
           // 旧クライアントの入力も、新世代の質問を再生するまでは正常に受け流す。
@@ -357,7 +349,6 @@ export function createInterviewSession(options: Options) {
           audioOffsetMs,
           receivedAt: options.now(),
         });
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         if (recorded && lifecycle.current?.question) {
           lifecycle.current.question.played(audioOffsetMs);
           await confirmQuestion(generation);

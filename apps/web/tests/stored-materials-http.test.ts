@@ -42,7 +42,6 @@ test('分析枠を確保してからAIへ送り、保存した候補を返し、
       expect(response.status).toBe(200);
       expect(parseJson(await response.text())).toMatchObject({
         themes: [{ excerpt: '架空の経験' }],
-        // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherはany型だが、この値は期待値専用で業務データとして使用しない。
         analysisId: expect.any(String),
       });
     }

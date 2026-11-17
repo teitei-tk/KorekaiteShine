@@ -64,9 +64,7 @@ export function PracticeHistory({ onOpen }: { onOpen: (id: string) => void }) {
     const controller = new AbortController();
     setPage(null);
     setError('');
-    // oxlint-disable-next-line promise/catch-or-return, promise/prefer-catch -- thenの第2引数で拒否を処理する終端のUI更新。 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     readHistory(cursor, controller.signal).then(
-      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       (value) => {
         if (!controller.signal.aborted) {
           setPage(value);
@@ -152,7 +150,6 @@ function Report({
 }) {
   function citations(items: Schema['EvaluationEvidence'][]) {
     return items.map((item, i) => (
-      // oxlint-disable-next-line react/no-array-index-key -- 状態を持たない表示専用の行。重複する本文も別々に表示する。
       <blockquote key={i}>
         <p>{item.quote}</p>
         {item.source === 'material' ? (
@@ -217,7 +214,6 @@ function Report({
             <section key={key}>
               <h3>{title}</h3>
               {items.map((item, i) => (
-                // oxlint-disable-next-line react/no-array-index-key -- 状態を持たない表示専用の行。重複する本文も別々に表示する。
                 <div key={i}>
                   <p>{item.text}</p>
                   {citations(item.evidence)}
@@ -231,7 +227,6 @@ function Report({
         <section>
           <h3>発言の整合性</h3>
           {report.consistency.map((item, i) => (
-            // oxlint-disable-next-line react/no-array-index-key -- 状態を持たない表示専用の行。重複する本文も別々に表示する。
             <div key={i}>
               <strong>{item.status === 'resolved' ? '確認済み' : '要確認'}</strong>
               <p>{item.explanation}</p>

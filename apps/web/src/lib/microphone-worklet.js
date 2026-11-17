@@ -1,5 +1,3 @@
-/* oxlint-disable import/unambiguous -- AudioWorkletが直接読み込む登録用スクリプト。 */
-// oxlint-disable-next-line import/unambiguous -- プラットフォームが読み込むスクリプトまたはambient宣言であり、module化しない。
 /* global AudioWorkletProcessor, registerProcessor */
 class InterviewMicrophone extends AudioWorkletProcessor {
   constructor() {

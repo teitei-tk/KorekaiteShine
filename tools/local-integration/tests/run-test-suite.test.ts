@@ -29,7 +29,6 @@ test('Vitestが探索するspecとsrc配下も未登録検査に含める', asyn
     await mkdir(join(dir, 'src'));
     await writeFile(join(dir, 'tests/new.spec.ts'), '');
     await writeFile(join(dir, 'src/new.test.ts'), '');
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
     expect((await discoverTestFiles(dir)).sort()).toEqual(['src/new.test.ts', 'tests/new.spec.ts']);
   } finally {
     await rm(dir, { recursive: true, force: true });

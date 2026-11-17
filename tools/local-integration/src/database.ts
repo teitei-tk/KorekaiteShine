@@ -128,7 +128,6 @@ export async function runDatabaseCommand(
   }
 }
 
-// eslint-disable-next-line typescript/no-restricted-types -- CLI/テスト境界の配列を実行時検証する。
 function validDatabaseCommand(value: readonly unknown[]): value is DatabaseCommand {
   return (
     (value.length === 1 &&

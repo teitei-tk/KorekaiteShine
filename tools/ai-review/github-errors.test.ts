@@ -15,7 +15,6 @@ it('不正な実行IDはGitHubへ照会する前に拒否する', async () => {
 });
 
 it('コメント一覧が配列でなければ未投稿と見なさず失敗する', async () => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
   const api: Api = async <T>() => ({ message: 'private response' }) as T;
   await expect(comments(api, 7)).rejects.toThrow('コメント応答が不正');
 });

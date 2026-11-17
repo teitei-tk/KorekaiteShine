@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- 外部artifactのunknownを全フィールド検証してから公開する。 */
 import { isRecord, parseJson } from './json.ts';
 import type { Plan, Result, Test, Shard, RunnerClass } from './types.ts';
 export const runnerClasses: RunnerClass[] = ['node', 'worker', 'boundary', 'integration', 'e2e'];

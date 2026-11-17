@@ -62,6 +62,7 @@ test('原文を順序付きで追記し、再送では上書きせず、終了�
     ).rejects.toThrow();
     expect(await appendTranscript(database.db, 'other', fragment)).toBeNull();
     const row = await loadInterview(database.db, 'actor', 'interview');
+    assert(row);
     expect(row.revision).toBe(1);
     const ending = {
       ...row,
@@ -220,6 +221,7 @@ test('終了時の会話・評価入力・ジョブ・通知を固定し、終�
       receivedAt: 10,
     });
     const active = await loadInterview(database.db, 'actor', 'interview');
+    assert(active);
     const ending = {
       ...active,
       status: 'ending' as const,
@@ -349,6 +351,7 @@ test('同時到着した原文と再生確認を一度だけ保存し、旧世�
     ).toEqual([true, true]);
     expect(await recordPlayback(database.db, 'actor', { ...input, generation: 10 })).toBe(false);
     const state = await loadInterview(database.db, 'actor', 'interview');
+    assert(state);
     await expect(
       saveInterviewState(database.db, 'actor', { ...state, status: 'ended' }, state.revision),
     ).rejects.toThrow('一体');
@@ -381,7 +384,7 @@ test('未完了の質問操作は同じ音声接続で更新し、古い世代�
     setPendingQuestionOperation(database.db, actorId, 'interview', generation, operation, 10);
   try {
     expect(
-      (await loadInterview(database.db, 'actor', 'interview')).pendingQuestionOperation,
+      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
     ).toBeNull();
     expect(await write(1, 'rephrase')).toBe(true);
     expect(await write(1, 'skip')).toBe(true);
@@ -393,7 +396,7 @@ test('未完了の質問操作は同じ音声接続で更新し、古い世代�
     });
     expect(await write(1, null)).toBe(true);
     expect(
-      (await loadInterview(database.db, 'actor', 'interview')).pendingQuestionOperation,
+      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
     ).toBeNull();
   } finally {
     database.close();

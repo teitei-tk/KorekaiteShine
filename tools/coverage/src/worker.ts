@@ -1,5 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
-/* eslint-disable typescript/no-restricted-types -- Reflect.constructの外部値はinstanceofで検証する。 */
 import { object, parse, readCoverageDictionary } from './schema.ts';
 import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
 type Reply = { id?: number; method?: string; contextId?: number; failure: boolean; value?: string };

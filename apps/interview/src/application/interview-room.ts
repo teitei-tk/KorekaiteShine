@@ -125,9 +125,7 @@ export function createInterviewRoom(options: {
   });
   function serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = room.pending.then(operation);
-    // oxlint-disable-next-line promise/prefer-catch -- 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     room.pending = result.then(
-      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       () => {
         /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
       },
@@ -191,7 +189,6 @@ export function createInterviewRoom(options: {
       error(id, event.commandId, 'NOT_OWNER');
       return;
     }
-    // oxlint-disable-next-line eslint/default-case -- validatorが保証するイベントunionの分岐を列挙する。
     switch (event.type) {
       case 'sync': {
         await sync(id);

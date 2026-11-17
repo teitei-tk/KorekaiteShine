@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- 履歴artifactはunknownとして受け、全フィールドを検証する。 */
 import { isRecord } from './json.ts';
 type Sample = { id: string; identity: string; durationMs: number; sampledAt?: string };
 export type History = {

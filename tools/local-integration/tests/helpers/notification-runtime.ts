@@ -38,7 +38,6 @@ export function createNotificationRuntime() {
           manualDiagnostics: true,
           probeOnlyEvaluation: true,
         }));
-        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査の起動中に停止されました。');
         }
@@ -70,7 +69,6 @@ export function createNotificationRuntime() {
           },
         });
         signal?.throwIfAborted();
-        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査中に環境が停止されました。');
         }
@@ -92,7 +90,6 @@ export function createNotificationRuntime() {
           );
         }
         signal?.throwIfAborted();
-        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査の清掃中に環境が停止されました。');
         }

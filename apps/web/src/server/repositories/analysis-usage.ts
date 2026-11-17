@@ -22,13 +22,13 @@ export async function reserveAnalysis(
     ) < ${usageLimits.analysesPerDay}
     ON CONFLICT DO NOTHING
   `);
-  const [saved] = await db
-    .select()
-    .from(usageReservations)
-    .where(eq(usageReservations.reservationId, input.reservationId));
-  // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果と非同期状態の変化を真偽値へ正規化する。
+  const saved = (
+    await db
+      .select()
+      .from(usageReservations)
+      .where(eq(usageReservations.reservationId, input.reservationId))
+  ).at(0);
   return Boolean(
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/no-unnecessary-type-conversion, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     saved &&
     saved.actorId === input.actorId &&
     saved.day === day &&

@@ -1,4 +1,3 @@
-// oxlint-disable-next-line eslint/max-classes-per-file -- 各テストの異なるSocket・Worker・Audio API代替を同一suite内に閉じ込める。
 import { assert, expect, test, vi } from 'vitest';
 import {
   encodeMicrophoneFrame,
@@ -72,7 +71,6 @@ test('再生が自然に終了した位置だけ確認し、停止した音声�
       return source;
     },
   };
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   const playback = createPlayback(context as object as AudioContext);
   const acknowledge = vi.fn<(offset: number) => void>();
   playback.play(new ArrayBuffer(960), () => acknowledge(20));
@@ -94,7 +92,6 @@ test('再生バッファの不正なサイズ、5秒の遅延、256個を超え�
     }),
     createBufferSource: () => ({ connect: vi.fn(), start: vi.fn() }),
   };
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   const playback = createPlayback(context as object as AudioContext);
   for (const length of [0, 1, 98_306]) {
     expect(() => {
@@ -106,7 +103,6 @@ test('再生バッファの不正なサイズ、5秒の遅延、256個を超え�
   expect(() => {
     playback.play(new ArrayBuffer(98_304), vi.fn<() => void>());
   }).toThrow('追いついて');
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   const queue = createPlayback(context as object as AudioContext);
   for (const _ of Array.from({ length: 256 }).keys()) {
     queue.play(new ArrayBuffer(2), vi.fn<() => void>());
@@ -132,7 +128,6 @@ function microphone(sampleRate = 24_000) {
       sampleRate = sampleRate;
       resume = vi.fn().mockResolvedValue(undefined);
       audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
-      // oxlint-disable-next-line eslint/class-methods-use-this -- テスト対象のインスタンスAPIを置換する部分モックで、共有fixtureから値を返す。
       createMediaStreamSource = () => input;
       close = close;
     },

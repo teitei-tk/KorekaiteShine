@@ -18,7 +18,6 @@ afterEach(() => {
 async function cliFixture(args: string[], env: NodeJS.ProcessEnv = {}) {
   vi.resetModules();
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-  // oxlint-disable-next-line unicorn/prefer-event-target -- Nodeのprocess IPCを模擬するためEventEmitterのon/emit契約を使う。
   const events = new EventEmitter();
   const channel = {
     argv: ['node', 'run.ts', ...args],
@@ -108,7 +107,6 @@ test('previewを起動し二度の終了シグナルでも停止処理は一度�
 
 test('周期回復が長引いても重複実行せず完了後の周期で再開する', async () => {
   const fixture = await cliFixture(['dev']);
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- Promise.withResolvers<void>は値を返さない標準Promiseの型引数。
   const scheduled = Promise.withResolvers<void>();
   vi.mocked(fixture.runtime.runScheduled).mockReturnValueOnce(scheduled.promise);
   await vi.advanceTimersByTimeAsync(120_000);

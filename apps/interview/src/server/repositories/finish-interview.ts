@@ -33,7 +33,6 @@ export async function finishInterview(
     rubric: options.evaluation.rubric,
   };
   const interview = await loadInterview(db, actorId, interviewId);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!interview) {
     return null;
   }
@@ -41,11 +40,9 @@ export async function finishInterview(
     eq(evaluationInputs.interviewId, interviewId),
     eq(evaluationInputs.kind, 'initial'),
   );
-  const [existing] = await db
-    .select({ jobId: evaluationInputs.jobId })
-    .from(evaluationInputs)
-    .where(initial);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const existing = (
+    await db.select({ jobId: evaluationInputs.jobId }).from(evaluationInputs).where(initial)
+  ).at(0);
   if (existing) {
     return existing.jobId;
   }
@@ -168,10 +165,8 @@ export async function finishInterview(
       })
       .where(and(finishing, exists(db.select().from(evaluationInputs).where(createdInput)))),
   ]);
-  const [accepted] = await db
-    .select({ jobId: evaluationInputs.jobId })
-    .from(evaluationInputs)
-    .where(initial);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const accepted = (
+    await db.select({ jobId: evaluationInputs.jobId }).from(evaluationInputs).where(initial)
+  ).at(0);
   return accepted?.jobId ?? null;
 }

@@ -43,7 +43,6 @@ export function DiagnosticPage() {
       }
       setAccepted(await run.current.start());
     } catch (error_) {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (error_ instanceof DiagnosticValidationError && error_.code === 'VALIDATION_ERROR') {
         const locations = error_.details.map(
           (detail) => `${detail.location}${detail.path}: ${detail.code}`,

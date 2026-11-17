@@ -10,7 +10,7 @@
     "test": "pnpm prepare:checks && pnpm -r --workspace-concurrency=1 run test",
     "check:docs": "pnpm --dir tools/docs check",
     "check:actions": "gh actions-lock --verify",
-    "lint": "pnpm prepare:checks && node tools/lint/check-rule-inventory.mjs && oxlint --type-aware --deny-warnings .",
+    "lint": "pnpm prepare:checks && node tools/lint/check-rule-inventory.mjs && node tools/lint/check-inline-directives.mjs && oxlint --type-aware --deny-warnings .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "check:ai-run": "node tools/ai-review/check-run.ts",

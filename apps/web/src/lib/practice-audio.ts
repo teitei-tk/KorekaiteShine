@@ -40,7 +40,6 @@ export function createPlayback(context: AudioContext) {
       source.buffer = buffer;
       source.connect(context.destination);
       sources.add(source);
-      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       source.onended = () => {
         if (sources.delete(source)) {
           source.disconnect();
@@ -52,7 +51,6 @@ export function createPlayback(context: AudioContext) {
     },
     stop() {
       for (const source of sources) {
-        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         source.onended = null;
         source.stop();
         source.disconnect();
@@ -85,7 +83,6 @@ export async function openInterviewAudio(
     signal.removeEventListener('abort', close);
     playback.stop();
     if (streamContext.node) {
-      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       streamContext.node.port.onmessage = null;
       streamContext.node.port.close();
       streamContext.node.disconnect();
@@ -106,7 +103,6 @@ export async function openInterviewAudio(
       context.audioWorklet.addModule(workletUrl),
       navigator.mediaDevices
         .getUserMedia({ audio: { channelCount: 1, echoCancellation: true }, video: false })
-        // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
         .then((acquired) => {
           if (streamContext.disposed) {
             for (const track of acquired.getTracks()) {
@@ -127,7 +123,6 @@ export async function openInterviewAudio(
       channelCountMode: 'explicit',
       outputChannelCount: [1],
     });
-    // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
     streamContext.node.port.onmessage = (event: MessageEvent<ArrayBuffer>) => {
       if (!streamContext.disposed) {
         captured(event.data);

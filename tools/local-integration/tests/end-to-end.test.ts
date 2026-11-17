@@ -43,7 +43,6 @@ test('実HTTPの正常系がDO・Queue・Consumer・D1を通り、実測結果�
   const stored = parseObject(await readFile(resultPath, 'utf8'));
   expect(stored).toEqual(report);
   expect(resultPath).toMatch(new RegExp(`/\\.local/tests/${runId}/0/results\\.json$`, 'u'));
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
   expect(Object.keys(report.actual).sort()).toEqual([
     'attemptCount',
     'checks',

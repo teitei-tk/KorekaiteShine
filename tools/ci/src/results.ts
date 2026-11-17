@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- artifact境界を実行時検証する。 */
 import { isPlan, isResult } from './schema.ts';
 export function validateResults(plan: unknown, results: unknown): void {
   if (!isPlan(plan) || !Array.isArray(results) || !results.every((value) => isResult(value))) {

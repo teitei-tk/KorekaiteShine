@@ -21,7 +21,6 @@ const row = {
 };
 function dependencies() {
   return {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     database: {} as D1Database,
     now: vi.fn(() => 0),
     sendNotification: vi.fn(async () => {

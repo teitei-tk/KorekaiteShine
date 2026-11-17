@@ -43,7 +43,6 @@ it('不正なPID名前空間表記と起動失敗を隔離の証拠にしない'
 });
 it('Error以外の例外も拒否の証拠にせず内容を隠す', async () => {
   vi.mocked(openSync).mockImplementation(() => {
-    // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の例外の秘匿を検証するため、意図的に文字列を投げる。
     throw 'private fixture';
   });
   const report = await probe();

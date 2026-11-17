@@ -11,7 +11,6 @@ export function createPrimaryDb(binding: D1Database): ReturnType<typeof createDb
         if (property === 'withSession') {
           return () => target.withSession('first-primary');
         }
-        // oxlint-disable-next-line typescript/no-unsafe-return -- Proxyの通常プロパティは元のD1 bindingへそのまま転送する。
         return Reflect.get(target, property, receiver);
       },
     }),

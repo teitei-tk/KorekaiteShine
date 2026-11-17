@@ -58,7 +58,6 @@ export class TopologyObject extends DurableObject<{
     return { enqueued: true };
   }
 
-  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async writeShared() {
     await db
       .insert(connectionChecks)

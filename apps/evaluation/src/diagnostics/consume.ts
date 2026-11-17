@@ -24,15 +24,12 @@ export async function consumeDiagnostic(
       if (signal.aborted) {
         throw new Error('評価は中止されました。');
       }
-      const [check] = await db
-        .select()
-        .from(diagnosticChecks)
-        .where(eq(diagnosticChecks.jobId, jobId));
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+      const check = (
+        await db.select().from(diagnosticChecks).where(eq(diagnosticChecks.jobId, jobId))
+      ).at(0);
       if (!check) {
         throw new Error('診断条件がありません。');
       }
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (signal.aborted) {
         throw new Error('評価は中止されました。');
       }

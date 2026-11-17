@@ -326,7 +326,6 @@ export async function verifyProductionArtifacts(
       }
     }
   }
-  // eslint-disable-next-line unicorn/no-array-sort -- ES2022利用側向けにreaddirが生成した局所配列だけを整列する。
   const routes = (await readdir(join(project, 'src/routes'))).sort();
   if (
     JSON.stringify(routes) !==

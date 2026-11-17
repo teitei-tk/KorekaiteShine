@@ -20,7 +20,6 @@ async function evaluator() {
       expectedPurpose: 'diagnostics',
       kind: 'normal',
     },
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     {} as D1Database,
   );
   return vi.mocked(consumeJob).mock.calls[0][2].evaluate;

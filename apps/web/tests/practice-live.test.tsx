@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-// oxlint-disable-next-line eslint/max-classes-per-file -- 各テストの異なるSocket・Worker・Audio API代替を同一suite内に閉じ込める。
 import type * as AudioModule from '../src/lib/practice-audio';
 import { parseObject } from './helpers/json';
 import './helpers/dom';

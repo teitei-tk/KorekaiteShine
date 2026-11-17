@@ -74,7 +74,6 @@ export function protectTree(path: string): void {
   if (lstatSync(path).uid !== 0) {
     throw new Error('準備ファイルの所有者不一致');
   }
-  // oxlint-disable-next-line no-bitwise -- POSIX modeの実行bitを保持する標準のmask演算。
   chmodSync(path, stat.isDirectory() || stat.mode & 0o111 ? 0o755 : 0o644);
   if (stat.isDirectory()) {
     for (const name of readdirSync(path)) {

@@ -15,20 +15,21 @@ export function createJobEvaluator(
   now: () => number = () => Temporal.Now.instant().epochMilliseconds,
 ): EvaluationDependencies['evaluate'] {
   return async (jobId, attemptNumber, signal) => {
-    const [saved] = await db
-      .select({ input: evaluationInputs.inputJson, actorId: jobs.actorId })
-      .from(evaluationInputs)
-      .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
-      .where(
-        and(
-          eq(jobs.jobId, jobId),
-          eq(jobs.purpose, 'evaluation'),
-          eq(jobs.status, 'running'),
-          eq(jobs.attemptCount, attemptNumber),
-          notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
-        ),
-      );
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    const saved = (
+      await db
+        .select({ input: evaluationInputs.inputJson, actorId: jobs.actorId })
+        .from(evaluationInputs)
+        .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
+        .where(
+          and(
+            eq(jobs.jobId, jobId),
+            eq(jobs.purpose, 'evaluation'),
+            eq(jobs.status, 'running'),
+            eq(jobs.attemptCount, attemptNumber),
+            notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
+          ),
+        )
+    ).at(0);
     if (!saved) {
       return { ok: false, error: { code: 'EVALUATION_INPUT_UNAVAILABLE', retryable: false } };
     }

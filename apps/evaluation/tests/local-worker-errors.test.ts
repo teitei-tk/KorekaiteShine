@@ -21,7 +21,6 @@ afterEach(() => {
 });
 
 function environment(appEnv = 'test') {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   return {
     APP_ENV: appEnv,
     DIAGNOSTIC_QUEUE_NAME: 'diagnostics',
@@ -35,7 +34,6 @@ function batch(queue = 'diagnostics') {
     ack: vi.fn(),
     retry: vi.fn(),
   };
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   return { queue, messages: [message] } as object as Parameters<typeof worker.queue>[0] & {
     messages: [typeof message];
   };
@@ -78,7 +76,6 @@ test('通知の再配送に失敗しても保存済みの処理はackし内部�
 
 test('本番環境ではscheduledから診断回復を開始しない', async () => {
   await expect(
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     worker.scheduled({} as Parameters<typeof worker.scheduled>[0], environment('production')),
   ).rejects.toThrow('診断回復を利用できない環境です。');
   expect(recoverJobs).not.toHaveBeenCalled();
@@ -104,7 +101,6 @@ test('scheduledで正式評価の回復通知を送る際は遅延を維持し�
     await deps.sendNotification('evaluation', 'notify', notification, 30);
     return { outboxSent: 1, outboxDeferred: 0 };
   });
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await worker.scheduled({} as Parameters<typeof worker.scheduled>[0], env);
   expect(send).toHaveBeenCalledExactlyOnceWith(notification, { delaySeconds: 30 });
   expect(diagnosticSend).not.toHaveBeenCalled();
@@ -114,9 +110,7 @@ test('定期回復では診断と評価の最終失敗をそれぞれのDLQへ�
   const env = environment();
   const send = vi.fn(),
     diagnosticSend = vi.fn();
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   env.EVALUATION_DLQ = { send } as object as typeof env.EVALUATION_DLQ;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   env.DIAGNOSTIC_DLQ = { send: diagnosticSend } as object as typeof env.DIAGNOSTIC_DLQ;
   const message = batch().messages[0].body;
   vi.mocked(recoverJobs).mockImplementationOnce(async (deps) => {
@@ -124,7 +118,6 @@ test('定期回復では診断と評価の最終失敗をそれぞれのDLQへ�
     await deps.sendNotification('diagnostics', 'notify_dlq', message, 0);
     return { outboxSent: 2, outboxDeferred: 0 };
   });
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await worker.scheduled({} as Parameters<typeof worker.scheduled>[0], env);
   expect(send).toHaveBeenCalledExactlyOnceWith(message, { delaySeconds: 0 });
   expect(diagnosticSend).toHaveBeenCalledExactlyOnceWith(message, { delaySeconds: 0 });
@@ -135,7 +128,6 @@ test('正式Workerは診断用通知の送信を拒否し、配送を保留し�
   env.EVALUATION_QUEUE_NAME = 'evaluation';
   env.EVALUATION_DLQ_NAME = 'evaluation-dlq';
   const send = vi.fn();
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   env.EVALUATION_QUEUE = { send } as object as typeof env.EVALUATION_QUEUE;
   const message = batch('evaluation');
   const log = vi.spyOn(console, 'info').mockImplementation(() => {

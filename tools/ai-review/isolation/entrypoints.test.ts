@@ -95,7 +95,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 it('sandbox起動失敗では出力がなくても安全に終了する', async () => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
   vi.mocked(spawnSync).mockReturnValueOnce({
     pid: 0,
     error: new Error('fixture'),
@@ -106,16 +105,13 @@ it('sandbox起動失敗では出力がなくても安全に終了する', async 
     signal: null,
   } as object as ReturnType<typeof spawnSync>);
   await expect(import('./action-probe.ts')).rejects.toThrow('fixture exit');
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.stdout.write).toHaveBeenCalledWith('');
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.stderr.write).toHaveBeenCalledWith('');
   expect(writeFileSync).not.toHaveBeenCalled();
 });
 it('Action境界で資格情報保護に失敗したらsandboxへ進まない', async () => {
   state.report.checks[2].passed = false;
   await expect(import('./action-probe.ts')).rejects.toThrow('fixture exit');
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.exit).toHaveBeenCalledWith(1);
   expect(spawnSync).not.toHaveBeenCalled();
 });

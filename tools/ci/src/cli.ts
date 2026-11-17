@@ -169,7 +169,7 @@ async function main() {
   }
   if (command === 'run') {
     const shard = plan.shards.find((shard) => shard.id === id);
-    if (!shard || !/^[a-z]+-\d+$/u.test(shard.id)) {
+    if (!shard || !/^(?:node|worker|boundary|integration|e2e)-[1-9]\d*$/u.test(shard.id)) {
       throw new Error('シャードIDが不正です。');
     }
     const { runShard } = await import('./run.ts');

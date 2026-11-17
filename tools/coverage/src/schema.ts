@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- 計測JSON・VM・Inspectorをunknownとして検証し、外部値のcastを避ける。 */
 import type { SourceCoverageData, SourceMap } from '@vitest/istanbul-lib-instrument';
 import type { CoverageRun, CoverageTarget, Measurement } from './merge.ts';
 export function object(value: unknown): value is Record<string, unknown> {

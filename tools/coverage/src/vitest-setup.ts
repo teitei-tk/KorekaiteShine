@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Istanbulが生成する既定のグローバル名との互換性を維持する。 */
 import { readCoverageConfig, required } from './schema.ts';
 import { readFileSync } from 'node:fs';
 import { afterAll } from 'vitest';

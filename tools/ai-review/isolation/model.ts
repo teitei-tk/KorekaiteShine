@@ -148,7 +148,6 @@ function checkLive(value: State): void {
   }
   for (const file of [value.infoPath, `${home}/config.toml`]) {
     const stat = statSync(file);
-    // oxlint-disable-next-line eslint/no-bitwise -- Unix権限のgroup/other書込みビットをマスクして保護を確認する。
     if (stat.uid !== 0 || (stat.mode & 0o022) !== 0) {
       throw new Error('writable proxy configuration');
     }
@@ -333,13 +332,11 @@ if (import.meta.main) {
       throw new Error('requires disposable Linux root');
     }
     const [command, argument] = process.argv.slice(2);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvは実行時に欠損するため検査を維持する。
     if (command === 'prepare' && /^\d+$/u.test(argument ?? '')) {
       await prepare(argument);
     } else if (command === 'wait') {
       await waitAndReject();
     } else if (command === 'finish') {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvは実行時に欠損するため検査を維持する。
       await finish(argument ?? '');
     } else {
       throw new Error('invalid probe command');

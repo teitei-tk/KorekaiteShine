@@ -10,7 +10,6 @@ export type JsonValue =
 
 /** JSON文法だけを保証し、業務の構造検証は既存validatorへ委譲する。 */
 export function parseJson(text: string): JsonValue {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSON.parse成功値のJSON文法にだけ型を付ける。業務型へ断定しない。
   return JSON.parse(text) as JsonValue;
 }
 

@@ -21,9 +21,7 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
   try {
     const project = await buildProductionArtifacts(directory);
     const report = await verifyProductionArtifacts(project);
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
     expect(report.environments.sort()).toEqual(['client', 'evaluation', 'interview', 'ssr']);
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
     expect(report.routes.sort()).toEqual([
       '__root.tsx',
       'api.interview-history.ts',
@@ -142,7 +140,6 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
       expect(
         Object.values(objectAt(web.env))
           .map((binding) => stringValue(objectAt(binding).type))
-          // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
           .sort(),
       ).toEqual(['d1', 'text']);
       expect(web.triggers ?? []).toEqual([]);

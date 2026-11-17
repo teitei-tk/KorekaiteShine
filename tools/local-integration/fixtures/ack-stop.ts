@@ -45,8 +45,7 @@ export async function stopAfterResultBeforeAckForTest(
   for (const message of acknowledgements) {
     if (validateJobNotification(message.body)) {
       const { jobId } = message.body;
-      const [job] = await primary.select().from(jobs).where(eq(jobs.jobId, jobId));
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+      const job = (await primary.select().from(jobs).where(eq(jobs.jobId, jobId))).at(0);
       if (job?.purpose === 'diagnostics' && job.status === 'completed') {
         const claimed = await primary
           .insert(connectionChecks)

@@ -93,9 +93,7 @@ export function buildLiveSession(
     0,
   );
   const availableBytes = 8000 - historyBytes - 64;
-  // oxlint-disable-next-line typescript/no-misused-spread -- UTF-16コード単位ではなくUnicodeコードポイント単位で長さを制限する。
   const excerpt = [...material.themeExcerpt];
-  // oxlint-disable-next-line typescript/no-misused-spread -- UTF-16コード単位ではなくUnicodeコードポイント単位で長さを制限する。
   const background = [...material.background];
   function materialText(limit: number) {
     const select = (text: string[], original: string) =>

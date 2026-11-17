@@ -56,9 +56,7 @@ export function lifecyclePassed(
 
 export function identity(pid: number): Identity {
   const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-  // oxlint-disable-next-line eslint/prefer-destructuring -- Linux /proc statの固定フィールド番号で起動時刻を読む。
   const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
   if (!/^\d+$/u.test(start ?? '')) {
     throw new Error('process identity unavailable');
   }
@@ -373,7 +371,6 @@ async function finish(mode: string, outcome: string): Promise<void> {
     const report: Report = { count: reportInput.count, authOk: reportInput.authOk };
     const protectedConfig = [state.infoPath, `${home}/config.toml`].every((file) => {
       const stat = statSync(file);
-      // oxlint-disable-next-line eslint/no-bitwise -- Unix権限のgroup/other書込みビットをマスクして保護を確認する。
       return stat.uid === 0 && (stat.mode & 0o022) === 0;
     });
     validContext.valid =
@@ -425,17 +422,14 @@ if (import.meta.main) {
     throw new Error('requires disposable Linux root');
   }
   const [command, mode, extra] = process.argv.slice(2);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
   if (!['complete', 'reject'].includes(mode ?? '')) {
     throw new Error('invalid fixture mode');
   }
   if (command === 'serve') {
     await serve(mode);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
   } else if (command === 'prepare' && /^\d+$/u.test(extra ?? '')) {
     await prepare(mode, extra);
   } else if (command === 'finish') {
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
     await finish(mode, extra ?? '');
   } else {
     throw new Error('invalid fixture command');

@@ -1,4 +1,3 @@
-// oxlint-disable-next-line eslint/max-classes-per-file -- 各テストの異なるSocket・Worker・Audio API代替を同一suite内に閉じ込める。
 import { parseJson } from '@korekaite/api-contracts/json';
 import { assert, afterEach, expect, test, vi } from 'vitest';
 import { interviews, deletedInterviews } from '@korekaite/database/interviews';
@@ -77,9 +76,7 @@ function fixture(ObjectType = InterviewObject) {
     },
   };
   const object = new ObjectType(
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     ctx as object as ConstructorParameters<typeof InterviewObject>[0],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     env as object as ConstructorParameters<typeof InterviewObject>[1],
   );
   const fetchObject = (
@@ -220,7 +217,6 @@ test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが�
   });
   const f = fixture(
     class extends InterviewObject {
-      // oxlint-disable-next-line eslint/class-methods-use-this -- テスト対象のインスタンスAPIを置換する部分モックで、共有fixtureから値を返す。
       protected override connectLive(
         _options: Parameters<typeof createLiveConnection>[0],
         callbacks: LiveHandlers,

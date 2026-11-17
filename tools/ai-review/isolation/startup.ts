@@ -14,7 +14,6 @@ if (
 ) {
   throw new Error('requires root in an offline Linux network namespace');
 }
-// oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- Node CLIの固定位置引数を読み取る。
 const [, , action] = process.argv;
 if (!action) {
   throw new Error('official Action path required');

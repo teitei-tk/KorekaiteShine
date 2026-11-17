@@ -47,7 +47,6 @@ it('Schema指定とAPI出力、利用量が揃った時だけ成功する', () =
 });
 
 it('本文を持たない補助イベントや推論項目を最終出力と混同しない', () => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このファイル内で構築した固定JSON fixtureの複製。外部入力ではない。
   const event = JSON.parse(response.body.slice(5)) as {
     response: { output: { type: string; content?: { type: string; text?: string }[] }[] };
   };
@@ -61,7 +60,6 @@ it('本文を持たない補助イベントや推論項目を最終出力と混�
 });
 
 it('最終出力項目にtextがなければ成功扱いしない', () => {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このファイル内で構築した固定JSON fixtureの複製。外部入力ではない。
   const event = JSON.parse(response.body.slice(5)) as {
     response: { output: { type: string; content?: { type: string; text?: string }[] }[] };
   };

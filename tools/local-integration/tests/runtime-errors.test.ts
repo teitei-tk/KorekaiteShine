@@ -131,7 +131,6 @@ test('起動後処理が失敗したらロックを保持し後処理の再試�
   const fixture = await runtimeFixture();
   vi.mocked(confirmHttpReady).mockRejectedValue(new Error('not ready'));
   vi.mocked(stopProcessGroup).mockRejectedValueOnce(new Error('still alive'));
-  // oxlint-disable-next-line promise/prefer-catch -- 成功と拒否を別々の観測値へ変換し、成功処理の例外を拒否結果へ混ぜない。
   const failure = await startRuntimeInProcess(fixture.config).then(
     () => null,
     (error: Error) => error,

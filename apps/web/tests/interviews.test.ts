@@ -38,11 +38,8 @@ test('OpenAPIに定義したすべての応答に検証コードと実行ケー�
   const statusKeys = Object.keys(
     jsonObject(jsonObject(jsonObject(jsonObject(document.paths)['/api/interviews']).get).responses),
   );
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、新しいテスト配列だけを整列する。
   const statuses = statusKeys.sort();
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。
   expect(Object.keys(interviewResponseValidators).sort()).toEqual(statuses);
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。
   expect([...new Set(interviewCases.map((example) => String(example.status)))].sort()).toEqual(
     statuses,
   );

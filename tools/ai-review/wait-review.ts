@@ -59,12 +59,10 @@ async function latest<T extends { id: number; run_attempt: number }>(
     const data = await api<{ workflow_runs: T[] }>(
       `${workflow ? `actions/workflows/${workflow}` : 'actions'}/runs?event=${event}&per_page=100&page=${page}`,
     );
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     if (!Array.isArray(data?.workflow_runs)) {
       throw new TypeError('実行一覧が不正です');
     }
     for (const run of data.workflow_runs) {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       if (!run || !positive(run.id) || !positive(run.run_attempt)) {
         throw new Error('実行IDが不正です');
       }
@@ -99,11 +97,8 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
       epochMilliseconds(run.created_at) >= epochMilliseconds(revision.since) &&
       run.event === 'pull_request' &&
       isSourceCi(run.path) &&
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.repository?.id === REPOSITORY_ID &&
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.head_repository?.id === REPOSITORY_ID &&
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.pull_requests?.length === 1 &&
       run.pull_requests[0]?.number === revision.number &&
       run.pull_requests[0]?.head?.sha === revision.head &&
@@ -121,7 +116,6 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
     }
     const commit = await api<{ parents: { sha: string }[] }>(`git/commits/${source.head_sha}`);
     if (
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       commit.parents?.length !== 2 ||
       commit.parents[0]?.sha !== revision.base ||
       commit.parents[1]?.sha !== revision.head
@@ -136,9 +130,7 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
     (run) =>
       run.event === 'workflow_run' &&
       run.path === '.github/workflows/ai-review.yml' &&
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.repository?.id === REPOSITORY_ID &&
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.head_repository?.id === REPOSITORY_ID &&
       run.display_title ===
         `AI review / source run ${source.id} attempt ${source.run_attempt} / review`,
@@ -196,9 +188,7 @@ export async function finishReview(
     run.status !== 'completed' ||
     run.event !== 'workflow_run' ||
     run.path !== '.github/workflows/ai-review.yml' ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.repository?.id !== REPOSITORY_ID ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.head_repository?.id !== REPOSITORY_ID
   ) {
     throw new Error('監視結果が不一致です');

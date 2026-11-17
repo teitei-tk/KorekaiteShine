@@ -33,7 +33,6 @@ it('公式終了APIで停止しなければ待機上限後に停止し失敗を�
       }),
   );
   expect(await executeRuntime('finish', '/fixture/artifact', 'success', reportEnv)).toBe(false);
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).toHaveBeenCalledWith(12_345, 'SIGKILL');
   expect(status()).toMatchObject({ target: 'finish/shutdown' });
   expect(console.log).toHaveBeenCalledWith('Official WIF shutdown: failed');
@@ -41,7 +40,6 @@ it('公式終了APIで停止しなければ待機上限後に停止し失敗を�
 it('起動失敗時に既に終了したプロセスへkillを送らない', async () => {
   fixture.alive = false;
   expect(await executeRuntime('start', '', '', reportEnv)).toBe(false);
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).not.toHaveBeenCalled();
   expect(status()).toMatchObject({ target: 'start/isolation' });
 });
@@ -255,7 +253,6 @@ it('プロキシ情報のPID不一致を隔離成功にしない', async () => {
   fixture.infoPid = 54_321;
   expect(await executeRuntime('finish', '/fixture/artifact', 'success', reportEnv)).toBe(false);
   expect(status()).toMatchObject({ target: 'finish/shutdown' });
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).toHaveBeenCalledWith(12_345, 'SIGKILL');
 });
 it('設定ハッシュが変わった場合は成果物を保存せず終了する', async () => {
@@ -268,7 +265,6 @@ it('初期交換のPIDが違えば起動プロセスを停止し情報を削除�
   fixture.infoPid = 54_321;
   expect(await executeRuntime('start', '', '', reportEnv)).toBe(false);
   expect(status()).toMatchObject({ target: 'start/proxy' });
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).toHaveBeenCalledWith(12_345, 'SIGKILL');
   expect(rmSync).toHaveBeenCalledWith(`${home}/20.json`, { force: true });
 });
@@ -290,7 +286,6 @@ it('finishは成果物を保存して公式終了APIで停止する', async () =
     'artifact=ai-review-v2-20-1\nattempt=1\n',
   );
   expect(rmSync).toHaveBeenCalledWith(`${home}/20.json`, { force: true });
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).not.toHaveBeenCalled();
 });
 it('startは隔離確認後に設定ハッシュと生成元を保存する', async () => {
@@ -303,7 +298,6 @@ it('startは隔離確認後に設定ハッシュと生成元を保存する', as
     hash(fixture.files.get(`${home}/config.toml`) ?? assert.fail('必須のテスト値がありません。')),
   );
   expect(spawnSync).toHaveBeenCalledTimes(2);
-  // oxlint-disable-next-line typescript/unbound-method -- spyの呼出履歴をexpectで照合するだけで、メソッドを非束縛で呼び出さない。
   expect(process.kill).not.toHaveBeenCalled();
 });
 it('root所有化できない場合は準備段階を固定理由で記録する', async () => {

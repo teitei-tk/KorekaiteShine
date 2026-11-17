@@ -66,7 +66,6 @@ test('本処理が文字列をthrowしても固定分類のErrorと失敗記録�
   const resultPath = join(directory, 'results.json');
   await expect(
     runWithEvidence({ resultPath, metadata: {} }, async () => {
-      // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外をthrowされたときの処理を検証する故障fixture。
       throw 'private failure';
     }),
   ).rejects.toThrow('CASE_FAILED');

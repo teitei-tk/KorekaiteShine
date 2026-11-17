@@ -175,11 +175,12 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
             if (hold) {
               const deadline = Temporal.Now.instant().epochMilliseconds + 15_000;
               for (;;) {
-                const [released] = await primary
-                  .select()
-                  .from(connectionChecks)
-                  .where(eq(connectionChecks.writer, `release:${jobId}`));
-                // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+                const released = (
+                  await primary
+                    .select()
+                    .from(connectionChecks)
+                    .where(eq(connectionChecks.writer, `release:${jobId}`))
+                ).at(0);
                 if (released) {
                   break;
                 }
@@ -191,11 +192,9 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
                 });
               }
             }
-            const [check] = await primary
-              .select()
-              .from(diagnosticChecks)
-              .where(eq(diagnosticChecks.jobId, jobId));
-            // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+            const check = (
+              await primary.select().from(diagnosticChecks).where(eq(diagnosticChecks.jobId, jobId))
+            ).at(0);
             if (!check) {
               throw new Error('診断条件がありません。');
             }
@@ -217,13 +216,13 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       },
     );
   }
-  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async readQueueReceipt(jobId: string) {
-    const [row] = await db
-      .select()
-      .from(connectionChecks)
-      .where(eq(connectionChecks.writer, `queue:${jobId}`));
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+    const row = (
+      await db
+        .select()
+        .from(connectionChecks)
+        .where(eq(connectionChecks.writer, `queue:${jobId}`))
+    ).at(0);
     return row ? parseJson(row.value) : null;
   }
 
@@ -231,16 +230,17 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
     }
-    const [job] = await createPrimaryDb(this.env.DB)
-      .select({
-        jobId: jobs.jobId,
-        purpose: jobs.purpose,
-        status: jobs.status,
-        attemptCount: jobs.attemptCount,
-      })
-      .from(jobs)
-      .where(eq(jobs.jobId, jobId));
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+    const job = (
+      await createPrimaryDb(this.env.DB)
+        .select({
+          jobId: jobs.jobId,
+          purpose: jobs.purpose,
+          status: jobs.status,
+          attemptCount: jobs.attemptCount,
+        })
+        .from(jobs)
+        .where(eq(jobs.jobId, jobId))
+    ).at(0);
     return job ?? null;
   }
 
@@ -277,11 +277,12 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
     }
-    const [row] = await createPrimaryDb(this.env.DB)
-      .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
-      .from(diagnosticChecks)
-      .where(eq(diagnosticChecks.jobId, jobId));
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+    const row = (
+      await createPrimaryDb(this.env.DB)
+        .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
+        .from(diagnosticChecks)
+        .where(eq(diagnosticChecks.jobId, jobId))
+    ).at(0);
     return row ?? null;
   }
 
@@ -316,7 +317,6 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       .orderBy(jobAttempts.attemptNumber);
   }
 
-  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async writeShared() {
     await db
       .insert(connectionChecks)

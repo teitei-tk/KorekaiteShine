@@ -75,7 +75,6 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
 );
 
 test('起動待ちの間に停止しても、後から起動したWorkerを停止して証拠を保持する', async () => {
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- Promise.withResolvers<void>は値を返さない標準Promiseの型引数。
   const { promise: gate, resolve: release } = Promise.withResolvers<void>();
   const evidenceContext = { evidence: '', stops: 0 };
   const start = vi.spyOn(runtimeModule, 'startRuntime').mockImplementationOnce(async (config) => {

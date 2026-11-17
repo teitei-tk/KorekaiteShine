@@ -35,21 +35,22 @@ export async function retryEvaluationRequest(
   const parent = parsed.value.failedJobId;
   const { db } = deps;
   try {
-    const [source] = await db
-      .select({ status: jobs.status, interviewStatus: interviews.status })
-      .from(evaluationInputs)
-      .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
-      .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
-      .where(
-        and(
-          eq(interviews.actorId, actor),
-          eq(jobs.actorId, actor),
-          eq(jobs.purpose, 'evaluation'),
-          eq(interviews.interviewId, interviewId),
-          eq(jobs.jobId, parent),
-        ),
-      );
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    const source = (
+      await db
+        .select({ status: jobs.status, interviewStatus: interviews.status })
+        .from(evaluationInputs)
+        .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
+        .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
+        .where(
+          and(
+            eq(interviews.actorId, actor),
+            eq(jobs.actorId, actor),
+            eq(jobs.purpose, 'evaluation'),
+            eq(interviews.interviewId, interviewId),
+            eq(jobs.jobId, parent),
+          ),
+        )
+    ).at(0);
     if (!source) {
       return applicationFailure('NOT_FOUND');
     }
@@ -127,18 +128,19 @@ export async function retryEvaluationRequest(
           .where(and(eq(evaluationInputs.jobId, id), sql`changes()=1`)),
       ),
     ]);
-    const [accepted] = await db
-      .select({ jobId: evaluationInputs.jobId })
-      .from(evaluationInputs)
-      .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
-      .where(
-        and(
-          eq(interviews.actorId, actor),
-          eq(interviews.interviewId, interviewId),
-          eq(evaluationInputs.retryOf, parent),
-        ),
-      );
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    const accepted = (
+      await db
+        .select({ jobId: evaluationInputs.jobId })
+        .from(evaluationInputs)
+        .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
+        .where(
+          and(
+            eq(interviews.actorId, actor),
+            eq(interviews.interviewId, interviewId),
+            eq(evaluationInputs.retryOf, parent),
+          ),
+        )
+    ).at(0);
     if (!accepted) {
       return applicationFailure('CONFLICT');
     }

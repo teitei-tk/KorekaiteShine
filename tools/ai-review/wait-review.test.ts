@@ -22,7 +22,6 @@ it('完了結果の取得中にPRが閉じても成功を返さない', async ()
 it('取得した完了結果の生成元が違えば拒否する', async () => {
   const f = fixture();
   const api: Api = async <T>(path: string) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     path === 'actions/runs/20/attempts/1' ? ({ ...f.review, id: 21 } as T) : f.api<T>(path);
   await expect(finishReview(api, f.revision, 20, 1)).rejects.toThrow('監視結果が不一致');
 });
@@ -44,7 +43,6 @@ it('仮想mergeの親が対象と異なれば監視を失敗させる', async ()
   const f = fixture();
   f.source.head_sha = 'c'.repeat(40);
   const api: Api = async <T>(path: string) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     path.startsWith('git/commits/') ? ({ parents: [] } as T) : f.api<T>(path);
   expect(await inspectReview(api, f.revision)).toEqual({
     status: 'failure',
@@ -64,7 +62,6 @@ it('一覧10ページの上限で停止し無期限に取得しない', async ()
   const api: Api = async <T>(path: string) => {
     if (path.startsWith('actions/runs?')) {
       pagesState.pages++;
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         workflow_runs: Array.from({ length: 100 }, (_, i) => ({
           ...f.source,
@@ -86,7 +83,6 @@ it('一覧内の実行IDが不正なら別の成功実行へ読み飛ばさな�
 it('実行一覧が配列でなければ監視を停止する', async () => {
   const f = fixture();
   const api: Api = async <T>(path: string) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     path.startsWith('actions/runs?') ? ({ workflow_runs: null } as T) : f.api<T>(path);
   await expect(inspectReview(api, f.revision)).rejects.toThrow('実行一覧が不正');
 });
@@ -137,27 +133,21 @@ function fixture(workflow = '.github/workflows/docs.yml') {
     expect(method).toBe('GET');
     calls.push(path);
     if (path === 'pulls/7') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return pr as T;
     }
     if (path.startsWith('actions/runs?')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { workflow_runs: sources } as T;
     }
     if (path.startsWith('actions/workflows/ai-review.yml/runs?')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { workflow_runs: reviews } as T;
     }
     if (path === 'actions/runs/20/attempts/1') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return review as T;
     }
     if (path.startsWith('git/commits/')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { parents: [{ sha: revision.base }, { sha: revision.head }] } as T;
     }
     if (path.endsWith('/jobs?per_page=100')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
     }
     throw new Error(`Unexpected request ${path}`);
@@ -319,7 +309,6 @@ it('完了結果の取得中に再試行が始まった場合も旧成功を返�
       const frozen = { ...f.review };
       f.review.run_attempt = 2;
       f.review.status = 'in_progress';
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return frozen as T;
     }
     return value;

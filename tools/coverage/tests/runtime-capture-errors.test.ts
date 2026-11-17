@@ -16,7 +16,6 @@ test('Error以外の収集失敗もfailedとして保存する', async () => {
   const directory = setup();
   const stop = await startRuntimeCapture(12_345, 'http://fixture', ['worker']);
   vi.spyOn(process, 'kill').mockImplementation(() => {
-    // eslint-disable-next-line no-throw-literal, typescript/only-throw-error -- Error以外の失敗を保存する分岐の回帰fixture。
     throw 'fixture failure';
   });
   await stop();

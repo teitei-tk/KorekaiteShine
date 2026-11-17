@@ -83,7 +83,6 @@ function fakeSocket() {
 test('開始確認まで音声を送らず、終了要求後の最後の原文保存を待って完了する', async () => {
   const fake = fakeSocket();
 
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
   const { promise: saved, resolve: save } = Promise.withResolvers<void>();
   const transcript = vi.fn(async (_event: LiveTranscriptEvent) => {
     await saved;
@@ -247,7 +246,6 @@ test('不正な上流イベントと保存失敗で停止し、外部のエラ�
 test('保存待ちの受信が上限を超えたら接続を止め、受付済みの保存を待つ', async () => {
   const fake = fakeSocket();
 
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
   const { promise: pending, resolve: save } = Promise.withResolvers<void>();
   const transcript = vi.fn(async (_event: LiveTranscriptEvent) => {
     await pending;
@@ -475,7 +473,6 @@ test('文字起こし保存の応答が止まっても終了要求から15秒で
   try {
     const fake = fakeSocket();
 
-    // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
     const { promise: saving, resolve: release } = Promise.withResolvers<void>();
     const connection = createLiveConnection(
       { apiKey: 'fixture-key', session },
@@ -587,7 +584,6 @@ test('重複した開始と内部イベントを無視し、音声位置と使�
   for (const length of [0, 1, 9602]) {
     expect(connection.sendAudio(new Uint8Array(length))).toBe(false);
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 型外の操作名を意図的に注入し、実行時の拒否を検査する。
   expect(connection.request('unknown' as 'skip')).toBe(false);
   const result = connection.close();
   expect(connection.close()).toBe(result);
@@ -656,7 +652,6 @@ test('開始の保存中に切断した場合は遅れて完了してもreadyを
   try {
     const { fake, connection, handlers } = openFixture();
 
-    // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
     const { promise: pending, resolve: release } = Promise.withResolvers<void>();
     handlers.onReady.mockReturnValueOnce(pending);
     await vi.advanceTimersByTimeAsync(0);
@@ -698,7 +693,6 @@ test('終了期限を過ぎて保存が失敗しても、確定した終了理�
   try {
     const { fake, handlers, connection } = openFixture();
 
-    // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
     const { promise: saving, reject: fail } = Promise.withResolvers<void>();
     handlers.onTranscript.mockReturnValueOnce(saving);
     await vi.advanceTimersByTimeAsync(0);

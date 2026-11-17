@@ -66,19 +66,15 @@ function setup(kind = 'owner') {
   const api: Api = async <T>(path: string) => {
     requests.push(path);
     if (path.startsWith('actions/')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return run as T;
     }
     if (path === 'pulls/7') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return pr as T;
     }
     if (path.startsWith('git/commits/')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { parents } as T;
     }
     if (path.startsWith('issues/')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return prior as T;
     }
     throw new Error('予期しない呼び出し');
@@ -125,7 +121,6 @@ it('レビューコメントも100件を超えたら次ページまで取得す�
   const paths: string[] = [];
   const api: Api = async <T>(path: string) => {
     paths.push(path);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return (path.endsWith('page=1') ? first : [last]) as T;
   };
   expect(await reviewComments(api, 7)).toEqual([...first, last]);

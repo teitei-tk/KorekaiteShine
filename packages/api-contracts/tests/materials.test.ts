@@ -68,7 +68,6 @@ test('材料分析は送信確認を必須とし、本文・候補・エラー�
   const analyze = objectAt(document, 'paths', '/api/materials/analyze', 'post');
   expect(analyze).toBeDefined();
   expect(objectAt(analyze.requestBody).required).toBe(true);
-  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、Object.keysが作成した配列だけを整列する。
   expect(Object.keys(objectAt(analyze.responses)).sort()).toEqual([
     '200',
     '400',

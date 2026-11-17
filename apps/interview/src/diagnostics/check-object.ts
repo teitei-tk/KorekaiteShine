@@ -56,7 +56,6 @@ export class CheckObject extends DurableObject<CheckBindings> {
       Temporal.Instant.from(persisted.firstReceivedAt).epochMilliseconds,
     );
     const pending = await pendingCheckNotification(this.env.DB, jobId);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (pending) {
       const notification = { schemaVersion: 1, jobId: pending.jobId };
       if (!validateJobNotification(notification)) {

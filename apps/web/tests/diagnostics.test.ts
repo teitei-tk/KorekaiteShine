@@ -24,7 +24,6 @@ test('予期しない内部例外は詳細を公開せず500と追跡ログを�
   });
   const deps: CheckDependencies = {
     // repositoryを置き換えるこの例外境界テストではDBを呼ばない。ローカルD1障害は統合テストで検証する。
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',
@@ -57,7 +56,6 @@ test('本文を読み取れない要求は保存せず400と追跡情報を返�
     /* このテストでは呼出しに副作用を持たせない。 */
   });
   const deps: CheckDependencies = {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',
@@ -108,7 +106,6 @@ test('永続化後の初期化開始に失敗しても202と元の受付を保�
     /* このテストでは呼出しに副作用を持たせない。 */
   });
   const deps: CheckDependencies = {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',

@@ -70,10 +70,9 @@ export async function acceptDiagnosticJob(
     );
   } catch (error) {
     // batchの失敗時は全体がrollbackされる。競合した確定済み受付だけを読み直す。
-    const [existing] = await databaseOperation(async () =>
-      db.select().from(diagnosticRequests).where(scope),
-    );
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    const existing = (
+      await databaseOperation(async () => db.select().from(diagnosticRequests).where(scope))
+    ).at(0);
     if (!existing) {
       throw error;
     }
@@ -103,20 +102,21 @@ export async function findDiagnosticJob(
   context: AcceptanceContext,
   jobId: string,
 ): Promise<CheckStatus | null> {
-  const [row] = await databaseOperation(async () =>
-    context.db
-      .select({ job: jobs, check: diagnosticChecks })
-      .from(jobs)
-      .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
-      .where(
-        and(
-          eq(jobs.jobId, jobId),
-          eq(jobs.actorId, context.actorId),
-          eq(jobs.purpose, 'diagnostics'),
+  const row = (
+    await databaseOperation(async () =>
+      context.db
+        .select({ job: jobs, check: diagnosticChecks })
+        .from(jobs)
+        .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
+        .where(
+          and(
+            eq(jobs.jobId, jobId),
+            eq(jobs.actorId, context.actorId),
+            eq(jobs.purpose, 'diagnostics'),
+          ),
         ),
-      ),
-  );
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    )
+  ).at(0);
   if (!row) {
     return null;
   }

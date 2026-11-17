@@ -37,7 +37,6 @@ test('別用途のSQLiteファイルを除外し実スキーマの開発DBだけ
   );
   try {
     const migrations = new URL('../../../packages/database/db/migrations/', import.meta.url);
-    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022型設定の共有テスト。生成した一時配列だけを整列する。
     for (const name of (await readdir(migrations)).filter((name) => name.endsWith('.sql')).sort()) {
       database.exec(await readFile(new URL(name, migrations), 'utf8'));
     }

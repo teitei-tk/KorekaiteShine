@@ -12,9 +12,7 @@ export function InterviewPage() {
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const activeState = { active: true };
-    // oxlint-disable-next-line promise/catch-or-return, promise/prefer-catch -- thenの第2引数で拒否を処理する終端のUI更新。 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     getInterviews(globalThis.location.origin).then(
-      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       (data) => {
         if (activeState.active) {
           setResult(data);

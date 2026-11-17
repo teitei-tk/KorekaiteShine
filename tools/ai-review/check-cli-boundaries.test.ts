@@ -12,10 +12,8 @@ it('レビュー監視の既定時計は15秒待機後に対象変更を検出�
   const readsState = { reads: 0 };
   const api: Api = async <T>(path: string) => {
     if (path === 'pulls/7') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { ...fixture.pr, state: ++readsState.reads === 1 ? 'open' : 'closed' } as T;
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return { workflow_runs: [] } as T;
   };
   const result = await waitReview(api, {

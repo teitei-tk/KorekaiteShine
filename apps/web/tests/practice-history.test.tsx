@@ -166,7 +166,6 @@ test('履歴のエラーから復帰し、前後のページを表示する', as
       }
       callsState.calls++;
       if (callsState.calls === 1) {
-        // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
         throw 'offline';
       }
       if (callsState.calls === 2) {
@@ -211,7 +210,6 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
       if (init?.method === 'POST') {
         fetchedContext.attempts++;
         if (fetchedContext.attempts === 1) {
-          // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
           throw 'offline';
         }
         if (fetchedContext.attempts === 2) {
@@ -221,7 +219,6 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
       }
       fetchedContext.fetched++;
       if (fetchedContext.fetched === 1) {
-        // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
         throw 'offline';
       }
       if (fetchedContext.fetched === 2) {

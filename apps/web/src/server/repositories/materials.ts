@@ -42,17 +42,18 @@ export async function findMaterialTheme(
   if (!Number.isSafeInteger(themeIndex) || themeIndex < 0) {
     return null;
   }
-  const [row] = await db
-    .select()
-    .from(materialAnalyses)
-    .where(
-      and(
-        eq(materialAnalyses.analysisId, analysisId),
-        eq(materialAnalyses.actorId, actorId),
-        gt(materialAnalyses.expiresAt, now),
-      ),
-    );
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+  const row = (
+    await db
+      .select()
+      .from(materialAnalyses)
+      .where(
+        and(
+          eq(materialAnalyses.analysisId, analysisId),
+          eq(materialAnalyses.actorId, actorId),
+          gt(materialAnalyses.expiresAt, now),
+        ),
+      )
+  ).at(0);
   if (!row) {
     return null;
   }
@@ -61,6 +62,5 @@ export async function findMaterialTheme(
     throw new Error('保存された分析候補が不正です。');
   }
   const theme = candidates.themes[themeIndex];
-  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   return theme ? { materialHash: row.materialHash, theme } : null;
 }

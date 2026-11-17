@@ -106,7 +106,6 @@ export function PracticePreparation({
         <section>
           <h2>面接のテーマ</h2>
           {analysis.themes.map((theme, index) => (
-            // oxlint-disable-next-line react/no-array-index-key -- 状態を持たない表示専用の行。重複する本文も別々に表示する。
             <div key={index}>
               <label>
                 <input

@@ -24,7 +24,6 @@ export async function evaluateInterview(
       (fragment) => fragment.speaker === 'user' && fragment.content.trim().length > 0,
     );
     const value = hasAnswer ? await generate(input, signal) : noAnswerResult();
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (signal.aborted || !validateInterviewEvaluation(value) || !validEvidence(input, value)) {
       return { ok: false, error: { code: 'INVALID_AI_RESULT', retryable: true } };
     }

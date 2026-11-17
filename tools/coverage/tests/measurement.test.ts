@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { runInNewContext } from 'node:vm';
 import { createFileCoverage } from '@vitest/istanbul-lib-coverage';
 import type { FileCoverageData } from '@vitest/istanbul-lib-coverage';

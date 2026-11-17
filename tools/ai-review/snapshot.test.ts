@@ -35,7 +35,6 @@ it('保存済み履歴の外形と更新日時を検査する', () => {
 it.each([1000, 1001])('通常・行コメント%s件を打ち切らない', async (count) => {
   const api: Api = async <T>(path: string) => {
     const page = Number(new URL(`https://example.invalid/${path}`).searchParams.get('page'));
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return Array.from({ length: Math.max(0, Math.min(100, count - (page - 1) * 100)) }, (_, i) => ({
       id: (page - 1) * 100 + i + 1,
     })) as T;
@@ -48,14 +47,12 @@ it('末尾API失敗は部分履歴にしない', async () => {
     if (path.endsWith('page=12')) {
       throw new Error('tail failed');
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return Array.from({ length: 100 }, (_, i) => ({ id: i + 1 })) as T;
   };
   await expect(comments(api, 1)).rejects.toThrow('tail failed');
 });
 it('取得順だけでは改訂にならない', () => {
   expect(snapshotRevision(normalizeSnapshot(input))).toBe(
-    // oxlint-disable-next-line unicorn/no-array-reverse -- ES2022対象を維持し、コピーした入力配列のみ逆順にする。
     snapshotRevision(normalizeSnapshot({ ...input, inline: [...input.inline].reverse() })),
   );
 });
@@ -94,10 +91,8 @@ it('21返信・16KiB本文・128KiB履歴を切り捨てない', () => {
 it('Resolve状態が取得できない時は停止する', async () => {
   const api: Api = async <T>(path: string) => {
     if (path === 'graphql') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { errors: [{ message: 'failed' }] } as T;
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return [] as T;
   };
   await expect(loadSnapshot(api, 1)).rejects.toThrow();
@@ -132,7 +127,6 @@ it('スレッドを次ページまで取得し、取得順に依存せず履歴�
       const { cursor } = body.variables;
       assert.ok(cursor === null || typeof cursor === 'string');
       cursors.push(cursor);
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         data: {
           repository: {
@@ -152,7 +146,6 @@ it('スレッドを次ページまで取得し、取得順に依存せず履歴�
         },
       } as T;
     }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return (
       path.startsWith('pulls/')
         ? [root, { ...root, id: 4 }]
@@ -169,11 +162,9 @@ it('次ページのカーソルが同じなら部分履歴を返さず停止す�
   const requestsState = { requests: 0 };
   const api: Api = async <T>(path: string) => {
     if (path !== 'graphql') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return [] as T;
     }
     requestsState.requests++;
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     return {
       data: {
         repository: {
@@ -193,7 +184,6 @@ it('次ページのカーソルが同じなら部分履歴を返さず停止す�
 
 it('元コメントを持たないスレッドを拒否する', async () => {
   const api: Api = async <T>(path: string) =>
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     (path === 'graphql'
       ? {
           data: {

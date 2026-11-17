@@ -28,7 +28,6 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
       {
         location: 'header',
         path: 'Idempotency-Key',
-        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         code: key === null ? 'REQUIRED' : 'INVALID_FORMAT',
         message: '冪等キーを確認してください。',
       },

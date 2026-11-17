@@ -641,7 +641,6 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
   const writes = await import('../src/server/repositories/interviews.ts');
   const append = writes.appendTranscript;
 
-  // oxlint-disable-next-line typescript/no-invalid-void-type -- 標準Promise.withResolvers<void>()の完了通知であり、値を返さないPromiseの型引数。
   const { promise: deferred, resolve: release } = Promise.withResolvers<void>();
   const delayed = vi.spyOn(writes, 'appendTranscript').mockImplementationOnce(async (...args) => {
     await deferred;
@@ -939,7 +938,6 @@ test('開始後の重複接続を拒否し、終了済みの接続からの通�
       await handlers[0].onReady('upstream');
 
       // 保存済み発言に時刻がない上流実装でも原文は保持する。
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 時刻欠損の上流イベントを意図的に注入し、原文保存の防御動作を検査する。
       await handlers[0].onTranscript({
         type: 'session.output_transcript.delta',
         event_id: 't',

@@ -37,7 +37,6 @@ test('実行回復に失敗したジョブを保留し、既定の時計で後�
     { jobId: 'next', purpose: 'diagnostics' },
   ]);
   vi.mocked(recoverExpiredExecution).mockRejectedValueOnce(new Error('private details'));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await recoverExecutions({} as D1Database);
   expect(recoverExpiredExecution).toHaveBeenCalledTimes(2);
   expect(recoverExpiredExecution).toHaveBeenLastCalledWith(
@@ -65,7 +64,6 @@ test('初期化に失敗しても後続ジョブを初期化し、失敗の内�
       /* このテストでは呼出しに副作用を持たせない。 */
     })
     .mockRejectedValueOnce(new Error('private details'));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await recoverInitializations({} as D1Database, initialize);
   expect(clock).toHaveBeenCalledTimes(1);
   expect(initialize.mock.calls).toEqual([['failed'], ['next']]);

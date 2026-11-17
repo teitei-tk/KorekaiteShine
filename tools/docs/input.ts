@@ -1,4 +1,3 @@
-// oxlint-disable-next-line typescript/no-restricted-types -- JSON/YAMLの入力境界だけを表し、利用前に構造を検証する。
 export type DocumentInput = unknown;
 
 function isInputRecord(value: DocumentInput): value is Record<string, DocumentInput> {

@@ -88,7 +88,6 @@ export async function startOwnedRuntime(
     });
   });
   const ready = new Promise<string>((resolve, reject) => {
-    // eslint-disable-next-line typescript/no-restricted-types -- IPC境界で通知の形状を検証する。
     owner.on('message', (message: unknown) => {
       if (isObject(message) && message.type === 'ready' && typeof message.baseUrl === 'string') {
         resolve(message.baseUrl);

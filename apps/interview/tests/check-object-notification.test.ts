@@ -31,9 +31,7 @@ test('診断DOの再初期化では最初の受信時刻と送信済み通知を
     transaction: (work: (tx: typeof values) => Promise<CheckInitialized>) => work(values),
   };
   const object = new CheckObject(
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     { storage } as object as ConstructorParameters<typeof CheckObject>[0],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     env as object as ConstructorParameters<typeof CheckObject>[1],
   );
   const first = crypto.randomUUID();

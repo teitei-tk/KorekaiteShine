@@ -63,7 +63,6 @@ function readStructuredOutput(body: JsonValue): MaterialAnalysisCandidate | null
     typeof body !== 'object' ||
     Array.isArray(body) ||
     body.status !== 'completed' ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- JSONオブジェクトの未定義プロパティを実行時に除外する。
     (body.error !== null && body.error !== undefined) ||
     !Array.isArray(body.output)
   ) {
@@ -78,7 +77,6 @@ function readStructuredOutput(body: JsonValue): MaterialAnalysisCandidate | null
   }
   const [message] = messages;
   if (
-    // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     !message ||
     typeof message !== 'object' ||
     Array.isArray(message) ||
@@ -91,7 +89,6 @@ function readStructuredOutput(body: JsonValue): MaterialAnalysisCandidate | null
   }
   const [content] = message.content;
   if (
-    // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     !content ||
     typeof content !== 'object' ||
     Array.isArray(content) ||

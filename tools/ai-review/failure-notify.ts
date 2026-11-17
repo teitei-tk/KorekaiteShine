@@ -23,7 +23,6 @@ export async function failureTarget(api: Api, id: number, attempt: number) {
   // 最新試行だけを扱い、旧試行の遅延通知を防ぐ。
   const run = await api<NotificationRun>(`actions/runs/${id}`);
   if (
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     !run ||
     run.id !== id ||
     run.run_attempt !== attempt ||
@@ -31,9 +30,7 @@ export async function failureTarget(api: Api, id: number, attempt: number) {
     run.event !== 'workflow_run' ||
     run.path !== '.github/workflows/ai-review.yml' ||
     run.head_branch !== 'main' ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.repository?.id !== REPOSITORY_ID ||
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.head_repository?.id !== REPOSITORY_ID
   ) {
     return undefined;
@@ -53,7 +50,6 @@ export async function failureTarget(api: Api, id: number, attempt: number) {
     return undefined;
   }
   const source = await api<SourceRun>(`actions/runs/${sourceId}`);
-  // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
   if (source?.id !== sourceId || source.run_attempt !== sourceAttempt) {
     return undefined;
   }
@@ -107,7 +103,6 @@ export async function notifyFailure(
   ].join('\n\n');
   const prior = (await comments(api, number)).filter(
     (c) =>
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       c.user?.id === 41_898_282 &&
       c.user.login === 'github-actions[bot]' &&
       c.user.type === 'Bot' &&

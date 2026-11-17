@@ -43,7 +43,6 @@ export async function runWithEvidence(
     report.failureCode = 'CASE_FAILED';
     failureState.failure = error instanceof Error ? error : new Error('CASE_FAILED');
   } finally {
-    // eslint-disable-next-line unicorn/no-array-reverse -- ES2022利用側向けに新しい局所コピーだけを反転する。
     for (const cleanup of [...cleanups].reverse()) {
       try {
         await cleanup(!failureState.failure);

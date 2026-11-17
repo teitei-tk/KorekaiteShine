@@ -47,7 +47,6 @@ export class InterviewObject extends DurableObject<Bindings> {
       evaluation: evaluationConfiguration(this.env.EVALUATION_MODEL ?? ''),
     } as const;
   }
-  // oxlint-disable-next-line eslint/class-methods-use-this -- 診断用サブクラスが接続実装を差し替えるprotected拡張点。
   protected connectLive(
     options: Parameters<typeof createLiveConnection>[0],
     handlers: LiveHandlers,
@@ -67,7 +66,6 @@ export class InterviewObject extends DurableObject<Bindings> {
         return;
       }
       const db = createPrimaryDb(this.env.DB);
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!(await loadInterview(db, identity.actorId, identity.interviewId))) {
         throw new Error('面接が見つかりません。');
       }
@@ -127,16 +125,17 @@ export class InterviewObject extends DurableObject<Bindings> {
       return new Response(null, { status: 404 });
     }
     if (request.method === 'DELETE') {
-      const [marked] = await createPrimaryDb(this.env.DB)
-        .select({ id: deletedInterviews.interviewId })
-        .from(deletedInterviews)
-        .where(
-          and(
-            eq(deletedInterviews.interviewId, interviewId),
-            eq(deletedInterviews.actorId, actorId),
-          ),
-        );
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+      const marked = (
+        await createPrimaryDb(this.env.DB)
+          .select({ id: deletedInterviews.interviewId })
+          .from(deletedInterviews)
+          .where(
+            and(
+              eq(deletedInterviews.interviewId, interviewId),
+              eq(deletedInterviews.actorId, actorId),
+            ),
+          )
+      ).at(0);
       if (!marked) {
         return new Response(null, { status: 404 });
       }
@@ -152,7 +151,6 @@ export class InterviewObject extends DurableObject<Bindings> {
     if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response(null, { status: 426 });
     }
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!(await loadInterview(createPrimaryDb(this.env.DB), actorId, interviewId))) {
       return new Response(null, { status: 404 });
     }

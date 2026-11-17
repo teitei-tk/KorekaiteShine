@@ -28,7 +28,6 @@ function fixture(mode: 'ready' | 'failure' | 'wrong-pid' | 'no-shutdown') {
     expect(command).toBe('/usr/local/bin/codex-responses-api-proxy');
     expect(argv).toContain('--github-oidc');
     expect(JSON.stringify(args)).not.toContain(env.ACTIONS_ID_TOKEN_REQUEST_TOKEN);
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 実際の子プロセスの欠損状態を検査する。
     expect(options?.env).toEqual({ PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/root' });
     // 模擬プロセスはstdin一致時だけreadyにする。HTTPは終了要求しか受け付けない。
     const source = `
@@ -55,7 +54,6 @@ function fixture(mode: 'ready' | 'failure' | 'wrong-pid' | 'no-shutdown') {
   return {
     info,
     launch,
-    // oxlint-disable-next-line typescript/no-unsafe-return -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
     child: () => (launch.mock.results[0] ?? assert.fail('必須のテスト値がありません。')).value,
   };
 }
@@ -73,7 +71,6 @@ describe('公式プロキシだけによる認証検証', () => {
       f.launch,
     );
     expect(inspectedState.inspected).toBe(true);
-    // oxlint-disable-next-line typescript/no-unsafe-member-access -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
     expect(f.child().exitCode).toBe(0);
   });
   for (const mode of ['failure', 'wrong-pid', 'no-shutdown'] as const) {
@@ -90,7 +87,6 @@ describe('公式プロキシだけによる認証検証', () => {
           f.launch,
         ),
       ).rejects.toThrow();
-      // oxlint-disable-next-line typescript/no-unsafe-member-access -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
       expect(f.child().exitCode !== null || f.child().signalCode !== null).toBe(true);
     });
   }
@@ -107,7 +103,6 @@ describe('公式プロキシだけによる認証検証', () => {
         f.launch,
       ),
     ).rejects.toThrow();
-    // oxlint-disable-next-line typescript/no-unsafe-member-access -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
     expect(f.child().exitCode).toBe(0);
   });
 });

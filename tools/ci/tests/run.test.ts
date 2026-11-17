@@ -151,6 +151,29 @@ test('実runnerは成功・失敗を結果JSONと終了コードへ伝え、部�
     expect(
       parseResult(await readFile(resolve(root, '.ci/results/node-1.json'), 'utf8')).executed,
     ).toStrictEqual([test.id]);
+    await mkdir(resolve(root, 'tools/e2e'), { recursive: true });
+    await writeFile(
+      resolve(root, 'tools/e2e/run.mjs'),
+      "import assert from 'node:assert/strict';assert.equal(process.argv[2],'pr');",
+    );
+    const e2eTest = { ...test, suite: 'e2e', runnerClass: 'e2e' };
+    await writeFile(
+      resolve(root, '.ci/plan.json'),
+      JSON.stringify({
+        ...plan,
+        tests: [e2eTest],
+        shards: [{ ...plan.shards[0], id: 'e2e-1', runnerClass: 'e2e' }],
+      }),
+    );
+    const e2e = spawnSync(
+      process.execPath,
+      [resolve(repository, 'tools/ci/src/cli.ts'), 'run', 'e2e-1'],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_SHA: '' } },
+    );
+    expect({ status: e2e.status, error: e2e.stderr }).toStrictEqual({ status: 0, error: '' });
+    expect(
+      parseResult(await readFile(resolve(root, '.ci/results/e2e-1.json'), 'utf8')).executed,
+    ).toStrictEqual([test.id]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

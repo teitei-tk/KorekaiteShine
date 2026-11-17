@@ -108,7 +108,6 @@ test('履歴のインライン引数と参照付きの必須引数からvalidato
   await import('../scripts/generate-application-validation.ts');
   const [[, code]] = vi.mocked(writeFile).mock.calls;
   assert.ok(typeof code === 'string');
-  // oxlint-disable-next-line typescript/no-unsafe-assignment -- このテストで生成したESMを読み込む。直後にexportの存在と3入力のboolean応答を検証する。
   const {
     validateInterviewHistoryQuery,
   }: { validateInterviewHistoryQuery: (input: object) => boolean } = await import(

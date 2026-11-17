@@ -51,7 +51,6 @@ function batch(
 ) {
   const message = {
     id,
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
     body: (body === undefined ? { schemaVersion: 1, jobId } : body) as JobNotification,
     ack: vi.fn(),
     retry: vi.fn(),
@@ -64,7 +63,6 @@ function batch(
     retryAll: vi.fn(),
     metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } },
   };
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
   return delivery as typeof delivery & Parameters<typeof diagnostic.queue>[0];
 }
 async function job(
@@ -211,7 +209,6 @@ test('診断の再試行と期限切れの初期化を回復し、目的別のQu
   });
   const initializeCheck = vi.fn(async () => ({ jobId: id, firstReceivedAt: '0' }));
   env.CHECK_OBJECT.getByName.mockReturnValue({ initializeCheck });
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
   await diagnostic.scheduled({} as Parameters<typeof diagnostic.scheduled>[0], env);
   expect(initializeCheck).toHaveBeenCalledExactlyOnceWith(id);
   await diagnostic.queue(batch('diag', id), env);

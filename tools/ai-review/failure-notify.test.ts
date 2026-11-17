@@ -11,7 +11,6 @@ it('投稿直前の最終照合でPRが閉じられた場合は通知しない',
   const readsState = { reads: 0 };
   const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (path === 'pulls/7' && ++readsState.reads === 3) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { ...f.pr, state: 'closed' } as T;
     }
     return f.api<T>(path, method, body);
@@ -30,7 +29,6 @@ it('通知APIが不正なコメントIDを返したら成功扱いしない', as
   const f = fixture();
   const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (method === 'POST') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { id: 0 } as T;
     }
     return f.api<T>(path, method, body);
@@ -48,7 +46,6 @@ it('上限件数のジョブ一覧は欠落の可能性があるため通知を�
   const f = fixture();
   const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (path.includes('/jobs?')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         jobs: Array.from({ length: 100 }, () => ({ name: 'generate', conclusion: 'failure' })),
       } as T;
@@ -141,23 +138,18 @@ function fixture(reason = 'OUTPUT_INVALID') {
         user: { id: 41_898_282, login: 'github-actions[bot]', type: 'Bot' },
       };
       prior.push(comment);
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return comment as T;
     }
     if (path === 'actions/runs/20' || path === 'actions/runs/20/attempts/1') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return run as T;
     }
     if (path === 'actions/runs/10') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return source as T;
     }
     if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
     }
     if (path === 'pulls/7') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return pr as T;
     }
     if (path.startsWith('issues/7/comments')) {
@@ -165,7 +157,6 @@ function fixture(reason = 'OUTPUT_INVALID') {
       if (failPostContext.changeOnComments && failPostContext.commentReads === 2) {
         pr.head.sha = 'c'.repeat(40);
       }
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return prior as T;
     }
     throw new Error(`Unexpected path: ${path}`);
@@ -381,7 +372,6 @@ it.each(['failure', 'cancelled', 'timed_out'])(
     f.run.conclusion = conclusion;
     const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
       if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },

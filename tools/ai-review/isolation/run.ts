@@ -17,7 +17,6 @@ import type { IsolationInput } from '../isolation-probe.ts';
 if (process.platform !== 'linux' || process.getuid?.() !== 0) {
   throw new Error('requires disposable Linux root environment');
 }
-// oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- Node CLIの固定位置引数を読み取る。
 const [, , action] = process.argv;
 if (!action) {
   throw new Error('official Action dist/main.js path required');
@@ -61,9 +60,7 @@ try {
   }
   const startTime = (pid: number) => {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-    // oxlint-disable-next-line eslint/prefer-destructuring -- Linux /proc statの固定フィールド番号で起動時刻を読む。
     const value = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
     if (!/^\d+$/u.test(value ?? '')) {
       throw new Error('process identity unavailable');
     }

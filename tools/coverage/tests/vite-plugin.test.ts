@@ -1,5 +1,4 @@
 import { readCoverageDictionary } from '../src/schema.ts';
-/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { runInNewContext } from 'node:vm';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';

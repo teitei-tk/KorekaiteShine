@@ -1,4 +1,3 @@
-/* eslint-disable typescript/no-restricted-types -- JSON/IPC境界はunknownを全フィールド検証して公開する。 */
 import type { BuildAudit } from './build-audit.ts';
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

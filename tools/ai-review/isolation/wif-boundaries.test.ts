@@ -38,7 +38,6 @@ it('隔離検査中にプロキシが終了した場合は初期交換成功で�
     ),
   ).rejects.toThrow('exited during isolation verification');
   expect(fetch).not.toHaveBeenCalled();
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(child.kill).not.toHaveBeenCalled();
 });
 it('標準入力の切断時は要求トークンの引き渡し成功にしない', async () => {
@@ -63,7 +62,6 @@ it('標準入力の切断時は要求トークンの引き渡し成功にしな�
       () => child,
     ),
   ).rejects.toThrow('did not become ready');
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(child.kill).toHaveBeenCalledWith('SIGKILL');
 });
 it('プロキシ起動のerrorイベントを成功扱いせず子を回収する', async () => {
@@ -85,7 +83,6 @@ it('プロキシ起動のerrorイベントを成功扱いせず子を回収す�
       () => child,
     ),
   ).rejects.toThrow('did not become ready');
-  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(child.kill).toHaveBeenCalledWith('SIGKILL');
   expect(rmSync).toHaveBeenLastCalledWith('/fixture/info', { force: true });
 });

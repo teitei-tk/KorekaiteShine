@@ -530,6 +530,844 @@
       "rules": {
         "max-classes-per-file": "off"
       }
+    },
+    {
+      "files": ["tools/e2e/tests/media.test.mjs"],
+      "rules": {
+        "class-methods-use-this": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/fixtures/evaluation.ts",
+        "tools/local-integration/fixtures/interview.ts"
+      ],
+      "rules": {
+        "class-methods-use-this": "off"
+      }
+    },
+    {
+      "files": ["apps/web/tests/practice-audio.test.ts"],
+      "rules": {
+        "class-methods-use-this": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/server/interview-object.ts"],
+      "rules": {
+        "class-methods-use-this": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/src/application/interview-room.ts",
+        "apps/interview/src/server/live-connection.ts",
+        "apps/web/src/components/practice-live.tsx"
+      ],
+      "rules": {
+        "default-case": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/domain/interview-state.ts"],
+      "rules": {
+        "default-case": "off"
+      }
+    },
+    {
+      "files": ["tools/e2e/tests/media.test.mjs"],
+      "rules": {
+        "max-classes-per-file": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/tests/interview-object.test.ts",
+        "apps/web/tests/practice-audio.test.ts",
+        "apps/web/tests/practice-live.test.tsx"
+      ],
+      "rules": {
+        "max-classes-per-file": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/diagnostics/client.tsx", "apps/web/src/lib/interviews.ts"],
+      "rules": {
+        "new-cap": [
+          "error",
+          {
+            "capIsNewExceptions": ["GET", "POST"]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["tools/ai-review/runtime.ts"],
+      "rules": {
+        "no-bitwise": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/lifecycle.ts", "tools/ai-review/isolation/model.ts"],
+      "rules": {
+        "no-bitwise": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/coverage-diagnostic.test.ts"],
+      "rules": {
+        "no-bitwise": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation-probe-boundaries.test.ts"],
+      "rules": {
+        "no-throw-literal": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/tests/runtime-capture-errors.test.ts"],
+      "rules": {
+        "no-throw-literal": "off"
+      }
+    },
+    {
+      "files": ["apps/web/tests/practice-history.test.tsx"],
+      "rules": {
+        "no-throw-literal": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/evidence.test.ts",
+        "tools/local-integration/tests/process-errors.test.ts"
+      ],
+      "rules": {
+        "no-throw-literal": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/src/node-loader.ts", "tools/coverage/src/vitest-setup.ts"],
+      "rules": {
+        "no-underscore-dangle": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/coverage/tests/measurement.test.ts",
+        "tools/coverage/tests/node-loader-hooks.test.ts"
+      ],
+      "rules": {
+        "no-underscore-dangle": "off"
+      }
+    },
+    {
+      "files": ["tools/e2e/tests/provider.test.mjs"],
+      "rules": {
+        "no-underscore-dangle": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/run.test.ts",
+        "tools/ai-review/isolation/startup.test.ts"
+      ],
+      "rules": {
+        "no-use-before-define": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/lifecycle.ts", "tools/ai-review/isolation/run.ts"],
+      "rules": {
+        "prefer-destructuring": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/src/application/interview-room.ts",
+        "apps/interview/src/application/interview-session.ts",
+        "apps/interview/src/server/live-connection.ts",
+        "apps/web/src/components/practice-record.tsx",
+        "apps/web/src/lib/practice-audio.ts",
+        "apps/web/src/routes/index.tsx"
+      ],
+      "rules": {
+        "promise/always-return": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-record.tsx", "apps/web/src/routes/index.tsx"],
+      "rules": {
+        "promise/catch-or-return": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-record.tsx", "apps/web/src/routes/index.tsx"],
+      "rules": {
+        "promise/prefer-catch": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/process.test.ts",
+        "tools/local-integration/tests/runtime-errors.test.ts"
+      ],
+      "rules": {
+        "promise/prefer-catch": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/src/application/interview-room.ts",
+        "apps/interview/src/application/interview-session.ts",
+        "apps/interview/src/server/live-connection.ts"
+      ],
+      "rules": {
+        "promise/prefer-catch": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-live.tsx"],
+      "rules": {
+        "react/exhaustive-deps": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/web/src/components/practice-preparation.tsx",
+        "apps/web/src/components/practice-record.tsx"
+      ],
+      "rules": {
+        "react/no-array-index-key": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/domain/interview-state.ts"],
+      "rules": {
+        "typescript/consistent-return": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/router.tsx"],
+      "rules": {
+        "typescript/consistent-type-definitions": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/worker-env.d.ts"],
+      "rules": {
+        "typescript/consistent-type-imports": "off"
+      }
+    },
+    {
+      "files": ["packages/database/testing/sqlite.ts"],
+      "rules": {
+        "typescript/no-deprecated": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/cli-boundaries.test.ts",
+        "tools/local-integration/tests/notification-runtime-lifecycle.test.ts"
+      ],
+      "rules": {
+        "typescript/no-invalid-void-type": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/tests/interview-session.test.ts",
+        "apps/interview/tests/live-connection.test.ts"
+      ],
+      "rules": {
+        "typescript/no-invalid-void-type": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/application/live-session.ts"],
+      "rules": {
+        "typescript/no-misused-spread": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/diagnostics/errors.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/database.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/runtime-owner.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/records.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/docs/input.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/ci/src/json.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/src/worker.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/ci/src/results.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/src/journal.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["packages/database/testing/journal.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["apps/evaluation/src/server/repositories/job-execution.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/ci/src/schema.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/ci/src/history.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/src/schema.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/src/application/evaluate-interview.ts",
+        "apps/evaluation/src/application/run-evaluation-attempt.ts",
+        "apps/evaluation/src/domain/retry-policy.ts",
+        "apps/interview/src/server/live-connection.ts",
+        "apps/web/src/diagnostics/accept.ts",
+        "apps/web/src/diagnostics/page.tsx"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/web/src/components/practice-live.tsx",
+        "apps/web/src/server/repositories/materials.ts"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/src/diagnostics/consume.ts",
+        "apps/interview/src/application/interview-session.ts"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/server/repositories/interviews.ts"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/src/server/openai-interview-evaluator.ts",
+        "apps/web/src/server/openai-material-analyzer.ts"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/model.ts"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/action-probe.ts",
+        "tools/ai-review/isolation/lifecycle.ts",
+        "tools/ai-review/isolation/run.ts"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/helpers/notification-runtime.ts"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/followup.ts"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/wif.test.ts"],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/failure-notify.ts",
+        "tools/ai-review/github.ts",
+        "tools/ai-review/snapshot.ts",
+        "tools/ai-review/wait-review.ts"
+      ],
+      "rules": {
+        "typescript/no-unnecessary-condition": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/application/interview-session.ts"],
+      "rules": {
+        "typescript/no-unnecessary-type-conversion": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/tests/repository-confirmation.test.ts",
+        "apps/web/tests/material-repository.test.ts",
+        "apps/web/tests/stored-materials-http.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/material-collect.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/check-object.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off"
+      }
+    },
+    {
+      "files": ["packages/api-contracts/tests/generation-errors.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/run.test.ts",
+        "tools/ai-review/isolation/startup.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-call": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/run.test.ts", "tools/ai-review/isolation/wif.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-member-access": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/startup.test.ts",
+        "tools/ai-review/isolation/wif.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-return": "off"
+      }
+    },
+    {
+      "files": ["packages/database/src/connection.ts"],
+      "rules": {
+        "typescript/no-unsafe-return": "off"
+      }
+    },
+    {
+      "files": ["packages/database/testing/sqlite.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["packages/api-contracts/json.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/json.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/voice-interview.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/entrypoints.test.ts",
+        "tools/ai-review/isolation/run.test.ts",
+        "tools/ai-review/isolation/startup.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/material.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/tests/check-object-storage.test.ts",
+        "apps/evaluation/tests/consume-renewal.test.ts",
+        "apps/evaluation/tests/database-connection.test.ts",
+        "apps/evaluation/tests/database-seed.test.ts",
+        "apps/evaluation/tests/diagnostic-consume-errors.test.ts",
+        "apps/evaluation/tests/dispatch-guards.test.ts",
+        "apps/evaluation/tests/local-worker-errors.test.ts",
+        "apps/evaluation/tests/recovery-errors.test.ts",
+        "apps/evaluation/tests/repository-confirmation.test.ts",
+        "apps/interview/tests/check-object-notification.test.ts",
+        "apps/interview/tests/interview-object.test.ts",
+        "apps/web/tests/diagnostics.test.ts",
+        "apps/web/tests/practice-audio.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["apps/web/tests/practice-api-routes.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/model.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["apps/evaluation/tests/worker-delivery.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/tests/live-connection.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/tests/interview-session.test.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/check-cli-boundaries.test.ts",
+        "tools/ai-review/check-status.test.ts",
+        "tools/ai-review/failure-notify.test.ts",
+        "tools/ai-review/github-errors.test.ts",
+        "tools/ai-review/github.test.ts",
+        "tools/ai-review/prepare.test.ts",
+        "tools/ai-review/resume.test.ts",
+        "tools/ai-review/snapshot.test.ts",
+        "tools/ai-review/wait-review.test.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/github.ts"],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation-probe-boundaries.test.ts"],
+      "rules": {
+        "typescript/only-throw-error": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/tests/runtime-capture-errors.test.ts"],
+      "rules": {
+        "typescript/only-throw-error": "off"
+      }
+    },
+    {
+      "files": ["apps/web/tests/practice-history.test.tsx"],
+      "rules": {
+        "typescript/only-throw-error": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/evidence.test.ts",
+        "tools/local-integration/tests/process-errors.test.ts"
+      ],
+      "rules": {
+        "typescript/only-throw-error": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/evaluation/src/server/openai-interview-evaluator.ts",
+        "apps/web/src/server/openai-material-analyzer.ts"
+      ],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/interview/src/application/interview-session.ts",
+        "apps/web/src/components/practice-live.tsx",
+        "apps/web/src/server/repositories/materials.ts"
+      ],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/server/repositories/interviews.ts"],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/helpers/notification-runtime.ts"],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/followup.ts"],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/failure-notify.ts",
+        "tools/ai-review/snapshot.ts",
+        "tools/ai-review/wait-review.ts"
+      ],
+      "rules": {
+        "typescript/strict-boolean-expressions": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/runtime-owner.test.ts"],
+      "rules": {
+        "typescript/strict-void-return": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/entrypoints.test.ts",
+        "tools/ai-review/isolation/startup.test.ts",
+        "tools/ai-review/isolation/wif-boundaries.test.ts"
+      ],
+      "rules": {
+        "typescript/unbound-method": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/runtime-boundaries.test.ts"],
+      "rules": {
+        "typescript/unbound-method": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/evidence.ts"],
+      "rules": {
+        "unicorn/no-array-reverse": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-live.tsx"],
+      "rules": {
+        "unicorn/no-array-reverse": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/snapshot.test.ts"],
+      "rules": {
+        "unicorn/no-array-reverse": "off"
+      }
+    },
+    {
+      "files": ["tools/coverage/src/merge.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/production.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/development-snapshot.test.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-live.tsx", "apps/web/src/server/interviews.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": [
+        "packages/api-contracts/tests/diagnostics.test.ts",
+        "packages/api-contracts/tests/materials.test.ts"
+      ],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["apps/web/tests/interviews.test.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/end-to-end.test.ts",
+        "tools/local-integration/tests/production-artifacts.test.ts",
+        "tools/local-integration/tests/run-test-suite.test.ts"
+      ],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["apps/evaluation/tests/database-schema.test.ts"],
+      "rules": {
+        "unicorn/no-array-sort": "off"
+      }
+    },
+    {
+      "files": ["apps/evaluation/src/server/repositories/job-execution.ts"],
+      "rules": {
+        "unicorn/no-unreadable-array-destructuring": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/isolation/run.ts", "tools/ai-review/isolation/startup.ts"],
+      "rules": {
+        "unicorn/no-unreadable-array-destructuring": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/components/practice-live.tsx", "apps/web/src/lib/practice-audio.ts"],
+      "rules": {
+        "unicorn/prefer-add-event-listener": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/tests/voice-interview.test.ts"],
+      "rules": {
+        "unicorn/prefer-array-find": "off"
+      }
+    },
+    {
+      "files": ["apps/interview/src/server/live-connection.ts"],
+      "rules": {
+        "unicorn/prefer-code-point": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/ai-review/isolation/run.test.ts",
+        "tools/ai-review/isolation/startup.test.ts"
+      ],
+      "rules": {
+        "unicorn/prefer-event-target": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/local-integration/tests/cli-boundaries.test.ts",
+        "tools/local-integration/tests/runtime-owner-host.test.ts"
+      ],
+      "rules": {
+        "unicorn/prefer-event-target": "off"
+      }
+    },
+    {
+      "files": ["tools/local-integration/src/run.ts"],
+      "rules": {
+        "unicorn/prefer-top-level-await": "off"
+      }
+    },
+    {
+      "files": ["tools/ai-review/policy.ts"],
+      "rules": {
+        "no-extra-boolean-cast": "off"
+      }
     }
   ]
 }

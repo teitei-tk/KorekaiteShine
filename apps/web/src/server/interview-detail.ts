@@ -31,11 +31,12 @@ export async function interviewDetailRequest(
     return applicationFailure('INVALID_REQUEST');
   }
   try {
-    const [row] = await deps.db
-      .select()
-      .from(interviews)
-      .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)));
-    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
+    const row = (
+      await deps.db
+        .select()
+        .from(interviews)
+        .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)))
+    ).at(0);
     if (!row) {
       return applicationFailure('NOT_FOUND');
     }
@@ -62,35 +63,37 @@ export async function interviewDetailRequest(
       .from(playbackReceipts)
       .where(eq(playbackReceipts.interviewId, interviewId))
       .orderBy(asc(playbackReceipts.generation));
-    const [job] = await deps.db
-      .select({
-        jobId: jobs.jobId,
-        status: jobs.status,
-        attemptCount: jobs.attemptCount,
-        nextAttemptAt: jobs.nextAttemptAt,
-        lastErrorCode: jobs.lastErrorCode,
-      })
-      .from(evaluationInputs)
-      .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
-      .where(
-        and(
-          eq(evaluationInputs.interviewId, interviewId),
-          eq(jobs.actorId, actorId),
-          eq(jobs.purpose, 'evaluation'),
-        ),
-      )
-      .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
-      .limit(1);
-    const resultState = { result: null as JsonValue };
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
-    if (job?.status === 'completed') {
-      const [attempt] = await deps.db
-        .select({ resultJson: jobAttempts.resultJson })
-        .from(jobAttempts)
+    const job = (
+      await deps.db
+        .select({
+          jobId: jobs.jobId,
+          status: jobs.status,
+          attemptCount: jobs.attemptCount,
+          nextAttemptAt: jobs.nextAttemptAt,
+          lastErrorCode: jobs.lastErrorCode,
+        })
+        .from(evaluationInputs)
+        .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
         .where(
-          and(eq(jobAttempts.jobId, job.jobId), eq(jobAttempts.attemptNumber, job.attemptCount)),
-        );
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
+          and(
+            eq(evaluationInputs.interviewId, interviewId),
+            eq(jobs.actorId, actorId),
+            eq(jobs.purpose, 'evaluation'),
+          ),
+        )
+        .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
+        .limit(1)
+    ).at(0);
+    const resultState = { result: null as JsonValue };
+    if (job?.status === 'completed') {
+      const attempt = (
+        await deps.db
+          .select({ resultJson: jobAttempts.resultJson })
+          .from(jobAttempts)
+          .where(
+            and(eq(jobAttempts.jobId, job.jobId), eq(jobAttempts.attemptNumber, job.attemptCount)),
+          )
+      ).at(0);
       if (!attempt?.resultJson) {
         return applicationFailure('UNAVAILABLE');
       }
@@ -120,7 +123,6 @@ export async function interviewDetailRequest(
       transcriptIncomplete: row.transcriptIncomplete,
       transcripts,
       playback,
-      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       evaluation: job ? { ...job, result: resultState.result } : null,
     };
     if (!validateInterviewDetail(body)) {

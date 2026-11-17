@@ -95,7 +95,6 @@ export function counterJournalOwnerIsRunning(path: string): boolean {
   }
 }
 
-/* eslint-disable typescript/no-restricted-types -- journalは外部JSON境界として検証する。 */
 function readEvent(value: unknown): CounterEvent {
   if (!object(value)) {
     throw new Error('計測journalが不正です。');

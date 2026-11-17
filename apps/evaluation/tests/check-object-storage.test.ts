@@ -39,7 +39,6 @@ function fixture(persisted: { jobId: string; firstReceivedAt: string } | undefin
   });
   const send = vi.fn();
   const object = new CheckObject(
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     {
       storage: {
         transaction: async (
@@ -55,7 +54,6 @@ function fixture(persisted: { jobId: string; firstReceivedAt: string } | undefin
         get: async () => persisted,
       },
     } as object as ConstructorParameters<typeof CheckObject>[0],
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     {
       APP_ENV: 'test',
       DIAGNOSTIC_QUEUE: { send },

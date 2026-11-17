@@ -43,3 +43,7 @@ Shisho Cloudに組織とGuard用Botを作成し、対象リポジトリを信頼
 - [公式npm導入ガイド](https://shisho.dev/docs/ja/t/guard/quickstart/npm/)：匿名設定、pnpm互換性、組織連携
 - [公式Action](https://github.com/flatt-security/setup-takumi-guard-npm)：registry設定の範囲と遮断確認用パッケージ
 - [公式OIDC仕様](https://shisho.dev/docs/t/guard/architecture/oidc/)：Bot ID、信頼条件、短命トークン
+
+## 通常CIのstore再利用
+
+2026年11月18日追補。通常CIは[CI高速化設計の依存キャッシュ](2026-11-17-ci-acceleration-design.md#依存キャッシュ)に従い、storeだけを再利用します。現在のregistry判定を取得するため、metadataと過去の検証結果を毎回分離し、固定lockfile・信頼ポリシー・整合性検査を維持します。他のworkflowは初期導入時のキャッシュ無効設定を維持します。

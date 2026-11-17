@@ -77,7 +77,11 @@ node tools/docs/check-guard.ts --registry-only
 node tools/docs/check-guard.ts
 ```
 
-取得済み依存が現在のGuard判定を迂回しないよう、対象ジョブのpnpm storeキャッシュ復元とsetup-nodeの自動キャッシュを無効にしています。GitHub-hosted runnerの使い捨て環境を前提とし、pnpm Action自身のstoreキャッシュも既定の無効状態で使います。再実行では依存を再取得するため、通信量と所要時間が増えます。Guardの拒否・障害時は対象版と応答を確認し、必要に応じて復旧後に再実行してください。npm公式レジストリへの自動切替は行いません。
+通常CIは固定版setup-nodeの明示的な`cache: pnpm`でstoreを再利用します。`node_modules`、registryメタデータ、過去のlockfile検証結果はキャッシュしません。キーにはOS・architectureに加え、lockfile、workspace保護設定、各package.json、Node版、pnpm hook、インストール処理、Guard確認、workflowを含め、別キーへの部分一致復元は行いません。pnpm Action自身のstoreキャッシュとsetup-nodeの自動キャッシュは引き続き無効です。
+
+キャッシュ命中時も[依存準備](../ci/src/install-dependencies.ts)を省略しません。npm・pnpmのGuard registryを確認し、毎回空のmetadata/stateディレクトリで`pnpm install --frozen-lockfile --ignore-scripts --no-trust-lockfile --no-offline --no-prefer-offline`を実行します。store整合性検査も明示的に有効化します。公開後の待機時間・信頼ポリシー・依存ビルド保護はworkspace設定を維持します。metadataと検証結果の再利用は、現在のGuard拒否を迂回するため禁止します。Guardの拒否・障害時は失敗させ、offline実行やnpm公式レジストリへ自動切替しません。
+
+Worker実時間検査・AIレビュー・隔離受入検査は、今回のキャッシュ導入対象に含めず、従来どおり依存を再取得します。匿名モードでの全依存の再検証には引き続き通信が必要です。キャッシュの効果はダウンロード・展開の削減であり、検証時間を省略するものではありません。
 
 匿名モードには取得履歴と事後通知がありません。scope別registryや直接URLの依存は別途レビューし、GitHub Releases・apt・Actions本体の取得はGuardの保護範囲外として扱います。固定版の確認結果と未検証範囲は[検証記録](../../docs/research/takumi-guard.md)、将来のShisho CloudへのOIDC移行は[導入設計](../../docs/superpowers/specs/2026-11-07-takumi-guard-design.md#将来のshisho-cloud連携)を参照してください。
 

@@ -8,7 +8,7 @@ PRの結果待ち時間を短縮し、検査範囲を維持します。基準コ
 
 - [設計基準](../../spec/mvp.md#設計基準)と[契約生成のADR](../../adr/0006-typespec-api-contracts.md)に従い、TypeSpecを原本とし、生成物はGit管理しません。
 - [環境分離](../../adr/0009-explicit-environments.md)と[診断機能の分離](../../adr/0011-access-and-diagnostics-isolation.md)を維持します。
-- Guard、pnpmの公開後24時間待機、未審査ビルド拒否、Actionsロック、pnpm storeを復元しない運用を維持します。tsrsの固定版だけは利用者承認の信頼ポリシー例外です。
+- Guard、pnpmの公開後24時間待機、未審査ビルド拒否、Actionsロックを維持します。storeのみの再利用と毎回の再検証は[依存キャッシュ](#依存キャッシュ)に従います。tsrsの固定版だけは利用者承認の信頼ポリシー例外です。
 - 通常CIが対象です。独立した実時間・全体カバレッジ検査を部分テストで代替せず、クラウド配置や実AI検証を追加しません。
 - 同一runner内のworkspace検査は直列のままです。Vitestの共有キャッシュ削除競合を避け、検査種別の並列化は別runnerで行います。
 
@@ -83,3 +83,13 @@ JSON境界は実行時検証と型の絞り込みを維持します。生成vali
 必須チェックの推奨対象は表示名`CI result`（ジョブID `ci-result`）です。リポジトリのbranch protectionはこのPRでは変更しません。従来のジョブ名を必須にしている場合は、管理者が新しい集約チェックへ更新する必要があります。
 
 選択範囲に疑義があれば計画を全件へ戻し、時間履歴を破棄して均一割当できます。型検査器の復旧はscriptsと固定依存を戻します。実行失敗を省略で回避しません。
+
+## 依存キャッシュ
+
+通常CIのdocs、lint、typecheck、build、test-plan、testsで、既存の固定版setup-nodeによるpnpm storeキャッシュを使います。新しいActionや依存は追加しません。保護設定・lockfile・manifest・Node版・hook・依存準備実装・Guard確認・workflowをキーへ含め、キーの部分一致復元は行いません。集約ジョブは依存をインストールしません。
+
+各ジョブでGuard設定とregistry確認を維持し、キャッシュ命中時もインストールを実行します。新しい一時ディレクトリをmetadataとstateへ指定し、過去のregistry応答やlockfile検証結果を再利用しません。固定lockfile、no-downgrade、公開後待機、ignore-scripts、store integrity検証を維持し、拒否・通信障害時は停止します。node_modulesはキャッシュしません。
+
+固定版pnpmの隔離registry試験で、storeだけを再利用した場合はtarballの再取得を省略しつつmetadataを問い合わせること、現在の403・version削除・公開直後の版を拒否することを確認しました。metadata/stateも再利用した対照試験では、403へ切り替えても通信せず成功したため、この領域の共有は禁止します。store改変時は整合性検査を有効にするとtarballを再取得し、無効にすると改変内容を導入したため、有効設定を明示します。固定lockfileの内容とregistryの現行dist.integrityが異なる場合でも、固定lockfileの内容を使用する挙動はキャッシュの有無と別に扱います。
+
+Guard実サービスの遮断確認は従来のCIステップで継続します。キャッシュなし・ありの速度はGitHub上の依存準備ステップで比較し、全体の高速化とは分けて評価します。テスト計画を待つジョブ依存の変更は本変更に含めません。

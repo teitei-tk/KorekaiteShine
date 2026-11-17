@@ -80,12 +80,25 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - name: Verify Guard registry
         if: steps.changes.outputs.required == 'true'
         run: node tools/docs/check-guard.ts --registry-only
       - name: Install documentation check dependencies
         if: steps.changes.outputs.required == 'true'
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: node tools/ci/src/install-dependencies.ts
       - name: Check Node.js configuration
         if: steps.changes.outputs.required == 'true'
         run: pnpm check:node
@@ -109,8 +122,22 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
       - run: node tools/docs/check-guard.ts
       - run: pnpm lint
       - run: pnpm format:check
@@ -131,8 +158,22 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
       - run: pnpm typecheck
   build:
     name: Build application and isolation tooling
@@ -151,8 +192,22 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
       - name: Generate contracts and route types
         run: pnpm prepare:checks
       - run: pnpm --filter korekaite-shine-web build:app
@@ -180,8 +235,22 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
       - name: Generate contracts and route types
         run: pnpm prepare:checks
       - name: Read timing history from a successful main push
@@ -235,8 +304,22 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
       - name: Generate contracts and route types
         run: pnpm prepare:checks
       - uses: actions/download-artifact@v8.0.2

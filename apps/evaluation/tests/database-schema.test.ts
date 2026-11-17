@@ -5,6 +5,7 @@ import * as schema from '@korekaite/database';
 test('DB定義はジョブ参照と冪等性の一意制約を保持し、隔離記録には外部キーを課さない', () => {
   const configs = Object.values(schema)
     .map((table) => getTableConfig(table))
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。
     .sort((left, right) => left.name.localeCompare(right.name));
   const references = configs.flatMap((table) =>
     table.foreignKeys.map((key) => {

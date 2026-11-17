@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { and, eq, gt } from 'void/db';
 import { materialAnalyses } from '@korekaite/database/materials';
 import type { createPrimaryDb } from '@korekaite/database/connection';
@@ -6,10 +7,10 @@ import { validateMaterialAnalysisResult } from '@korekaite/api-contracts/http/ma
 
 type Database = ReturnType<typeof createPrimaryDb>;
 type Analysis = typeof materialAnalyses.$inferInsert;
-interface SaveAnalysis extends Omit<Analysis, 'materialHash' | 'candidatesJson'> {
+type SaveAnalysis = {
   markdown: string;
   result: components['schemas']['MaterialAnalysisResult'];
-}
+} & Omit<Analysis, 'materialHash' | 'candidatesJson'>;
 
 export async function saveMaterialAnalysis(db: Database, input: SaveAnalysis): Promise<void> {
   if (!validateMaterialAnalysisResult(input.result)) {
@@ -51,13 +52,15 @@ export async function findMaterialTheme(
         gt(materialAnalyses.expiresAt, now),
       ),
     );
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!row) {
     return null;
   }
-  const candidates = JSON.parse(row.candidatesJson);
+  const candidates = parseJson(row.candidatesJson);
   if (!validateMaterialAnalysisResult(candidates)) {
     throw new Error('保存された分析候補が不正です。');
   }
   const theme = candidates.themes[themeIndex];
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   return theme ? { materialHash: row.materialHash, theme } : null;
 }

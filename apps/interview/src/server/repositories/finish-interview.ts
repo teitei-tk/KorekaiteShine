@@ -4,20 +4,19 @@ import {
   transcriptFragments,
   playbackReceipts,
   evaluationInputs,
-  type EvaluationConfiguration,
-  type EvaluationSnapshot,
 } from '@korekaite/database/interviews';
+import type { EvaluationConfiguration, EvaluationSnapshot } from '@korekaite/database/interviews';
 import { jobs, jobOutbox } from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
 import { loadInterview } from './interviews';
 
 type Database = ReturnType<typeof createPrimaryDb>;
-interface FinishOptions {
+type FinishOptions = {
   jobId: string;
   evaluation: EvaluationConfiguration;
   transcriptIncomplete: boolean;
-}
+};
 
 export async function finishInterview(
   db: Database,
@@ -34,6 +33,7 @@ export async function finishInterview(
     rubric: options.evaluation.rubric,
   };
   const interview = await loadInterview(db, actorId, interviewId);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!interview) {
     return null;
   }
@@ -45,6 +45,7 @@ export async function finishInterview(
     .select({ jobId: evaluationInputs.jobId })
     .from(evaluationInputs)
     .where(initial);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (existing) {
     return existing.jobId;
   }
@@ -143,7 +144,7 @@ export async function finishInterview(
     db.insert(jobOutbox).select(
       db
         .select({
-          id: sql<string>`${options.jobId + ':notify:0'}`.as('id'),
+          id: sql<string>`${`${options.jobId}:notify:0`}`.as('id'),
           jobId: evaluationInputs.jobId,
           purpose: sql<'evaluation'>`'evaluation'`.as('purpose'),
           operation: sql<'notify'>`'notify'`.as('operation'),
@@ -171,5 +172,6 @@ export async function finishInterview(
     .select({ jobId: evaluationInputs.jobId })
     .from(evaluationInputs)
     .where(initial);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
   return accepted?.jobId ?? null;
 }

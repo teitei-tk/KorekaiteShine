@@ -37,6 +37,6 @@ test('Vitest設定は全プロジェクトへ共通計測と終了時回収を�
     join(root, 'tools/coverage'),
   ]);
   expect(value.test.projects.every((project) => project.extends)).toBe(true);
-  expect(value.test.setupFiles[0]).toMatch(/vitest-setup\.ts$/);
+  expect(value.test.setupFiles[0]).toMatch(/vitest-setup\.ts$/u);
   expect(value.plugins[0].enforce).toBe('pre');
 });

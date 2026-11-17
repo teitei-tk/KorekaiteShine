@@ -21,15 +21,18 @@ export const failureReasons = [
   'ARTIFACT_INVALID',
 ] as const;
 export type FailureReason = (typeof failureReasons)[number];
-export class ReviewFailure extends Error {
+class ReviewFailureError extends Error {
   readonly reason: FailureReason;
   readonly detail?: FailureDetail;
   constructor(reason: FailureReason, message: string, detail?: FailureDetail) {
     super(message);
+    this.name = 'ReviewFailureError';
     this.reason = reason;
     this.detail = detail;
   }
 }
+export { ReviewFailureError as ReviewFailure };
+
 export function validFailureReason(value: string | undefined): value is FailureReason {
   return typeof value === 'string' && failureReasons.some((reason) => reason === value);
 }

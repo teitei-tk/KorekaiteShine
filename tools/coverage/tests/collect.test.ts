@@ -1,3 +1,4 @@
+import { readCoverageConfig } from '../src/schema.ts';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -53,7 +54,8 @@ test.each([undefined, ''])(
       });
       expect(result.fileCoverageFor('choose.mjs').b['0']).toEqual([1, 0]);
       expect(
-        JSON.parse(readFileSync(join(root, 'coverage/run.json'), 'utf8')).run.requiredSuites,
+        readCoverageConfig(readFileSync(join(root, 'coverage/run.json'), 'utf8')).run
+          .requiredSuites,
       ).toEqual(['inventory', 'node']);
       expect(readFileSync(join(root, 'coverage/combined/index.html'), 'utf8')).toContain(
         'choose.mjs',

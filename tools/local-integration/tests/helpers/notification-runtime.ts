@@ -2,14 +2,16 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveRuntime, type RuntimeConfig } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand, type LocalRuntime } from '../../src/runtime.ts';
+import { resolveRuntime } from '@korekaite/runtime-config';
+import type { RuntimeConfig } from '@korekaite/runtime-config';
+import { startRuntime, runDatabaseCommand } from '../../src/runtime.ts';
+import type { LocalRuntime } from '../../src/runtime.ts';
 
-interface NotificationCase {
+type NotificationCase = {
   config: RuntimeConfig;
   runtime: LocalRuntime;
-  newJobId(): string;
-}
+  newJobId: () => string;
+};
 
 // 通知時刻の検査専用。同じWorkerを使い、各ケースの行だけを除去する。
 export function createNotificationRuntime() {
@@ -36,6 +38,7 @@ export function createNotificationRuntime() {
           manualDiagnostics: true,
           probeOnlyEvaluation: true,
         }));
+        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査の起動中に停止されました。');
         }
@@ -67,10 +70,11 @@ export function createNotificationRuntime() {
           },
         });
         signal?.throwIfAborted();
+        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査中に環境が停止されました。');
         }
-        if (ids.length) {
+        if (ids.length > 0) {
           const values = ids.map((id) => `'${id}'`).join(',');
           await runDatabaseCommand(
             config,
@@ -88,6 +92,7 @@ export function createNotificationRuntime() {
           );
         }
         signal?.throwIfAborted();
+        // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- await中に別の呼出しが停止状態を変更し得る。
         if (runtimeContext.stopping) {
           throw new Error('通知検査の清掃中に環境が停止されました。');
         }

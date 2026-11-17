@@ -1,7 +1,11 @@
+import type * as LintTypeModule0 from 'node:fs';
 import { expect, it, vi } from 'vitest';
+import { chownSync, chmodSync } from 'node:fs';
+import { protectTree } from './runtime.ts';
+
 const state = vi.hoisted(() => ({ uid: 1001, symlink: false, mode: 0o644 }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule0>()),
   lstatSync: () => ({
     uid: state.uid,
     mode: state.mode,
@@ -15,8 +19,7 @@ vi.mock('node:fs', async (original) => ({
     state.mode = mode;
   }),
 }));
-import { chownSync, chmodSync } from 'node:fs';
-import { protectTree } from './runtime.ts';
+
 it('コピー元のrunner所有が残るファイルもroot所有・読取専用へ固定する', () => {
   state.uid = 1001;
   state.symlink = false;

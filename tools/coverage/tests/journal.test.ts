@@ -1,9 +1,11 @@
+import { parse } from '../src/schema.ts';
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { SystemError } from '../../testing/system-error.mts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { expect, test, vi, onTestFinished } from 'vitest';
+import { assert, expect, test, vi, onTestFinished } from 'vitest';
 import {
   createCounterJournal,
   replayCounterJournal,
@@ -13,7 +15,7 @@ import { createMergeFixture } from './fixtures/measurement.ts';
 import { instrumentSource } from '../src/instrument.ts';
 test('所有者への権限エラーを終了済みと誤判定しない', () => {
   const path = journalPath();
-  writeFileSync(path, JSON.stringify({ type: 'start', pid: 12345 }) + '\n');
+  writeFileSync(path, `${JSON.stringify({ type: 'start', pid: 12_345 })}\n`);
   const failure = new SystemError('permission', 'EPERM');
   vi.spyOn(process, 'kill').mockImplementation(() => {
     throw failure;
@@ -22,7 +24,7 @@ test('所有者への権限エラーを終了済みと誤判定しない', () =>
 });
 test('開始記録のPIDが不正ならjournal所有者を信用しない', () => {
   const path = journalPath();
-  writeFileSync(path, JSON.stringify({ type: 'start', pid: 0 }) + '\n');
+  writeFileSync(path, `${JSON.stringify({ type: 'start', pid: 0 })}\n`);
   expect(() => counterJournalOwnerIsRunning(path)).toThrow('開始記録が不正');
 });
 
@@ -47,14 +49,18 @@ test('終了処理がなくても同期記録した文・関数・分岐の回�
   const directory = mkdtempSync(join(tmpdir(), 'coverage-journal-'));
   try {
     const { run, target, path } = createMergeFixture();
-    const source = target.coverage.inputSourceMap!.sourcesContent![0]!;
+    const source =
+      (
+        (target.coverage.inputSourceMap ?? assert.fail('必須のテスト値がありません。'))
+          .sourcesContent ?? assert.fail('必須のテスト値がありません。')
+      )[0] ?? assert.fail('必須のテスト値がありません。');
     const { code } = instrumentSource(path, source);
     const file = join(directory, 'events.jsonl');
     const data = createCounterJournal(file, run.targets);
     runInNewContext(`${code}\nchoose(true); choose(false);`, { __coverage__: data });
     const recovered = replayCounterJournal(file);
     expect(recovered).toHaveLength(1);
-    expect(recovered[0].coverage).toEqual(JSON.parse(JSON.stringify(data[path])));
+    expect(recovered[0].coverage).toEqual(parse(JSON.stringify(data[path])));
     expect(recovered[0].coverage.f['0']).toBe(2);
     expect(recovered[0].coverage.b['0']).toEqual([1, 1]);
   } finally {

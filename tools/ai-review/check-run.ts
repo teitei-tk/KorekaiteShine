@@ -1,3 +1,5 @@
+import { parseJson, isJsonObject } from './json.ts';
+import type { JsonValue } from './json.ts';
 import { runVersion } from './run-version.ts';
 import { execFileSync } from 'node:child_process';
 import { setTimeout } from 'node:timers/promises';
@@ -38,23 +40,7 @@ const labels = new Map([
   ['Check formatting, links, and heading anchors', '文書検査'],
   ['Verify Actions lockfile', 'Actionsロック検証'],
 ]);
-interface StepInput {
-  name?: string;
-  status: string | null;
-  conclusion: string | null;
-}
-interface JobInput extends StepInput {
-  steps: StepInput[];
-}
-interface RunInput {
-  status: string | null;
-  conclusion: string | null;
-  jobs: JobInput[];
-}
-function record(value: object | null | undefined): boolean {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-function state(value: string | null | undefined): string {
+function state(value: JsonValue | undefined): string {
   if (value === '' || value === null) {
     return '未確定';
   }
@@ -64,21 +50,21 @@ function state(value: string | null | undefined): string {
   return value;
 }
 export function runSnapshot(raw: string): { output: string; done: boolean; ok: boolean } {
-  const data: RunInput = JSON.parse(raw);
-  if (!record(data) || !Array.isArray(data.jobs)) {
+  const data = parseJson(raw);
+  if (!isJsonObject(data) || !Array.isArray(data.jobs)) {
     throw new Error('Invalid response');
   }
   const status = state(data.status),
     conclusion = state(data.conclusion);
   const lines = [`実行: ${status} / ${conclusion}`];
   for (const [i, job] of data.jobs.entries()) {
-    if (!record(job) || !Array.isArray(job.steps)) {
+    if (!isJsonObject(job) || !Array.isArray(job.steps)) {
       throw new Error('Invalid job');
     }
     const name = typeof job.name === 'string' ? labels.get(job.name) : undefined;
     lines.push(`${name ?? `job ${i + 1}`}: ${state(job.status)} / ${state(job.conclusion)}`);
     for (const [j, step] of job.steps.entries()) {
-      if (!record(step)) {
+      if (!isJsonObject(step)) {
         throw new Error('Invalid step');
       }
       const result = state(step.conclusion);
@@ -112,14 +98,14 @@ export async function checkRun(
     await setTimeout(15_000);
   },
 ): Promise<number> {
-  if (!/^[1-9][0-9]{0,17}$/.test(id)) {
+  if (!/^[1-9][0-9]{0,17}$/u.test(id)) {
     emit('正の実行IDを指定してください。');
     return 2;
   }
   const previousState = { previous: '' };
   try {
     emit(`https://github.com/${REPOSITORY}/actions/runs/${id}`);
-    for (const attempt of Array(watch ? 40 : 1).keys()) {
+    for (const attempt of Array.from({ length: watch ? 40 : 1 }).keys()) {
       const snapshot = runSnapshot(read(id));
       if (snapshot.output !== previousState.previous) {
         emit(snapshot.output);
@@ -144,7 +130,7 @@ export async function checkRun(
 }
 export function parseRunArgs(args: string[]): { id: string; watch: boolean; expected?: string } {
   const [id, ...options] = args;
-  if (!id || !/^[1-9][0-9]{0,17}$/.test(id)) {
+  if (!id || !/^[1-9][0-9]{0,17}$/u.test(id)) {
     throw new Error('Invalid arguments');
   }
   const flags = { watch: false, expected: undefined as string | undefined };
@@ -154,7 +140,7 @@ export function parseRunArgs(args: string[]): { id: string; watch: boolean; expe
       flags.watch = true;
     } else if (option === '--expect-commit' && flags.expected === undefined) {
       flags.expected = remaining.next().value;
-      if (!flags.expected || !/^[a-f0-9]{40}$/.test(flags.expected)) {
+      if (!flags.expected || !/^[a-f0-9]{40}$/u.test(flags.expected)) {
         throw new Error('Invalid arguments');
       }
     } else {

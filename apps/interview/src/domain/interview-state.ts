@@ -1,6 +1,6 @@
 import { usageLimits } from '@korekaite/runtime-config/limits';
 
-export interface InterviewState {
+export type InterviewState = {
   interviewId: string;
   status: 'ready' | 'connecting' | 'active' | 'paused' | 'reconnecting' | 'ending' | 'ended';
   generation: number;
@@ -9,7 +9,7 @@ export interface InterviewState {
   activeSince: number | null;
   deadline: number | null;
   updatedAt: number;
-}
+};
 
 export type InterviewAction =
   | { type: 'connect'; deadline?: number }
@@ -41,6 +41,7 @@ export function canSendAudio(state: InterviewState, generation: number, now: num
   );
 }
 
+// oxlint-disable-next-line typescript/consistent-return -- 判別unionの全分岐がInterviewStateを返す。
 export function transitionInterview(
   state: InterviewState,
   action: InterviewAction,
@@ -87,10 +88,12 @@ export function transitionInterview(
       deadline: null,
     };
   }
+  // oxlint-disable-next-line eslint/default-case -- 判別unionの全分岐を列挙する。
   switch (action.type) {
-    case 'start_failed':
+    case 'start_failed': {
       return state;
-    case 'connect':
+    }
+    case 'connect': {
       if (!['ready', 'paused', 'reconnecting'].includes(state.status)) {
         throw new Error('面接を接続できない状態です。');
       }
@@ -102,7 +105,8 @@ export function transitionInterview(
         activeSince: null,
         deadline: Math.min(state.deadline ?? Infinity, action.deadline ?? Infinity, now + 30_000),
       };
-    case 'ready':
+    }
+    case 'ready': {
       if (state.status !== 'connecting') {
         throw new Error('接続待ちではありません。');
       }
@@ -115,7 +119,8 @@ export function transitionInterview(
           action.deadline ?? Infinity,
         ),
       };
-    case 'disconnected':
+    }
+    case 'disconnected': {
       if (!['active', 'connecting'].includes(state.status)) {
         return state;
       }
@@ -130,7 +135,8 @@ export function transitionInterview(
             ? Math.min(state.deadline ?? Infinity, now + 60_000)
             : now + 60_000,
       };
-    case 'takeover':
+    }
+    case 'takeover': {
       if (!['active', 'paused', 'reconnecting', 'connecting'].includes(state.status)) {
         throw new Error('引き継ぎできない状態です。');
       }
@@ -146,7 +152,8 @@ export function transitionInterview(
             ? now + 30_000
             : Math.min(state.deadline ?? Infinity, now + 30_000),
       };
-    case 'pause':
+    }
+    case 'pause': {
       if (
         state.status !== 'reconnecting' &&
         (state.status !== 'active' || state.activeSince === null)
@@ -161,7 +168,8 @@ export function transitionInterview(
         activeSince: null,
         deadline: now + 300_000,
       };
-    case 'finish':
+    }
+    case 'finish': {
       if (state.status === 'ending' || state.status === 'ended') {
         return state;
       }
@@ -173,9 +181,11 @@ export function transitionInterview(
         activeSince: null,
         deadline: null,
       };
-    case 'tick':
+    }
+    case 'tick': {
       return state.status === 'ended' || state.status === 'ending' ? state : next;
-    case 'persisted':
+    }
+    case 'persisted': {
       if (state.status === 'ended') {
         return state;
       }
@@ -183,5 +193,6 @@ export function transitionInterview(
         throw new Error('終了処理中ではありません。');
       }
       return { ...next, status: 'ended', streamGeneration: null };
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import { expect, test, vi } from 'vitest';
-import WebSocket from 'ws';
+import { WebSocket } from 'ws';
 import { startProvider } from '../runtime-provider.mjs';
 
 test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上流セッションを維持する', async () => {
@@ -20,7 +20,12 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
     await once(client, 'open');
     const send = (type, extra = {}) => client.send(JSON.stringify({ type, ...extra }));
     send('session.start');
-    await vi.waitFor(() => expect(events).toHaveLength(3), { timeout: 30000 });
+    await vi.waitFor(
+      () => {
+        expect(events).toHaveLength(3);
+      },
+      { timeout: 30_000 },
+    );
     const voice = Buffer.alloc(4802);
     voice.fill(Buffer.from([0xff, 0x03]));
     for (const buf of [voice, Buffer.alloc(9600), voice]) {
@@ -28,11 +33,17 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
     }
     send('ignored');
     send('session.close');
-    await vi.waitFor(() => expect(events.at(-1)?.type).toBe('session.closed'), { timeout: 30000 });
+    await vi.waitFor(
+      () => {
+        expect(events.at(-1)?.type).toBe('session.closed');
+      },
+      { timeout: 30_000 },
+    );
     expect(events.filter((e) => e.type === 'session.input_transcript.delta')).toHaveLength(2);
     expect(events.filter((e) => e.type === 'session.output_audio.delta')).toHaveLength(3);
     // RFC 6455の予約ビットを立てたフレームでサーバー側errorを発生させる。
     const closed = once(client, 'close');
+    // oxlint-disable-next-line eslint/no-underscore-dangle -- wsの低水準socketで意図的に壊れたフレームを送る。
     client._socket.write(Buffer.from([0xc1, 0x80, 0, 0, 0, 0]));
     await closed;
     const open = new WebSocket(url);
@@ -40,7 +51,7 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
   } finally {
     await provider.stop();
   }
-}, 120000);
+}, 120_000);
 
 test('リスナーの終了失敗を呼び出し側に返す', async () => {
   const provider = await startProvider();
@@ -60,7 +71,9 @@ async function openPeer(provider) {
     },
     async finish() {
       socket.send(JSON.stringify({ type: 'session.close' }));
-      await vi.waitFor(() => expect(events.at(-1)?.type).toBe('session.closed'));
+      await vi.waitFor(() => {
+        expect(events.at(-1)?.type).toBe('session.closed');
+      });
     },
   };
 }
@@ -153,7 +166,9 @@ test('無応答にした既存の接続は終了通知も返さず、新しい�
   try {
     const unavailable = await openPeer(provider);
     unavailable.send('session.start');
-    await vi.waitFor(() => expect(unavailable.events).toHaveLength(3));
+    await vi.waitFor(() => {
+      expect(unavailable.events).toHaveLength(3);
+    });
     provider.silenceCurrentConnections();
     unavailable.send('session.close');
     const next = await openPeer(provider);

@@ -1,4 +1,5 @@
-import { createArtifact, type Metadata, type GenerationOrigin } from '../../artifact.ts';
+import { createArtifact } from '../../artifact.ts';
+import type { Metadata, GenerationOrigin } from '../../artifact.ts';
 import type { ReviewInput } from '../../policy.ts';
 
 export function artifactFixture() {

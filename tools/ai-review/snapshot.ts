@@ -1,15 +1,19 @@
+import { isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
 import { createHash } from 'node:crypto';
-import { comments, reviewComments, type Api, type Comment, type ReviewComment } from './github.ts';
+import { comments, reviewComments } from './github.ts';
+import type { Api, Comment, ReviewComment } from './github.ts';
 export type Thread = { id: string; root: number; resolved: boolean };
 export type Snapshot = { issues: Comment[]; inline: ReviewComment[]; threads: Thread[] };
 export const digest = (text: string): string => createHash('sha256').update(text).digest('hex');
-const idValid = (id: number) => Number.isSafeInteger(id) && id > 0;
-function comment(value: Comment): Comment {
+const idValid = (id: JsonInput): id is number =>
+  typeof id === 'number' && Number.isSafeInteger(id) && id > 0;
+function comment(value: JsonInput): Comment {
   if (
-    !value ||
+    !isJsonObject(value) ||
     !idValid(value.id) ||
     typeof value.body !== 'string' ||
-    !value.user ||
+    !isJsonObject(value.user) ||
     typeof value.user.login !== 'string' ||
     typeof value.user.type !== 'string' ||
     (value.user.id !== undefined && !idValid(value.user.id)) ||
@@ -28,23 +32,30 @@ function comment(value: Comment): Comment {
     },
   };
 }
-export function normalizeSnapshot(input: Snapshot): Snapshot {
+export function normalizeSnapshot(input: JsonInput): Snapshot {
   if (
-    !input ||
+    !isJsonObject(input) ||
     !Array.isArray(input.issues) ||
     !Array.isArray(input.inline) ||
     !Array.isArray(input.threads)
   ) {
     throw new Error('履歴スナップショットが不正です');
   }
-  const issues = input.issues.map(comment).sort((a, b) => a.id - b.id);
+  const issues = input.issues.map(comment).toSorted((a, b) => a.id - b.id);
   const inline = input.inline
     .map((c): ReviewComment => {
       const base = comment(c);
+      if (!isJsonObject(c)) {
+        throw new Error('履歴コメントが不正です');
+      }
       if (
         typeof c.path !== 'string' ||
-        ![c.commit_id, c.original_commit_id].every((x) => /^[a-f0-9]{40}$/.test(x)) ||
-        ![c.line, c.original_line].every((x) => x === null || idValid(x)) ||
+        typeof c.commit_id !== 'string' ||
+        !/^[a-f0-9]{40}$/u.test(c.commit_id) ||
+        typeof c.original_commit_id !== 'string' ||
+        !/^[a-f0-9]{40}$/u.test(c.original_commit_id) ||
+        !(c.line === null || idValid(c.line)) ||
+        !(c.original_line === null || idValid(c.original_line)) ||
         (c.in_reply_to_id !== undefined && !idValid(c.in_reply_to_id))
       ) {
         throw new Error('行コメントが不正です');
@@ -59,14 +70,15 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
         ...(c.in_reply_to_id === undefined ? {} : { in_reply_to_id: c.in_reply_to_id }),
       };
     })
-    .sort((a, b) => a.id - b.id);
+    .toSorted((a, b) => a.id - b.id);
   const roots = inline.filter((c) => !c.in_reply_to_id).map((c) => c.id);
   const threads = input.threads
     .map((t) => {
       if (
-        !t ||
+        !isJsonObject(t) ||
         typeof t.id !== 'string' ||
         !t.id ||
+        typeof t.root !== 'number' ||
         !roots.includes(t.root) ||
         typeof t.resolved !== 'boolean'
       ) {
@@ -74,14 +86,14 @@ export function normalizeSnapshot(input: Snapshot): Snapshot {
       }
       return { id: t.id, root: t.root, resolved: t.resolved };
     })
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .toSorted((a, b) => a.id.localeCompare(b.id));
   if (
     new Set(issues.map((c) => c.id)).size !== issues.length ||
     new Set(inline.map((c) => c.id)).size !== inline.length ||
     new Set(threads.map((t) => t.id)).size !== threads.length ||
     new Set(threads.map((t) => t.root)).size !== roots.length ||
     threads.length !== roots.length ||
-    inline.some((c) => c.in_reply_to_id && !roots.includes(c.in_reply_to_id))
+    inline.some((c) => Boolean(c.in_reply_to_id) && !roots.includes(c.in_reply_to_id ?? 0))
   ) {
     throw new Error('履歴の関連が欠落・重複しています');
   }
@@ -118,16 +130,20 @@ export async function loadSnapshot(api: Api, number: number): Promise<Snapshot> 
         'query($number:Int!,$cursor:String){repository(owner:"teitei-tk",name:"KorekaiteShine"){pullRequest(number:$number){reviewThreads(first:100,after:$cursor){nodes{id isResolved comments(first:1){nodes{databaseId}}} pageInfo{hasNextPage endCursor}}}}}',
       variables: { number, cursor: cursorState.cursor },
     });
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     const connection = page?.data?.repository?.pullRequest?.reviewThreads;
     if (
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       page?.errors?.length ||
       !connection ||
       !Array.isArray(connection.nodes) ||
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       typeof connection.pageInfo?.hasNextPage !== 'boolean'
     ) {
       throw new Error('Resolve状態を取得できません');
     }
     for (const node of connection.nodes) {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       if (!node || !Array.isArray(node.comments?.nodes) || node.comments.nodes.length !== 1) {
         throw new Error('スレッド元が不明です');
       }

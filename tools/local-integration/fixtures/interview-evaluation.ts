@@ -1,14 +1,14 @@
 import type { MessageBatch } from '@cloudflare/workers-types';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
-import {
-  createEvaluationWorker,
-  type EvaluationEnvironment,
-} from '../../../apps/evaluation/src/worker';
+import { createEvaluationWorker } from '../../../apps/evaluation/src/worker';
+import type { EvaluationEnvironment } from '../../../apps/evaluation/src/worker';
 
 const worker = createEvaluationWorker({
   generate: async (input) => {
     if (
-      !input.fragments.some((fragment) => fragment.speaker === 'user' && fragment.content.trim())
+      !input.fragments.some(
+        (fragment) => fragment.speaker === 'user' && fragment.content.trim().length > 0,
+      )
     ) {
       throw new Error('回答なしでAIを呼んではいけません。');
     }

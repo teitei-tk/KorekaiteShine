@@ -1,11 +1,6 @@
-import { expect, it } from 'vitest';
-import {
-  detail,
-  validDetail,
-  validDiagnostic,
-  renderDiagnostic,
-  type Diagnostic,
-} from './diagnostics.ts';
+import { assert, expect, it } from 'vitest';
+import { detail, validDetail, validDiagnostic, renderDiagnostic } from './diagnostics.ts';
+import type { Diagnostic } from './diagnostics.ts';
 
 function scoped(): Diagnostic {
   return {
@@ -27,7 +22,7 @@ it('診断に作業種別がないscopeを受け付けない', () => {
 
 it('資料の終了行が開始行より前なら診断表示を拒否する', () => {
   const value = scoped();
-  value.scope!.sources[0].end = 1;
+  (value.scope ?? assert.fail('必須のテスト値がありません。')).sources[0].end = 1;
   expect(validDiagnostic(value)).toBe(false);
   expect(() => renderDiagnostic(value)).toThrow('診断の形式が不正');
 });
@@ -39,7 +34,7 @@ it('不足分類の重複は診断作成時に拒否する', () => {
 
 it('scopeの件数と表示サンプルが一致しなければ受理しない', () => {
   const value = scoped();
-  value.scope!.sourceCount = 2;
+  (value.scope ?? assert.fail('必須のテスト値がありません。')).sourceCount = 2;
   expect(validDiagnostic(value)).toBe(false);
 });
 
@@ -49,5 +44,5 @@ it('固定IDと行範囲で構成した診断を受理し資料・確認対象�
   const rendered = renderDiagnostic(value);
   expect(rendered).toContain('資料: 1/1件、確認対象: 1/1件');
   expect(rendered).toContain('行: 2-4、版: base, head');
-  expect(rendered).toContain('確認対象ID: ' + 'b'.repeat(16));
+  expect(rendered).toContain(`確認対象ID: ${'b'.repeat(16)}`);
 });

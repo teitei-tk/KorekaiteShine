@@ -1,11 +1,17 @@
-import { expect, it, vi, afterEach, beforeEach } from 'vitest';
+import type * as LintTypeModule0 from 'node:fs';
+import type * as LintTypeModule1 from './isolation/lifecycle.ts';
+import { assert, expect, it, vi, afterEach, beforeEach } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { executeRuntime } from './runtime.ts';
+import { recordExecutionFailure, readStatusReports, validReport } from './status-report.ts';
+import { readInfo, alive } from './isolation/lifecycle.ts';
+
 const mock = vi.hoisted(() => ({ stage: 'copy' }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
-  readFileSync: vi.fn((await original<typeof import('node:fs')>()).readFileSync),
+  ...(await original<typeof LintTypeModule0>()),
+  readFileSync: vi.fn((await original<typeof LintTypeModule0>()).readFileSync),
   mkdirSync: vi.fn(),
   cpSync: vi.fn(() => {
     if (mock.stage === 'copy') {
@@ -20,10 +26,11 @@ vi.mock('node:fs', async (original) => ({
   })),
   chownSync: vi.fn(),
 }));
-import { executeRuntime } from './runtime.ts';
-import { recordExecutionFailure, readStatusReports, validReport } from './status-report.ts';
+
 const dirs: string[] = [];
-const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+const platformDescriptor =
+  Object.getOwnPropertyDescriptor(process, 'platform') ??
+  assert.fail('必須のテスト値がありません。');
 beforeEach(() => {
   Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'linux' });
   vi.spyOn(process, 'getuid').mockReturnValue(0);
@@ -62,7 +69,9 @@ it.each([
       history: { issues: [], inline: [], threads: [] },
     }),
   );
-  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   expect(await executeRuntime('setup', dir, '/source', env)).toBe(false);
   recordExecutionFailure(env);
   expect(readStatusReports(dir, 20, 1)[0]).toMatchObject({
@@ -75,7 +84,7 @@ it.each([
     readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8') +
     JSON.stringify(log.mock.calls);
   expect(text).toContain(target);
-  expect(text).not.toMatch(/SECRET|Bearer|private\/path/);
+  expect(text).not.toMatch(/SECRET|Bearer|private\/path/u);
   expect(validReport({ ...readStatusReports(dir, 20, 1)[0], target: 'setup/SECRET' })).toBe(false);
 });
 it.each(['missing', 'invalid', 'old-attempt'])('%s記録は汎用の固定失敗へ置き換える', (kind) => {
@@ -110,11 +119,11 @@ it.each(['missing', 'invalid', 'old-attempt'])('%s記録は汎用の固定失敗
   });
 });
 vi.mock('./isolation/lifecycle.ts', async (original) => ({
-  ...(await original<typeof import('./isolation/lifecycle.ts')>()),
+  ...(await original<typeof LintTypeModule1>()),
   readInfo: vi.fn(),
   alive: vi.fn(() => false),
 }));
-import { readInfo, alive } from './isolation/lifecycle.ts';
+
 it.each([false, true])(
   '終了処理の成否に応じて元の診断か終了診断を残す: %s',
   async (shutdownFails) => {
@@ -127,7 +136,13 @@ it.each([false, true])(
       GITHUB_RUN_ATTEMPT: '1',
     };
     vi.mocked(readFileSync).mockReturnValueOnce(
-      JSON.stringify({ proxy: { pid: 123, start: '1' }, infoPath: join(dir, 'info.json') }),
+      JSON.stringify({
+        proxy: { pid: 123, start: '1' },
+        infoPath: join(dir, 'info.json'),
+        configHash: 'a'.repeat(64),
+        metadataHash: 'b'.repeat(64),
+        origin: { run: '20', attempt: '1', sha: 'c'.repeat(40) },
+      }),
     );
     if (shutdownFails) {
       vi.mocked(readInfo).mockRejectedValueOnce(new Error('SECRET upstream body'));
@@ -136,7 +151,9 @@ it.each([false, true])(
       vi.mocked(alive).mockReturnValueOnce(true);
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 200 }));
     }
-    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {
+      /* この実装では追加の処理を行わない。 */
+    });
     expect(await executeRuntime('finish', dir, 'failure', env)).toBe(false);
     expect(readStatusReports(dir, 20, 1)[0].target).toBe(
       shutdownFails ? 'finish/shutdown' : 'finish/action',
@@ -160,7 +177,9 @@ it.each([
     GITHUB_RUN_ATTEMPT: '1',
     GITHUB_STEP_SUMMARY: join(dir, 'summary.md'),
   };
-  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   expect(await executeRuntime('setup', dir, '/source', env)).toBe(false);
   recordExecutionFailure(env);
   expect(readStatusReports(dir, 20, 1)[0]).toMatchObject({

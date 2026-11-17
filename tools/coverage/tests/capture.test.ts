@@ -1,3 +1,4 @@
+import { readMeasurement } from '../src/schema.ts';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,13 +12,13 @@ test('開始時の未完了記録を、正常終了時のカウンター付き�
   try {
     const { run, records, path } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'process-1');
-    expect(JSON.parse(readFileSync(capture.path, 'utf8'))).toMatchObject({
+    expect(readMeasurement(readFileSync(capture.path, 'utf8'))).toMatchObject({
       captureId: 'process-1',
       status: 'incomplete',
       files: [],
     });
     capture.finish({ [path]: records[0].files[0].coverage }, 'complete');
-    const result = JSON.parse(readFileSync(capture.path, 'utf8'));
+    const result = readMeasurement(readFileSync(capture.path, 'utf8'));
     expect(result).toEqual({ ...records[0], captureId: 'process-1' });
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -29,10 +30,10 @@ test('未知のファイルを黙って捨てず未完了の記録を残す', ()
   try {
     const { run, records } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'process-2');
-    expect(() => capture.finish({ unknown: records[0].files[0].coverage }, 'complete')).toThrow(
-      '台帳にない計測対象: unknown',
-    );
-    expect(JSON.parse(readFileSync(capture.path, 'utf8')).status).toBe('incomplete');
+    expect(() => {
+      capture.finish({ unknown: records[0].files[0].coverage }, 'complete');
+    }).toThrow('台帳にない計測対象: unknown');
+    expect(readMeasurement(readFileSync(capture.path, 'utf8')).status).toBe('incomplete');
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

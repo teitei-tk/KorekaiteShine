@@ -1,3 +1,4 @@
+import { parseObject } from './schema-input.ts';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020.js';
@@ -14,10 +15,10 @@ const ajv = new Ajv2020({
 });
 for (const name of await readdir(directory)) {
   if (name.endsWith('.json')) {
-    ajv.addSchema(JSON.parse(await readFile(new URL(name, directory), 'utf8')), name);
+    ajv.addSchema(parseObject(await readFile(new URL(name, directory), 'utf8')), name);
   }
 }
-const exports: Record<string, string> = {};
+const validatorExports: Record<string, string> = {};
 const declarations: string[] = [];
 for (const name of [
   'LiveStartEvent',
@@ -26,21 +27,22 @@ for (const name of [
   'InterviewClientEvent',
   'InterviewServerEvent',
 ]) {
-  const schema = JSON.parse(await readFile(new URL(`${name}.json`, directory), 'utf8'));
+  const schema = parseObject(await readFile(new URL(`${name}.json`, directory), 'utf8'));
   await writeFile(
     new URL(`${name}.d.ts`, directory),
     await compile(schema, name, {
       cwd: fileURLToPath(directory),
       bannerComment: '// 自動生成。編集しないでください。',
-      customName: (definition) => definition.$id?.replace(/\.json$/u, ''),
+      customName: (definition) =>
+        typeof definition.$id === 'string' ? definition.$id.replace(/\.json$/u, '') : undefined,
     }),
   );
-  exports[`validate${name}`] = `${name}.json`;
+  validatorExports[`validate${name}`] = `${name}.json`;
   declarations.push(
     `import type { ${name} } from './${name}';\nexport const validate${name}: ValidateFunction<${name}>;`,
   );
 }
-await writeFile(new URL('validators.mjs', directory), standaloneValidator(ajv, exports));
+await writeFile(new URL('validators.mjs', directory), standaloneValidator(ajv, validatorExports));
 await writeFile(
   new URL('validators.d.mts', directory),
   `// 自動生成。編集しないでください。\nimport type { ValidateFunction } from 'ajv';\n${declarations.join('\n')}\n`,

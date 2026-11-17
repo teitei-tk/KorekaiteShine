@@ -15,9 +15,9 @@ export async function retryEvaluationRequest(
   interviewId: string,
   deps: {
     db: ReturnType<typeof createPrimaryDb>;
-    actor(request: Request): string | null;
-    now(): number;
-    newId(): string;
+    actor: (request: Request) => string | null;
+    now: () => number;
+    newId: () => string;
   },
 ) {
   const actor = deps.actor(request);
@@ -49,6 +49,7 @@ export async function retryEvaluationRequest(
           eq(jobs.jobId, parent),
         ),
       );
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!source) {
       return applicationFailure('NOT_FOUND');
     }
@@ -114,7 +115,7 @@ export async function retryEvaluationRequest(
       db.insert(jobOutbox).select(
         db
           .select({
-            id: sql<string>`${id + ':notify:0'}`.as('id'),
+            id: sql<string>`${`${id}:notify:0`}`.as('id'),
             jobId: evaluationInputs.jobId,
             purpose: sql<'evaluation'>`'evaluation'`.as('purpose'),
             operation: sql<'notify'>`'notify'`.as('operation'),
@@ -137,6 +138,7 @@ export async function retryEvaluationRequest(
           eq(evaluationInputs.retryOf, parent),
         ),
       );
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!accepted) {
       return applicationFailure('CONFLICT');
     }

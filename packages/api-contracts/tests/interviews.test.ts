@@ -1,11 +1,12 @@
+import { parseObject, objectAt } from '../scripts/schema-input.ts';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 
 test('面接開始は保存済み候補の選択だけを受け付け、再送用IDと型付き結果を持つ', async () => {
-  const document = JSON.parse(
+  const document = parseObject(
     await readFile(new URL('../generated/http/openapi.json', import.meta.url), 'utf8'),
   );
-  expect(document.paths['/api/interviews'].post).toBeDefined();
+  expect(objectAt(document, 'paths', '/api/interviews', 'post')).toBeDefined();
   const { validateCreateInterviewRequest, validateInterviewSession, validateInterviewErrorBody } =
     await import('../generated/http/interviews-validators.mjs');
   const input = {

@@ -9,8 +9,9 @@
     "verify:http": "node scripts/verify-http.ts",
     "build": "pnpm generate && pnpm build:app",
     "build:app": "vite build",
-    "typecheck": "pnpm build && tsc --noEmit",
-    "test": "pnpm build:app && vitest run --config vitest.config.ts"
+    "typecheck": "tsrs --fast --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "generate:routes": "node scripts/generate-routes.ts"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261115.1",
+    "@tanstack/router-generator": "1.168.0",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.10",

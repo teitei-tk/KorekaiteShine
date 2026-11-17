@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type BodyResult =
   | { ok: true; value: JsonValue }
@@ -31,7 +32,7 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
       }
       body.text += decoder.decode(chunk.value, { stream: true });
     }
-    return { ok: true, value: JSON.parse(body.text + decoder.decode()) };
+    return { ok: true, value: parseJson(body.text + decoder.decode()) };
   } catch {
     await reader.cancel().catch(() => undefined);
     return { ok: false, code: 'INVALID_REQUEST' };

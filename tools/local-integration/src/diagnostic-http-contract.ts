@@ -1,3 +1,5 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { requireValue } from './required.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
@@ -58,7 +60,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
           if (!passed) {
             return;
           }
-          await rm(config.stateDirectory!, { recursive: true, force: true });
+          await rm(requireValue(config.stateDirectory), { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
         if (mode === 'preview') {
@@ -85,7 +87,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
           assert.equal(response.status, status, name);
           assert.equal(row.noStore, true, name);
           assert.match(response.headers.get('Content-Type') ?? '', /^application\/json\b/u);
-          return { row, body: await response.json() };
+          return { row, body: parseJson(await response.text()) };
         }
         for (const fixture of diagnosticRequests) {
           const result = await record(
@@ -121,7 +123,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
         const response = await post();
         const accepted = await record(response, 'accepted', 202);
         assert.ok(validateCheckAccepted(accepted.body));
-        const jobId = accepted.body.jobId;
+        const { jobId } = accepted.body;
         assert.equal(response.headers.get('Location'), `${endpoint}/${jobId}`);
         accepted.row.contractValid = true;
         const replay = await record(await post(), 'replay', 202);
@@ -134,7 +136,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
         const deadline = performance.now() + 30_000;
         for (;;) {
           const statusResponse = await request(`${endpoint}/${jobId}`);
-          const body = await statusResponse.clone().json();
+          const body = parseJson(await statusResponse.clone().text());
           assert.ok(validateCheckStatus(body));
           assert.equal(body.jobId, jobId);
           if (body.status === 'completed') {
@@ -171,7 +173,7 @@ export async function runDiagnosticHttpContractIntegration(): Promise<
             'execute',
             `UPDATE jobs SET ${update} WHERE job_id = '${jobId}';`,
           ]);
-          const notFound = await record(await request(`${endpoint}/${jobId}`), name!, 404);
+          const notFound = await record(await request(`${endpoint}/${jobId}`), name, 404);
           assert.ok(validateCheckNotFound(notFound.body));
           notFound.row.contractValid = true;
         }

@@ -1,5 +1,7 @@
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { runInNewContext } from 'node:vm';
-import { createFileCoverage, type FileCoverageData } from '@vitest/istanbul-lib-coverage';
+import { createFileCoverage } from '@vitest/istanbul-lib-coverage';
+import type { FileCoverageData } from '@vitest/istanbul-lib-coverage';
 import { transformSync } from 'rolldown/utils';
 import { expect, test } from 'vitest';
 import { instrumentSource } from '../src/instrument.ts';
@@ -34,7 +36,7 @@ test('TSXの型を除去しても画面の両分岐を計測できる', () => {
     h: (_tag: string, _props: null, child: number) => child,
     __coverage__: {} as Record<string, FileCoverageData>,
   };
-  expect(runInNewContext(executable.code + '\n[C({ok:true}), C({ok:false})]', scope)).toEqual([
+  expect(runInNewContext(`${executable.code}\n[C({ok:true}), C({ok:false})]`, scope)).toEqual([
     1, 2,
   ]);
   const summary = createFileCoverage(scope.__coverage__['fixture.tsx']).toSummary();
@@ -58,5 +60,5 @@ test('計測後コードから元のTypeScriptへのsource mapを返す', () => 
     sources: ['src/answer.ts'],
     sourcesContent: [source],
   });
-  expect(result.map?.mappings.length).toBeGreaterThan(0);
+  expect(result.map.mappings.length).toBeGreaterThan(0);
 });

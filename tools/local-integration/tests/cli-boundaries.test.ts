@@ -1,11 +1,7 @@
 import { EventEmitter } from 'node:events';
-import { afterEach, expect, test, vi } from 'vitest';
-import {
-  buildRuntime,
-  runDatabaseCommand,
-  startRuntime,
-  type LocalRuntime,
-} from '../src/runtime.ts';
+import { assert, afterEach, expect, test, vi } from 'vitest';
+import { buildRuntime, runDatabaseCommand, startRuntime } from '../src/runtime.ts';
+import type { LocalRuntime } from '../src/runtime.ts';
 
 vi.mock('../src/runtime.ts', () => ({
   buildRuntime: vi.fn(),
@@ -22,6 +18,7 @@ afterEach(() => {
 async function cliFixture(args: string[], env: NodeJS.ProcessEnv = {}) {
   vi.resetModules();
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  // oxlint-disable-next-line unicorn/prefer-event-target -- Nodeのprocess IPCを模擬するためEventEmitterのon/emit契約を使う。
   const events = new EventEmitter();
   const channel = {
     argv: ['node', 'run.ts', ...args],
@@ -37,11 +34,17 @@ async function cliFixture(args: string[], env: NodeJS.ProcessEnv = {}) {
     stop: vi.fn(async () => {
       close({ exitCode: 0 });
     }),
-    runScheduled: vi.fn(async () => {}),
+    runScheduled: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
   };
   vi.mocked(startRuntime).mockResolvedValue(runtime);
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.stubGlobal('process', channel);
   await import('../src/run.ts');
   await vi.advanceTimersByTimeAsync(0);
@@ -105,6 +108,7 @@ test('previewを起動し二度の終了シグナルでも停止処理は一度�
 
 test('周期回復が長引いても重複実行せず完了後の周期で再開する', async () => {
   const fixture = await cliFixture(['dev']);
+  // oxlint-disable-next-line typescript/no-invalid-void-type -- Promise.withResolvers<void>は値を返さない標準Promiseの型引数。
   const scheduled = Promise.withResolvers<void>();
   vi.mocked(fixture.runtime.runScheduled).mockReturnValueOnce(scheduled.promise);
   await vi.advanceTimersByTimeAsync(120_000);
@@ -132,7 +136,13 @@ test('停止に伴う周期回復の中断は一時失敗として報告しな�
   vi.mocked(fixture.runtime.runScheduled).mockImplementation(
     (signal) =>
       new Promise((_resolve, reject) => {
-        signal!.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        (signal ?? assert.fail('必須のテスト値がありません。')).addEventListener(
+          'abort',
+          () => {
+            reject(new Error('aborted'));
+          },
+          { once: true },
+        );
       }),
   );
   await vi.advanceTimersByTimeAsync(60_000);

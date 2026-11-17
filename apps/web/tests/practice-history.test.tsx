@@ -2,7 +2,7 @@
 import './helpers/dom';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { PracticePage } from '../src/routes/practice';
 import { PracticeHistory, PracticeRecord } from '../src/components/practice-record';
 
@@ -94,10 +94,12 @@ test('履歴から保存済みの五軸評価を開き、引用から元の発�
   expect(screen.getByText('対象外')).toBeTruthy();
   expect(screen.getByText('確認済み')).toBeTruthy();
   expect(screen.getByText('要確認')).toBeTruthy();
-  const link = screen.getAllByRole('link', { name: '発言1' })[0];
-  expect(document.getElementById(link.getAttribute('href')!.slice(1))?.textContent).toContain(
-    '比較しました。',
-  );
+  const [link] = screen.getAllByRole('link', { name: '発言1' });
+  expect(
+    document.querySelector(
+      `#${CSS.escape((link.getAttribute('href') ?? assert.fail('必須のテスト値がありません。')).slice(1))}`,
+    )?.textContent,
+  ).toContain('比較しました。');
   expect(screen.getByRole('link', { name: '材料の抜粋' }).getAttribute('href')).toBe(
     '#interview-material',
   );
@@ -143,12 +145,12 @@ test('削除対象のテーマを確認し、キャンセル時は記録を保�
   render(<PracticePage />);
   await user.click(await screen.findByRole('button', { name: '架空の選択' }));
   await user.click(await screen.findByRole('button', { name: '記録の削除' }));
-  expect(screen.getByText(/「架空の選択」の会話/)).toBeTruthy();
+  expect(screen.getByText(/「架空の選択」の会話/u)).toBeTruthy();
   await user.click(screen.getByRole('button', { name: 'キャンセル' }));
   expect(removedContext.removed).toBe(false);
   await user.click(screen.getByRole('button', { name: '記録の削除' }));
   await user.click(screen.getByRole('button', { name: 'この面接を削除する' }));
-  expect((await screen.findByRole('alert')).textContent).toMatch(/削除の完了/);
+  expect((await screen.findByRole('alert')).textContent).toMatch(/削除の完了/u);
   await user.click(screen.getByRole('button', { name: 'この面接を削除する' }));
   expect(await screen.findByText('保存された面接はありません。')).toBeTruthy();
 });
@@ -164,6 +166,7 @@ test('履歴のエラーから復帰し、前後のページを表示する', as
       }
       callsState.calls++;
       if (callsState.calls === 1) {
+        // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
         throw 'offline';
       }
       if (callsState.calls === 2) {
@@ -198,7 +201,7 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
   const jobId = '00000000-0000-4000-8000-000000000001';
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url, init) => {
+    vi.fn<typeof fetch>(async (url, init) => {
       if (url === '/api/local-session') {
         return Response.json({ operationToken: 'a'.repeat(64) });
       }
@@ -208,6 +211,7 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
       if (init?.method === 'POST') {
         fetchedContext.attempts++;
         if (fetchedContext.attempts === 1) {
+          // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
           throw 'offline';
         }
         if (fetchedContext.attempts === 2) {
@@ -217,6 +221,7 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
       }
       fetchedContext.fetched++;
       if (fetchedContext.fetched === 1) {
+        // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の拒否値も安全に扱えることを意図的に検査する。
         throw 'offline';
       }
       if (fetchedContext.fetched === 2) {
@@ -226,7 +231,7 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
         session,
         material: { title: '構成', heading: '判断', excerpt: '内容' },
         background: '担当',
-        audioRemainingMs: 60000,
+        audioRemainingMs: 60_000,
         transcriptIncomplete: false,
         transcripts: [],
         playback: [],
@@ -248,16 +253,16 @@ test('詳細を再取得し、失敗した評価を手動再試行して次の�
   await user.click(refresh);
   expect((await screen.findByRole('alert')).textContent).toContain('詳細の取得失敗');
   await user.click(refresh);
-  expect(await screen.findByText(/評価を完了できません/)).toBeTruthy();
+  expect(await screen.findByText(/評価を完了できません/u)).toBeTruthy();
   await user.click(refresh);
-  expect(await screen.findByText(/評価の応答が制限時間/)).toBeTruthy();
+  expect(await screen.findByText(/評価の応答が制限時間/u)).toBeTruthy();
   const retry = screen.getByRole('button', { name: '同じ条件で再評価する' });
   await user.click(retry);
   expect((await screen.findByRole('alert')).textContent).toContain('再評価を受け付けられません');
   await user.click(retry);
   expect((await screen.findByRole('alert')).textContent).toContain('再評価に失敗');
   await user.click(retry);
-  expect(await screen.findByText(/次の試行/)).toBeTruthy();
+  expect(await screen.findByText(/次の試行/u)).toBeTruthy();
   await user.click(screen.getByRole('button', { name: '準備と履歴へ戻る' }));
   expect(await screen.findByRole('button', { name: session.theme })).toBeTruthy();
 });
@@ -284,19 +289,21 @@ test.each(['履歴', '詳細'])('%sの読取中に画面を閉じた後の成功
     };
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url, init) => {
+      vi.fn<typeof fetch>(async (url, init) => {
         if (url === '/api/local-session') {
           return Response.json({ operationToken: 'a'.repeat(64) });
         }
-        signalState.signal = init.signal;
+        signalState.signal = init?.signal ?? undefined;
         return pending;
       }),
     );
     const page =
       kind === '履歴'
-        ? render(<PracticeHistory onOpen={vi.fn()} />)
-        : render(<PracticeRecord id="one" onDeleted={vi.fn()} />);
-    await waitFor(() => expect(signalState.signal).toBeDefined());
+        ? render(<PracticeHistory onOpen={vi.fn<(id: string) => void>()} />)
+        : render(<PracticeRecord id="one" onDeleted={vi.fn<() => void>()} />);
+    await waitFor(() => {
+      expect(signalState.signal).toBeDefined();
+    });
     page.unmount();
     expect(signalState.signal?.aborted).toBe(true);
     await act(async () => {

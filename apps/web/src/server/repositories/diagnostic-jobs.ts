@@ -7,13 +7,13 @@ import type { operations } from '@korekaite/api-contracts/http';
 
 type Start = operations['startCheckJob']['requestBody']['content']['application/json'];
 type Accepted = operations['startCheckJob']['responses'][202]['content']['application/json'];
-export interface AcceptanceContext {
+export type AcceptanceContext = {
   db: ReturnType<typeof createPrimaryDb>;
   environment: 'development' | 'test';
   actorId: string;
-  now(): number;
-  newId(): string;
-}
+  now: () => number;
+  newId: () => string;
+};
 
 export async function acceptDiagnosticJob(
   context: AcceptanceContext,
@@ -73,6 +73,7 @@ export async function acceptDiagnosticJob(
     const [existing] = await databaseOperation(async () =>
       db.select().from(diagnosticRequests).where(scope),
     );
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!existing) {
       throw error;
     }
@@ -115,6 +116,7 @@ export async function findDiagnosticJob(
         ),
       ),
   );
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!row) {
     return null;
   }

@@ -10,15 +10,15 @@ import {
   markCheckNotificationSent,
 } from '../server/repositories/check-outbox';
 
-interface CheckBindings {
+type CheckBindings = {
   DB: D1Database;
   APP_ENV: string;
   DIAGNOSTIC_QUEUE: Queue<JobNotification>;
-}
-export interface CheckInitialized {
+};
+export type CheckInitialized = {
   jobId: string;
   firstReceivedAt: string;
-}
+};
 
 export class CheckObject extends DurableObject<CheckBindings> {
   async initializeCheck(jobId: string): Promise<CheckInitialized> {
@@ -56,6 +56,7 @@ export class CheckObject extends DurableObject<CheckBindings> {
       Temporal.Instant.from(persisted.firstReceivedAt).epochMilliseconds,
     );
     const pending = await pendingCheckNotification(this.env.DB, jobId);
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (pending) {
       const notification = { schemaVersion: 1, jobId: pending.jobId };
       if (!validateJobNotification(notification)) {

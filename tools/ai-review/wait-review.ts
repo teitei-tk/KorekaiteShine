@@ -11,18 +11,18 @@ import { eligible, REPOSITORY, REPOSITORY_ID } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 import type { StatusReason } from './status-report.ts';
 
-interface Revision {
+type Revision = {
   number: number;
   head: string;
   base: string;
   since: string;
-}
-interface SourceRun extends Run {
+};
+type SourceRun = {
   created_at: string;
   id: number;
   run_attempt: number;
   status: string;
-}
+} & Run;
 type ReadApi = Api;
 type Failure = { status: 'failure'; target: string; reason: StatusReason };
 type Inspection =
@@ -43,8 +43,8 @@ function validRevision(revision: Revision): boolean {
   return (
     Number.isFinite(epochMilliseconds(revision.since)) &&
     positive(revision.number) &&
-    /^[a-f0-9]{40}$/.test(revision.head) &&
-    /^[a-f0-9]{40}$/.test(revision.base)
+    /^[a-f0-9]{40}$/u.test(revision.head) &&
+    /^[a-f0-9]{40}$/u.test(revision.base)
   );
 }
 // APIの降順一覧から最初に一致した実行を選ぶ。最新試行が進行中なら旧成功へ戻らない。
@@ -54,15 +54,17 @@ async function latest<T extends { id: number; run_attempt: number }>(
   event: string,
   match: (run: T) => boolean,
 ): Promise<T | undefined> {
-  for (const index of Array(10).keys()) {
+  for (const index of Array.from({ length: 10 }).keys()) {
     const page = index + 1;
     const data = await api<{ workflow_runs: T[] }>(
       `${workflow ? `actions/workflows/${workflow}` : 'actions'}/runs?event=${event}&per_page=100&page=${page}`,
     );
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     if (!Array.isArray(data?.workflow_runs)) {
-      throw new Error('実行一覧が不正です');
+      throw new TypeError('実行一覧が不正です');
     }
     for (const run of data.workflow_runs) {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       if (!run || !positive(run.id) || !positive(run.run_attempt)) {
         throw new Error('実行IDが不正です');
       }
@@ -71,7 +73,7 @@ async function latest<T extends { id: number; run_attempt: number }>(
       }
     }
     if (data.workflow_runs.length < 100) {
-      return;
+      return undefined;
     }
   }
   throw new Error('実行一覧の取得上限に達しました');
@@ -97,25 +99,29 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
       epochMilliseconds(run.created_at) >= epochMilliseconds(revision.since) &&
       run.event === 'pull_request' &&
       isSourceCi(run.path) &&
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.repository?.id === REPOSITORY_ID &&
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.head_repository?.id === REPOSITORY_ID &&
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.pull_requests?.length === 1 &&
       run.pull_requests[0]?.number === revision.number &&
       run.pull_requests[0]?.head?.sha === revision.head &&
       run.pull_requests[0]?.base?.sha === revision.base,
   );
-  if (!source || source.status !== 'completed') {
+  if (source?.status !== 'completed') {
     return { status: 'pending', target: 'source-ci' };
   }
   if (source.conclusion !== 'success') {
     return { status: 'failure', target: 'source-ci', reason: 'EXECUTION_FAILED' };
   }
   if (source.head_sha !== revision.head) {
-    if (!/^[a-f0-9]{40}$/.test(source.head_sha)) {
+    if (!/^[a-f0-9]{40}$/u.test(source.head_sha)) {
       throw new Error('起点SHAが不正です');
     }
     const commit = await api<{ parents: { sha: string }[] }>(`git/commits/${source.head_sha}`);
     if (
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       commit.parents?.length !== 2 ||
       commit.parents[0]?.sha !== revision.base ||
       commit.parents[1]?.sha !== revision.head
@@ -130,26 +136,29 @@ export async function inspectReview(api: ReadApi, revision: Revision): Promise<I
     (run) =>
       run.event === 'workflow_run' &&
       run.path === '.github/workflows/ai-review.yml' &&
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.repository?.id === REPOSITORY_ID &&
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
       run.head_repository?.id === REPOSITORY_ID &&
       run.display_title ===
         `AI review / source run ${source.id} attempt ${source.run_attempt} / review`,
   );
-  if (!review || review.status !== 'completed') {
+  if (review?.status !== 'completed') {
     return { status: 'pending', target: 'workflow' };
   }
   return { status: 'complete', run: review.id, attempt: review.run_attempt };
 }
+const defaultClock = {
+  now: () => Temporal.Now.instant().epochMilliseconds,
+  sleep: async () => {
+    await setTimeout(15_000);
+  },
+  timeout: 50 * 60_000,
+};
 export async function waitReview(
   api: ReadApi,
   revision: Revision,
-  clock = {
-    now: () => Temporal.Now.instant().epochMilliseconds,
-    sleep: async () => {
-      await setTimeout(15_000);
-    },
-    timeout: 50 * 60_000,
-  },
+  clock = defaultClock,
 ): Promise<Exclude<Inspection, { status: 'pending' }>> {
   const deadline = clock.now() + clock.timeout;
   const targetState = { target: 'workflow' };
@@ -187,7 +196,9 @@ export async function finishReview(
     run.status !== 'completed' ||
     run.event !== 'workflow_run' ||
     run.path !== '.github/workflows/ai-review.yml' ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.repository?.id !== REPOSITORY_ID ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.head_repository?.id !== REPOSITORY_ID
   ) {
     throw new Error('監視結果が不一致です');
@@ -210,7 +221,7 @@ function summary(
   diagnostic?: Diagnostic,
   commentId?: number,
 ): void {
-  const message = `対象: ${target}、理由: ${reason}。${diagnostic ? '\n\n' + renderDiagnostic(diagnostic) : ''}`;
+  const message = `対象: ${target}、理由: ${reason}。${diagnostic ? `\n\n${renderDiagnostic(diagnostic)}` : ''}`;
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
@@ -255,7 +266,7 @@ if (import.meta.main) {
       summary(result.target, result.reason, id, attempt, result.diagnostic, result.commentId);
       if (result.conclusion !== 'success' && result.conclusion !== 'neutral') {
         console.error(
-          `::error::${result.reason}${result.diagnostic ? '/' + result.diagnostic.subcode : ''} (${result.target})`,
+          `::error::${result.reason}${result.diagnostic ? `/${result.diagnostic.subcode}` : ''} (${result.target})`,
         );
         process.exitCode = 1;
       }

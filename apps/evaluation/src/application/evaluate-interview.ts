@@ -1,7 +1,8 @@
 import type { EvaluationSnapshot } from '@korekaite/database';
 import type { components } from '@korekaite/api-contracts/http';
 import { validateInterviewEvaluation } from '@korekaite/api-contracts/http/evaluation-validators';
-import { EvaluationProviderError, type EvaluationResult } from '../domain/evaluation-result';
+import { EvaluationProviderError } from '../domain/evaluation-result';
+import type { EvaluationResult } from '../domain/evaluation-result';
 
 type Evidence = components['schemas']['EvaluationEvidence'];
 export type InterviewEvaluation = components['schemas']['InterviewEvaluation'];
@@ -23,6 +24,7 @@ export async function evaluateInterview(
       (fragment) => fragment.speaker === 'user' && fragment.content.trim().length > 0,
     );
     const value = hasAnswer ? await generate(input, signal) : noAnswerResult();
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (signal.aborted || !validateInterviewEvaluation(value) || !validEvidence(input, value)) {
       return { ok: false, error: { code: 'INVALID_AI_RESULT', retryable: true } };
     }
@@ -49,18 +51,18 @@ function validEvidence(input: EvaluationSnapshot, value: InterviewEvaluation): b
       );
     }
     const selected = reference.fragmentIds.map((id) => fragments.get(id));
-    if (selected.length === 0 || selected.some((fragment) => !fragment)) {
+    if (selected.length === 0 || !selected.every((fragment) => fragment !== undefined)) {
       return false;
     }
     const contiguous = selected.every(
       (fragment, index) =>
-        fragment!.speaker === selected[0]!.speaker &&
-        (index === 0 || fragment!.sequence === selected[index - 1]!.sequence + 1),
+        fragment.speaker === selected[0].speaker &&
+        (index === 0 || fragment.sequence === selected[index - 1].sequence + 1),
     );
     return (
       contiguous &&
       selected
-        .map((fragment) => fragment!.content)
+        .map((fragment) => fragment.content)
         .join('')
         .includes(reference.quote)
     );

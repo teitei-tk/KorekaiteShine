@@ -1,3 +1,5 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { readFixtureObject } from './json';
 import { confirmFixtureKey } from './ai-bindings';
 import { diagnosticTransactionEffects } from '../../../apps/evaluation/src/diagnostics/transaction-effects';
 import { Temporal } from '@js-temporal/polyfill';
@@ -25,8 +27,8 @@ import {
   completeExecution,
   renewExecution,
   recoverExpiredExecution,
-  type ExecutionLease,
 } from '../../../apps/evaluation/src/server/repositories/job-execution';
+import type { ExecutionLease } from '../../../apps/evaluation/src/server/repositories/job-execution';
 
 export class TopologyEvaluation extends WorkerEntrypoint<{
   DB: D1Database;
@@ -177,23 +179,27 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
                   .select()
                   .from(connectionChecks)
                   .where(eq(connectionChecks.writer, `release:${jobId}`));
+                // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
                 if (released) {
                   break;
                 }
                 if (Temporal.Now.instant().epochMilliseconds >= deadline) {
                   throw new Error('テストの評価待機がタイムアウトしました。');
                 }
-                await new Promise((resolve) => setTimeout(resolve, 50));
+                await new Promise((resolve) => {
+                  setTimeout(resolve, 50);
+                });
               }
             }
             const [check] = await primary
               .select()
               .from(diagnosticChecks)
               .where(eq(diagnosticChecks.jobId, jobId));
+            // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
             if (!check) {
               throw new Error('診断条件がありません。');
             }
-            return evaluateDiagnostic(check.scenario, attemptNumber);
+            return await evaluateDiagnostic(check.scenario, attemptNumber);
           } catch (error) {
             console.error(
               JSON.stringify({
@@ -211,12 +217,14 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       },
     );
   }
+  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async readQueueReceipt(jobId: string) {
     const [row] = await db
       .select()
       .from(connectionChecks)
       .where(eq(connectionChecks.writer, `queue:${jobId}`));
-    return row ? JSON.parse(row.value) : null;
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
+    return row ? parseJson(row.value) : null;
   }
 
   async readFormalJob(jobId: string) {
@@ -232,6 +240,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       })
       .from(jobs)
       .where(eq(jobs.jobId, jobId));
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
     return job ?? null;
   }
 
@@ -249,8 +258,14 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     const receipts = await primary.select().from(connectionChecks);
     const deliveries = receipts
       .filter((row) => row.writer.startsWith('queue-message:'))
-      .map((row) => JSON.parse(row.value))
-      .filter((row) => row.message.jobId === jobId).length;
+      .map((row) => {
+        const value = readFixtureObject(row.value);
+        if (!validateJobNotification(value.message)) {
+          throw new Error('配送通知の形式が不正です。');
+        }
+        return value.message;
+      })
+      .filter((message) => message.jobId === jobId).length;
     return {
       notifications: notifications.length,
       unsent: notifications.filter((row) => row.sentAt === null).length,
@@ -266,6 +281,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
       .from(diagnosticChecks)
       .where(eq(diagnosticChecks.jobId, jobId));
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
     return row ?? null;
   }
 
@@ -300,6 +316,7 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
       .orderBy(jobAttempts.attemptNumber);
   }
 
+  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async writeShared() {
     await db
       .insert(connectionChecks)
@@ -342,11 +359,11 @@ export async function recordQueueDelivery(batch: {
   }
 }
 
-export default {
+const queueFixture = {
   // 接続確認専用Consumer。受信を記録し、評価の業務状態は変更しない。
   async queue(batch: {
     queue: string;
-    messages: { id: string; body: JobNotification; ack(): void }[];
+    messages: { id: string; body: JobNotification; ack: () => void }[];
   }) {
     await recordQueueDelivery(batch);
     for (const message of batch.messages) {
@@ -366,6 +383,10 @@ export async function holdBeforeEvaluationForTest(env: { APP_ENV: string }): Pro
     throw new Error('評価前の停止はtest環境専用です。');
   }
   for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, 60_000));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 60_000);
+    });
   }
 }
+
+export default queueFixture;

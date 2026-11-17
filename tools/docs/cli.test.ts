@@ -96,7 +96,7 @@ test('Node版とengineの不整合はCLIで失敗する', async () => {
 test('通常の文書CLI入口は既定のリポジトリを検査する', () => {
   const result = invoke('./check.ts');
   expect(result.status, result.stderr).toBe(0);
-  expect(result.stdout).toMatch(/文書検査成功: Markdown \d+件/);
+  expect(result.stdout).toMatch(/文書検査成功: Markdown \d+件/u);
   expect(result.stderr).toBe('');
 });
 
@@ -151,7 +151,7 @@ syncBuiltinESMExports();
   );
   const result = spawnSync(
     process.execPath,
-    ['--import', preload, fileURLToPath(new URL('./check-node.ts', import.meta.url))],
+    ['--import', preload, fileURLToPath(new URL('check-node.ts', import.meta.url))],
     { encoding: 'utf8', timeout: 10_000 },
   );
   if (result.error) {

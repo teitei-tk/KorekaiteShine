@@ -3,7 +3,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-r
 export const Route = createRootRoute({
   head: () => ({
     meta: [
-      { charSet: 'utf-8' },
+      { charSet: 'utf8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: '面接一覧・ローカル検証' },
     ],

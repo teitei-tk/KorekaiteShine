@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,7 +28,7 @@ test('後処理が失敗しても全処理を試み、例外の秘密値を含�
     expect(cleaned).toEqual(['second', 'first']);
     const serialized = await readFile(resultPath, 'utf8');
     expect(serialized).not.toContain('secret-token-sentinel');
-    expect(JSON.parse(serialized)).toMatchObject({
+    expect(parseJson(serialized)).toMatchObject({
       environment: 'test',
       case: 'cleanup',
       actual: { received: 1 },
@@ -56,7 +57,7 @@ test('本処理と後処理がともに失敗しても本処理の例外を維�
   expect(cleanup).toHaveBeenCalledExactlyOnceWith(false);
   const serialized = await readFile(resultPath, 'utf8');
   expect(serialized).not.toContain('private');
-  expect(JSON.parse(serialized)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
+  expect(parseJson(serialized)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
 });
 
 test('本処理が文字列をthrowしても固定分類のErrorと失敗記録を残す', async () => {
@@ -65,10 +66,11 @@ test('本処理が文字列をthrowしても固定分類のErrorと失敗記録�
   const resultPath = join(directory, 'results.json');
   await expect(
     runWithEvidence({ resultPath, metadata: {} }, async () => {
+      // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外をthrowされたときの処理を検証する故障fixture。
       throw 'private failure';
     }),
   ).rejects.toThrow('CASE_FAILED');
   const serialized = await readFile(resultPath, 'utf8');
   expect(serialized).not.toContain('private failure');
-  expect(JSON.parse(serialized)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
+  expect(parseJson(serialized)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
 });

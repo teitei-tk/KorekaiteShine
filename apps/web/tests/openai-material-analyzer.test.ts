@@ -1,4 +1,5 @@
-import { expect, test, vi } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test, vi } from 'vitest';
 import { createMaterialAnalyzer } from '../src/server/openai-material-analyzer';
 
 test('材料を命令と分離し、指定モデルと生成Schemaで分析して結果を読み取る', async () => {
@@ -36,7 +37,9 @@ test('材料を命令と分離し、指定モデルと生成Schemaで分析し�
   expect(sentState.sent?.url).toBe('https://api.openai.com/v1/responses');
   expect(sentState.sent?.headers.get('Authorization')).toBe('Bearer fixture-key');
   expect(fetcher).toHaveBeenCalledTimes(1);
-  const body = await sentState.sent!.json();
+  const body = parseObject(
+    await (sentState.sent ?? assert.fail('必須のテスト値がありません。')).text(),
+  );
   expect(body).toMatchObject({
     model: 'fixture-model',
     store: false,
@@ -53,12 +56,17 @@ test('材料を命令と分離し、指定モデルと生成Schemaで分析し�
     },
   });
   expect(body.instructions).not.toContain(markdown);
-  expect(body.text.format.schema.properties.themes.items.required).toEqual([
-    'title',
-    'heading',
-    'excerpt',
-  ]);
-  expect(body.text.format.schema.properties.themes.items.additionalProperties).toBe(false);
+  expect(body.text).toMatchObject({
+    format: {
+      schema: {
+        properties: {
+          themes: {
+            items: { required: ['title', 'heading', 'excerpt'], additionalProperties: false },
+          },
+        },
+      },
+    },
+  });
 });
 
 test('推論項目を飛ばして完成メッセージを読み、失敗・拒否・設定不足を安全に返す', async () => {

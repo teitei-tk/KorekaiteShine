@@ -1,4 +1,5 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, afterEach, expect, test, vi } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite';
 import { jobs } from '@korekaite/database/jobs';
 import { interviews, evaluationInputs } from '@korekaite/database/interviews';
@@ -11,19 +12,21 @@ import { Route as live } from '../src/routes/api.interviews.$interviewId.live';
 import { Route as materials } from '../src/routes/api.materials.analyze';
 import type { Bindings } from '../src/server/interview-runtime';
 
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
 const { env } = vi.hoisted(() => ({ env: {} as Bindings }));
 vi.mock('cloudflare:workers', () => ({ env }));
 afterEach(() => vi.unstubAllGlobals());
 
-interface ApiRoute {
+type ApiRoute = {
   options: object;
-}
+};
 function requestRoute(route: ApiRoute, method: string, path: string, options?: RequestInit) {
-  const request = new Request('https://localhost' + path, { ...options, method });
+  const request = new Request(`https://localhost${path}`, { ...options, method });
   type Handler = (input: {
     request: Request;
     params: { interviewId: string };
   }) => Response | Promise<Response>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 実際にimportしたTanStack Routeの登録済handlerをテストから呼ぶため、非公開metadata形状を局所的に表現する。
   const { server } = route.options as { server: { handlers: Record<string, Handler> } };
   return server.handlers[method]({ request, params: { interviewId: 'one' } });
 }
@@ -37,9 +40,12 @@ test('登録したHTTP入口で本人を認証し、DBと面接DOへ接続する
   env.DB = data.binding;
   env.INTERVIEW_SESSION = { getByName: forward };
   const bootstrap = await requestRoute(session, 'GET', '/api/local-session');
-  const { operationToken } = await bootstrap.json();
+  const { operationToken } = parseObject(await bootstrap.text());
+  assert.ok(typeof operationToken === 'string');
   const headers = {
-    Cookie: bootstrap.headers.get('Set-Cookie')!.split(';')[0],
+    Cookie: (
+      bootstrap.headers.get('Set-Cookie') ?? assert.fail('必須のテスト値がありません。')
+    ).split(';')[0],
     Origin: 'https://localhost',
     'X-Interview-Token': operationToken,
     'Content-Type': 'application/json',
@@ -160,7 +166,8 @@ test('登録したHTTP入口で本人を認証し、DBと面接DOへ接続する
     expect((await remove()).status).toBe(503);
     expect((await remove()).status).toBe(204);
     expect(forward.mock.lastCall).toEqual(['test:interview:one']);
-    const removed = deliver.mock.lastCall![0] as Request;
+    const [removed] = deliver.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
+    assert.ok(removed instanceof Request);
     expect(removed.method).toBe('DELETE');
     expect(removed.headers.get('X-Interview-Actor')).toBe('local-developer');
     expect(removed.headers.get('X-Interview-ID')).toBe('one');

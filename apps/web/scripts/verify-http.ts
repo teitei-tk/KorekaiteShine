@@ -14,5 +14,5 @@ for (const example of interviewCases) {
 }
 const page = await fetch(baseUrl);
 assert.equal(page.status, 200);
-assert.match(await page.text(), /面接一覧/);
+assert.match(await page.text(), /面接一覧/u);
 console.log(`HTTP検証成功: 契約${interviewCases.length}件・一覧順序・HTML応答`);

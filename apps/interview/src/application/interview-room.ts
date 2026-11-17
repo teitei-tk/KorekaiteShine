@@ -8,23 +8,24 @@ import {
   validateInterviewClientEvent,
   validateInterviewServerEvent,
 } from '@korekaite/api-contracts/events/validators';
-import { AudioUsageLimitError, type createInterviewSession } from './interview-session';
+import { AudioUsageLimitError } from './interview-session';
+import type { createInterviewSession } from './interview-session';
 
 type Session = ReturnType<typeof createInterviewSession>;
 type State = Awaited<ReturnType<Session['state']>>;
 type SessionOptions = Parameters<typeof createInterviewSession>[0];
 type Hooks = Pick<SessionOptions, 'onState' | 'onTranscript' | 'onAudio' | 'onDialFailure'>;
 type Fragment = Parameters<NonNullable<SessionOptions['onTranscript']>>[0];
-export interface InterviewPeer {
+export type InterviewPeer = {
   questionBoundaries?: boolean;
-  send(data: string | ArrayBuffer): void;
-  close(): void;
-}
+  send: (data: string | ArrayBuffer) => void;
+  close: () => void;
+};
 
 export function createInterviewRoom(options: {
-  createSession(hooks: Hooks): Session;
-  schedule(state: State): Promise<void>;
-  history(): Promise<Fragment[]>;
+  createSession: (hooks: Hooks) => Session;
+  schedule: (state: State) => Promise<void>;
+  history: () => Promise<Fragment[]>;
 }) {
   const peers = new Map<string, InterviewPeer>();
   const commands = new Map<string, Map<string, string>>();
@@ -124,9 +125,15 @@ export function createInterviewRoom(options: {
   });
   function serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = room.pending.then(operation);
+    // oxlint-disable-next-line promise/prefer-catch -- 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     room.pending = result.then(
-      () => {},
-      () => {},
+      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
+      () => {
+        /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+      },
+      () => {
+        /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+      },
     );
     return result;
   }
@@ -155,7 +162,10 @@ export function createInterviewRoom(options: {
     send(id, { type: 'error', commandId, code });
   }
   async function command(id: string, event: InterviewClientEvent) {
-    const cache = commands.get(id)!;
+    const cache = commands.get(id);
+    if (!cache) {
+      throw new Error('接続のコマンド履歴がありません。');
+    }
     const encoded = JSON.stringify(event);
     const replay = cache.get(event.commandId);
     if (replay !== undefined) {
@@ -181,12 +191,14 @@ export function createInterviewRoom(options: {
       error(id, event.commandId, 'NOT_OWNER');
       return;
     }
+    // oxlint-disable-next-line eslint/default-case -- validatorが保証するイベントunionの分岐を列挙する。
     switch (event.type) {
-      case 'sync':
+      case 'sync': {
         await sync(id);
         break;
+      }
       case 'start':
-      case 'resume':
+      case 'resume': {
         if (
           (event.type === 'start' && room.state.status !== 'ready') ||
           (event.type === 'resume' && !['paused', 'reconnecting'].includes(room.state.status))
@@ -197,7 +209,8 @@ export function createInterviewRoom(options: {
         room.owner = id;
         await session.start();
         break;
-      case 'takeover':
+      }
+      case 'takeover': {
         if (['ending', 'ended'].includes(room.state.status)) {
           error(id, event.commandId, 'STALE_STATE');
           return;
@@ -208,20 +221,24 @@ export function createInterviewRoom(options: {
         room.owner = id;
         await session.start();
         break;
-      case 'pause':
+      }
+      case 'pause': {
         await session.pause();
         break;
-      case 'finish':
+      }
+      case 'finish': {
         await session.finish();
         break;
-      case 'playback':
+      }
+      case 'playback': {
         if (!(await session.playback(event.generation, event.audioOffsetMs))) {
           error(id, event.commandId, 'INVALID_EVENT');
           return;
         }
         break;
+      }
       case 'rephrase':
-      case 'skip':
+      case 'skip': {
         if (!(await session.request(event.generation, event.type))) {
           error(id, event.commandId, 'STALE_STATE');
           return;
@@ -231,10 +248,14 @@ export function createInterviewRoom(options: {
           await session.start();
         }
         break;
+      }
     }
     cache.set(event.commandId, encoded);
     if (cache.size > 100) {
-      cache.delete(cache.keys().next().value!);
+      const oldest = cache.keys().next();
+      if (!oldest.done) {
+        cache.delete(oldest.value);
+      }
     }
     send(id, { type: 'ack', commandId: event.commandId });
   }
@@ -282,7 +303,7 @@ export function createInterviewRoom(options: {
         error(id, null, 'INVALID_EVENT');
         return Promise.resolve();
       }
-      if (room.queuedEvents >= 64 || room.queuedBytes + bytes > 524288) {
+      if (room.queuedEvents >= 64 || room.queuedBytes + bytes > 524_288) {
         return detach(id);
       }
       room.queuedEvents += 1;
@@ -321,11 +342,11 @@ export function createInterviewRoom(options: {
               }
             }
           }
-        } catch (cause) {
+        } catch (error_) {
           error(
             id,
             commandIdState.commandId,
-            cause instanceof AudioUsageLimitError ? 'AUDIO_USAGE_LIMIT' : 'UNAVAILABLE',
+            error_ instanceof AudioUsageLimitError ? 'AUDIO_USAGE_LIMIT' : 'UNAVAILABLE',
           );
         }
       }).finally(() => {

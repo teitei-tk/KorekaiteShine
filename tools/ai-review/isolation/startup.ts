@@ -14,7 +14,8 @@ if (
 ) {
   throw new Error('requires root in an offline Linux network namespace');
 }
-const action = process.argv[2];
+// oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- Node CLIの固定位置引数を読み取る。
+const [, , action] = process.argv;
 if (!action) {
   throw new Error('official Action path required');
 }
@@ -33,10 +34,12 @@ const server = createServer((req, res) => {
     }),
   );
 });
-await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+await new Promise<void>((resolve) => {
+  server.listen(0, '127.0.0.1', resolve);
+});
 try {
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (address === null || typeof address === 'string') {
     throw new Error('local receiver unavailable');
   }
   const provider = (name: string) => `
@@ -69,7 +72,9 @@ hooks = [{ type = "command", command = "touch ${markers[1]}" }]
     }),
   );
   for (const trusted of [true, false]) {
-    markers.forEach((file) => rmSync(file, { force: true }));
+    for (const file of markers) {
+      rmSync(file, { force: true });
+    }
     requests.length = 0;
     writeFileSync(
       `${home}/config.toml`,
@@ -157,7 +162,7 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
           process.kill(-child.pid, 'SIGKILL');
         }
         reject(new Error('offline startup timed out'));
-      }, 30000);
+      }, 30_000);
       child.once('error', (error) => {
         clearTimeout(timer);
         reject(error);
@@ -193,7 +198,13 @@ trust_level = "${trusted ? 'trusted' : 'untrusted'}"
   }
 } finally {
   writeFileSync(`${home}/config.toml`, original);
-  markers.forEach((file) => rmSync(file, { force: true }));
+  for (const file of markers) {
+    rmSync(file, { force: true });
+  }
   server.closeAllConnections();
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+  });
 }

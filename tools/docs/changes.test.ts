@@ -4,13 +4,21 @@ import os from 'node:os';
 import path from 'node:path';
 import { expect, onTestFinished, test } from 'vitest';
 import { parse } from 'yaml';
+import { inputRecord, optionalText } from './input.ts';
+import type { DocumentInput } from './input.ts';
 
 // Workflowの実際のシェルを実行し、判定ロジックをテスト側へ複製しない。
-const workflow: { jobs: { docs: { steps: { id?: string; run?: string }[] } } } = parse(
+const input: DocumentInput = parse(
   await readFile(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8'),
 );
 const script = (() => {
-  const run = workflow.jobs.docs.steps.find((step) => step.id === 'changes')?.run;
+  const workflow = inputRecord(input, 'workflow');
+  const docs = inputRecord(inputRecord(workflow.jobs, 'jobs').docs, 'docs');
+  if (!Array.isArray(docs.steps)) {
+    throw new TypeError('stepsは配列が必要です');
+  }
+  const steps = (docs.steps as DocumentInput[]).map((step) => inputRecord(step, 'step'));
+  const run = optionalText(steps.find((step) => step.id === 'changes')?.run, 'changes.run');
   if (!run) {
     throw new Error('文書の変更判定ステップが見つかりません');
   }
@@ -105,11 +113,7 @@ test.each([
 test.each(['削除', '移動'])('Markdown以外のファイルの%sでもリンクを検査する', async (operation) => {
   const f = await fixture();
   const image = path.join(f.root, 'image.png');
-  if (operation === '削除') {
-    await rm(image);
-  } else {
-    await rename(image, path.join(f.root, 'renamed.png'));
-  }
+  await (operation === '削除' ? rm(image) : rename(image, path.join(f.root, 'renamed.png')));
   f.commit();
   expect(await f.detect('push')).toBe('required=true');
 });

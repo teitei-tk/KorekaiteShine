@@ -29,7 +29,9 @@ test('本人が評価中の面接を削除すると原文・実行履歴を消�
     activeMs: 5,
   };
   const request = new Request('http://localhost/api/interviews/one', { method: 'DELETE' });
-  const discard = vi.fn(async () => {});
+  const discard = vi.fn(async () => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const deps = { db: database.db, actor: () => 'actor', now: () => 10, discard };
   try {
     await database.db
@@ -138,19 +140,21 @@ test('停止したDOを復旧前に削除しても最後に確認した面接中
       generation: 1,
       streamGeneration: 1,
       activeSince: 1000,
-      deadline: 1201000,
+      deadline: 1_201_000,
       createdAt: 1000,
-      updatedAt: 61000,
+      updatedAt: 61_000,
     });
     const response = await deleteInterviewRequest(new Request('https://local.invalid'), 'lost', {
       db: database.db,
       actor: () => 'actor',
-      now: () => 601000,
-      discard: async () => {},
+      now: () => 601_000,
+      discard: async () => {
+        /* このテストでは呼出しに副作用を持たせない。 */
+      },
     });
     expect(response.status).toBe(204);
     expect(await database.db.select().from(audioUsagePeriods)).toMatchObject([
-      { startedAt: 1000, endedAt: 61000 },
+      { startedAt: 1000, endedAt: 61_000 },
     ]);
   } finally {
     database.close();

@@ -1,7 +1,7 @@
-type JsonValue = string | number | boolean | null | JsonValue[] | JsonSchema;
-interface JsonSchema {
+type JsonValue = string | number | boolean | null | undefined | JsonValue[] | JsonSchema;
+type JsonSchema = {
   [key: string]: JsonValue;
-}
+};
 
 /** 検証対象から参照されるSchemaだけを同梱し、他のAPIの契約を配信しない。 */
 export function withReachableSchemas(
@@ -14,23 +14,25 @@ export function withReachableSchemas(
       return;
     }
     if (Array.isArray(value)) {
-      value.forEach(visit);
+      for (const child of value) {
+        visit(child);
+      }
       return;
     }
     for (const [key, child] of Object.entries(value)) {
       if (key === '$ref' && typeof child === 'string') {
-        const match = /^#\/components\/schemas\/([^/]+)$/u.exec(child);
-        if (!match) {
+        const match = /^#\/components\/schemas\/(?<name>[^/]+)$/u.exec(child);
+        if (!match?.groups) {
           throw new Error(`未対応のSchema参照です: ${child}`);
         }
-        const name = match[1]!.replaceAll('~1', '/').replaceAll('~0', '~');
+        const name = match.groups.name.replaceAll('~1', '/').replaceAll('~0', '~');
         if (selected.has(name)) {
           continue;
         }
         if (!Object.hasOwn(components, name)) {
           throw new Error(`Schema参照先がありません: ${child}`);
         }
-        const target = components[name]!;
+        const target = components[name];
         selected.set(name, target);
         visit(target);
       } else {

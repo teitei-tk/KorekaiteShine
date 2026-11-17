@@ -9,15 +9,21 @@ import {
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
-    constructor(
-      protected ctx: object,
-      protected env: object,
-    ) {}
+    protected ctx: object;
+    protected env: object;
+    constructor(ctx: object, env: object) {
+      this.ctx = ctx;
+      this.env = env;
+    }
   },
 }));
 vi.mock('../../interview/src/server/repositories/check-outbox', () => ({
-  requireDiagnosticInitialization: vi.fn(async () => {}),
-  confirmDiagnosticInitialization: vi.fn(async () => {}),
+  requireDiagnosticInitialization: vi.fn(async () => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  }),
+  confirmDiagnosticInitialization: vi.fn(async () => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  }),
   pendingCheckNotification: vi.fn(),
   markCheckNotificationSent: vi.fn(),
 }));
@@ -28,14 +34,17 @@ afterEach(() => {
 const jobId = '00000000-0000-4000-8000-000000000001';
 function fixture(persisted: { jobId: string; firstReceivedAt: string } | undefined) {
   vi.spyOn(Temporal.Now, 'instant').mockReturnValue(Temporal.Instant.from('2026-11-07T00:00:00Z'));
-  const put = vi.fn(async () => {});
+  const put = vi.fn(async () => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const send = vi.fn();
   const object = new CheckObject(
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     {
       storage: {
         transaction: async (
           callback: (transaction: {
-            get(): Promise<undefined>;
+            get: () => Promise<undefined>;
             put: typeof put;
           }) => Promise<object>,
         ) =>
@@ -46,6 +55,7 @@ function fixture(persisted: { jobId: string; firstReceivedAt: string } | undefin
         get: async () => persisted,
       },
     } as object as ConstructorParameters<typeof CheckObject>[0],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     {
       APP_ENV: 'test',
       DIAGNOSTIC_QUEUE: { send },

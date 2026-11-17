@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { assert, afterEach, expect, test, vi } from 'vitest';
 import { runEvaluationAttempt } from '../src/application/run-evaluation-attempt.ts';
 import type { EvaluationResult } from '../src/domain/evaluation-result.ts';
 
@@ -11,15 +11,18 @@ function deferredEvaluation() {
 test('AIが120秒で完了しなければ通信を中止し、再呼出しせず失敗を保存する', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(1_793_577_600_000);
-  const aborted = vi.fn();
+  const aborted = vi.fn<() => void>();
   const evaluate = vi.fn((signal: AbortSignal) => {
     signal.addEventListener('abort', aborted);
-    return new Promise<EvaluationResult>(() => {});
+    return new Promise<EvaluationResult>(() => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    });
   });
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
-    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    deadline:
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000,
     evaluate,
     renew: async () => true,
     save,
@@ -45,8 +48,9 @@ test('評価中は30秒ごとに実行権を更新し、成功保存後に更新
   const renew = vi.fn(async () => true);
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
-    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    deadline:
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000,
     evaluate: async () => evaluated.promise,
     renew,
     save,
@@ -70,12 +74,13 @@ test('実行権更新で所有権を失ったら評価を中止し、遅れて�
   vi.useFakeTimers();
   vi.setSystemTime(1_793_577_600_000);
   const evaluated = deferredEvaluation();
-  const aborted = vi.fn();
+  const aborted = vi.fn<() => void>();
   const renew = vi.fn(async () => false);
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
-    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    deadline:
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000,
     evaluate: async (signal) => {
       signal.addEventListener('abort', aborted);
       return evaluated.promise;
@@ -103,8 +108,9 @@ test('保存だけが一時失敗した場合は同じ評価結果を再保存�
     .fn(async (_result: EvaluationResult) => true)
     .mockRejectedValueOnce(new Error('一時的な保存障害'));
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
-    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    deadline:
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000,
     evaluate,
     renew: async () => true,
     save,
@@ -123,20 +129,28 @@ test('保存だけが一時失敗した場合は同じ評価結果を再保存�
 test('保存失敗が続き更新処理も応答しなくても、180秒で試行と保存再試行を打ち切る', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(1_793_577_600_000);
-  const deadline = vi.getMockedSystemTime()!.getTime() + 180_000;
+  const deadline =
+    (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000;
   const evaluate = vi.fn(async (): Promise<EvaluationResult> => ({
     ok: true,
     value: { summary: '未保存の結果' },
   }));
-  const renew = vi.fn(() => new Promise<boolean>(() => {}));
+  const renew = vi.fn(
+    () =>
+      new Promise<boolean>(() => {
+        /* このテストでは呼出しに副作用を持たせない。 */
+      }),
+  );
   const savedAt: number[] = [];
   const save = vi.fn(async (_result: EvaluationResult): Promise<boolean> => {
-    savedAt.push(vi.getMockedSystemTime()!.getTime());
+    savedAt.push(
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    );
     throw new Error('保存先が応答できません。');
   });
   const settledState = { settled: false };
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
     deadline,
     evaluate,
     renew,
@@ -163,14 +177,15 @@ test('実行権更新が例外で失敗したら評価を中止し、結果保�
   vi.useFakeTimers();
   vi.setSystemTime(1_793_577_600_000);
   const evaluated = deferredEvaluation();
-  const aborted = vi.fn();
+  const aborted = vi.fn<() => void>();
   const renew = vi.fn(async (): Promise<boolean> => {
     throw new Error('更新先に接続できません。');
   });
   const save = vi.fn(async (_result: EvaluationResult) => true);
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
-    deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+    deadline:
+      (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() + 180_000,
     evaluate: async (signal) => {
       signal.addEventListener('abort', aborted);
       return evaluated.promise;
@@ -224,13 +239,22 @@ test.each(['timeout', 'lease-loss'] as const)(
     vi.setSystemTime(1_793_577_600_000);
     const saved: EvaluationResult[] = [];
     const result = runEvaluationAttempt({
-      now: () => vi.getMockedSystemTime()!.getTime(),
-      deadline: vi.getMockedSystemTime()!.getTime() + 180_000,
+      now: () =>
+        (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+      deadline:
+        (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime() +
+        180_000,
       evaluate: (signal) =>
         new Promise<EvaluationResult>((_resolve, reject) => {
-          signal.addEventListener('abort', () => reject(new Error('評価通信を中止しました。')), {
-            once: true,
-          });
+          signal.addEventListener(
+            'abort',
+            () => {
+              reject(new Error('評価通信を中止しました。'));
+            },
+            {
+              once: true,
+            },
+          );
         }),
       renew: async () => mode !== 'lease-loss',
       save: async (value) => {
@@ -328,7 +352,7 @@ test('期限で停止した後に保留中の保存が失敗しても保存を�
     value: { summary: '保存待機' },
   }));
   const result = runEvaluationAttempt({
-    now: () => vi.getMockedSystemTime()!.getTime(),
+    now: () => (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
     deadline: 1000,
     evaluate,
     renew: async () => true,

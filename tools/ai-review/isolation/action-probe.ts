@@ -3,19 +3,20 @@
 // 本番Workflowの実行ラッパーとして使用してはならない。
 import { readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { probeIsolation, requireIsolationReport, type IsolationInput } from '../isolation-probe.ts';
+import { probeIsolation, requireIsolationReport } from '../isolation-probe.ts';
+import { isolationInput } from './input.ts';
 
 const args = process.argv.slice(2);
 const outputIndex = args.indexOf('--output-last-message');
 if (
   args[0] !== 'exec' ||
-  outputIndex < 0 ||
+  outputIndex === -1 ||
   args.at(-2) !== '--sandbox' ||
   args.at(-1) !== 'read-only'
 ) {
   throw new Error('official Action did not select read-only exec');
 }
-const input: IsolationInput = JSON.parse(readFileSync('/opt/ai-review-probe/input.json', 'utf8'));
+const input = isolationInput(readFileSync('/opt/ai-review-probe/input.json', 'utf8'));
 input.env = process.env;
 const outside = await probeIsolation(input);
 if (!input.parentPidNamespace || outside.pidNamespace !== input.parentPidNamespace) {
@@ -26,7 +27,7 @@ const boundaryChecks = outside.checks.filter(
   (check) =>
     ['uid', 'groups', 'credential-environment', 'sudo', 'parent-environ', 'parent-mem'].includes(
       check.name,
-    ) || /^(runner-process-|protected-file-|protected-socket-)/.test(check.name),
+    ) || /^(?:runner-process-|protected-file-|protected-socket-)/u.test(check.name),
 );
 console.log(
   JSON.stringify({
@@ -51,9 +52,11 @@ const result = spawnSync(
     '-c',
     'exec /usr/local/bin/node /opt/ai-review-probe/pr/probe-child.js',
   ],
-  { encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] },
+  { encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] },
 );
+// oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
 process.stdout.write(result.stdout ?? '');
+// oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
 process.stderr.write(result.stderr ?? '');
 if (result.error || result.status !== 0) {
   process.exit(1);

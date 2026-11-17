@@ -1,6 +1,8 @@
+import { readCoverageData, parse } from '../src/schema.ts';
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
-import { createCoverageMap, type FileCoverageData } from '@vitest/istanbul-lib-coverage';
+import { createCoverageMap } from '@vitest/istanbul-lib-coverage';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { expect, test } from 'vitest';
 import { instrumentSource } from '../src/instrument.ts';
@@ -14,8 +16,7 @@ test('Node子プロセスとWorkerの記録を重複なく統合し、未呼び�
     [
       '--input-type=module',
       '-e',
-      code +
-        `
+      `${code}
 import { writeSync } from 'node:fs';
 choose(); select(); label(true);
 try { await fail(true); } catch {}
@@ -27,16 +28,17 @@ writeSync(1, JSON.stringify(globalThis.__coverage__['branches.ts']));
   );
   expect(node.error).toBeUndefined();
   expect(node.status, node.stderr).toBe(0);
-  const nodeCoverage: FileCoverageData = JSON.parse(node.stdout);
-  const vmCoverage: FileCoverageData = await runInNewContext(
-    code +
-      `
+  const nodeCoverage = readCoverageData(parse(node.stdout));
+  const vmCoverage = readCoverageData(
+    await runInNewContext(
+      `${code}
 (async () => {
   choose(); select(); label(true);
   try { await fail(true); } catch {}
   return globalThis.__coverage__['branches.ts'];
 })()
 `,
+    ),
   );
   const worker = new Miniflare(
     convertV4MiniflareOptions({
@@ -45,9 +47,7 @@ writeSync(1, JSON.stringify(globalThis.__coverage__['branches.ts']));
           name: 'coverage-fixture',
           modules: true,
           compatibilityDate: '2026-10-19',
-          script:
-            code +
-            `
+          script: `${code}
 export default { async fetch() {
   choose(false); select(1); label(false); await fail(false);
   return Response.json(globalThis.__coverage__['branches.ts']);
@@ -58,12 +58,10 @@ export default { async fetch() {
   );
   try {
     const response = await worker.dispatchFetch('http://localhost');
-    const workerCoverage = (await response.json()) as FileCoverageData;
+    const workerCoverage = readCoverageData(await response.json());
     for (const record of [nodeCoverage, vmCoverage, workerCoverage]) {
       for (const key of ['statementMap', 'fnMap', 'branchMap'] as const) {
-        expect(JSON.parse(JSON.stringify(record[key]))).toEqual(
-          JSON.parse(JSON.stringify(coverage[key])),
-        );
+        expect(parse(JSON.stringify(record[key]))).toEqual(parse(JSON.stringify(coverage[key])));
       }
     }
     const combined = createCoverageMap({ [path]: nodeCoverage });

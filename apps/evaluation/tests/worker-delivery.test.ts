@@ -20,7 +20,9 @@ import type { JobNotification } from '@korekaite/api-contracts/messages';
 
 function environment() {
   const fixture = createTestDatabase();
-  onTestFinished(() => fixture.close());
+  onTestFinished(() => {
+    fixture.close();
+  });
   const queue = () => ({
     send: vi.fn(async () => ({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } })),
     sendBatch: vi.fn(),
@@ -44,12 +46,13 @@ function environment() {
 function batch(
   queue: string,
   jobId: string,
-  body: { schemaVersion?: number; jobId?: string } | null = { schemaVersion: 1, jobId },
+  body?: { schemaVersion?: number; jobId?: string } | null,
   id = crypto.randomUUID(),
 ) {
   const message = {
     id,
-    body: body as JobNotification,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
+    body: (body === undefined ? { schemaVersion: 1, jobId } : body) as JobNotification,
     ack: vi.fn(),
     retry: vi.fn(),
     attempts: 1,
@@ -61,6 +64,7 @@ function batch(
     retryAll: vi.fn(),
     metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } },
   };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
   return delivery as typeof delivery & Parameters<typeof diagnostic.queue>[0];
 }
 async function job(
@@ -182,9 +186,9 @@ test('実行権を更新し、同じ利用者の後続ジョブを延期して�
   }
   expect(await db.select().from(jobOutbox)).toMatchObject([{ operation: 'notify' }]);
   expect(await recoverExpiredExecution(db, id, 'evaluation', 'early', 500)).toBe(false);
-  expect(await recoverExpiredExecution(db, id, 'evaluation', 'late', lease.deadline + 100000)).toBe(
-    true,
-  );
+  expect(
+    await recoverExpiredExecution(db, id, 'evaluation', 'late', lease.deadline + 100_000),
+  ).toBe(true);
 });
 
 test('診断の再試行と期限切れの初期化を回復し、目的別のQueueへ配送する', async () => {
@@ -207,6 +211,7 @@ test('診断の再試行と期限切れの初期化を回復し、目的別のQu
   });
   const initializeCheck = vi.fn(async () => ({ jobId: id, firstReceivedAt: '0' }));
   env.CHECK_OBJECT.getByName.mockReturnValue({ initializeCheck });
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 不正なQueue本文・配送境界を意図的に注入するテスト用fixture。実運用入力の型保証には使用しない。
   await diagnostic.scheduled({} as Parameters<typeof diagnostic.scheduled>[0], env);
   expect(initializeCheck).toHaveBeenCalledExactlyOnceWith(id);
   await diagnostic.queue(batch('diag', id), env);

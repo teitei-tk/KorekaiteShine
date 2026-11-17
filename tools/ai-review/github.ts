@@ -1,13 +1,14 @@
+import { parseJson } from './json.ts';
 import { isSourceCi } from './source-ci.ts';
 import { REPOSITORY, MARKER, revisionMarker, eligible } from './policy.ts';
 import type { PullRequest } from './policy.ts';
 
-export interface InlineCommentInput {
+export type InlineCommentInput = {
   path: string;
   line: number;
   side: 'RIGHT';
   body: string;
-}
+};
 export type ApiBody =
   | { query: string; variables: { number: number; cursor: string | null } }
   | { body: string }
@@ -44,10 +45,11 @@ export function githubApi<Body extends object = ApiBody>(token: string): Api<Bod
     if (!response.ok) {
       throw new Error(`GitHub API HTTP ${response.status}`);
     }
-    return (await response.json()) as T;
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub transportには実行時のTが存在しない。各callerの既存validator/許可リストで構造を検査する。
+    return parseJson(await response.text()) as T;
   };
 }
-export interface Run {
+export type Run = {
   event: string;
   conclusion: string;
   path: string;
@@ -55,27 +57,27 @@ export interface Run {
   repository: { id: number };
   head_repository: { id: number };
   pull_requests: { number: number; head: { sha: string }; base: { sha: string } }[];
-}
-export interface Comment {
+};
+export type Comment = {
   id: number;
   body: string;
   updated_at?: string;
   user: { id?: number; login: string; type: string };
-}
-export interface ReviewComment extends Comment {
+};
+export type ReviewComment = {
   path: string;
   line: number | null;
   original_line: number | null;
   commit_id: string;
   original_commit_id: string;
   in_reply_to_id?: number;
-}
+} & Comment;
 async function pages<T>(api: Api, path: string): Promise<T[]> {
   const batches: T[][] = [];
   for (;;) {
     const batch = await api<T[]>(`${path}?per_page=100&page=${batches.length + 1}`);
     if (!Array.isArray(batch)) {
-      throw new Error('コメント応答が不正です');
+      throw new TypeError('コメント応答が不正です');
     }
     batches.push(batch);
     if (batch.length < 100) {
@@ -91,6 +93,7 @@ export function reviewComments(api: Api, number: number): Promise<ReviewComment[
 }
 export function ownComment(c: Comment): boolean {
   return (
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     c.user?.login === 'github-actions[bot]' && c.user.type === 'Bot' && c.body.startsWith(MARKER)
   );
 }
@@ -107,13 +110,16 @@ export async function target(api: Api, runId: number): Promise<TargetResult> {
     run.event !== 'pull_request' ||
     run.conclusion !== 'success' ||
     !isSourceCi(run.path) ||
-    run.repository?.id !== 1426899426 ||
-    run.head_repository?.id !== 1426899426 ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
+    run.repository?.id !== 1_426_899_426 ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
+    run.head_repository?.id !== 1_426_899_426 ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
     run.pull_requests?.length !== 1
   ) {
     return { status: 'excluded' };
   }
-  const number = run.pull_requests[0].number;
+  const [{ number }] = run.pull_requests;
   if (!Number.isSafeInteger(number) || number < 1) {
     return { status: 'excluded' };
   }
@@ -121,12 +127,13 @@ export async function target(api: Api, runId: number): Promise<TargetResult> {
   if (!eligible(pr) || pr.number !== number) {
     return { status: 'excluded' };
   }
-  const tested = run.pull_requests[0];
+  const [tested] = run.pull_requests;
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- 汎用GitHub transportの型は外部応答の実体を保証しないため、欠損の実行時検証を維持する。
   if (tested.head?.sha !== pr.head.sha || tested.base?.sha !== pr.base.sha) {
     return { status: 'excluded' };
   }
   if (run.head_sha !== pr.head.sha) {
-    if (!/^[a-f0-9]{40}$/.test(run.head_sha)) {
+    if (!/^[a-f0-9]{40}$/u.test(run.head_sha)) {
       return { status: 'excluded' };
     }
     const commit = await api<{ parents: { sha: string }[] }>(`git/commits/${run.head_sha}`);

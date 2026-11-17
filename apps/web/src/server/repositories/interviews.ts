@@ -25,6 +25,7 @@ export async function findInterview(
     .select()
     .from(interviews)
     .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)));
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
   return row ?? null;
 }
 
@@ -77,6 +78,7 @@ export async function createInterview(
     )
     .onConflictDoNothing()
     .returning();
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (created) {
     return created;
   }
@@ -87,6 +89,7 @@ export async function createInterview(
       and(eq(interviews.interviewId, input.interviewId), eq(interviews.actorId, input.actorId)),
     );
   if (
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     !existing ||
     existing.materialHash !== input.materialHash ||
     existing.themeTitle !== input.themeTitle ||

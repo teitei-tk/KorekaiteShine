@@ -1,3 +1,6 @@
+import { readObject, textField, identityField } from './input.ts';
+import { isJsonObject } from '../json.ts';
+import { requireValue } from '../required.ts';
 // 廃棄可能な検証環境専用。公式プロキシの代替実装でも、本番の起動ラッパーでもない。
 import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
@@ -10,14 +13,10 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
-import {
-  requireIsolationReport,
-  type IsolationInput,
-  type IsolationReport,
-} from '../isolation-probe.ts';
+import { requireIsolationReport } from '../isolation-probe.ts';
+import type { IsolationInput } from '../isolation-probe.ts';
 
 const home = '/home/ai-review/.codex';
 const privateDir = '/opt/ai-review-probe/private';
@@ -44,10 +43,10 @@ export function lifecyclePassed(
     // Actionの3分timeoutより短い検証期限。時間切れを期待した拒否と取り違えない。
     Number.isFinite(elapsedMs) &&
     elapsedMs >= 0 &&
-    elapsedMs < 150000 &&
+    elapsedMs < 150_000 &&
     Number.isInteger(report.count) &&
     report.count > 0 &&
-    report.authOk === true &&
+    report.authOk &&
     ((mode === 'complete' &&
       outcome === 'success' &&
       output.trim() === 'offline fixture complete') ||
@@ -57,8 +56,10 @@ export function lifecyclePassed(
 
 export function identity(pid: number): Identity {
   const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+  // oxlint-disable-next-line eslint/prefer-destructuring -- Linux /proc statの固定フィールド番号で起動時刻を読む。
   const start = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-  if (!/^\d+$/.test(start ?? '')) {
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
+  if (!/^\d+$/u.test(start ?? '')) {
     throw new Error('process identity unavailable');
   }
   return { pid, start };
@@ -83,15 +84,17 @@ export async function readInfo(path: string, timeoutMs = 5000): Promise<Info> {
   const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
   while (Temporal.Now.instant().epochMilliseconds < deadline) {
     try {
-      const info: Partial<Info> = JSON.parse(readFileSync(path, 'utf8'));
+      const info = readObject(readFileSync(path, 'utf8'));
       if (
+        typeof info.port === 'number' &&
         Number.isInteger(info.port) &&
-        info.port! > 0 &&
-        info.port! < 65536 &&
+        requireValue(info.port) > 0 &&
+        requireValue(info.port) < 65_536 &&
+        typeof info.pid === 'number' &&
         Number.isInteger(info.pid) &&
-        info.pid! > 0
+        requireValue(info.pid) > 0
       ) {
-        return info as Info;
+        return { port: info.port, pid: info.pid };
       }
     } catch {
       /* 書込み途中だけ再試行。成功は有効なJSONを読めた場合のみ。 */
@@ -165,9 +168,11 @@ async function serve(mode: string): Promise<void> {
       events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''),
     );
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (address === null || typeof address === 'string') {
     throw new Error('fixture receiver unavailable');
   }
   writeFileSync(
@@ -225,12 +230,28 @@ export function verifyProxyIsolation(
   const outside = spawnSync(
     '/usr/bin/sudo',
     ['-u', 'ai-review', '--', '/usr/local/bin/node', '/opt/ai-review-probe/pr/probe-child.js'],
-    { encoding: 'utf8', timeout: 10000 },
+    { encoding: 'utf8', timeout: 10_000 },
   );
   if (outside.error || outside.status === null) {
     throw new Error('proxy boundary probe failed');
   }
-  const report: IsolationReport = JSON.parse(outside.stdout);
+  const reportInput = readObject(outside.stdout);
+  if (!Array.isArray(reportInput.checks)) {
+    throw new TypeError('invalid isolation report');
+  }
+  const report = {
+    pidNamespace: reportInput.pidNamespace,
+    checks: reportInput.checks.map((check) => {
+      if (
+        !isJsonObject(check) ||
+        typeof check.name !== 'string' ||
+        typeof check.passed !== 'boolean'
+      ) {
+        throw new TypeError('invalid isolation check');
+      }
+      return { name: check.name, passed: check.passed };
+    }),
+  };
   const required = [
     'uid',
     'groups',
@@ -268,7 +289,7 @@ export function verifyProxyIsolation(
       '/usr/local/bin/node',
       '/opt/ai-review-probe/pr/probe-child.js',
     ],
-    { encoding: 'utf8', timeout: 10000 },
+    { encoding: 'utf8', timeout: 10_000 },
   );
   if (inside.error || inside.status !== 0) {
     throw new Error('proxy sandbox probe failed');
@@ -283,11 +304,7 @@ async function prepare(mode: string, runId: string): Promise<void> {
   const started: Identity[] = [];
   const infoPath = `${home}/${runId}.json`;
   try {
-    const backendPid = start('/usr/local/bin/node', [
-      fileURLToPath(import.meta.url),
-      'serve',
-      mode,
-    ]);
+    const backendPid = start('/usr/local/bin/node', [import.meta.filename, 'serve', mode]);
     started.push(identity(backendPid));
     const backend = await readInfo(`${privateDir}/backend.json`);
     if (backend.pid !== backendPid) {
@@ -336,15 +353,27 @@ async function prepare(mode: string, runId: string): Promise<void> {
 }
 
 async function finish(mode: string, outcome: string): Promise<void> {
-  const state: State = JSON.parse(readFileSync(`${privateDir}/lifecycle.json`, 'utf8'));
+  const input = readObject(readFileSync(`${privateDir}/lifecycle.json`, 'utf8'));
+  const state: State = {
+    proxy: identityField(input.proxy),
+    backend: identityField(input.backend),
+    infoPath: textField(input.infoPath),
+    configHash: textField(input.configHash),
+    startedAt: textField(input.startedAt),
+  };
   const validContext = { valid: false, stopped: false };
   try {
     const info = await readInfo(state.infoPath);
-    const report: Report = existsSync(reportFile)
-      ? JSON.parse(readFileSync(reportFile, 'utf8'))
+    const reportInput = existsSync(reportFile)
+      ? readObject(readFileSync(reportFile, 'utf8'))
       : { count: 0, authOk: false };
+    if (typeof reportInput.count !== 'number' || typeof reportInput.authOk !== 'boolean') {
+      throw new TypeError('invalid fixture report');
+    }
+    const report: Report = { count: reportInput.count, authOk: reportInput.authOk };
     const protectedConfig = [state.infoPath, `${home}/config.toml`].every((file) => {
       const stat = statSync(file);
+      // oxlint-disable-next-line eslint/no-bitwise -- Unix権限のgroup/other書込みビットをマスクして保護を確認する。
       return stat.uid === 0 && (stat.mode & 0o022) === 0;
     });
     validContext.valid =
@@ -362,7 +391,7 @@ async function finish(mode: string, outcome: string): Promise<void> {
     const response = await fetch(`http://127.0.0.1:${info.port}/shutdown`, {
       signal: AbortSignal.timeout(3000),
     });
-    for (const _ of Array(60)) {
+    for (const _ of Array.from({ length: 60 })) {
       if (!alive(state.proxy)) {
         break;
       }
@@ -396,14 +425,17 @@ if (import.meta.main) {
     throw new Error('requires disposable Linux root');
   }
   const [command, mode, extra] = process.argv.slice(2);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
   if (!['complete', 'reject'].includes(mode ?? '')) {
     throw new Error('invalid fixture mode');
   }
   if (command === 'serve') {
     await serve(mode);
-  } else if (command === 'prepare' && /^\d+$/.test(extra ?? '')) {
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
+  } else if (command === 'prepare' && /^\d+$/u.test(extra ?? '')) {
     await prepare(mode, extra);
   } else if (command === 'finish') {
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
     await finish(mode, extra ?? '');
   } else {
     throw new Error('invalid fixture command');

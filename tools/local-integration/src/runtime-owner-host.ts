@@ -1,4 +1,5 @@
-import { startRuntimeInProcess, PendingRuntimeCleanup, type LocalRuntime } from './runtime.ts';
+import { startRuntimeInProcess, PendingRuntimeCleanup } from './runtime.ts';
+import type { LocalRuntime } from './runtime.ts';
 import type { RuntimeOwnerMessage, RuntimeOwnerRequest } from './runtime-owner.ts';
 
 const startingContext = {
@@ -11,7 +12,9 @@ const startup = new AbortController();
 
 function send(message: RuntimeOwnerMessage): void {
   if (process.connected) {
-    process.send?.(message, () => {});
+    process.send?.(message, () => {
+      /* この実装では追加の処理を行わない。 */
+    });
   }
 }
 
@@ -59,7 +62,7 @@ process.on('message', (message: RuntimeOwnerRequest) => {
     stop();
     return;
   }
-  if (message.type !== 'start' || startingContext.starting || startingContext.stopping) {
+  if (!isStartType(message.type) || startingContext.starting || startingContext.stopping) {
     return;
   }
   startingContext.starting = startRuntimeInProcess(
@@ -68,23 +71,36 @@ process.on('message', (message: RuntimeOwnerRequest) => {
     message.options,
     startup.signal,
   );
-  startingContext.starting.then(
-    (runtime) => {
-      void runtime.closed.then(({ exitCode }) => {
-        if (exitCode !== 0 && !startingContext.stopping) {
-          report('ローカルランタイムが予期せず終了しました。');
-          stop();
-        }
-      });
-      if (startingContext.stopping) {
-        stop();
-      } else {
-        send({ type: 'ready', baseUrl: runtime.baseUrl });
-      }
-    },
-    (error) => {
-      report(error instanceof Error ? error : 'ランタイムを起動できませんでした。');
-      stop();
-    },
-  );
+  void finishStart(startingContext.starting);
 });
+
+async function observeClosed(runtime: LocalRuntime): Promise<void> {
+  try {
+    const { exitCode } = await runtime.closed;
+    if (exitCode !== 0 && !startingContext.stopping) {
+      report('ローカルランタイムが予期せず終了しました。');
+      stop();
+    }
+  } catch (error) {
+    report(error instanceof Error ? error : 'ランタイムの終了確認に失敗しました。');
+    stop();
+  }
+}
+async function finishStart(starting: Promise<LocalRuntime>): Promise<void> {
+  try {
+    const runtime = await starting;
+    void observeClosed(runtime);
+    if (startingContext.stopping) {
+      stop();
+    } else {
+      send({ type: 'ready', baseUrl: runtime.baseUrl });
+    }
+  } catch (error) {
+    report(error instanceof Error ? error : 'ランタイムを起動できませんでした。');
+    stop();
+  }
+}
+
+function isStartType(type: string): boolean {
+  return type === 'start';
+}

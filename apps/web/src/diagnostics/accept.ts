@@ -1,17 +1,16 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { DiagnosticDatabaseError } from '../server/repositories/database-error';
 import { bodyValidationDetails, errorResponse, validationResponse } from './errors';
 import {
   validateCheckIdempotencyKey,
   validateCheckStart,
 } from '@korekaite/api-contracts/http/diagnostics-validators';
-import {
-  acceptDiagnosticJob,
-  type AcceptanceContext,
-} from '../server/repositories/diagnostic-jobs';
+import { acceptDiagnosticJob } from '../server/repositories/diagnostic-jobs';
+import type { AcceptanceContext } from '../server/repositories/diagnostic-jobs';
 
-export interface CheckDependencies extends AcceptanceContext {
-  scheduleInitialization?(jobId: string): void;
-}
+export type CheckDependencies = {
+  scheduleInitialization?: (jobId: string) => void;
+} & AcceptanceContext;
 
 export async function acceptCheck(request: Request, deps: CheckDependencies): Promise<Response> {
   const requestId = deps.newId();
@@ -29,6 +28,7 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
       {
         location: 'header',
         path: 'Idempotency-Key',
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         code: key === null ? 'REQUIRED' : 'INVALID_FORMAT',
         message: '冪等キーを確認してください。',
       },
@@ -36,7 +36,7 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   }
   const input = (() => {
     try {
-      return body === null ? undefined : JSON.parse(body);
+      return body === null ? undefined : parseJson(body);
     } catch {
       return undefined;
     }

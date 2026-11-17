@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { comments, githubApi, target, type Api } from './github.ts';
+import { comments, githubApi, target } from './github.ts';
+import type { Api } from './github.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,6 +15,7 @@ it('不正な実行IDはGitHubへ照会する前に拒否する', async () => {
 });
 
 it('コメント一覧が配列でなければ未投稿と見なさず失敗する', async () => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
   const api: Api = async <T>() => ({ message: 'private response' }) as T;
   await expect(comments(api, 7)).rejects.toThrow('コメント応答が不正');
 });
@@ -23,7 +25,7 @@ it('GitHub HTTPエラーに応答本文やトークンを含めない', async ()
     'fetch',
     vi.fn().mockResolvedValue(new Response('private response', { status: 403 })),
   );
-  await expect(githubApi('private-token')('issues/1')).rejects.toThrow(/^GitHub API HTTP 403$/);
+  await expect(githubApi('private-token')('issues/1')).rejects.toThrow(/^GitHub API HTTP 403$/u);
 });
 
 it('GitHub GraphQLの要求本文をJSONとして送る', async () => {

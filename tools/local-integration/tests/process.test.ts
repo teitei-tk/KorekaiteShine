@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { stopProcessGroup, runNodeCommand } from '../src/process.ts';
 
 test('終了要求を無視する子プロセスを猶予後に強制停止する', async () => {
@@ -26,7 +26,9 @@ test('終了要求を無視する子プロセスを猶予後に強制停止す�
     await stopProcessGroup(child, { graceMs: 100, killMs: 2000 });
     expect(performance.now() - started).toBeLessThan(2500);
     expect(await exited).toEqual([null, 'SIGKILL']);
-    expect(() => process.kill(-child.pid!, 0)).toThrow();
+    expect(() =>
+      process.kill(-(child.pid ?? assert.fail('必須のテスト値がありません。')), 0),
+    ).toThrow();
   } finally {
     if (child.exitCode === null && child.signalCode === null && child.pid) {
       process.kill(-child.pid, 'SIGKILL');
@@ -80,6 +82,7 @@ test('実行中の子コマンドへ中断を伝え、期限を待たず停止�
     label: '中断検証',
     timeoutMs: 30_000,
     signal: controller.signal,
+    // oxlint-disable-next-line promise/prefer-catch -- 成功と拒否を別々の観測値へ変換し、成功処理の例外を拒否結果へ混ぜない。
   }).then(
     () => {
       settledContext.settled = true;

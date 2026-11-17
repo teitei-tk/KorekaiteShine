@@ -18,7 +18,8 @@ test('検証済み候補を本人と期限に結び付け、Markdown全文を保
     });
     expect(await findMaterialTheme(database.db, 'actor', 'analysis', 0, 100)).toEqual({
       theme,
-      materialHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherはany型だが、この値は期待値専用で業務データとして使用しない。
+      materialHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
     });
     expect(await findMaterialTheme(database.db, 'other', 'analysis', 0, 100)).toBeNull();
     expect(await findMaterialTheme(database.db, 'actor', 'analysis', 0, 200)).toBeNull();

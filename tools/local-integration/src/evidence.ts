@@ -4,12 +4,12 @@ import { dirname } from 'node:path';
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 type Observation = Record<string, JsonValue>;
 
-interface EvidenceContext {
+type EvidenceContext = {
   /** 秘密値や入力本文を除いた実測値だけを渡す。 */
-  observe(values: Observation): void;
+  observe: (values: Observation) => void;
   /** 登録と逆順で実行し、一つの失敗でも残りの後処理を省略しない。 */
-  cleanup(action: (passed: boolean) => Promise<void>): void;
-}
+  cleanup: (action: (passed: boolean) => Promise<void>) => void;
+};
 
 export async function runWithEvidence(
   input: { resultPath: string; metadata: Observation },
@@ -43,7 +43,8 @@ export async function runWithEvidence(
     report.failureCode = 'CASE_FAILED';
     failureState.failure = error instanceof Error ? error : new Error('CASE_FAILED');
   } finally {
-    for (const cleanup of cleanups.reverse()) {
+    // eslint-disable-next-line unicorn/no-array-reverse -- ES2022利用側向けに新しい局所コピーだけを反転する。
+    for (const cleanup of [...cleanups].reverse()) {
       try {
         await cleanup(!failureState.failure);
       } catch {

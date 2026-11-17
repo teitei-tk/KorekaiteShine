@@ -1,15 +1,17 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, openSync, closeSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { REPOSITORY, type PullRequest } from './policy.ts';
+import { REPOSITORY } from './policy.ts';
+import type { PullRequest } from './policy.ts';
 import { reviewHistory } from './history.ts';
-import { validateMetadata, type Metadata } from './artifact.ts';
-import { type Snapshot } from './snapshot.ts';
+import { validateMetadata } from './artifact.ts';
+import type { Metadata } from './artifact.ts';
+import type { Snapshot } from './snapshot.ts';
 export function changedLines(patch: string): number[] {
   const lineState = { line: 0 };
   const result: number[] = [];
   for (const text of patch.split('\n')) {
-    const hunk = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text);
+    const hunk = /^@@ -\d+(?:,\d+)? \+(?<capture1>\d+)(?:,\d+)? @@/u.exec(text);
     if (hunk) {
       lineState.line = Number(hunk[1]);
       continue;
@@ -43,7 +45,7 @@ export function collect(
         'git',
         ['-c', 'core.hooksPath=/dev/null', '-c', 'diff.external=', '-C', repository, ...args],
         {
-          timeout: 120000,
+          timeout: 120_000,
           env: {
             PATH: process.env.PATH,
             HOME: directory,
@@ -74,13 +76,14 @@ export function collectFromGit(
   sourceRun: string,
 ): Metadata {
   const ancestor = git('merge-base', pr.base.sha, pr.head.sha).trim();
-  if (!/^[a-f0-9]{40}$/.test(ancestor)) {
+  if (!/^[a-f0-9]{40}$/u.test(ancestor)) {
     throw new Error('比較元を確定できません');
   }
   const paths = git('diff', '--name-only', '-z', '--no-renames', ancestor, pr.head.sha)
     .split('\0')
     .filter(Boolean);
-  const lines: Record<string, number[]> = Object.create(null);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Object.create(null)は空の辞書を生成する標準API。継承プロパティや外部入力は存在せず、代入値はnumber[]で検査する。
+  const lines = Object.create(null) as Record<string, number[]>;
   for (const path of paths) {
     lines[path] = changedLines(
       git(

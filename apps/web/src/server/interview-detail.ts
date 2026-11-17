@@ -1,3 +1,5 @@
+import type { JsonValue } from '@korekaite/api-contracts/json';
+import { parseJson } from '@korekaite/api-contracts/json';
 import { Temporal } from '@js-temporal/polyfill';
 import { usageLimits } from '@korekaite/runtime-config/limits';
 import { usedAudioMs } from '@korekaite/database/audio-periods';
@@ -19,7 +21,7 @@ import { applicationFailure } from './application-response';
 export async function interviewDetailRequest(
   request: Request,
   interviewId: string,
-  deps: { db: ReturnType<typeof createPrimaryDb>; actor(request: Request): string | null },
+  deps: { db: ReturnType<typeof createPrimaryDb>; actor: (request: Request) => string | null },
 ): Promise<Response> {
   const actorId = deps.actor(request);
   if (!actorId) {
@@ -33,6 +35,7 @@ export async function interviewDetailRequest(
       .select()
       .from(interviews)
       .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)));
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!row) {
       return applicationFailure('NOT_FOUND');
     }
@@ -78,7 +81,8 @@ export async function interviewDetailRequest(
       )
       .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
       .limit(1);
-    const resultState = { result: null as object | null };
+    const resultState = { result: null as JsonValue };
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (job?.status === 'completed') {
       const [attempt] = await deps.db
         .select({ resultJson: jobAttempts.resultJson })
@@ -86,10 +90,11 @@ export async function interviewDetailRequest(
         .where(
           and(eq(jobAttempts.jobId, job.jobId), eq(jobAttempts.attemptNumber, job.attemptCount)),
         );
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!attempt?.resultJson) {
         return applicationFailure('UNAVAILABLE');
       }
-      resultState.result = JSON.parse(attempt.resultJson);
+      resultState.result = parseJson(attempt.resultJson);
     }
     const now = Temporal.Now.instant().epochMilliseconds;
     const start = Temporal.Instant.fromEpochMilliseconds(now)
@@ -115,6 +120,7 @@ export async function interviewDetailRequest(
       transcriptIncomplete: row.transcriptIncomplete,
       transcripts,
       playback,
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       evaluation: job ? { ...job, result: resultState.result } : null,
     };
     if (!validateInterviewDetail(body)) {

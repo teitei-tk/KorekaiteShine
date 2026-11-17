@@ -1,3 +1,6 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { readObject } from './records.ts';
+import { requireValue } from './required.ts';
 import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -11,10 +14,10 @@ async function dependency(
   from: string,
 ): Promise<{ path: string; version: string }> {
   // 組込みモジュールではない固定依存名なので、Nodeは検索先の配列を返す。
-  for (const directory of createRequire(from).resolve.paths(name)!) {
+  for (const directory of requireValue(createRequire(from).resolve.paths(name))) {
     try {
       const path = await realpath(join(directory, name, 'package.json'));
-      const manifest = JSON.parse(await readFile(path, 'utf8'));
+      const manifest = readObject(parseJson(await readFile(path, 'utf8')));
       if (manifest.name === name && typeof manifest.version === 'string') {
         return { path, version: manifest.version };
       }
@@ -33,7 +36,10 @@ export async function runtimeVersions(): Promise<Record<string, string>> {
   const plugin = await dependency('@cloudflare/vite-plugin', framework.path);
   const miniflare = await dependency('miniflare', plugin.path);
   const vite = await dependency('vite', from);
-  const root = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'));
+  const root = readObject(parseJson(await readFile(join(repositoryRoot, 'package.json'), 'utf8')));
+  if (typeof root.packageManager !== 'string') {
+    throw new TypeError('PACKAGE_MANAGER_NOT_FOUND');
+  }
   return {
     node: process.version,
     packageManager: root.packageManager,

@@ -11,17 +11,23 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { probeIsolation, type IsolationInput } from '../isolation-probe.ts';
+import { probeIsolation } from '../isolation-probe.ts';
+import type { IsolationInput } from '../isolation-probe.ts';
 
 if (process.platform !== 'linux' || process.getuid?.() !== 0) {
   throw new Error('requires disposable Linux root environment');
 }
-const action = process.argv[2];
+// oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- Node CLIの固定位置引数を読み取る。
+const [, , action] = process.argv;
 if (!action) {
   throw new Error('official Action dist/main.js path required');
 }
-const server = createServer((socket) => socket.end());
-const service = createServer((socket) => socket.end());
+const server = createServer((socket) => {
+  socket.end();
+});
+const service = createServer((socket) => {
+  socket.end();
+});
 const servicePath = '/opt/ai-review-probe/service.sock';
 await new Promise<void>((resolve, reject) => {
   service.once('error', reject);
@@ -34,16 +40,18 @@ await new Promise<void>((resolve, reject) => {
 });
 try {
   const address = server.address();
-  if (!address || typeof address === 'string') {
+  if (address === null || typeof address === 'string') {
     throw new Error('listener not ready');
   }
   // 実runnerの認証候補は開閉だけを検査する。内容や任意のファイル名はログに出さない。
   const runnerProcesses = readdirSync('/proc')
-    .filter((name) => /^\d+$/.test(name))
+    .filter((name) => /^\d+$/u.test(name))
     .map(Number)
     .filter((pid) => {
       try {
-        return /^Runner\.(Worker|Listener)$/.test(readFileSync(`/proc/${pid}/comm`, 'utf8').trim());
+        return /^Runner\.(?:Worker|Listener)$/u.test(
+          readFileSync(`/proc/${pid}/comm`, 'utf8').trim(),
+        );
       } catch {
         return false;
       }
@@ -53,8 +61,10 @@ try {
   }
   const startTime = (pid: number) => {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    // oxlint-disable-next-line eslint/prefer-destructuring -- Linux /proc statの固定フィールド番号で起動時刻を読む。
     const value = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
-    if (!/^\d+$/.test(value ?? '')) {
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvや外部プロセスの返値は実行時に欠損するためガードを維持する。
+    if (!/^\d+$/u.test(value ?? '')) {
       throw new Error('process identity unavailable');
     }
     return value;
@@ -183,7 +193,7 @@ try {
           OPENAI_API_KEY: 'dummy-only',
         },
         stdio: 'inherit',
-        timeout: 45000,
+        timeout: 45_000,
       },
     );
     child.once('error', reject);
@@ -209,6 +219,14 @@ try {
   }
   console.log('official Action boundary + official CLI sandbox: passed');
 } finally {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
-  await new Promise<void>((resolve) => service.close(() => resolve()));
+  await new Promise<void>((resolve) => {
+    server.close(() => {
+      resolve();
+    });
+  });
+  await new Promise<void>((resolve) => {
+    service.close(() => {
+      resolve();
+    });
+  });
 }

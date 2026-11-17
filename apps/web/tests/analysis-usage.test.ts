@@ -6,7 +6,7 @@ test('分析枠を日本時間の日付で原子的に予約し、再送を重�
   const database = createTestDatabase();
   try {
     // 2026-11-07 23:59:59 JST
-    const now = 1794063599000;
+    const now = 1_794_063_599_000;
     const reserve = (id: string, actor = 'actor', at = now) =>
       reserveAnalysis(database.db, { reservationId: id, actorId: actor, now: at });
     const accepted = await Promise.all(

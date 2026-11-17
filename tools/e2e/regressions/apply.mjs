@@ -18,10 +18,12 @@ if (!directory || !causes.includes(cause)) {
 }
 
 const cwd = realpathSync(directory);
-const tempRoots = [tmpdir(), '/tmp'].filter(existsSync).map((path) => realpathSync(path) + sep);
+const tempRoots = [tmpdir(), '/tmp']
+  .filter((path) => existsSync(path))
+  .map((path) => realpathSync(path) + sep);
 if (!tempRoots.some((root) => cwd.startsWith(root)) || existsSync(join(cwd, '.git'))) {
   throw new Error('一時ディレクトリ内の、.git を含まないソースコピーを指定してください。');
 }
-const patch = fileURLToPath(new URL(`./${cause}.patch`, import.meta.url));
+const patch = fileURLToPath(new URL(`${cause}.patch`, import.meta.url));
 execFileSync('git', ['apply', '--check', patch], { cwd, stdio: 'inherit' });
 execFileSync('git', ['apply', patch], { cwd, stdio: 'inherit' });

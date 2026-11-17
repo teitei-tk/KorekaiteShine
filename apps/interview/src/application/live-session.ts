@@ -30,6 +30,7 @@ const instructions = `あなたは日本語の模擬技術面接官です。選�
 面接中に採点や模範解答を作らず、回答を待ちます。`;
 
 export class InterviewContextLimitError extends Error {
+  override name = 'InterviewContextLimitError';
   constructor() {
     super('面接の文脈が再開上限を超えています。');
   }
@@ -76,7 +77,7 @@ export function buildLiveSession(
     turn.previousGeneration = fragment.generation;
   }
   const resume =
-    fragments.length || material.transcriptIncomplete || material.pendingQuestionOperation
+    fragments.length > 0 || material.transcriptIncomplete || material.pendingQuestionOperation
       ? {
           transcriptIncomplete: material.transcriptIncomplete,
           pendingQuestionOperation: material.pendingQuestionOperation,
@@ -92,11 +93,13 @@ export function buildLiveSession(
     0,
   );
   const availableBytes = 8000 - historyBytes - 64;
+  // oxlint-disable-next-line typescript/no-misused-spread -- UTF-16コード単位ではなくUnicodeコードポイント単位で長さを制限する。
   const excerpt = [...material.themeExcerpt];
+  // oxlint-disable-next-line typescript/no-misused-spread -- UTF-16コード単位ではなくUnicodeコードポイント単位で長さを制限する。
   const background = [...material.background];
   function materialText(limit: number) {
     const select = (text: string[], original: string) =>
-      text.length > limit ? text.slice(0, limit).join('') + '（後略）' : original;
+      text.length > limit ? `${text.slice(0, limit).join('')}（後略）` : original;
     return JSON.stringify({
       kind: 'interview_material',
       resume,
@@ -142,7 +145,7 @@ export function buildLiveSession(
     store: false,
     instructions,
     input,
-    audio: { format: { type: 'audio/pcm', rate: 24000 }, output: { voice: settings.voice } },
+    audio: { format: { type: 'audio/pcm', rate: 24_000 }, output: { voice: settings.voice } },
     delegation: {
       type: 'responses',
       responses: {

@@ -1,28 +1,27 @@
 import { loadConfiguration, runCucumber } from '@cucumber/cucumber/api';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 const [profile, scenario] = process.argv.slice(2);
 if (!['pr', 'live'].includes(profile)) {
-  throw Error('pr または live を指定してください。');
+  throw new Error('pr または live を指定してください。');
 }
 process.env.E2E_PROFILE = profile;
 process.env.E2E_APP_ROOT = resolve(process.env.E2E_APP_ROOT || '.');
 if (profile === 'live') {
   for (const key of ['OPENAI_API_KEY', 'RESPONSES_MODEL', 'MATERIAL_MODEL', 'EVALUATION_MODEL']) {
     if (!process.env[key]?.trim()) {
-      throw Error(`実AIの設定が不足しています: ${key}`);
+      throw new Error(`実AIの設定が不足しています: ${key}`);
     }
   }
 }
-const cwd = fileURLToPath(new URL('.', import.meta.url));
+const cwd = import.meta.dirname;
 const { runConfiguration } = await loadConfiguration(
   {
     file: false,
     provided: {
       paths: ['features/**/*.feature'],
       import: ['steps.mjs'],
-      tags: '@' + profile,
+      tags: `@${profile}`,
       name: scenario ? [scenario] : [],
       format: ['summary'],
       retry: 0,

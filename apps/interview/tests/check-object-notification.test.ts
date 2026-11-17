@@ -1,20 +1,25 @@
 import { expect, test, vi } from 'vitest';
 import { jobs, diagnosticChecks, jobOutbox } from '@korekaite/database';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite';
-import { CheckObject, type CheckInitialized } from '../src/diagnostics/check-object';
+import { CheckObject } from '../src/diagnostics/check-object';
+import type { CheckInitialized } from '../src/diagnostics/check-object';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
-    constructor(
-      protected ctx: object,
-      protected env: object,
-    ) {}
+    protected ctx: object;
+    protected env: object;
+    constructor(ctx: object, env: object) {
+      this.ctx = ctx;
+      this.env = env;
+    }
   },
 }));
 
 test('診断DOの再初期化では最初の受信時刻と送信済み通知を再利用する', async () => {
   const database = createTestDatabase();
-  const send = vi.fn(async () => {});
+  const send = vi.fn(async () => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const env = { DB: database.binding, APP_ENV: 'production', DIAGNOSTIC_QUEUE: { send } };
   const data = new Map<string, CheckInitialized>();
   const values = {
@@ -26,7 +31,9 @@ test('診断DOの再初期化では最初の受信時刻と送信済み通知を
     transaction: (work: (tx: typeof values) => Promise<CheckInitialized>) => work(values),
   };
   const object = new CheckObject(
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     { storage } as object as ConstructorParameters<typeof CheckObject>[0],
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     env as object as ConstructorParameters<typeof CheckObject>[1],
   );
   const first = crypto.randomUUID();

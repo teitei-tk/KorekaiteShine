@@ -22,8 +22,12 @@ beforeEach(async () => {
     mkdtempSync(join((await vi.importActual('node:os')).tmpdir(), 'voice-snapshot-test-')),
   );
   temp.mockReturnValue(rootState.root);
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
 });
 afterEach(() => {
   process.argv = originalArgs;
@@ -69,7 +73,7 @@ test.each([undefined, 'audio-event', 'upgrade'])(
     mkdirSync(join(dir, 'node_modules/example'));
     process.argv = ['node', 'snapshot', dir, ...(cause ? [cause] : [])];
     await import('../regressions/snapshot.mjs');
-    const copy = console.log.mock.lastCall[0];
+    const [copy] = console.log.mock.lastCall;
     expect(readFileSync(join(copy, 'regular'), 'utf8')).toBe('{}');
     expect(existsSync(join(copy, '.env.local'))).toBe(false);
     expect(realpathSync(join(copy, 'node_modules/@korekaite/api-contracts'))).toBe(

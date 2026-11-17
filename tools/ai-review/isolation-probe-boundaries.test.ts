@@ -1,3 +1,5 @@
+import type * as LintTypeModule0 from 'node:fs';
+import type * as LintTypeModule1 from 'node:net';
 import { SystemError } from '../testing/system-error.mts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openSync, readlinkSync, writeFileSync } from 'node:fs';
@@ -41,6 +43,7 @@ it('不正なPID名前空間表記と起動失敗を隔離の証拠にしない'
 });
 it('Error以外の例外も拒否の証拠にせず内容を隠す', async () => {
   vi.mocked(openSync).mockImplementation(() => {
+    // oxlint-disable-next-line eslint/no-throw-literal, typescript/only-throw-error -- Error以外の例外の秘匿を検証するため、意図的に文字列を投げる。
     throw 'private fixture';
   });
   const report = await probe();
@@ -58,7 +61,9 @@ it('コードのない例外を権限拒否の証拠にしない', async () => {
   });
   vi.mocked(createConnection).mockImplementation(() => {
     const socket = new Socket();
-    queueMicrotask(() => socket.emit('error', new Error('private fixture')));
+    queueMicrotask(() => {
+      socket.emit('error', new Error('private fixture'));
+    });
     return socket;
   });
   const report = await probe();
@@ -87,14 +92,14 @@ it('接続タイムアウトだけではネットワークやソケットの隔�
 });
 
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule0>()),
   openSync: vi.fn(),
   readlinkSync: vi.fn(),
   writeFileSync: vi.fn(),
 }));
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 vi.mock('node:net', async (original) => ({
-  ...(await original<typeof import('node:net')>()),
+  ...(await original<typeof LintTypeModule1>()),
   createConnection: vi.fn(),
 }));
 
@@ -119,7 +124,9 @@ beforeEach(() => {
   vi.spyOn(process, 'getgroups').mockReturnValue([1000]);
   vi.mocked(createConnection).mockImplementation(() => {
     const socket = new Socket();
-    queueMicrotask(() => socket.emit('error', new SystemError('private fixture', 'EACCES')));
+    queueMicrotask(() => {
+      socket.emit('error', new SystemError('private fixture', 'EACCES'));
+    });
     return socket;
   });
 });
@@ -137,7 +144,7 @@ function probe() {
     readOnlyDirectories: ['/fixture/readonly'],
     readOnlyFiles: ['/fixture/readonly/file'],
     protectedSockets: ['/fixture/private.sock'],
-    port: 43210,
+    port: 43_210,
     env: {},
   });
 }

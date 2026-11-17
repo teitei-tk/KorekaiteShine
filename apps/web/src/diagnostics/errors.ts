@@ -51,7 +51,8 @@ export function bodyValidationDetails(
   errors: ErrorObject[] | null | undefined,
 ): ValidationDetail[] {
   return (errors ?? []).map((error): ValidationDetail => {
-    const property =
+    // oxlint-disable-next-line typescript/no-restricted-types -- Ajvの任意のparams値を文字列か検証する境界。
+    const property: unknown =
       error.keyword === 'required'
         ? error.params.missingProperty
         : error.keyword === 'additionalProperties'

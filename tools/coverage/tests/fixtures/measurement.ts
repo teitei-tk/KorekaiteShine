@@ -1,6 +1,7 @@
+import { readCoverageData } from '../../src/schema.ts';
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { createHash } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
-import type { FileCoverageData } from '@vitest/istanbul-lib-coverage';
 import { instrumentSource } from '../../src/instrument.ts';
 import type { Measurement, CoverageRun } from '../../src/merge.ts';
 
@@ -26,8 +27,8 @@ export function createMergeFixture() {
     targets: [target],
   };
   const records: Measurement[] = [true, false].map((value, index) => {
-    const executed: FileCoverageData = runInNewContext(
-      code + `\nchoose(${value}); globalThis.__coverage__['src/choose.ts'];`,
+    const executed = readCoverageData(
+      runInNewContext(`${code}\nchoose(${value}); globalThis.__coverage__['src/choose.ts'];`),
     );
     return {
       formatVersion: 1,

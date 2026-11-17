@@ -1,12 +1,15 @@
+import { parseObject, objectAt } from './helpers/config-json.ts';
+import type * as LintTypeModule0 from 'node:module';
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { runtimeVersions } from '../src/versions.ts';
 
-const boundary = vi.hoisted(() => ({ paths: vi.fn() }));
-vi.mock('node:module', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:module')>()),
+const boundary = vi.hoisted(() => ({
+  paths: vi.fn<(from: string, name: string) => string[] | null>(),
+}));
+vi.mock('node:module', () => ({
   createRequire: (from: string) => ({
     resolve: { paths: (name: string) => boundary.paths(from, name) },
   }),
@@ -38,19 +41,19 @@ test('manifestを読み取れない異常は依存の不在に置き換えず呼
 });
 
 test('実際の依存解決位置から固定版とロックファイルの証拠を取得する', async () => {
-  const actual = await vi.importActual<typeof import('node:module')>('node:module');
+  const actual = await vi.importActual<typeof LintTypeModule0>('node:module');
   boundary.paths.mockImplementation((from: string, name: string) =>
     actual.createRequire(from).resolve.paths(name),
   );
   const versions = await runtimeVersions();
-  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const manifest = parseObject(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   expect(versions).toMatchObject({
     node: process.version,
-    void: manifest.dependencies.void,
-    vite: manifest.devDependencies.vite,
+    void: objectAt(manifest.dependencies).void,
+    vite: objectAt(manifest.devDependencies).vite,
   });
-  expect(versions.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
-  expect(versions.cloudflareVite).toMatch(/^\d+\.\d+\.\d+/);
-  expect(versions.miniflare).toMatch(/^\d+\.\d+\.\d+/);
-  expect(versions.lockfileSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(versions.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/u);
+  expect(versions.cloudflareVite).toMatch(/^\d+\.\d+\.\d+/u);
+  expect(versions.miniflare).toMatch(/^\d+\.\d+\.\d+/u);
+  expect(versions.lockfileSha256).toMatch(/^[a-f0-9]{64}$/u);
 });

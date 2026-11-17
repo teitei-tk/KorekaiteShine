@@ -1,12 +1,17 @@
+import { readEndpoints } from '../src/schema.ts';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { readWorkerCoverage } from '../src/worker.ts';
 import { instrumentSource } from '../src/instrument.ts';
 import { createMergeFixture } from './fixtures/measurement.ts';
 
 test('WorkerのInspectorから停止前の実行回数を回収する', async () => {
   const { target, path } = createMergeFixture();
-  const source = target.coverage.inputSourceMap!.sourcesContent![0]!;
+  const source =
+    (
+      (target.coverage.inputSourceMap ?? assert.fail('必須のテスト値がありません。'))
+        .sourcesContent ?? assert.fail('必須のテスト値がありません。')
+    )[0] ?? assert.fail('必須のテスト値がありません。');
   const { code } = instrumentSource(path, source);
   const mf = new Miniflare(
     convertV4MiniflareOptions({
@@ -15,7 +20,7 @@ test('WorkerのInspectorから停止前の実行回数を回収する', async ()
           name: 'coverage-worker',
           modules: true,
           compatibilityDate: '2026-10-19',
-          script: code + '\nexport default {fetch(){choose(false);return new Response("ok");}}',
+          script: `${code}\nexport default {fetch(){choose(false);return new Response("ok");}}`,
         },
       ],
       inspectorPort: 0,
@@ -25,12 +30,12 @@ test('WorkerのInspectorから停止前の実行回数を回収する', async ()
     await mf.dispatchFetch('http://localhost');
     const url = await mf.getInspectorURL();
     url.protocol = 'http:';
-    const endpoints = (await (await fetch(new URL('/json/list', url))).json()) as {
-      id: string;
-      webSocketDebuggerUrl: string;
-    }[];
+    const endpoints = readEndpoints(await (await fetch(new URL('/json/list', url))).json());
     const data = await readWorkerCoverage(
-      endpoints.find((entry) => entry.id.includes('coverage-worker'))!.webSocketDebuggerUrl,
+      (
+        endpoints.find((entry) => entry.id.includes('coverage-worker')) ??
+        assert.fail('必須のテスト値がありません。')
+      ).webSocketDebuggerUrl,
     );
     expect(data[path].fnMap).toEqual(target.coverage.fnMap);
     expect(data[path].f['0']).toBe(1);
@@ -58,11 +63,11 @@ test('Worker再生成で失われたカウンターを完了扱いしない', as
     await mf.ready;
     const url = await mf.getInspectorURL();
     url.protocol = 'http:';
-    const entries = (await (await fetch(new URL('/json/list', url))).json()) as {
-      id: string;
-      webSocketDebuggerUrl: string;
-    }[];
-    return entries.find((entry) => entry.id === 'core:user:epoch-worker')!.webSocketDebuggerUrl;
+    const entries = readEndpoints(await (await fetch(new URL('/json/list', url))).json());
+    return (
+      entries.find((entry) => entry.id === 'core:user:epoch-worker') ??
+      assert.fail('必須のテスト値がありません。')
+    ).webSocketDebuggerUrl;
   };
   try {
     await readWorkerCoverage(await endpoint(), { value: 'epoch', start: true });

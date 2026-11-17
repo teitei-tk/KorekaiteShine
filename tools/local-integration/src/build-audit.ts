@@ -3,12 +3,12 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { Plugin } from 'vite';
 
-export interface BuildAudit {
+export type BuildAudit = {
   environment: string;
   outputDirectory: string;
   modules: { id: string; imports: string[]; dynamicImports: string[]; isEntry: boolean }[];
   outputs: { fileName: string; sha256: string; modules: string[] }[];
-}
+};
 
 /** 配信物の外に、実際に読み込まれたモジュールと出力の対応を残す。 */
 export function buildAudit(directory: string): Plugin {

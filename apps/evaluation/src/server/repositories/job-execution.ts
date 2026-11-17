@@ -15,13 +15,13 @@ import { executionTiming } from '../../domain/lease';
 
 type Database = ReturnType<typeof createPrimaryDb>;
 export type JobPurpose = typeof jobs.$inferSelect.purpose;
-export interface ExecutionLease {
+export type ExecutionLease = {
   jobId: string;
   ownerToken: string;
   generation: number;
   attemptNumber: number;
   deadline: number;
-}
+};
 
 export async function acquireExecution(
   db: Database,
@@ -50,6 +50,7 @@ export async function acquireExecution(
       ),
     );
   const deadline = now + executionTiming.attemptLimitMs;
+  // oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- D1 batchのSQL実行順に対応する結果の位置を維持する。
   const [, , attempts] = await db.batch([
     db
       .insert(executionSlots)
@@ -98,6 +99,7 @@ export async function acquireExecution(
       )
       .returning({ attemptNumber: jobAttempts.attemptNumber }),
   ]);
+  // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!attempts[0]) {
     return null;
   }
@@ -105,6 +107,7 @@ export async function acquireExecution(
     .select({ generation: jobs.generation })
     .from(jobs)
     .where(and(eq(jobs.jobId, jobId), eq(jobs.ownerToken, ownerToken)));
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!job) {
     return null;
   }
@@ -199,7 +202,11 @@ export async function completeExecution(
       ),
     ),
   ]);
-  const completed = results[1 + extra.length] as { jobId: string }[];
+  // oxlint-disable-next-line typescript/no-restricted-types -- 動的なD1 batch結果を配列か検証する境界。
+  const completed: unknown = results[1 + extra.length];
+  if (!Array.isArray(completed)) {
+    throw new TypeError('D1更新結果が配列ではありません。');
+  }
   return completed.length === 1;
 }
 
@@ -374,6 +381,7 @@ async function persistExecutionFailure(
   const status = nextAttemptAt === null ? 'failed' : 'retry_wait';
   const operation = nextAttemptAt === null ? 'notify_dlq' : 'notify';
   const ownedJob = db.select().from(jobs).where(owned);
+  // oxlint-disable-next-line unicorn/no-unreadable-array-destructuring -- D1 batchのSQL実行順に対応する結果の位置を維持する。
   const [, , changed] = await db.batch([
     db
       .update(jobAttempts)
@@ -470,6 +478,7 @@ export async function recoverExpiredExecution(
     ),
   );
   const [job] = await db.select().from(jobs).where(expired);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!job || job.ownerToken === null || job.leaseUntil === null || job.attemptDeadline === null) {
     return false;
   }

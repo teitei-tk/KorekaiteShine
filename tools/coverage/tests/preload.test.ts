@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { prepareRun } from '../src/prepare.ts';
 import { readCaptures } from '../src/capture.ts';
 import { createNodePreload } from '../src/preload.ts';
@@ -35,8 +35,16 @@ test.each([false, true])('リンク経由%sでもNode起動時のローダー自
     const files = readCaptures(join(directory, 'records')).flatMap((record) => record.files);
     const loader = files.find((file) => file.path === path);
     expect(loader).toBeDefined();
-    expect(Object.values(loader!.coverage.s).some((count) => count > 0)).toBe(true);
-    expect(Object.values(loader!.coverage.f).some((count) => count > 0)).toBe(true);
+    expect(
+      Object.values((loader ?? assert.fail('必須のテスト値がありません。')).coverage.s).some(
+        (count) => count > 0,
+      ),
+    ).toBe(true);
+    expect(
+      Object.values((loader ?? assert.fail('必須のテスト値がありません。')).coverage.f).some(
+        (count) => count > 0,
+      ),
+    ).toBe(true);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

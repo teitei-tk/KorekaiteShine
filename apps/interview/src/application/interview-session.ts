@@ -1,12 +1,10 @@
 import { dailyAudioDeadline, remainingAudioMs } from '../server/repositories/audio-usage';
 import { asc, eq } from 'void/db';
-import {
-  playbackReceipts,
-  transcriptFragments,
-  type EvaluationConfiguration,
-} from '@korekaite/database/interviews';
+import { playbackReceipts, transcriptFragments } from '@korekaite/database/interviews';
+import type { EvaluationConfiguration } from '@korekaite/database/interviews';
 import type { createPrimaryDb } from '@korekaite/database/connection';
-import { canSendAudio, transitionInterview, type InterviewAction } from '../domain/interview-state';
+import { canSendAudio, transitionInterview } from '../domain/interview-state';
+import type { InterviewAction } from '../domain/interview-state';
 import { questionPlayback } from '../domain/question-playback';
 import { createLiveConnection } from '../server/live-connection';
 import {
@@ -20,27 +18,29 @@ import {
 import { finishInterview } from '../server/repositories/finish-interview';
 import { buildLiveSession, InterviewContextLimitError } from './live-session';
 
-export class AudioUsageLimitError extends Error {}
+export class AudioUsageLimitError extends Error {
+  override name = 'AudioUsageLimitError';
+}
 
 type Options = {
-  onDialFailure?(): void;
+  onDialFailure?: () => void;
   db: ReturnType<typeof createPrimaryDb>;
   actorId: string;
   interviewId: string;
-  now(): number;
-  newJobId(): string;
+  now: () => number;
+  newJobId: () => string;
   apiKey: string;
   responsesModel: string;
   voice: Parameters<typeof buildLiveSession>[2]['voice'];
   evaluation: EvaluationConfiguration;
   connect?: typeof createLiveConnection;
-  onState?(
+  onState?: (
     state: NonNullable<Awaited<ReturnType<typeof loadInterview>>>,
     jobId: string | null,
-  ): Promise<void>;
-  onTranscript?(fragment: typeof transcriptFragments.$inferSelect): void;
-  onAudio?(generation: number, bytes: Uint8Array, endOffsetMs: number): void;
-  onUsage?(generation: number, seconds: number, final: boolean): Promise<void>;
+  ) => Promise<void>;
+  onTranscript?: (fragment: typeof transcriptFragments.$inferSelect) => void;
+  onAudio?: (generation: number, bytes: Uint8Array, endOffsetMs: number) => void;
+  onUsage?: (generation: number, seconds: number, final: boolean) => Promise<void>;
 };
 type Connection = ReturnType<typeof createLiveConnection>;
 
@@ -51,7 +51,9 @@ async function awaitTranscript<T>(save: Promise<T>): Promise<T | null> {
     return await Promise.race([
       save,
       new Promise<null>((resolve) => {
-        timerState.timer = setTimeout(() => resolve(null), 15000);
+        timerState.timer = setTimeout(() => {
+          resolve(null);
+        }, 15_000);
       }),
     ]);
   } finally {
@@ -63,7 +65,7 @@ async function awaitTranscript<T>(save: Promise<T>): Promise<T | null> {
 export function createInterviewSession(options: Options) {
   const { db, actorId, interviewId } = options;
   const lifecycle = {
-    pending: Promise.resolve() as Promise<void>,
+    pending: Promise.resolve(),
     current: null as {
       connection: Connection;
       generation: number;
@@ -78,14 +80,21 @@ export function createInterviewSession(options: Options) {
 
   function serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = lifecycle.pending.then(operation);
+    // oxlint-disable-next-line promise/prefer-catch -- 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
     lifecycle.pending = result.then(
-      () => {},
-      () => {},
+      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
+      () => {
+        /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+      },
+      () => {
+        /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+      },
     );
     return result;
   }
   async function read() {
     const row = await loadInterview(db, actorId, interviewId);
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!row) {
       throw new Error('面接が見つかりません。');
     }
@@ -98,6 +107,7 @@ export function createInterviewSession(options: Options) {
       return row;
     }
     const saved = await saveInterviewState(db, actorId, next, row.revision);
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!saved) {
       throw new Error('面接状態の保存が競合しました。');
     }
@@ -215,7 +225,7 @@ export function createInterviewSession(options: Options) {
         if (lifecycle.discarded) {
           throw new Error('削除済みの面接です。');
         }
-        const generation = connecting.generation;
+        const { generation } = connecting;
         lifecycle.outputOffsetMs = 0;
         const question = row.pendingQuestionOperation ? questionPlayback() : null;
         const connection = (options.connect ?? createLiveConnection)(
@@ -245,7 +255,9 @@ export function createInterviewSession(options: Options) {
                       event.type === 'session.output_transcript.delta' &&
                       event.delta.trim().length > 0,
                     content: event.delta,
+                    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
                     sourceStartMs: event.start_ms ?? null,
+                    // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
                     sourceEndMs: event.end_ms ?? null,
                     receivedAt: options.now(),
                   }),
@@ -309,17 +321,22 @@ export function createInterviewSession(options: Options) {
           }),
         );
         // 失敗は操作のawaitで返す。非同期の接続失敗を未処理rejectionにしない。
-        void connection.ready.catch(() => {});
-        void settled.catch(() => {});
+        void connection.ready.catch(() => {
+          /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+        });
+        void settled.catch(() => {
+          /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+        });
         lifecycle.current = { connection, generation, settled, question };
         return connecting;
       }),
     sendAudio: (generation: number, bytes: Uint8Array) =>
       serial(async () => {
         const row = await read();
+        // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果と非同期状態の変化を真偽値へ正規化する。
         return Boolean(
-          lifecycle.current &&
-          lifecycle.current.generation === generation &&
+          // oxlint-disable-next-line typescript/no-unnecessary-type-conversion -- DBの空結果や非同期更新があり得るため、実行時の真偽値変換を維持する。
+          lifecycle.current?.generation === generation &&
           canSendAudio(row, generation, options.now()) &&
           // 旧クライアントの入力も、新世代の質問を再生するまでは正常に受け流す。
           (lifecycle.current.question !== null || lifecycle.current.connection.sendAudio(bytes)),
@@ -340,6 +357,7 @@ export function createInterviewSession(options: Options) {
           audioOffsetMs,
           receivedAt: options.now(),
         });
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         if (recorded && lifecycle.current?.question) {
           lifecycle.current.question.played(audioOffsetMs);
           await confirmQuestion(generation);

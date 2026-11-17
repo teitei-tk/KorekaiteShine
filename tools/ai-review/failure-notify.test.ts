@@ -1,3 +1,4 @@
+import type * as LintTypeModule0 from './github.ts';
 import { expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,12 +9,9 @@ import { prFixture } from './policy.test.ts';
 it('投稿直前の最終照合でPRが閉じられた場合は通知しない', async () => {
   const f = fixture();
   const readsState = { reads: 0 };
-  const api: Api = async <T>(
-    path: string,
-    method?: string,
-    body?: import('./github.ts').ApiBody,
-  ) => {
+  const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (path === 'pulls/7' && ++readsState.reads === 3) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { ...f.pr, state: 'closed' } as T;
     }
     return f.api<T>(path, method, body);
@@ -30,12 +28,9 @@ it('実行タイトルが欠落した応答を通知対象にしない', async (
 });
 it('通知APIが不正なコメントIDを返したら成功扱いしない', async () => {
   const f = fixture();
-  const api: Api = async <T>(
-    path: string,
-    method?: string,
-    body?: import('./github.ts').ApiBody,
-  ) => {
+  const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (method === 'POST') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { id: 0 } as T;
     }
     return f.api<T>(path, method, body);
@@ -51,12 +46,9 @@ it('既存通知が重複していればさらに通知を追加しない', asyn
 });
 it('上限件数のジョブ一覧は欠落の可能性があるため通知を停止する', async () => {
   const f = fixture();
-  const api: Api = async <T>(
-    path: string,
-    method?: string,
-    body?: import('./github.ts').ApiBody,
-  ) => {
+  const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (path.includes('/jobs?')) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         jobs: Array.from({ length: 100 }, () => ({ name: 'generate', conclusion: 'failure' })),
       } as T;
@@ -101,8 +93,8 @@ function fixture(reason = 'OUTPUT_INVALID') {
     display_title: 'AI review / source run 10 attempt 1 / review',
     status: 'completed',
     conclusion: 'failure',
-    repository: { id: 1426899426 },
-    head_repository: { id: 1426899426 },
+    repository: { id: 1_426_899_426 },
+    head_repository: { id: 1_426_899_426 },
   };
   const source = {
     id: 10,
@@ -111,8 +103,8 @@ function fixture(reason = 'OUTPUT_INVALID') {
     conclusion: 'success',
     path: '.github/workflows/docs.yml',
     head_sha: pr.head.sha,
-    repository: { id: 1426899426 },
-    head_repository: { id: 1426899426 },
+    repository: { id: 1_426_899_426 },
+    head_repository: { id: 1_426_899_426 },
     pull_requests: [{ number: pr.number, head: { sha: pr.head.sha }, base: { sha: pr.base.sha } }],
   };
   const directory = mkdtempSync(join(tmpdir(), 'review-failure-notify-'));
@@ -132,11 +124,7 @@ function fixture(reason = 'OUTPUT_INVALID') {
   const prior: Comment[] = [],
     posted: string[] = [];
   const failPostContext = { failPost: false, changeOnComments: false, commentReads: 0 };
-  const api: Api = async <T>(
-    path: string,
-    method?: string,
-    body?: import('./github.ts').ApiBody,
-  ) => {
+  const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
     if (method) {
       expect(path).toBe('issues/7/comments');
       expect(method).toBe('POST');
@@ -150,21 +138,26 @@ function fixture(reason = 'OUTPUT_INVALID') {
       const comment = {
         id: 100,
         body: body.body,
-        user: { id: 41898282, login: 'github-actions[bot]', type: 'Bot' },
+        user: { id: 41_898_282, login: 'github-actions[bot]', type: 'Bot' },
       };
       prior.push(comment);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return comment as T;
     }
     if (path === 'actions/runs/20' || path === 'actions/runs/20/attempts/1') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return run as T;
     }
     if (path === 'actions/runs/10') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return source as T;
     }
     if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { jobs: [{ name: 'generate', conclusion: 'failure' }] } as T;
     }
     if (path === 'pulls/7') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return pr as T;
     }
     if (path.startsWith('issues/7/comments')) {
@@ -172,9 +165,10 @@ function fixture(reason = 'OUTPUT_INVALID') {
       if (failPostContext.changeOnComments && failPostContext.commentReads === 2) {
         pr.head.sha = 'c'.repeat(40);
       }
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return prior as T;
     }
-    throw new Error('Unexpected path: ' + path);
+    throw new Error(`Unexpected path: ${path}`);
   };
   return {
     api,
@@ -314,7 +308,7 @@ it('成功実行のArtifactが取得不能・期限切れでも失敗通知し�
 it('未解決参照を日本語の原因・対処で説明し、機械用コードは詳細に収める', async () => {
   const f = fixture('UNRESOLVED_REFERENCE');
   await notifyFailure(f.api, 20, 1, f.directory);
-  const body = f.posted[0];
+  const [body] = f.posted;
   expect(body).toContain('参照先のファイルを見つけられず');
   expect(body).toContain('import先やリンク先');
   expect(body).toContain('<summary>調査用の詳細</summary>');
@@ -324,7 +318,7 @@ it('未解決参照を日本語の原因・対処で説明し、機械用コー�
 it('処理上限の通知は容量に断定せず、件数・時間も含めて実行記録の確認を案内する', async () => {
   const f = fixture('BUDGET_EXCEEDED');
   await notifyFailure(f.api, 20, 1, f.directory);
-  const body = f.posted[0];
+  const [body] = f.posted;
   expect(body).toContain('容量・件数・時間のいずれかの処理上限');
   expect(body).toContain('実行記録で停止した処理と該当する上限を確認してください');
   expect(body).toContain('料金の上限超過を示すものではありません');
@@ -385,12 +379,9 @@ it.each(['failure', 'cancelled', 'timed_out'])(
   async (conclusion) => {
     const f = fixture('PUBLISH_FAILED');
     f.run.conclusion = conclusion;
-    const api: Api = async <T>(
-      path: string,
-      method?: string,
-      body?: import('./github.ts').ApiBody,
-    ) => {
+    const api: Api = async <T>(path: string, method?: string, body?: LintTypeModule0.ApiBody) => {
       if (path.startsWith('actions/runs/20/attempts/1/jobs')) {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },

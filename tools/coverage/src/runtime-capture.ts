@@ -1,7 +1,7 @@
+import { readCoverageConfig, required, readEndpoints } from './schema.ts';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { startCapture } from './capture.ts';
-import type { CoverageRun } from './merge.ts';
 import { readWorkerCoverage } from './worker.ts';
 import { findWorkerdInspector } from './workerd-inspector.ts';
 
@@ -11,27 +11,40 @@ export async function startRuntimeCapture(
   baseUrl: string,
   names: readonly string[],
 ) {
-  const { run, directory }: { run: CoverageRun; directory: string } = JSON.parse(
-    readFileSync(process.env.KOREKAITE_COVERAGE_RUN!, 'utf8'),
+  const settings = readCoverageConfig(
+    readFileSync(required(process.env.KOREKAITE_COVERAGE_RUN, 'KOREKAITE_COVERAGE_RUN'), 'utf8'),
   );
+  const { run } = settings;
+  const directory = required(settings.directory, 'directory');
   const endpoints = await findWorkerdInspector(parentPid, names);
   const debug = await (await fetch(new URL('/__debug', baseUrl))).text();
-  const address = debug.match(/ws=localhost%3A(\d+)%2F/u);
+  const address = /ws=localhost%3A(?<port>\d+)%2F/u.exec(debug);
   if (!address) {
     throw new Error('Worker計測のInspectorプロキシが見つかりません');
   }
-  const proxyEndpoints = (await (
-    await fetch(`http://127.0.0.1:${address[1]}/json/list`)
-  ).json()) as { id: string; webSocketDebuggerUrl: string }[];
-  const workers = names.map((name) => ({
-    name,
-    epoch: randomUUID(),
-    proxy: proxyEndpoints.find(
+  const proxyEndpoints = readEndpoints(
+    await (await fetch(`http://127.0.0.1:${address[1]}/json/list`)).json(),
+  );
+  const workers = names.map((name) => {
+    const proxy = proxyEndpoints.find(
       (endpoint) => new URL(endpoint.webSocketDebuggerUrl).pathname === `/${name}`,
-    )!.webSocketDebuggerUrl,
-    socket: endpoints.find((endpoint) => endpoint.id === `core:user:${name}`)!.webSocketDebuggerUrl,
-    capture: startCapture(run, process.env.KOREKAITE_COVERAGE_SUITE!, directory),
-  }));
+    );
+    const socket = endpoints.find((endpoint) => endpoint.id === `core:user:${name}`);
+    if (proxy === undefined || socket === undefined) {
+      throw new Error(`Worker計測のInspector接続先がありません: ${name}`);
+    }
+    return {
+      name,
+      epoch: randomUUID(),
+      proxy: proxy.webSocketDebuggerUrl,
+      socket: socket.webSocketDebuggerUrl,
+      capture: startCapture(
+        run,
+        required(process.env.KOREKAITE_COVERAGE_SUITE, 'KOREKAITE_COVERAGE_SUITE'),
+        directory,
+      ),
+    };
+  });
   await Promise.all(
     workers.map(async ({ proxy, epoch }) => {
       await readWorkerCoverage(proxy, { value: epoch, start: true });

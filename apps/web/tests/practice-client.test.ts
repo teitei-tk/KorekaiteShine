@@ -9,7 +9,7 @@ import {
   deleteSavedInterview,
 } from '../src/lib/practice';
 
-const signal = new AbortController().signal;
+const { signal } = new AbortController();
 const input = { interviewId: 'one', analysisId: 'analysis', themeIndex: 0, background: '' };
 function respond(result: object, status = 200) {
   const fetcher = vi

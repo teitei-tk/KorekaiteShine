@@ -1,8 +1,9 @@
+import { parseObject } from './helpers/config-json.ts';
 import { randomUUID } from 'node:crypto';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { runDatabaseCommand } from '../src/runtime.ts';
 
@@ -36,7 +37,7 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
       { schemaDirectory: fixture },
     );
     await prepareMigrationFixture(fixture, '20261102101336_wide_zombie');
-    for (const _ of Array(2).keys()) {
+    for (const _ of Array.from({ length: 2 }).keys()) {
       await runDatabaseCommand(config, ['migrate'], { schemaDirectory: fixture });
       await runDatabaseCommand(
         config,
@@ -59,6 +60,7 @@ test('公式migrateで旧履歴から追加適用しても既存行を保持し�
       );
     }
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
@@ -89,8 +91,10 @@ test('失敗したmigrationは変更と履歴を残さず、修正後に再適�
     );
     const tag = '20990101000000_failure_fixture';
     const journalPath = join(fixture, 'migrations/meta/_journal.json');
-    const journal = JSON.parse(await readFile(journalPath, 'utf8'));
-    journal.entries.push({ idx: 4, version: '6', when: 4070908800000, tag, breakpoints: true });
+    const journal = parseObject(await readFile(journalPath, 'utf8'));
+    const { entries } = journal;
+    assert.ok(Array.isArray(entries));
+    entries.push({ idx: 4, version: '6', when: 4_070_908_800_000, tag, breakpoints: true });
     await writeFile(journalPath, JSON.stringify(journal));
     const migration = join(fixture, 'migrations', `${tag}.sql`);
     await writeFile(
@@ -134,6 +138,7 @@ test('失敗したmigrationは変更と履歴を残さず、修正後に再適�
       options,
     );
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(dirname(config.artifactDirectory), { recursive: true, force: true });

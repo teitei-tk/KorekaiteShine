@@ -12,7 +12,7 @@
     "./audio-periods": "./src/audio-periods.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --fast --noEmit"
   },
   "dependencies": {
     "void": "1.9.1"

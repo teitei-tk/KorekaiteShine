@@ -1,4 +1,5 @@
-import { expect, test, vi } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test, vi } from 'vitest';
 import { createInterviewRoom } from '../src/application/interview-room';
 import { AudioUsageLimitError } from '../src/application/interview-session';
 
@@ -60,11 +61,13 @@ function fixture(startsQuestion = false) {
   const room = createInterviewRoom({
     createSession,
     history: async () => [fragment],
-    schedule: async () => {},
+    schedule: async () => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    },
   });
   const peer = { send: vi.fn<(data: string | ArrayBuffer) => void>(), close: vi.fn() };
   const events = () =>
-    peer.send.mock.calls.flatMap(([data]) => (typeof data === 'string' ? [JSON.parse(data)] : []));
+    peer.send.mock.calls.flatMap(([data]) => (typeof data === 'string' ? [parseObject(data)] : []));
   const command = (type: string, id = type, generation = 1) =>
     room.receive(
       'peer',
@@ -77,7 +80,7 @@ function fixture(startsQuestion = false) {
     );
   return {
     room,
-    hooks: createSession.mock.lastCall![0],
+    hooks: (createSession.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0],
     session,
     row,
     peer,
@@ -95,8 +98,8 @@ test('操作IDの再送・衝突・期限切れと状態に合わない操作を
   await command('sync', 'same');
   await command('start', 'same');
   expect(events().at(-1)).toMatchObject({ code: 'INVALID_EVENT' });
-  for (const n of Array(101).keys()) {
-    await command('sync', 'sync-' + n);
+  for (const n of Array.from({ length: 101 }).keys()) {
+    await command('sync', `sync-${n}`);
   }
   await command('start', 'same');
   expect(session.start).toHaveBeenCalledOnce();
@@ -140,14 +143,14 @@ test('受信フレームと接続の制限を検証し、例外を利用者向�
   }
   for (const [id, err, code] of [
     ['limit', new AudioUsageLimitError(), 'AUDIO_USAGE_LIMIT'],
-    ['down', new Error(), 'UNAVAILABLE'],
+    ['down', new Error('上流切断'), 'UNAVAILABLE'],
   ] as const) {
     session.start.mockRejectedValueOnce(err);
     await command('start', id);
     expect(events().at(-1)).toMatchObject({ code });
   }
   await command('start');
-  for (const gen of [0, NaN]) {
+  for (const gen of [0, Number.NaN]) {
     const data = new ArrayBuffer(10);
     new DataView(data).setFloat64(0, gen);
     await room.receive('peer', data);
@@ -176,7 +179,7 @@ test('出力音声は操作中の世代へ配信し、送信に失敗した端�
   expect(peer.send).toHaveBeenLastCalledWith(new ArrayBuffer(2));
   peer.send.mockImplementation((data) => {
     if (typeof data !== 'string') {
-      throw new Error('切断');
+      throw new TypeError('切断');
     }
   });
   hooks.onAudio?.(1, new Uint8Array(2), 1);
@@ -184,7 +187,7 @@ test('出力音声は操作中の世代へ配信し、送信に失敗した端�
   expect(session.disconnect).toHaveBeenCalledOnce();
   await room.attach('peer', peer);
   peer.send.mockImplementationOnce(() => {
-    throw new Error('切断');
+    throw new TypeError('切断');
   });
   hooks.onTranscript?.(fragment);
   await room.alarm();
@@ -199,7 +202,9 @@ test('出力音声は操作中の世代へ配信し、送信に失敗した端�
 test('エラー送信時に削除された面接の状態を再配信しない', async () => {
   const { room, peer, command, events } = fixture();
   await room.attach('peer', peer);
-  peer.send.mockImplementationOnce(() => room.discard('i'));
+  peer.send.mockImplementationOnce(() => {
+    room.discard('i');
+  });
   await command('pause', 'old', 0);
   expect(events().at(-1)).toMatchObject({ type: 'deleted' });
 });
@@ -241,7 +246,9 @@ test('質問操作IDの再送で二重接続せず、切替中にタブを閉じ
   await command('skip', 'skip');
   expect(session.request).toHaveBeenCalledOnce();
   expect(session.start).toHaveBeenCalledTimes(2);
-  const submission = {} as { settle: (accepted: boolean) => void };
+  const submission: { settle: (accepted: boolean) => void } = {
+    settle: () => assert.fail('要求の開始後にのみ確定できます。'),
+  };
   session.request.mockImplementationOnce(
     () =>
       new Promise<boolean>((resolve) => {
@@ -249,7 +256,9 @@ test('質問操作IDの再送で二重接続せず、切替中にタブを閉じ
       }),
   );
   const changing = command('rephrase', 'next');
-  await vi.waitFor(() => expect(session.request).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => {
+    expect(session.request).toHaveBeenCalledTimes(2);
+  });
   const left = room.detach('peer');
   submission.settle(true);
   await Promise.all([changing, left]);

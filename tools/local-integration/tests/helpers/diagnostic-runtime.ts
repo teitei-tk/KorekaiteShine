@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveRuntime, type RuntimeConfig } from '@korekaite/runtime-config';
-import { startRuntime, type LocalRuntime, type LocalRuntimeOptions } from '../../src/runtime.ts';
+import { resolveRuntime } from '@korekaite/runtime-config';
+import type { RuntimeConfig } from '@korekaite/runtime-config';
+import { startRuntime } from '../../src/runtime.ts';
+import type { LocalRuntime, LocalRuntimeOptions } from '../../src/runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 

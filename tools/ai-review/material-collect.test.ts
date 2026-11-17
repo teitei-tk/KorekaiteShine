@@ -1,3 +1,4 @@
+import { parseJson } from './json.ts';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,14 +51,16 @@ it('Git実行が失敗しても一時出力を残さず資料を作らない', (
 });
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'material-boundary-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
   const pr = {
     number: 7,
     state: 'open',
     draft: false,
-    user: { id: 1324680, type: 'User' },
-    head: { sha: 'a'.repeat(40), repo: { id: 1426899426 } },
-    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1426899426 } },
+    user: { id: 1_324_680, type: 'User' },
+    head: { sha: 'a'.repeat(40), repo: { id: 1_426_899_426 } },
+    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1_426_899_426 } },
     title: 'title',
     body: 'body',
   };
@@ -76,11 +79,12 @@ it('Git資料収集は固定remoteと無効化したhooksを使い一時出力�
       'https://github.com/teitei-tk/KorekaiteShine.git',
     ]),
     expect.objectContaining({
+      // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherは期待値専用で、実行時の環境入力には使用しない。
       env: expect.objectContaining({ GIT_TERMINAL_PROMPT: '0', GIT_CONFIG_GLOBAL: '/dev/null' }),
     }),
   );
   expect(existsSync(join(f.directory, 'git-output'))).toBe(false);
-  expect(JSON.parse(readFileSync(join(f.directory, 'request.json'), 'utf8'))).toMatchObject({
+  expect(parseJson(readFileSync(join(f.directory, 'request.json'), 'utf8'))).toMatchObject({
     title: 'title',
     body: 'body',
   });

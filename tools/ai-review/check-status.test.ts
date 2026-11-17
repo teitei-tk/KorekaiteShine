@@ -6,15 +6,6 @@ import { completedOutcome } from './check-status.ts';
 import type { ReviewRun } from './check-status.ts';
 import type { Api } from './github.ts';
 
-it('失敗ジョブを特定できなくても元実行の失敗をworkflowとして返す', async () => {
-  const read: Api = async <T>() => ({ jobs: [{ name: 'generate', conclusion: null }] }) as T;
-  expect(await completedOutcome(read, { ...run, conclusion: 'failure' })).toEqual({
-    conclusion: 'failure',
-    target: 'workflow',
-    reason: 'EXECUTION_FAILED',
-  });
-});
-
 const run: ReviewRun = {
   id: 20,
   run_attempt: 1,
@@ -23,9 +14,21 @@ const run: ReviewRun = {
   display_title: 'AI review / source run 10 attempt 1 / review',
   status: 'completed',
   conclusion: 'success',
-  repository: { id: 1426899426 },
-  head_repository: { id: 1426899426 },
+  repository: { id: 1_426_899_426 },
+  head_repository: { id: 1_426_899_426 },
 };
+
+it('失敗ジョブを特定できなくても元実行の失敗をworkflowとして返す', async () => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
+  const read: Api = async <T>() => ({ jobs: [{ name: 'generate', conclusion: null }] }) as T;
+  expect(await completedOutcome(read, { ...run, conclusion: 'failure' })).toEqual({
+    conclusion: 'failure',
+    target: 'workflow',
+    reason: 'EXECUTION_FAILED',
+  });
+});
+
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
 const api: Api = async <T>() => ({ jobs: [{ name: 'publish', conclusion: 'failure' }] }) as T;
 async function report(value: object, work: (directory: string) => Promise<void>) {
   const directory = mkdtempSync(join(tmpdir(), 'review-outcome-'));

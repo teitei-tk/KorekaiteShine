@@ -1,8 +1,9 @@
+import { readReceipt, readJson } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 import { runWithEvidence } from '../src/evidence.ts';
@@ -36,7 +37,7 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
         expected: {
           normalDeliveries: 4,
           dlqDeliveries: 1,
-          minimumRetryIntervalMs: 30000,
+          minimumRetryIntervalMs: 30_000,
           queue: queues.dlq,
         },
       },
@@ -46,7 +47,10 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
         if (!passed) {
           return;
         }
-        await rm(config.stateDirectory!, { recursive: true, force: true });
+        await rm(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+          recursive: true,
+          force: true,
+        });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
       const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
@@ -64,16 +68,16 @@ test('配送保存失敗を30秒間隔で最大3回再試行し、実DLQで隔�
       });
       evidence.observe({ startHttpStatus: response.status });
       expect(response.status).toBe(202);
-      expect(await response.json()).toEqual({ enqueued: true });
+      expect(await readJson(response)).toEqual({ enqueued: true });
       await expect
         .poll(
           async () => {
             const result = await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`);
-            const receipt = await result.json();
+            const receipt = await readReceipt(result);
             evidence.observe({
               receiptHttpStatus: result.status,
               queue: receipt?.queue ?? null,
-              deliveredJobId: receipt?.message?.jobId ?? null,
+              deliveredJobId: receipt?.message.jobId ?? null,
             });
             return receipt;
           },

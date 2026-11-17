@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -7,7 +8,9 @@ import { expect, onTestFinished, test } from 'vitest';
 
 test('終了フックはカウンターがない場合も空の完了記録を保存する', () => {
   const directory = mkdtempSync(join(tmpdir(), 'coverage-setup-boundary-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
   const config = join(directory, 'run.json');
   writeFileSync(
     config,
@@ -44,7 +47,7 @@ if (record.status !== 'complete' || record.files.length !== 0) throw new Error('
 `;
   const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
     encoding: 'utf8',
-    timeout: 10000,
+    timeout: 10_000,
     env: {
       ...process.env,
       KOREKAITE_COVERAGE_RUN: process.env.KOREKAITE_COVERAGE_RUN ?? config,

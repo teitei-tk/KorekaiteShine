@@ -1,71 +1,75 @@
+import { parseJson } from './json.ts';
+import type { JsonValue } from './json.ts';
 import { ownComment } from './github.ts';
 import type { Comment, ReviewComment } from './github.ts';
 import { validFindings } from './policy.ts';
-import type { Finding, FindingInput } from './policy.ts';
+import type { Finding } from './policy.ts';
 
-export interface PriorFinding extends Finding {
+export type PriorFinding = {
   id: string;
   head: string;
   base: string;
   replyTo?: number;
-}
+} & Finding;
 export function historyMarker(findings: Finding[]): string {
   return `<!-- findings:v1:${Buffer.from(JSON.stringify(findings)).toString('base64')} -->`;
 }
 function unescape(value: string): string {
   return value
-    .replace(/\\([\\`*_[\]#!|])/g, '$1')
-    .replaceAll('@\u200b', '@')
+    .replaceAll(/\\(?<capture1>[\\`*_[\]#!|])/gu, '$1')
+    .replaceAll('@\u200B', '@')
     .replaceAll('&gt;', '>')
     .replaceAll('&lt;', '<')
     .replaceAll('&amp;', '&');
 }
-function readFindings(body: string): FindingInput[] {
-  const marker = /^<!-- findings:v1:([A-Za-z0-9+/=]+) -->$/m.exec(body);
+function readFindings(body: string): JsonValue {
+  const marker = /^<!-- findings:v1:(?<capture1>[A-Za-z0-9+/=]+) -->$/mu.exec(body);
   if (body.includes('<!-- findings:')) {
     if (!marker) {
       throw new Error('指摘履歴が不正です');
     }
-    const value: FindingInput[] = JSON.parse(Buffer.from(marker[1], 'base64').toString('utf8'));
+    const value = parseJson(Buffer.from(marker[1], 'base64').toString('utf8'));
     return value;
-  } else {
-    // 旧集約コメントの固定レンダリング形式だけを移行する。
-    const pattern =
-      /^\*\*(P1|P2) — (.+):(\d+)\*\*\n\n発生条件: ([\s\S]*?)\n\n影響: ([\s\S]*?)\n\n修正方針: ([\s\S]*?)(?=\n\n\*\*P[12] — |\n\n未確認事項:|\n\n指摘がない場合も、不具合がないことを保証しません。)/gm;
-    const findings = [...body.matchAll(pattern)].map((m) => ({
-      priority: m[1] as 'P1' | 'P2',
-      path: unescape(m[2]),
-      line: Number(m[3]),
-      condition: unescape(m[4]),
-      impact: unescape(m[5]),
-      fix: unescape(m[6]),
-    }));
-    if ((body.match(/^\*\*P[12] — /gm) ?? []).length !== findings.length) {
-      throw new Error('旧指摘の読み取りに失敗しました');
-    }
-    return findings;
   }
+  // 旧集約コメントの固定レンダリング形式だけを移行する。
+  const pattern =
+    /^\*\*(?<capture1>P1|P2) — (?<capture2>.+):(?<capture3>\d+)\*\*\n\n発生条件: (?<capture4>[\s\S]*?)\n\n影響: (?<capture5>[\s\S]*?)\n\n修正方針: (?<capture6>[\s\S]*?)(?=\n\n\*\*P[12] — |\n\n未確認事項:|\n\n指摘がない場合も、不具合がないことを保証しません。)/gmu;
+  const findings = [...body.matchAll(pattern)].map((m) => ({
+    priority: m[1],
+    path: unescape(m[2]),
+    line: Number(m[3]),
+    condition: unescape(m[4]),
+    impact: unescape(m[5]),
+    fix: unescape(m[6]),
+  }));
+  if ((body.match(/^\*\*P[12] — /gmu) ?? []).length !== findings.length) {
+    throw new Error('旧指摘の読み取りに失敗しました');
+  }
+  return findings;
 }
 
 export function readHistory(comments: Comment[]): PriorFinding[] {
   const history: PriorFinding[] = [];
-  for (const comment of comments.filter(ownComment)) {
-    if (/^<!-- followup:[^\n]+ -->$/m.test(comment.body)) {
+  for (const comment of comments.filter((comment) => ownComment(comment))) {
+    if (/^<!-- followup:[^\n]+ -->$/mu.test(comment.body)) {
       continue;
     }
-    const revision = /^<!-- revision:([a-f0-9]{40}):([a-f0-9]{40}) -->$/m.exec(comment.body);
+    const revision =
+      /^<!-- revision:(?<capture1>[a-f0-9]{40}):(?<capture2>[a-f0-9]{40}) -->$/mu.exec(
+        comment.body,
+      );
     if (!revision || !Number.isSafeInteger(comment.id) || comment.id < 1) {
       throw new Error('過去のレビュー対象が不正です');
     }
     const findings = validFindings(readFindings(comment.body));
-    findings.forEach((f, index) =>
+    for (const [index, f] of findings.entries()) {
       history.push({
         ...f,
         id: `${comment.id}:${index + 1}`,
         head: revision[1],
         base: revision[2],
-      }),
-    );
+      });
+    }
     if (history.length > 30) {
       throw new Error('修正確認対象が30件を超えました');
     }
@@ -80,7 +84,7 @@ export function readInlineHistory(comments: ReviewComment[]): PriorFinding[] {
     if (findings.length !== 1) {
       throw new Error('行コメントの指摘履歴が不正です');
     }
-    const finding = findings[0];
+    const [finding] = findings;
     if (
       finding.path !== comment.path ||
       finding.line !== comment.original_line ||

@@ -1,13 +1,13 @@
 import type { EvaluationResult } from '../domain/evaluation-result';
 import { executionTiming } from '../domain/lease';
 
-export interface AttemptDependencies {
-  now(): number;
+export type AttemptDependencies = {
+  now: () => number;
   deadline: number;
-  evaluate(signal: AbortSignal): Promise<EvaluationResult>;
-  renew(): Promise<boolean>;
-  save(result: EvaluationResult): Promise<boolean>;
-}
+  evaluate: (signal: AbortSignal) => Promise<EvaluationResult>;
+  renew: () => Promise<boolean>;
+  save: (result: EvaluationResult) => Promise<boolean>;
+};
 
 export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<boolean> {
   if (deps.now() >= deps.deadline) {
@@ -28,20 +28,27 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
   };
   const renew = async () => {
     if (deps.now() >= deps.deadline) {
-      return stop();
+      stop();
+      return;
     }
     try {
       if (!(await deps.renew())) {
-        return stop();
+        stop();
+        return;
       }
     } catch {
-      return stop();
+      stop();
+      return;
     }
     if (!execution.stopped) {
-      timers.heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+      timers.heartbeat = setTimeout(() => {
+        void renew();
+      }, executionTiming.renewalIntervalMs);
     }
   };
-  timers.heartbeat = setTimeout(renew, executionTiming.renewalIntervalMs);
+  timers.heartbeat = setTimeout(() => {
+    void renew();
+  }, executionTiming.renewalIntervalMs);
   const deadlineTimer = setTimeout(stop, deps.deadline - deps.now());
   const { promise: timeout, resolve: expire } = Promise.withResolvers<EvaluationResult>();
   const aiTimer = setTimeout(() => {
@@ -62,6 +69,7 @@ export async function runEvaluationAttempt(deps: AttemptDependencies): Promise<b
       try {
         return await deps.save(result);
       } catch {
+        // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
         if (execution.stopped || deps.now() >= deps.deadline) {
           return false;
         }

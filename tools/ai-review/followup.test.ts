@@ -4,6 +4,19 @@ import type { Comment, ReviewComment } from './github.ts';
 import type { PriorFinding } from './history.ts';
 import { MARKER } from './policy.ts';
 
+const sha = 'a'.repeat(40);
+const original: PriorFinding = {
+  id: '10:1',
+  head: sha,
+  base: sha,
+  priority: 'P2',
+  path: 'app.ts',
+  line: 1,
+  condition: '条件',
+  impact: '影響',
+  fix: '修正',
+};
+
 it('旧形式返信の見出しだけでは未修正か確認不能かを推測しない', () => {
   const comment = reply(20);
   comment.body = comment.body.replace(
@@ -30,22 +43,11 @@ it('旧形式の未修正返信を修正済みとして扱わない', () => {
   );
   expect(latestFollowupStatus(original, [comment], [])).toBe('unfixed');
 });
-const sha = 'a'.repeat(40);
-const original: PriorFinding = {
-  id: '10:1',
-  head: sha,
-  base: sha,
-  priority: 'P2',
-  path: 'app.ts',
-  line: 1,
-  condition: '条件',
-  impact: '影響',
-  fix: '修正',
-};
+
 function reply(id: number, findingId = '10:1'): Comment {
   return {
     id,
-    user: { id: 41898282, login: 'github-actions[bot]', type: 'Bot' },
+    user: { id: 41_898_282, login: 'github-actions[bot]', type: 'Bot' },
     body: `${MARKER}\n<!-- followup:${findingId}:${sha}:${sha} -->\n### ☑️: 修正を確認しました\n修正済み: 確認済み`,
   };
 }

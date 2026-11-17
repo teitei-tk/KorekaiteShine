@@ -9,9 +9,9 @@ export function analyzeStoredMaterialRequest(
   request: Request,
   deps: {
     db: ReturnType<typeof createPrimaryDb>;
-    actor(request: Request): string | null;
-    now(): number;
-    newId(): string;
+    actor: (request: Request) => string | null;
+    now: () => number;
+    newId: () => string;
     apiKey: string;
     model: string;
     analyze?: MaterialAnalysisDependencies['analyze'];

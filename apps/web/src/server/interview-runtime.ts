@@ -1,3 +1,4 @@
+import type { D1Database } from '@cloudflare/workers-types';
 import { deleteInterviewRequest } from './delete-interview';
 import { retryEvaluationRequest } from './retry-evaluation';
 import { analyzeStoredMaterialRequest } from './stored-materials';
@@ -9,17 +10,18 @@ import { localSessionRequest } from './local-session';
 import { createInterviewRequest } from './create-interview';
 import { interviewHistoryRequest } from './interview-history';
 import { interviewDetailRequest } from './interview-detail';
-import { interviewLiveRequest, type InterviewSessions } from './interview-live';
+import { interviewLiveRequest } from './interview-live';
+import type { InterviewSessions } from './interview-live';
 
-export interface Bindings {
+export type Bindings = {
   APP_ENV: string;
   OPENAI_API_KEY?: string;
   MATERIAL_MODEL?: string;
-  DB: import('@cloudflare/workers-types').D1Database;
+  DB: D1Database;
   INTERVIEW_SESSION: InterviewSessions;
-}
+};
 function bindings() {
-  return env as Bindings;
+  return env;
 }
 export function bootstrap(request: Request) {
   return localSessionRequest(request, localAccess(bindings().APP_ENV));

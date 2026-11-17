@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { resolveRuntime } from '../../../packages/runtime-config/src/resources.ts';
 import { startRuntime } from '../../local-integration/src/runtime.ts';
 import { prepareRun } from '../src/prepare.ts';
@@ -54,7 +54,7 @@ test.each(['stop', 'kill-vite'] as const)(
           ([pid, , group]) => pid !== process.pid && tree.has(pid) && pid === group,
         );
         expect(vite).toBeDefined();
-        process.kill(vite![0], 'SIGKILL');
+        process.kill((vite ?? assert.fail('必須のテスト値がありません。'))[0], 'SIGKILL');
         expect(await runtimeState.runtime.closed).toEqual({ exitCode: 1 });
         await expect(runtimeState.runtime.stop()).rejects.toThrow('予期せず終了');
       } else {
@@ -73,7 +73,11 @@ test.each(['stop', 'kill-vite'] as const)(
           })),
         ),
       ).toBeDefined();
-      expect(Object.values(web!.coverage.f).some((count) => count > 0)).toBe(true);
+      expect(
+        Object.values((web ?? assert.fail('必須のテスト値がありません。')).coverage.f).some(
+          (count) => count > 0,
+        ),
+      ).toBe(true);
       expect(records.every((record) => record.status === 'complete')).toBe(true);
     } finally {
       await runtimeState.runtime?.stop();
@@ -81,5 +85,5 @@ test.each(['stop', 'kill-vite'] as const)(
       rmSync(workspace, { recursive: true, force: true });
     }
   },
-  60000,
+  60_000,
 );

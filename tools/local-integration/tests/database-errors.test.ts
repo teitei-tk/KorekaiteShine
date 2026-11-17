@@ -1,3 +1,4 @@
+import type * as LintTypeModule0 from 'node:fs/promises';
 import { SystemError } from '../../testing/system-error.mts';
 import { mkdtemp, mkdir, symlink, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,7 +9,7 @@ import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
 import { runDatabaseCommand } from '../src/database.ts';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof LintTypeModule0>();
   return { ...actual, symlink: vi.fn(actual.symlink) };
 });
 afterEach(() => vi.resetAllMocks());

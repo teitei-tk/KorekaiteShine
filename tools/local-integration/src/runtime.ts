@@ -1,3 +1,4 @@
+import { requireValue } from './required.ts';
 import {
   coverageEnvironment,
   localProcessEnvironment,
@@ -9,7 +10,6 @@ import { startOwnedRuntime, connectLocalRuntime } from './runtime-owner.ts';
 import { stopProcessGroup, runNodeCommand } from './process.ts';
 import { lockEnvironment } from './lock.ts';
 import { runDatabaseCommand } from './database.ts';
-export { runDatabaseCommand } from './database.ts';
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -17,16 +17,18 @@ import { fileURLToPath } from 'node:url';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
 
+export { runDatabaseCommand } from './database.ts';
+
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-export interface LocalRuntime {
+export type LocalRuntime = {
   baseUrl: string;
   closed: Promise<{ exitCode: 0 | 1 }>;
-  stop(): Promise<void>;
-  runScheduled(signal?: AbortSignal): Promise<void>;
-}
+  stop: () => Promise<void>;
+  runScheduled: (signal?: AbortSignal) => Promise<void>;
+};
 
-export interface LocalRuntimeOptions {
+export type LocalRuntimeOptions = {
   port?: number;
   /** 面接DOの上流音声だけを独立test環境で代替する。 */
   interviewVoiceMock?: boolean;
@@ -44,15 +46,18 @@ export interface LocalRuntimeOptions {
   holdEvaluationBeforeConsume?: boolean;
   /** 保存後ack前のConsumer例外終了をtest環境で一度だけ起こす。 */
   stopAfterResultBeforeAck?: boolean;
-}
+};
 
-export class PendingRuntimeCleanup extends Error {
+class PendingRuntimeCleanupError extends Error {
   cleanup: () => Promise<void>;
   constructor(cleanup: () => Promise<void>) {
     super('起動失敗後のランタイム停止を確認できません。管理プロセスで後処理を継続します。');
+    this.name = 'PendingRuntimeCleanupError';
     this.cleanup = cleanup;
   }
 }
+
+export { PendingRuntimeCleanupError as PendingRuntimeCleanup };
 
 async function prepareRuntime(
   config: RuntimeConfig,
@@ -97,7 +102,7 @@ async function prepareRuntime(
       throw error;
     }
     if ((await readlink(modulesTarget)) !== modulesSource) {
-      throw new Error('Web依存の参照先が一致しません。');
+      throw new Error('Web依存の参照先が一致しません。', { cause: error });
     }
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
@@ -203,7 +208,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     interviewEntry,
     `export { ${options.interviewVoiceMock ? 'MockInterviewObject as InterviewObject' : 'InterviewObject'} } from ${JSON.stringify(options.interviewVoiceMock ? join(fixtures, 'voice-interview.ts') : join(repositoryRoot, 'apps/interview/src/worker.ts'))};\nexport { default${options.checkObjectProbe ? '' : ', CheckObject'} } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject${options.checkObjectProbe ? ', InspectableCheckObject as CheckObject' : ''} } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
   );
-  const diagnostics = config.queues.diagnostics;
+  const { diagnostics } = config.queues;
   if (!diagnostics) {
     throw new Error('ローカル診断Queueが未設定です。');
   }
@@ -419,8 +424,12 @@ async function startUnlockedRuntime(
     finishCoverage: undefined as (() => Promise<void>) | undefined,
   };
   const closed = new Promise<{ exitCode: 0 | 1 }>((resolve) => {
-    child.once('exit', () => resolve({ exitCode: outputContext.stopping ? 0 : 1 }));
-    child.once('error', () => resolve({ exitCode: 1 }));
+    child.once('exit', () => {
+      resolve({ exitCode: outputContext.stopping ? 0 : 1 });
+    });
+    child.once('error', () => {
+      resolve({ exitCode: 1 });
+    });
   });
   async function stop(): Promise<void> {
     outputContext.stopping = true;
@@ -431,10 +440,9 @@ async function startUnlockedRuntime(
   }
   try {
     const { promise: ready, resolve, reject } = Promise.withResolvers<string>();
-    const timeout = setTimeout(
-      () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
-      45_000,
-    );
+    const timeout = setTimeout(() => {
+      reject(new Error('ローカル起動が45秒以内に完了しませんでした。'));
+    }, 45_000);
     const onAbort = () => {
       clearTimeout(timeout);
       reject(new Error('ローカル起動を中断しました。'));
@@ -445,7 +453,7 @@ async function startUnlockedRuntime(
     }
     const collect = (chunk: Buffer) => {
       outputContext.output += chunk.toString();
-      const found = outputContext.output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+      const found = /http:\/\/127\.0\.0\.1:\d+/u.exec(outputContext.output);
       if (found) {
         clearTimeout(timeout);
         resolve(found[0]);
@@ -471,7 +479,7 @@ async function startUnlockedRuntime(
     if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
       const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
       outputContext.finishCoverage = await startRuntimeCapture(
-        child.pid!,
+        requireValue(child.pid),
         baseUrl,
         Object.values(config.workers),
       );
@@ -485,7 +493,7 @@ async function startUnlockedRuntime(
     try {
       await stop();
     } catch {
-      throw new PendingRuntimeCleanup(stop);
+      throw new PendingRuntimeCleanupError(stop);
     }
     throw error;
   }
@@ -531,7 +539,7 @@ export async function startRuntimeInProcess(
       },
     };
   } catch (error) {
-    if (error instanceof PendingRuntimeCleanup) {
+    if (error instanceof PendingRuntimeCleanupError) {
       const retry = error.cleanup;
       error.cleanup = async () => {
         await retry();

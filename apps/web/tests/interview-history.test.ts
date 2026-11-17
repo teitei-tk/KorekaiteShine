@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test } from 'vitest';
 import { interviews } from '@korekaite/database/interviews';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import { interviewHistoryRequest } from '../src/server/interview-history';
@@ -6,7 +7,7 @@ import { interviewHistoryRequest } from '../src/server/interview-history';
 test('本人の履歴だけを新しい順に返し、同時刻の面接もカーソルで重複なく取得する', async () => {
   const database = createTestDatabase();
   try {
-    for (const index of Array(23).keys()) {
+    for (const index of Array.from({ length: 23 }).keys()) {
       await database.db.insert(interviews).values({
         interviewId: `id-${String(index).padStart(2, '0')}`,
         actorId: index === 22 ? 'other' : 'actor',
@@ -28,7 +29,8 @@ test('本人の履歴だけを新しい順に返し、同時刻の面接もカ�
     );
     expect(first.status).toBe(200);
     expect(first.headers.get('Cache-Control')).toBe('no-store');
-    const page = await first.json();
+    const page = parseObject(await first.text());
+    assert.ok(Array.isArray(page.items));
     expect(page.items).toHaveLength(20);
     expect(page.items[0]).toEqual({
       interviewId: 'id-21',
@@ -42,7 +44,7 @@ test('本人の履歴だけを新しい順に返し、同時刻の面接もカ�
       new Request('http://localhost/api/interview-history?beforeCreatedAt=100&beforeId=id-02'),
       deps,
     );
-    expect(await second.json()).toMatchObject({
+    expect(parseObject(await second.text())).toMatchObject({
       items: [{ interviewId: 'id-01' }, { interviewId: 'id-00' }],
       next: null,
     });

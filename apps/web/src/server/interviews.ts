@@ -36,6 +36,7 @@ export function listInterviews(request: Request): Response {
   }
   const limit = query.limit ?? 20;
   const items = [...interviews]
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象。ここで生成した一時配列だけを変更する。
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
     .slice(0, limit);
   return Response.json({ items });

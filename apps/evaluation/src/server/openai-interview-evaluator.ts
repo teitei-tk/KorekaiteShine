@@ -1,23 +1,9 @@
+import type { JsonValue } from '@korekaite/api-contracts/json';
+import { parseJson } from '@korekaite/api-contracts/json';
 import { Temporal } from '@js-temporal/polyfill';
 import schema from '@korekaite/api-contracts/http/evaluation-schema';
 import type { EvaluationGenerator } from '../application/evaluate-interview';
 import { EvaluationProviderError } from '../domain/evaluation-result';
-
-interface ResponseContentInput {
-  type?: string;
-  text?: string;
-}
-interface ResponseMessageInput {
-  type?: string;
-  role?: string;
-  status?: string;
-  content?: (ResponseContentInput | null)[];
-}
-interface ResponseInput {
-  status?: string;
-  error?: { message?: string } | null;
-  output?: (ResponseMessageInput | null)[];
-}
 
 export function createInterviewEvaluator(options: {
   apiKey: string;
@@ -40,7 +26,7 @@ export function createInterviewEvaluator(options: {
         instructions: input.evaluation.instructions,
         tools: [],
         tool_choice: 'none',
-        max_output_tokens: 12000,
+        max_output_tokens: 12_000,
         input: [
           {
             role: 'user',
@@ -76,36 +62,39 @@ export function createInterviewEvaluator(options: {
               ? 'AI_UNAVAILABLE'
               : 'AI_REQUEST_REJECTED',
         retryable,
-        ...(retryAfterMs !== null ? { retryAfterMs } : {}),
+        ...(retryAfterMs === null ? {} : { retryAfterMs }),
       });
     }
     try {
-      return readStructuredOutput(await response.json());
+      return readStructuredOutput(parseJson(await response.text()));
     } catch {
       throw new EvaluationProviderError({ code: 'INVALID_AI_RESULT', retryable: true });
     }
   };
 }
 
-function readStructuredOutput(body: ResponseInput | null): object | null {
+function readStructuredOutput(body: JsonValue): object | null {
   if (
     body === null ||
     typeof body !== 'object' ||
     Array.isArray(body) ||
     body.status !== 'completed' ||
-    body.error != null ||
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- JSONオブジェクトの未定義プロパティを実行時に除外する。
+    (body.error !== null && body.error !== undefined) ||
     !Array.isArray(body.output)
   ) {
     throw new Error('未完了の応答です。');
   }
   const messages = body.output.filter(
-    (item) => item !== null && typeof item === 'object' && item.type === 'message',
+    (item) =>
+      item !== null && typeof item === 'object' && !Array.isArray(item) && item.type === 'message',
   );
   if (messages.length !== 1) {
     throw new Error('応答を特定できません。');
   }
-  const message = messages[0];
+  const [message] = messages;
   if (
+    // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     !message ||
     typeof message !== 'object' ||
     Array.isArray(message) ||
@@ -116,8 +105,9 @@ function readStructuredOutput(body: ResponseInput | null): object | null {
   ) {
     throw new Error('応答メッセージが不正です。');
   }
-  const content = message.content[0];
+  const [content] = message.content;
   if (
+    // oxlint-disable-next-line typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。
     !content ||
     typeof content !== 'object' ||
     Array.isArray(content) ||
@@ -126,7 +116,11 @@ function readStructuredOutput(body: ResponseInput | null): object | null {
   ) {
     throw new Error('構造化された応答がありません。');
   }
-  return JSON.parse(content.text);
+  const result = parseJson(content.text);
+  if (result === null || typeof result === 'object') {
+    return result;
+  }
+  throw new Error('構造化された応答がありません。');
 }
 
 function parseRetryAfter(value: string | null, now: number): number | null {
@@ -140,7 +134,7 @@ function parseRetryAfter(value: string | null, now: number): number | null {
     }
   }
   const match =
-    /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/u.exec(
+    /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (?<day>\d{2}) (?<month>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (?<year>\d{4}) (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2}) GMT$/u.exec(
       value,
     );
   if (match) {

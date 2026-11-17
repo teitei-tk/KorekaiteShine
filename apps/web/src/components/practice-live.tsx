@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { parseJson } from '@korekaite/api-contracts/json';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Temporal } from '@js-temporal/polyfill';
 import type { InterviewServerEvent } from '@korekaite/api-contracts/events/interview-server';
 import type { InterviewCommand } from '@korekaite/api-contracts/events/interview-client';
@@ -34,12 +35,13 @@ export function PracticeLive({
   onDeleted,
 }: {
   id: string;
-  onEnded(): void;
-  onDeleted?(): void;
+  onEnded: () => void;
+  onDeleted?: () => void;
 }) {
   const socket = useRef<WebSocket | null>(null);
   const latest = useRef<State | null>(null);
   const media = useRef<Awaited<ReturnType<typeof openInterviewAudio>> | null>(null);
+  // oxlint-disable-next-line react/hook-use-state -- 接続をまたいで同じ監視オブジェクトを保持し、setterは使用しない。
   const [responseMonitor] = useState(createResponseMonitor);
   const questionChange = useRef<{
     generation: number;
@@ -77,17 +79,17 @@ export function PracticeLive({
       clearQuestionChange();
     }
   }
-  function release() {
-    clearQuestionChange();
-    releaseMedia();
-  }
-  function releaseMedia() {
+  const releaseMedia = useCallback(() => {
     takeoverDisconnectGeneration.current = null;
     responseMonitor.reset();
     permission.current?.abort();
     permission.current = null;
     media.current?.close();
     media.current = null;
+  }, [responseMonitor]);
+  function release() {
+    clearQuestionChange();
+    releaseMedia();
   }
   function canChangeQuestion(current: State) {
     return (
@@ -127,13 +129,17 @@ export function PracticeLive({
       }),
     );
   }
+  /* oxlint-disable react-hooks/exhaustive-deps -- 接続はid/revisionで所有する。イベント処理は最新値をrefから読み、renderごとの関数再生成では再接続しない。 */
   useEffect(() => {
     setState(null);
     setDisconnected(false);
     setError('');
     setFragments([]);
     setPending(false);
-    const address = new URL(`/api/interviews/${encodeURIComponent(id)}/live`, window.location.href);
+    const address = new URL(
+      `/api/interviews/${encodeURIComponent(id)}/live`,
+      globalThis.location.href,
+    );
     address.searchParams.set('questionBoundaries', '1');
     address.protocol = address.protocol === 'https:' ? 'wss:' : 'ws:';
     const attempt = new AbortController();
@@ -158,7 +164,7 @@ export function PracticeLive({
       setPending(false);
       if (!retryTimerContext.terminal) {
         const time = performance.now();
-        retry.until ||= time + 60000;
+        retry.until ||= time + 60_000;
         if (time + retry.delay < retry.until) {
           retryTimerContext.retryTimer = setTimeout(() => {
             if (performance.now() < retry.until) {
@@ -172,7 +178,7 @@ export function PracticeLive({
     async function connect() {
       if (revision > 0) {
         try {
-          await sessionToken(AbortSignal.any([attempt.signal, AbortSignal.timeout(10000)]));
+          await sessionToken(AbortSignal.any([attempt.signal, AbortSignal.timeout(10_000)]));
         } catch {
           if (!attempt.signal.aborted) {
             setError('ローカルサーバーに接続できません。起動時のURLを確認してください。');
@@ -189,22 +195,25 @@ export function PracticeLive({
       socket.current = peer;
       const windowLeft = reconnect.current.until
         ? reconnect.current.until - performance.now()
-        : 10000;
+        : 10_000;
       retryTimerContext.handshake = setTimeout(
-        () => peer.close(),
-        Math.max(1, Math.min(10000, windowLeft)),
+        () => {
+          peer.close();
+        },
+        Math.max(1, Math.min(10_000, windowLeft)),
       );
       const headerState = {
         header: null as Extract<InterviewServerEvent, { type: 'audio' }> | null,
       };
       const saved = new Map<string, Transcript>();
+      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       peer.onmessage = ({ data }: MessageEvent<string | ArrayBuffer>) => {
         try {
           if (typeof data !== 'string') {
             const audio = headerState.header;
             headerState.header = null;
             if (!audio || !(data instanceof ArrayBuffer) || audio.byteLength !== data.byteLength) {
-              throw new Error();
+              throw new Error('音声接続のイベント形式が不正です。');
             }
             if (
               latest.current?.status === 'active' &&
@@ -237,14 +246,15 @@ export function PracticeLive({
             }
             return;
           }
-          const event = JSON.parse(data);
+          const event = parseJson(data);
           if (headerState.header || !validateInterviewServerEvent(event)) {
-            throw new Error();
+            throw new Error('音声接続のイベント形式が不正です。');
           }
+          // oxlint-disable-next-line eslint/default-case -- validatorが保証するイベントunionの分岐を列挙する。
           switch (event.type) {
             case 'state': {
               if (event.interviewId !== id) {
-                throw new Error();
+                throw new Error('音声接続のイベント形式が不正です。');
               }
               const change = questionChange.current;
               // 質問切替では、旧接続の終了待ちにも同じタブがマイクを保持する。
@@ -303,19 +313,21 @@ export function PracticeLive({
               }
               break;
             }
-            case 'deleted':
+            case 'deleted': {
               if (event.interviewId !== id) {
-                throw new Error();
+                throw new Error('音声接続のイベント形式が不正です。');
               }
               release();
               peer.close();
               retryTimerContext.terminal = true;
               removed.current?.();
               break;
-            case 'audio':
+            }
+            case 'audio': {
               headerState.header = event;
               break;
-            case 'transcript':
+            }
+            case 'transcript': {
               if (
                 questionChange.current &&
                 event.speaker === 'assistant' &&
@@ -327,8 +339,10 @@ export function PracticeLive({
                 acceptQuestion();
               }
               saved.set(event.fragmentId, event);
+              // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象。ここで生成した一時配列だけを変更する。
               setFragments([...saved.values()].sort((a, b) => a.sequence - b.sequence));
               break;
+            }
             case 'error': {
               const change = questionChange.current;
               setError(messages[event.code]);
@@ -361,8 +375,9 @@ export function PracticeLive({
               setPending(false);
               break;
             }
-            case 'ack':
+            case 'ack': {
               break;
+            }
           }
         } catch {
           setError('音声接続を再開してください。');
@@ -370,11 +385,16 @@ export function PracticeLive({
           peer.close();
         }
       };
+      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
       peer.onclose = () => {
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onclose = null;
         disconnectedPeer();
       };
-      peer.onerror = () => setError('面接画面とローカルサーバーの接続が切れました。');
+      // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
+      peer.onerror = () => {
+        setError('面接画面とローカルサーバーの接続が切れました。');
+      };
     }
     void connect();
     return () => {
@@ -383,8 +403,11 @@ export function PracticeLive({
       clearTimeout(retryTimerContext.handshake);
       const peer = socket.current;
       if (peer) {
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onclose = null;
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onmessage = null;
+        // oxlint-disable-next-line unicorn/prefer-add-event-listener -- 単一の接続所有者がハンドラーを置換し、停止時にnullで解除する。
         peer.onerror = null;
         peer.close();
       }
@@ -392,13 +415,18 @@ export function PracticeLive({
       latest.current = null;
       socket.current = null;
     };
-  }, [id, revision]);
+  }, [id, revision, responseMonitor, releaseMedia]);
+  /* oxlint-enable react-hooks/exhaustive-deps */
   useEffect(() => {
     if ((state?.status !== 'active' && !changingQuestion) || disconnected) {
-      return;
+      return undefined;
     }
-    const timer = setInterval(() => setNow(Temporal.Now.instant().epochMilliseconds), 500);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => {
+      setNow(Temporal.Now.instant().epochMilliseconds);
+    }, 500);
+    return () => {
+      clearInterval(timer);
+    };
   }, [state?.status, disconnected, changingQuestion]);
   async function begin(type: 'start' | 'resume' | 'takeover') {
     const initial = latest.current;
@@ -413,7 +441,7 @@ export function PracticeLive({
       const audio = await openInterviewAudio(
         controller.signal,
         (bytes) => {
-          const current = latest.current;
+          const { current } = latest;
           const peer = socket.current;
           if (
             !controller.signal.aborted &&
@@ -460,6 +488,7 @@ export function PracticeLive({
         setError('マイクの使用許可と入力機器を確認してください。');
       }
     } finally {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!permission.current || permission.current === controller) {
         setPending(false);
       }
@@ -510,26 +539,27 @@ export function PracticeLive({
       });
     }
   }
-  const question = turns
-    .slice()
+  const question = [...turns]
+    // oxlint-disable-next-line unicorn/no-array-reverse -- ES2022対象。ここで生成した一時配列だけを変更する。
     .reverse()
     .find((turn) => turn.speaker === 'assistant');
   return (
     <section>
       <h3>音声面接</h3>
-      <p role="status">
+      <output style={{ display: 'block', marginBlock: '1em' }}>
         {disconnected ? '切断' : state ? statuses[state.status] : '接続中'} ·{' '}
-        {Math.floor(elapsed / 60000)}分{Math.floor(elapsed / 1000) % 60}秒
-      </p>
-      {state?.status === 'active' && elapsed >= 15 * 60000 && (
+        {Math.floor(elapsed / 60_000)}分{Math.floor(elapsed / 1000) % 60}秒
+      </output>
+      {state?.status === 'active' && elapsed >= 15 * 60_000 && (
         <p>
           15分が経過しました。今回の判断を振り返り、話し終えたら評価へ進んでください。面接は20分で終了します。
         </p>
       )}
       {disconnected ? (
         <button
+          type="button"
           onClick={() => {
-            reconnect.current.until = performance.now() + 60000;
+            reconnect.current.until = performance.now() + 60_000;
             reconnect.current.delay = 1000;
             setRevision((value) => value + 1);
           }}
@@ -540,44 +570,85 @@ export function PracticeLive({
         state && (
           <fieldset disabled={pending} style={{ border: 0, padding: 0 }}>
             {state.status === 'ready' && (
-              <button onClick={() => void begin('start')}>マイクを許可して開始</button>
+              <button type="button" onClick={() => void begin('start')}>
+                マイクを許可して開始
+              </button>
             )}
             {!changingQuestion &&
               ((state.status === 'paused' && state.canControl) ||
                 state.status === 'reconnecting') && (
-                <button onClick={() => void begin('resume')}>マイクを許可して再開</button>
+                <button type="button" onClick={() => void begin('resume')}>
+                  マイクを許可して再開
+                </button>
               )}
             {!state.canControl && ['active', 'connecting', 'paused'].includes(state.status) && (
-              <button onClick={() => void begin('takeover')}>このタブで引き継ぐ</button>
+              <button type="button" onClick={() => void begin('takeover')}>
+                このタブで引き継ぐ
+              </button>
             )}
             {changingQuestion && (
-              <p role="status">質問を切り替えています。新しい質問を聞いてからお答えください。</p>
+              <output style={{ display: 'block', marginBlock: '1em' }}>
+                質問を切り替えています。新しい質問を聞いてからお答えください。
+              </output>
             )}
             {state.canControl && (state.status === 'active' || changingQuestion) && (
               <>
                 {waitingForText ? (
-                  <p role="status">
+                  <output style={{ display: 'block', marginBlock: '1em' }}>
                     質問の文字がまだ届いていません。「音声をつなぎ直す」を押して再開できます。
-                  </p>
+                  </output>
                 ) : (
                   responseMonitor.isWaitingTooLong(performance.now()) && (
-                    <p role="status">
+                    <output style={{ display: 'block', marginBlock: '1em' }}>
                       面接官の音声を待っています。聞こえない場合は「音声をつなぎ直す」を押し、マイクを許可して再開してください。
-                    </p>
+                    </output>
                   )
                 )}
-                <button onClick={() => stop('pause')}>一時停止</button>
-                <button onClick={() => stop('pause')}>音声をつなぎ直す</button>
-                <button disabled={!canChangeQuestion(state)} onClick={() => command('rephrase')}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stop('pause');
+                  }}
+                >
+                  一時停止
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stop('pause');
+                  }}
+                >
+                  音声をつなぎ直す
+                </button>
+                <button
+                  type="button"
+                  disabled={!canChangeQuestion(state)}
+                  onClick={() => {
+                    command('rephrase');
+                  }}
+                >
                   言い換えを依頼
                 </button>
-                <button disabled={!canChangeQuestion(state)} onClick={() => command('skip')}>
+                <button
+                  type="button"
+                  disabled={!canChangeQuestion(state)}
+                  onClick={() => {
+                    command('skip');
+                  }}
+                >
                   質問を見送る
                 </button>
               </>
             )}
             {(state.canControl || ['ready', 'reconnecting'].includes(state.status)) && (
-              <button onClick={() => stop('finish')}>終了して評価する</button>
+              <button
+                type="button"
+                onClick={() => {
+                  stop('finish');
+                }}
+              >
+                終了して評価する
+              </button>
             )}
           </fieldset>
         )

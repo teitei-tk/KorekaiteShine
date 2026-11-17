@@ -1,17 +1,11 @@
+import { parseJson, isJsonObject } from './json.ts';
+import type { JsonValue } from './json.ts';
+import { requireValue } from './required.ts';
 import { isSourceCi } from './source-ci.ts';
 import { execFileSync } from 'node:child_process';
 import { REPOSITORY } from './policy.ts';
-interface RunInput {
-  id?: number;
-  run_attempt?: number;
-  event?: string;
-  path?: string;
-  head_sha?: string;
-  display_title?: string;
-  pull_requests?: { number?: number; head?: { sha?: string }; base?: { sha?: string } }[];
-}
-const sha = (value: string | undefined): value is string =>
-  typeof value === 'string' && /^[a-f0-9]{40}$/.test(value);
+const sha = (value: JsonValue | undefined): value is string =>
+  typeof value === 'string' && /^[a-f0-9]{40}$/u.test(value);
 function readApi(path: string): string {
   return execFileSync('gh', ['api', path], {
     encoding: 'utf8',
@@ -26,12 +20,17 @@ export function runVersion(
   expected?: string,
   read = readApi,
 ): { output: string; eligible: boolean } {
-  if (!/^[1-9]\d{0,17}$/.test(id) || (expected !== undefined && !sha(expected))) {
+  if (!/^[1-9]\d{0,17}$/u.test(id) || (expected !== undefined && !sha(expected))) {
     throw new Error('Invalid input');
   }
   const prefix = `repos/${REPOSITORY}`;
-  const run: RunInput | null = JSON.parse(read(`${prefix}/actions/runs/${id}`));
-  if (!run || String(run.id) !== id || !sha(run.head_sha)) {
+  const run = parseJson(read(`${prefix}/actions/runs/${id}`));
+  if (
+    !isJsonObject(run) ||
+    (typeof run.id !== 'number' && typeof run.id !== 'string') ||
+    String(run.id) !== id ||
+    !sha(run.head_sha)
+  ) {
     throw new Error('Invalid run');
   }
   const lines = [`実行コードSHA: ${run.head_sha}`];
@@ -47,20 +46,21 @@ export function runVersion(
     };
   }
   const source =
-    /^AI review \/ source run ([1-9]\d{0,17}) attempt ([1-9]\d{0,5}) \/ (review|claims)$/.exec(
-      run.display_title ?? '',
+    /^AI review \/ source run (?<capture1>[1-9]\d{0,17}) attempt (?<capture2>[1-9]\d{0,5}) \/ (?<capture3>review|claims)$/u.exec(
+      typeof run.display_title === 'string' ? run.display_title : '',
     );
   if (!source) {
     throw new Error('Invalid source');
   }
-  const original: RunInput | null = JSON.parse(
-    read(`${prefix}/actions/runs/${source[1]}/attempts/${source[2]}`),
-  );
+  const original = parseJson(read(`${prefix}/actions/runs/${source[1]}/attempts/${source[2]}`));
   if (
-    !original ||
+    !isJsonObject(original) ||
+    (typeof original.id !== 'number' && typeof original.id !== 'string') ||
+    (typeof original.run_attempt !== 'number' && typeof original.run_attempt !== 'string') ||
     String(original.id) !== source[1] ||
     String(original.run_attempt) !== source[2] ||
     original.event !== 'pull_request' ||
+    typeof original.path !== 'string' ||
     !isSourceCi(original.path)
   ) {
     throw new Error('Invalid source');
@@ -71,11 +71,15 @@ export function runVersion(
       : undefined;
   const targetKnownState = { targetKnown: false };
   if (
-    pr &&
+    pr !== undefined &&
+    isJsonObject(pr) &&
+    typeof pr.number === 'number' &&
     Number.isSafeInteger(pr.number) &&
-    pr.number! > 0 &&
-    sha(pr.head?.sha) &&
-    sha(pr.base?.sha)
+    requireValue(pr.number) > 0 &&
+    isJsonObject(pr.head) &&
+    sha(pr.head.sha) &&
+    isJsonObject(pr.base) &&
+    sha(pr.base.sha)
   ) {
     targetKnownState.targetKnown = true;
     lines.push(
@@ -96,12 +100,11 @@ export function runVersion(
     };
   }
   lines.push(`期待コミットSHA: ${expected}`);
-  const comparison: { status?: string } | null = JSON.parse(
-    read(`${prefix}/compare/${expected}...${run.head_sha}?per_page=1`),
-  );
+  const comparison = parseJson(read(`${prefix}/compare/${expected}...${run.head_sha}?per_page=1`));
   if (
-    !comparison ||
-    !['ahead', 'identical', 'behind', 'diverged'].includes(comparison.status ?? '')
+    !isJsonObject(comparison) ||
+    typeof comparison.status !== 'string' ||
+    !['ahead', 'identical', 'behind', 'diverged'].includes(comparison.status)
   ) {
     throw new Error('Invalid comparison');
   }

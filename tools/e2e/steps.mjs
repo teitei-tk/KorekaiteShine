@@ -101,7 +101,7 @@ function button(world, name) {
 }
 
 function status(world, label) {
-  return world.page.getByRole('status').filter({ hasText: new RegExp('^' + label + ' ·') });
+  return world.page.getByRole('status').filter({ hasText: new RegExp(`^${label} ·`, 'u') });
 }
 
 async function readWithAction(world, path, action, method = 'GET') {
@@ -116,7 +116,7 @@ async function readWithAction(world, path, action, method = 'GET') {
 }
 
 function detailPath(world) {
-  return '/api/interviews/' + encodeURIComponent(world.id);
+  return `/api/interviews/${encodeURIComponent(world.id)}`;
 }
 
 async function detail(world) {
@@ -177,7 +177,7 @@ async function heardAnswer(world) {
       .slice(world.beforeAnswer)
       .filter((e) => e.type === 'transcript' && e.content.trim());
     const firstUser = turns.findIndex((e) => e.speaker === 'user');
-    if (firstUser >= 0 && turns.slice(firstUser + 1).some((e) => e.speaker === 'assistant')) {
+    if (firstUser !== -1 && turns.slice(firstUser + 1).some((e) => e.speaker === 'assistant')) {
       return;
     }
     await delay(50);
@@ -202,7 +202,7 @@ Then('次の発話にも音声応答が再生される', async function () {
 
 async function finish(world) {
   await button(world, '終了して評価する').click();
-  await world.page.getByText(/^終了 · 面接時間/).waitFor();
+  await world.page.getByText(/^終了 · 面接時間/u).waitFor();
 }
 
 When('面接を終了して履歴から開き直す', async function () {
@@ -219,7 +219,7 @@ function checkConversation(items) {
   for (const speaker of ['user', 'assistant']) {
     assert.ok(
       items.some((item) => item.speaker === speaker && item.content.trim()),
-      speaker + 'の確定発言がありません',
+      `${speaker}の確定発言がありません`,
     );
   }
 }
@@ -240,7 +240,7 @@ Given('今日の音声利用枠がすべて残っている', function () {
 });
 When('音声サービスとの接続が面接開始前に3回失敗する', async function () {
   await this.runtime.rejectDials(true);
-  for (const _ of Array(3).keys()) {
+  for (const _ of Array.from({ length: 3 }).keys()) {
     const offset = this.events.length;
     await button(this, startButton).click();
     await this.page.getByText('音声AIへの接続に失敗しました。再度開始してください。').waitFor();
@@ -283,7 +283,7 @@ async function reconnect(world) {
     function restore(event) {
       if (event.target.closest('button')?.textContent.trim() === '再接続') {
         document.removeEventListener('click', restore, true);
-        void window.restoreInterviewNetwork();
+        void globalThis.restoreInterviewNetwork();
       }
     }
     document.addEventListener('click', restore, true);
@@ -291,7 +291,7 @@ async function reconnect(world) {
   await button(world, '再接続').click();
   await allow.promise;
   await status(world, '面接中').waitFor();
-  assert.equal(world.events.filter((e) => e.type === 'state').at(-1).interviewId, world.id);
+  assert.equal(world.events.findLast((e) => e.type === 'state').interviewId, world.id);
 }
 
 When('面接を開始して質問を聞き、答える', async function () {
@@ -349,7 +349,7 @@ When('次の発話途中で回線が切れる', async function () {
     await delay(10);
   }
   assert.ok(this.voicedFrames - before >= 3, '発話の音声フレームが届きませんでした');
-  assert.ok(await this.page.evaluate(() => window.voiceE2e.speaking));
+  assert.ok(await this.page.evaluate(() => globalThis.voiceE2e.speaking));
   await disconnect(this);
 });
 When('回線の復旧後に同じタブで「再接続」を押してもう一度話す', async function () {
@@ -492,7 +492,7 @@ When('長い質問を聞きながら返事をして音声AIが応答しなくな
   await waitForPlayback(this.page, this.openingPlayback);
   this.runtime.silenceCurrentConnections();
   const frames = this.voicedFrames;
-  await this.page.evaluate(() => window.voiceE2e.speak());
+  await this.page.evaluate(() => globalThis.voiceE2e.speak());
   await waitForQuiet(this.page);
   assert.ok(this.voicedFrames > frames);
 });
@@ -527,7 +527,7 @@ async function hearQuestionAndAnswer(operation) {
   assert.equal(await heading.evaluate((el) => el.nextElementSibling.textContent), question);
   await waitForPlayback(this.page, this.beforeQuestion);
   await waitForQuiet(this.page);
-  const frequencies = await this.page.evaluate(() => window.voiceE2e.playedFrequencies);
+  const frequencies = await this.page.evaluate(() => globalThis.voiceE2e.playedFrequencies);
   assert.ok(
     frequencies.some((hz) => Math.abs(hz - 440) < 12),
     '新しい質問の音声',
@@ -538,7 +538,7 @@ async function hearQuestionAndAnswer(operation) {
   );
   const fragments = (await detail(this)).transcripts;
   assert.equal(fragments.filter((entry) => entry.content === question).length, 1);
-  const generation = fragments.find((entry) => entry.content === question).generation;
+  const { generation } = fragments.find((entry) => entry.content === question);
   assert.ok(
     fragments.every(
       (entry) => !entry.content.includes('遅れて届いた続き') || entry.generation < generation,
@@ -559,7 +559,9 @@ When('元のタブで見送りを受理した音声AIが返事を保留する', 
 Then('新しい担当タブで見送り後の質問だけを聞いて回答できる', async function () {
   this.otherTab.beforeQuestion = 0;
   await hearQuestionAndAnswer.call(this.otherTab, '質問を見送る');
-  const frequencies = await this.otherTab.page.evaluate(() => window.voiceE2e.playedFrequencies);
+  const frequencies = await this.otherTab.page.evaluate(
+    () => globalThis.voiceE2e.playedFrequencies,
+  );
   assert.ok(
     frequencies.every((hz) => Math.abs(hz - 330) > 12),
     '新しい担当タブで最初の質問が繰り返された',

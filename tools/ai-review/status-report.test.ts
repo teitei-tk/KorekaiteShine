@@ -12,7 +12,9 @@ import { detail } from './diagnostics.ts';
 
 function directoryFixture() {
   const directory = mkdtempSync(join(tmpdir(), 'report-boundaries-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
   return directory;
 }
 
@@ -49,8 +51,12 @@ it('必須フィールドの欠落を成功扱いしない', () => {
 });
 
 it('保存先未設定時は副作用なく終了する', () => {
-  expect(() => writeStatusReport({}, 'failure', 'generate', 'EXECUTION_FAILED')).not.toThrow();
-  expect(() => recordExecutionFailure({})).not.toThrow();
+  expect(() => {
+    writeStatusReport({}, 'failure', 'generate', 'EXECUTION_FAILED');
+  }).not.toThrow();
+  expect(() => {
+    recordExecutionFailure({});
+  }).not.toThrow();
   expect(readStatusReports(undefined, 20, 1)).toEqual([]);
 });
 
@@ -78,7 +84,7 @@ it('単一Artifactとジョブ別Artifactの混在を拒否する', () => {
   expect(() => readStatusReports(directory, 20, 1)).toThrow('混在');
 });
 it('未検証の対象IDを結果ファイルに出力しない', () => {
-  expect(() =>
+  expect(() => {
     writeStatusReport(
       {
         AI_REVIEW_REPORT: '/unused',
@@ -89,8 +95,8 @@ it('未検証の対象IDを結果ファイルに出力しない', () => {
       'failure',
       'SECRET\nmessage',
       'MODEL_FAILED',
-    ),
-  ).toThrow();
+    );
+  }).toThrow();
 });
 it('ジョブenvでrunnerコンテキストを使わず実行時RUNNER_TEMPへ結果を保存する', () => {
   const directory = mkdtempSync(join(tmpdir(), 'report-runtime-path-'));

@@ -1,9 +1,10 @@
+import { parseJson } from './json.ts';
 import { expect, it } from 'vitest';
 import { coverageDiagnostic, validCoverage, renderCoverage } from './coverage-diagnostic.ts';
 import { detail } from './diagnostics.ts';
 
 it('配列でない回答は専用の説明を表示し原文を含めない', () => {
-  const value = coverageDiagnostic(['a'.repeat(16)], JSON.parse('"private input"'));
+  const value = coverageDiagnostic(['a'.repeat(16)], parseJson('"private input"'));
   expect(validCoverage(value)).toBe(true);
   expect(renderCoverage(value)).toContain('一覧が配列ではありません');
   expect(renderCoverage(value)).not.toContain('private input');
@@ -51,13 +52,13 @@ it('診断の不正な件数・任意文字列・余分なフィールドを拒�
   expect(validCoverage(extra)).toBe(false);
 });
 it('配列以外・文字列以外の応答も自由文を残さず分類する', () => {
-  const scalar = JSON.parse('"SECRET"');
+  const scalar = parseJson('"SECRET"');
   expect(coverageDiagnostic(['a'.repeat(16)], scalar)).toMatchObject({
     arrayValid: false,
     received: 0,
     missing: 1,
   });
-  const mixed = coverageDiagnostic(['a'.repeat(16)], JSON.parse('[null,42,{"secret":"SECRET"}]'));
+  const mixed = coverageDiagnostic(['a'.repeat(16)], parseJson('[null,42,{"secret":"SECRET"}]'));
   expect(mixed).toMatchObject({ arrayValid: true, invalid: 3, received: 3, missing: 1 });
   expect(validCoverage(mixed)).toBe(true);
   expect(JSON.stringify(mixed)).not.toContain('SECRET');
@@ -65,7 +66,10 @@ it('配列以外・文字列以外の応答も自由文を残さず分類する'
 it('69件の不一致でも診断のサンプルを制限しActions概要に内訳を表示する', async () => {
   const { renderDiagnostic, validDiagnostic } = await import('./diagnostics.ts');
   const expected = Array.from({ length: 69 }, (_, i) => i.toString(16).padStart(16, '0'));
-  const coverage = coverageDiagnostic(expected, Array(69).fill(expected[0]));
+  const coverage = coverageDiagnostic(
+    expected,
+    Array.from({ length: 69 }, () => expected[0]),
+  );
   expect(coverage).toMatchObject({
     expected: 69,
     received: 69,
@@ -80,17 +84,18 @@ it('69件の不一致でも診断のサンプルを制限しActions概要に内�
 });
 it('敵対的な1000通りの応答で集計・秘匿・診断の整合性を維持する', () => {
   const expected = Array.from({ length: 8 }, (_, i) => i.toString(16).padStart(16, '0'));
-  const seedState = { seed: 12345 };
+  const seedState = { seed: 12_345 };
   const random = () => {
-    seedState.seed = (Math.imul(seedState.seed, 1664525) + 1013904223) >>> 0;
+    // oxlint-disable-next-line eslint/no-bitwise -- 固定seedの32bit疑似乱数を再現し、1000入力の検査を決定的にする。
+    seedState.seed = (Math.imul(seedState.seed, 1_664_525) + 1_013_904_223) >>> 0;
     return seedState.seed;
   };
-  for (const _ of Array(1000).keys()) {
+  for (const _ of Array.from({ length: 1000 }).keys()) {
     const values: (string | number | null)[] = Array.from({ length: random() % 80 }, () => {
       const i = random() % 12;
       return i < 8 ? expected[i] : i === 8 ? null : i === 9 ? 42 : `SECRET_${i}`;
     });
-    const received: string[] = JSON.parse(JSON.stringify(values));
+    const received = structuredClone(values);
     const diagnostic = coverageDiagnostic(expected, received);
     expect(validCoverage(diagnostic)).toBe(true);
     expect(diagnostic.received).toBe(values.length);

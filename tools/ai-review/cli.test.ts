@@ -97,7 +97,7 @@ it('監視CLIは認証や対象が欠けていても固定理由で終了する'
     const result = fixture.run('wait-review.ts', {
       args,
       env: {
-        GH_TOKEN: args.length ? 'fixture-token' : undefined,
+        GH_TOKEN: args.length > 0 ? 'fixture-token' : undefined,
         REVIEW_HEAD: undefined,
         REVIEW_BASE: undefined,
         REVIEW_SINCE: undefined,
@@ -202,14 +202,14 @@ function monitorFixture(directory: string) {
     status: 'completed',
     created_at: '2026-11-08T00:00:01Z',
   };
-  const review = { ...api.http[api.prefix + 'actions/runs/20'].body, conclusion: 'success' };
-  api.http[api.prefix + 'actions/runs?event=pull_request&per_page=100&page=1'] = {
+  const review = { ...api.http[`${api.prefix}actions/runs/20`].body, conclusion: 'success' };
+  api.http[`${api.prefix}actions/runs?event=pull_request&per_page=100&page=1`] = {
     body: { workflow_runs: [source] },
   };
   api.http[
-    api.prefix + 'actions/workflows/ai-review.yml/runs?event=workflow_run&per_page=100&page=1'
+    `${api.prefix}actions/workflows/ai-review.yml/runs?event=workflow_run&per_page=100&page=1`
   ] = { body: { workflow_runs: [review] } };
-  api.http[api.prefix + 'actions/runs/20/attempts/1'] = { body: review };
+  api.http[`${api.prefix}actions/runs/20/attempts/1`] = { body: review };
   return {
     api,
     env: {
@@ -289,8 +289,8 @@ it('失敗通知CLIは通知IDを概要へ保存する', () => {
 
 function notificationFixture(directory: string) {
   const api = apiFixture();
-  api.http[api.prefix + 'actions/runs/1'] = { body: { ...api.run, id: 1, run_attempt: 1 } };
-  api.http[api.prefix + 'actions/runs/20'] = {
+  api.http[`${api.prefix}actions/runs/1`] = { body: { ...api.run, id: 1, run_attempt: 1 } };
+  api.http[`${api.prefix}actions/runs/20`] = {
     body: {
       ...api.run,
       id: 20,
@@ -303,10 +303,10 @@ function notificationFixture(directory: string) {
       conclusion: 'failure',
     },
   };
-  api.http[api.prefix + 'actions/runs/20/attempts/1/jobs?per_page=100'] = {
+  api.http[`${api.prefix}actions/runs/20/attempts/1/jobs?per_page=100`] = {
     body: { jobs: [{ name: 'generate', conclusion: 'failure' }] },
   };
-  api.http[api.prefix + 'issues/7/comments'] = { body: { id: 100 } };
+  api.http[`${api.prefix}issues/7/comments`] = { body: { id: 100 } };
   return {
     api,
     env: {
@@ -344,7 +344,7 @@ it('概要と出力の保存先がなくても準備失敗の固定理由を返�
 it('現在の対象へ行指摘が途中投稿されていれば新しい生成を許可しない', () => {
   const fixture = cliFixture();
   const api = apiFixture();
-  api.http[api.prefix + 'pulls/7/comments?per_page=100&page=1'] = {
+  api.http[`${api.prefix}pulls/7/comments?per_page=100&page=1`] = {
     body: [
       {
         id: 2,
@@ -442,7 +442,7 @@ it('投稿CLIは検証済みの固定成果物だけを模擬APIへ渡し結果�
   const fixture = cliFixture();
   const { env } = publication(fixture.directory);
   const api = apiFixture();
-  api.http[api.prefix + 'issues/7/comments'] = { body: { id: 99 } };
+  api.http[`${api.prefix}issues/7/comments`] = { body: { id: 99 } };
   const result = fixture.run('publish.ts', { env, replies: api });
   expect(result.status).toBe(0);
   expect(readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8')).toContain('投稿結果: REVIEW_COMPLETE');
@@ -458,16 +458,13 @@ it('投稿CLIは検証済みの固定成果物だけを模擬APIへ渡し結果�
 it('同じ対象への途中投稿があれば新しい資料生成を拒否する', () => {
   const fixture = cliFixture();
   const api = apiFixture();
-  api.http[api.prefix + 'issues/7/comments?per_page=100&page=1'] = {
+  api.http[`${api.prefix}issues/7/comments?per_page=100&page=1`] = {
     body: [
       {
         id: 1,
-        body:
-          '<!-- korekaite-ai-review -->\n<!-- generation:v2:19:1:' +
-          api.pr.head.sha +
-          ':' +
-          api.pr.base.sha +
-          ' -->',
+        body: `<!-- korekaite-ai-review -->\n<!-- generation:v2:19:1:${api.pr.head.sha}:${
+          api.pr.base.sha
+        } -->`,
         user: { login: 'github-actions[bot]', type: 'Bot' },
       },
     ],
@@ -571,8 +568,7 @@ function wifInput(directory: string) {
     event_name: 'workflow_run',
     workflow_ref: 'teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main',
   };
-  const token =
-    'fixture%\r\n.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.signature';
+  const token = `fixture%\r\n.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
   const env = {
     AI_REVIEW_MODE: 'claims',
     ACTIONS_ID_TOKEN_REQUEST_URL: 'https://oidc.invalid/request',
@@ -617,7 +613,7 @@ it('実行状態CLIはコードSHAと成功状態を確認して終了する', (
     },
   });
   expect(result.status).toBe(0);
-  expect(result.stdout).toContain('実行コードSHA: ' + 'a'.repeat(40));
+  expect(result.stdout).toContain(`実行コードSHA: ${'a'.repeat(40)}`);
   expect(result.stdout).toContain('completed / success');
   expect(fixture.requests()).toHaveLength(2);
 });

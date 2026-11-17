@@ -25,8 +25,12 @@ test.each([
   }
   vi.stubEnv('E2E_PROFILE', undefined);
   vi.stubEnv('E2E_APP_ROOT', profile === 'live' ? '/example' : '');
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   loadConfiguration.mockResolvedValue({ runConfiguration: {} });
   runCucumber.mockImplementation(async (_config, _context, emit) => {
     if (status) {
@@ -39,14 +43,14 @@ test.each([
   });
   await import('../run.mjs');
   expect(loadConfiguration.mock.lastCall[0].provided).toMatchObject({
-    tags: '@' + profile,
+    tags: `@${profile}`,
     name: profile === 'live' ? ['再開'] : [],
     retry: 0,
     strict: true,
   });
   expect(process.exitCode).toBe(expected);
   if (status) {
-    expect(log).toHaveBeenCalledWith('[' + profile + '] 面接');
+    expect(log).toHaveBeenCalledWith(`[${profile}] 面接`);
   } else {
     expect(error).toHaveBeenCalledWith('対象シナリオが0件です。');
   }

@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import assert from 'node:assert/strict';
 import { validateBadRequest, validateList } from '@korekaite/api-contracts/http/validators';
 
@@ -46,7 +47,7 @@ export async function assertInterviewResponse(
 ): Promise<void> {
   assert.equal(response.status, expected.status, expected.query);
   assert.match(response.headers.get('content-type') ?? '', /^application\/json\b/u);
-  const body = await response.json();
+  const body = parseJson(await response.text());
   if (expected.status === 200) {
     assert.ok(interviewResponseValidators[200](body), JSON.stringify(validateList.errors));
     assert.equal(body.items.length, expected.count, expected.query);

@@ -1,3 +1,4 @@
+import { parse, readArray, readObject } from '../src/schema.ts';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -33,11 +34,9 @@ test('要素0件・未実行・一部実行・4指標100%を区別して出力�
     }
     const directory = join(root, 'report');
     await writeReports(map, directory, root);
-    const rows = JSON.parse(readFileSync(join(directory, 'files.json'), 'utf8')) as {
-      path: string;
-      state: string;
-      reason?: string;
-    }[];
+    const rows = readArray(parse(readFileSync(join(directory, 'files.json'), 'utf8'))).map(
+      (value) => readObject(value),
+    );
     expect(rows.map(({ path, state }) => [path, state])).toEqual([
       ['complete.ts', 'complete'],
       ['partial.ts', 'partial'],
@@ -60,13 +59,15 @@ test('暗黙のelseも分岐番号と条件の元ソース位置を報告する'
     coverage.b['0'] = [1, 0];
     const directory = join(root, 'report');
     await writeReports(createCoverageMap({ 'choose.ts': coverage }), directory, root);
-    const [row] = JSON.parse(readFileSync(join(directory, 'files.json'), 'utf8'));
-    expect(row.missing.branches).toEqual([
+    const [row] = readArray(parse(readFileSync(join(directory, 'files.json'), 'utf8'))).map(
+      (value) => readObject(value),
+    );
+    expect(readObject(row.missing).branches).toEqual([
       {
         id: '0',
         index: 1,
         type: 'if',
-        location: expect.objectContaining({ start: { line: 2, column: 2 } }),
+        location: readObject(expect.objectContaining({ start: { line: 2, column: 2 } })),
       },
     ]);
   } finally {

@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readdir, readFile, rm, symlink } from 'node:fs/promises
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
-import { expect, onTestFinished, test } from 'vitest';
+import { assert, expect, onTestFinished, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import {
   readDevelopmentSnapshot,
@@ -23,11 +23,21 @@ test('開発DBの保存先が未準備なら保持確認を成功扱いしない
 
 test('別用途のSQLiteファイルを除外し実スキーマの開発DBだけを読み取る', async () => {
   const config = await fixture();
-  await mkdir(config.stateDirectory!, { recursive: true });
-  new DatabaseSync(join(config.stateDirectory!, 'unrelated.sqlite')).close();
-  const database = new DatabaseSync(join(config.stateDirectory!, 'application.sqlite'));
+  await mkdir(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+    recursive: true,
+  });
+  new DatabaseSync(
+    join(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), 'unrelated.sqlite'),
+  ).close();
+  const database = new DatabaseSync(
+    join(
+      config.stateDirectory ?? assert.fail('必須のテスト値がありません。'),
+      'application.sqlite',
+    ),
+  );
   try {
     const migrations = new URL('../../../packages/database/db/migrations/', import.meta.url);
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022型設定の共有テスト。生成した一時配列だけを整列する。
     for (const name of (await readdir(migrations)).filter((name) => name.endsWith('.sql')).sort()) {
       database.exec(await readFile(new URL(name, migrations), 'utf8'));
     }

@@ -1,10 +1,17 @@
-import { expect, it } from 'vitest';
+import { parseJson } from './json.ts';
+import { assert, expect, it } from 'vitest';
 import { createArtifact } from './artifact.ts';
 import { publishArtifact, recognizeOperations } from './publish.ts';
-import { type Snapshot } from './snapshot.ts';
-import { type Api, type ApiBody } from './github.ts';
-import { MARKER, type Review } from './policy.ts';
+import type { Snapshot } from './snapshot.ts';
+import type { Api, ApiBody } from './github.ts';
+import { MARKER } from './policy.ts';
+import type { Review } from './policy.ts';
 import { historyMarker } from './history.ts';
+
+const head = 'a'.repeat(40),
+  base = 'b'.repeat(40),
+  old = 'c'.repeat(40);
+const bot = { id: 41_898_282, login: 'github-actions[bot]', type: 'Bot' };
 
 it('同じ対象に別の生成実行の投稿があれば履歴が一致しても新規投稿しない', async () => {
   const f = fixture();
@@ -22,14 +29,13 @@ it('同じ対象に別の生成実行の投稿があれば履歴が一致して�
 
 it('同じ操作マーカーが二つのコメントに存在したら再開を拒否する', () => {
   const f = fixture();
-  const body = f.artifact.operations.find((operation) => operation.kind === 'summary')!.body;
+  const { body } =
+    f.artifact.operations.find((operation) => operation.kind === 'summary') ??
+    assert.fail('必須のテスト値がありません。');
   f.snapshot.issues.push({ id: 100, body, user: bot }, { id: 101, body, user: bot });
   expect(() => recognizeOperations(f.artifact, f.snapshot)).toThrow('投稿操作が重複');
 });
-const head = 'a'.repeat(40),
-  base = 'b'.repeat(40),
-  old = 'c'.repeat(40);
-const bot = { id: 41898282, login: 'github-actions[bot]', type: 'Bot' };
+
 const finding = {
   priority: 'P2' as const,
   path: 'a.ts',
@@ -79,25 +85,30 @@ function fixture() {
         countContext.failAfterWrite = false;
         throw new Error('response lost');
       }
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return { id } as T;
     }
     if (path === 'pulls/7') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         number: 7,
-        user: { id: 1324680, type: 'User' },
+        user: { id: 1_324_680, type: 'User' },
         state: 'open',
         draft: false,
-        head: { sha: head, repo: { id: 1426899426 } },
-        base: { sha: base, ref: 'main', repo: { id: 1426899426 } },
+        head: { sha: head, repo: { id: 1_426_899_426 } },
+        base: { sha: base, ref: 'main', repo: { id: 1_426_899_426 } },
       } as T;
     }
     if (path.startsWith('issues/')) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return structuredClone(snapshot.issues) as T;
     }
     if (path.startsWith('pulls/7/comments?')) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return structuredClone(snapshot.inline) as T;
     }
     if (path === 'graphql') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
       return {
         data: {
           repository: {
@@ -115,7 +126,7 @@ function fixture() {
         },
       } as T;
     }
-    throw new Error('unexpected path ' + path);
+    throw new Error(`unexpected path ${path}`);
   };
   const metadata = {
     version: 2 as const,
@@ -257,7 +268,7 @@ it('出力改竄・旧形式・別生成元・確認漏れを拒否する', asyn
     mutate(v);
     expect(() => validateArtifact(v, f.artifact.origin)).toThrow();
   }
-  expect(() => validateArtifact(JSON.parse('{"version":1}'), f.artifact.origin)).toThrow();
+  expect(() => validateArtifact(parseJson('{"version":1}'), f.artifact.origin)).toThrow();
   expect(() => validateArtifact(f.artifact, { ...f.artifact.origin, attempt: '2' })).toThrow();
   expect(() =>
     createArtifact(
@@ -271,6 +282,7 @@ it('出力改竄・旧形式・別生成元・確認漏れを拒否する', asyn
 it('投稿直前に対象が変われば書き込まない', async () => {
   const f = fixture();
   const api: Api = async <T>(path: string, method?: string, body?: ApiBody) =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
     path === 'pulls/7' ? ({ number: 7, state: 'closed' } as T) : f.api<T>(path, method, body);
   await expect(publishArtifact(api, f.artifact)).resolves.toBe('TARGET_CHANGED');
   expect(f.count()).toBe(0);
@@ -288,6 +300,7 @@ it.each(['failure', 'cancelled', 'timed_out'])(
       directory = mkdtempSync(join(tmpdir(), 'resume-flow-'));
     const api: Api = async <T>(path: string, method?: string, body?: ApiBody) => {
       if (path === 'actions/runs/20') {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           id: 20,
           run_attempt: 1,
@@ -297,11 +310,12 @@ it.each(['failure', 'cancelled', 'timed_out'])(
           display_title: 'AI review / source run 12 attempt 1 / review',
           status: 'completed',
           conclusion,
-          repository: { id: 1426899426 },
-          head_repository: { id: 1426899426 },
+          repository: { id: 1_426_899_426 },
+          head_repository: { id: 1_426_899_426 },
         } as T;
       }
       if (path === 'actions/runs/12') {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           id: 12,
           run_attempt: 1,
@@ -309,12 +323,13 @@ it.each(['failure', 'cancelled', 'timed_out'])(
           conclusion: 'success',
           path: '.github/workflows/docs.yml',
           head_sha: head,
-          repository: { id: 1426899426 },
-          head_repository: { id: 1426899426 },
+          repository: { id: 1_426_899_426 },
+          head_repository: { id: 1_426_899_426 },
           pull_requests: [{ number: 7, head: { sha: head }, base: { sha: base } }],
         } as T;
       }
       if (path === 'actions/runs/20/attempts/1/jobs?per_page=100') {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- 汎用GitHub APIの試験用応答を注入する。実入力の検証は呼出し先で維持する。
         return {
           jobs: [
             { name: 'generate', conclusion: 'success' },

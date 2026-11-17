@@ -1,3 +1,4 @@
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,7 +11,9 @@ import { readCaptures } from '../src/capture.ts';
 const loader = fileURLToPath(new URL('../src/node-loader.ts', import.meta.url));
 function fixture(path: string, source: string) {
   const root = mkdtempSync(join(tmpdir(), 'coverage-loader-boundary-'));
-  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   writeFileSync(join(root, path), source);
   const { run } = prepareRun(root, [path], 'revision', ['node']);
   const directory = join(root, 'records');
@@ -25,7 +28,7 @@ function fixture(path: string, source: string) {
       return spawnSync(process.execPath, ['--import', loader, '-e', code], {
         cwd: root,
         encoding: 'utf8',
-        timeout: 10000,
+        timeout: 10_000,
         env: {
           ...process.env,
           NODE_OPTIONS: '',
@@ -68,7 +71,7 @@ test('シンボリックリンク経由のルートでも実ファイルのカ�
   const child = item.execute("import('./value.mjs')");
   expect(child.stderr).toBe('');
   expect(child.status).toBe(0);
-  expect(readCaptures(item.directory)[0].files[0]?.coverage.s['0']).toBe(1);
+  expect(readCaptures(item.directory)[0].files.at(0)?.coverage.s['0']).toBe(1);
 });
 
 test('終了前にカウンターが失われても空の収集記録を残す', () => {

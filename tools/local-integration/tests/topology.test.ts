@@ -1,10 +1,12 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { parseObject, stringValue } from './helpers/config-json.ts';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, buildRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -110,7 +112,7 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
       if (result.status !== 'fulfilled') {
         throw new Error('起動に失敗しました。');
       }
-      await runDatabaseCommand(configs[index]!, [
+      await runDatabaseCommand(configs[index] ?? assert.fail('必須のテスト値がありません。'), [
         'execute',
         `INSERT INTO connection_checks (writer, value) VALUES ('isolated', '${index}')`,
       ]);
@@ -118,22 +120,35 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
       expect(response.status).toBe(200);
       expect(await response.json()).toContainEqual({ writer: 'isolated', value: String(index) });
       expect(
-        (await stat(join(configs[index]!.artifactDirectory, 'vite-cache'))).isDirectory(),
+        (
+          await stat(
+            join(
+              (configs[index] ?? assert.fail('必須のテスト値がありません。')).artifactDirectory,
+              'vite-cache',
+            ),
+          )
+        ).isDirectory(),
       ).toBe(true);
       for (const project of ['web', 'database']) {
-        const projectRoot = join(configs[index]!.artifactDirectory, project);
-        const metadata = JSON.parse(
+        const projectRoot = join(
+          (configs[index] ?? assert.fail('必須のテスト値がありません。')).artifactDirectory,
+          project,
+        );
+        const metadata = parseObject(
           await readFile(join(projectRoot, '.void/local-d1.json'), 'utf8'),
         );
-        expect(await realpath(metadata.projectRoot)).toBe(await realpath(projectRoot));
-        expect(await realpath(metadata.persistRoot)).toBe(
-          await realpath(configs[index]!.stateDirectory!),
+        expect(await realpath(stringValue(metadata.projectRoot))).toBe(await realpath(projectRoot));
+        expect(await realpath(stringValue(metadata.persistRoot))).toBe(
+          await realpath(
+            (configs[index] ?? assert.fail('必須のテスト値がありません。')).stateDirectory ??
+              assert.fail('必須のテスト値がありません。'),
+          ),
         );
       }
     }
   } finally {
     await Promise.all(
-      started.map((result) => (result.status === 'fulfilled' ? result.value.stop() : undefined)),
+      started.flatMap((result) => (result.status === 'fulfilled' ? [result.value.stop()] : [])),
     );
   }
 
@@ -246,7 +261,7 @@ test('明示したreset-seedだけが既存データを消して固定データ�
       "INSERT INTO connection_checks (writer, value) VALUES ('temporary', 'remove-me')",
     ]);
     const before = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
-    const beforeRows = await before.json();
+    const beforeRows = parseJson(await before.text());
     expect(beforeRows).toContainEqual({ writer: 'temporary', value: 'remove-me' });
     expect(beforeRows).not.toContainEqual({ writer: 'fixture', value: 'local-only' });
     await runtimeContext.runtime.stop();

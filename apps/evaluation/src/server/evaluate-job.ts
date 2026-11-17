@@ -5,7 +5,8 @@ import { and, eq, notExists } from 'void/db';
 import { jobs, deletedJobs } from '@korekaite/database/jobs';
 import { evaluationInputs } from '@korekaite/database/interviews';
 import type { createPrimaryDb } from '@korekaite/database/connection';
-import { evaluateInterview, type EvaluationGenerator } from '../application/evaluate-interview';
+import { evaluateInterview } from '../application/evaluate-interview';
+import type { EvaluationGenerator } from '../application/evaluate-interview';
 import type { EvaluationDependencies } from '../application/consume-job';
 
 export function createJobEvaluator(
@@ -27,6 +28,7 @@ export function createJobEvaluator(
           notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobId))),
         ),
       );
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!saved) {
       return { ok: false, error: { code: 'EVALUATION_INPUT_UNAVAILABLE', retryable: false } };
     }

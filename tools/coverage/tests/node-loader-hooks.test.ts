@@ -1,17 +1,15 @@
+/* eslint-disable no-underscore-dangle -- Istanbulの標準グローバル名を検証する。 */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { registerHooks } from 'node:module';
 import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
-import { expect, onTestFinished, test, vi } from 'vitest';
+import { assert, expect, onTestFinished, test, vi } from 'vitest';
 import { prepareRun } from '../src/prepare.ts';
 import { startCapture } from '../src/capture.ts';
 import { createCounterJournal } from '../src/journal.ts';
-vi.mock('node:module', async (original) => ({
-  ...(await original<typeof import('node:module')>()),
-  registerHooks: vi.fn(),
-}));
+vi.mock('node:module', () => ({ registerHooks: vi.fn() }));
 vi.mock('../src/capture.ts', () => ({ startCapture: vi.fn() }));
 vi.mock('../src/journal.ts', () => ({ createCounterJournal: vi.fn() }));
 const global = globalThis as typeof globalThis & {
@@ -32,7 +30,7 @@ async function fixture() {
   writeFileSync(config, JSON.stringify({ root, directory: root, run }));
   vi.stubEnv('KOREKAITE_COVERAGE_RUN', config);
   vi.stubEnv('KOREKAITE_COVERAGE_SUITE', 'unit');
-  const finish = vi.fn();
+  const finish = vi.fn<ReturnType<typeof startCapture>['finish']>();
   const saved = global.__coverage__;
   vi.mocked(startCapture).mockImplementation(() => {
     delete global.__coverage__;
@@ -43,7 +41,9 @@ async function fixture() {
   const once = process.once.bind(process);
   vi.spyOn(process, 'once').mockImplementation((event, listener) => {
     if (event === 'exit') {
-      callbacks.push(listener);
+      callbacks.push(() => {
+        listener();
+      });
       return process;
     }
     return once(event, listener);
@@ -54,7 +54,9 @@ async function fixture() {
     path,
     finish,
     callbacks,
-    hook: vi.mocked(registerHooks).mock.calls.at(-1)![0].load!,
+    hook:
+      (vi.mocked(registerHooks).mock.calls.at(-1) ?? assert.fail('必須のテスト値がありません。'))[0]
+        .load ?? assert.fail('必須のテスト値がありません。'),
   };
 }
 

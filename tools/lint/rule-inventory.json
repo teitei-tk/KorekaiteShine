@@ -1,0 +1,5573 @@
+[
+  {
+    "rule": "eslint/accessor-pairs",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/array-callback-return",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/arrow-body-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/block-scoped-var",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/capitalized-comments",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "既存の日本語コメントと数学的な添字、宣言関数とコールバックの使い分けを許可する。"
+  },
+  {
+    "rule": "eslint/class-methods-use-this",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/complexity",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/constructor-super",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/curly",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/default-case",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/default-case-last",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/default-param-last",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/eqeqeq",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/for-direction",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/func-name-matching",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/func-names",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "既存の日本語コメントと数学的な添字、宣言関数とコールバックの使い分けを許可する。"
+  },
+  {
+    "rule": "eslint/func-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "既存の日本語コメントと数学的な添字、宣言関数とコールバックの使い分けを許可する。"
+  },
+  {
+    "rule": "eslint/getter-return",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/grouped-accessor-pairs",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/guard-for-in",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/id-denylist",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/id-length",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "既存の日本語コメントと数学的な添字、宣言関数とコールバックの使い分けを許可する。"
+  },
+  {
+    "rule": "eslint/id-match",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/init-declarations",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/logical-assignment-operators",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/max-classes-per-file",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+  },
+  {
+    "rule": "eslint/max-depth",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/max-lines",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/max-lines-per-function",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/max-nested-callbacks",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/max-params",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/max-statements",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "eslint/new-cap",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-alert",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-array-constructor",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-async-promise-executor",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-await-in-loop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "非同期インターフェース、逐次状態操作、テスト内closureを維持する。並列化で意味を変えない。"
+  },
+  {
+    "rule": "eslint/no-bitwise",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-caller",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-case-declarations",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-class-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-compare-neg-zero",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-cond-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-console",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "CLIとテスト起動の標準出力・診断を必要とする。秘密値の扱いは出力境界で検査する。"
+  },
+  {
+    "rule": "eslint/no-const-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-constant-binary-expression",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-constant-condition",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-constructor-return",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-continue",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "内部のカウンタと走査の制御を許可し、外部状態の不変性は独自ルールで検査する。"
+  },
+  {
+    "rule": "eslint/no-control-regex",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-debugger",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-delete-var",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-div-regex",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-dupe-class-members",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-dupe-else-if",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-dupe-keys",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-duplicate-case",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-duplicate-imports",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-else-return",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-empty",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-empty-character-class",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-empty-function",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-empty-pattern",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-empty-static-block",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-eq-null",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-eval",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-ex-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-extend-native",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-extra-bind",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-extra-boolean-cast",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "JsonInputのdraft欠損/falsyを既存どおり分類する明示Booleanとstrict-boolean-expressionsの混在型制約を両立する局所例外。"
+  },
+  {
+    "rule": "eslint/no-extra-label",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-fallthrough",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-func-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-global-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-implicit-coercion",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-implicit-globals",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-implied-eval",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-import-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-inline-comments",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "既存の日本語コメントと数学的な添字、宣言関数とコールバックの使い分けを許可する。"
+  },
+  {
+    "rule": "eslint/no-inner-declarations",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-invalid-regexp",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-irregular-whitespace",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-iterator",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-label-var",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-labels",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-lone-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-lonely-if",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-loop-func",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-loss-of-precision",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-magic-numbers",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "時刻・HTTP状態・バイト境界とfixtureの期待値を含む。意味を持つ定数の抽出はドメイン単位で判断する。"
+  },
+  {
+    "rule": "eslint/no-misleading-character-class",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-multi-assign",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-multi-str",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-negated-condition",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-nested-ternary",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "eslint/no-new",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-new-func",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-new-native-nonconstructor",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-new-wrappers",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-nonoctal-decimal-escape",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-obj-calls",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-object-constructor",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-param-reassign",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-plusplus",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "内部のカウンタと走査の制御を許可し、外部状態の不変性は独自ルールで検査する。"
+  },
+  {
+    "rule": "eslint/no-promise-executor-return",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-proto",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-prototype-builtins",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-redeclare",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの名前解決で検査する。型名・宣言マージ・libの大域宣言は構文Lintだけでは判定しない。"
+  },
+  {
+    "rule": "eslint/no-regex-spaces",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-restricted-exports",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-restricted-globals",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-restricted-imports",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-restricted-properties",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-return-assign",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-script-url",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-self-assign",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-self-compare",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-sequences",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-setter-return",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-shadow",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの名前解決で検査する。型名・宣言マージ・libの大域宣言は構文Lintだけでは判定しない。"
+  },
+  {
+    "rule": "eslint/no-shadow-restricted-names",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-sparse-arrays",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-template-curly-in-string",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+  },
+  {
+    "rule": "eslint/no-ternary",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "eslint/no-this-before-super",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-throw-literal",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unassigned-vars",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-undef",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの名前解決で検査する。型名・宣言マージ・libの大域宣言は構文Lintだけでは判定しない。"
+  },
+  {
+    "rule": "eslint/no-undefined",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "eslint/no-underscore-dangle",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unexpected-multiline",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unmodified-loop-condition",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unneeded-ternary",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unreachable",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unreachable-loop",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unsafe-finally",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unsafe-negation",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unsafe-optional-chaining",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unused-expressions",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unused-labels",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unused-private-class-members",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-unused-vars",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-use-before-define",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-assignment",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-backreference",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-call",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-catch",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-computed-key",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-concat",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-constructor",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-escape",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-rename",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-useless-return",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-var",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-void",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "eslint/no-warning-comments",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/no-with",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/object-shorthand",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/one-var",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "immutable/no-letとconst宣言を維持する。複数宣言の結合は採用しない。"
+  },
+  {
+    "rule": "eslint/operator-assignment",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-arrow-callback",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-const",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-destructuring",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-exponentiation-operator",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-named-capture-group",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-numeric-literals",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-object-has-own",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-object-spread",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-promise-reject-errors",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-regex-literals",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-rest-params",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-spread",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/prefer-template",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/preserve-caught-error",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/radix",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/require-await",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "非同期インターフェース、逐次状態操作、テスト内closureを維持する。並列化で意味を変えない。"
+  },
+  {
+    "rule": "eslint/require-unicode-regexp",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/require-yield",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/sort-imports",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "整形とimport順序はoxfmtに一元化し競合する書換えを避ける。"
+  },
+  {
+    "rule": "eslint/sort-keys",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "整形とimport順序はoxfmtに一元化し競合する書換えを避ける。"
+  },
+  {
+    "rule": "eslint/sort-vars",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "immutable/no-letとconst宣言を維持する。複数宣言の結合は採用しない。"
+  },
+  {
+    "rule": "eslint/symbol-description",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/unicode-bom",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/use-isnan",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/valid-typeof",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/vars-on-top",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "eslint/yoda",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/consistent-type-specifier-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/default",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/export",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/exports-last",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/extensions",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/first",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/group-exports",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/max-dependencies",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/named",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/namespace",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/newline-after-import",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "整形とimport順序はoxfmtに一元化し競合する書換えを避ける。"
+  },
+  {
+    "rule": "import/no-absolute-path",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-amd",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-anonymous-default-export",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-commonjs",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+  },
+  {
+    "rule": "import/no-cycle",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-default-export",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/no-duplicates",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-dynamic-require",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-empty-named-blocks",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-mutable-exports",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-named-as-default",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-named-as-default-member",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-named-default",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-named-export",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/no-namespace",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/no-nodejs-modules",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "CLI・生成器・テスト起動ではNode API、同期初期化、環境変数、top-level awaitが必要。Worker境界はビルドで検査する。"
+  },
+  {
+    "rule": "import/no-relative-parent-imports",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/no-self-import",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/no-unassigned-import",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/no-webpack-loader-syntax",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "import/prefer-default-export",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "workspaceの相対import、型付きnamed exports、設定default export、setup副作用importを許可する。"
+  },
+  {
+    "rule": "import/unambiguous",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "規則は有効。ファイル固有API・fixtureの局所例外はrule-exceptions.jsonと設定overrideに記録。"
+  },
+  {
+    "rule": "jest/consistent-test-it",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/expect-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/max-expects",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/max-nested-describe",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-alias-methods",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-commented-out-tests",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-conditional-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-conditional-in-test",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-confusing-set-timeout",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-deprecated-functions",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-disabled-tests",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-done-callback",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-duplicate-hooks",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-export",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-focused-tests",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-hooks",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-identical-title",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-interpolation-in-snapshots",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-jasmine-globals",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-large-snapshots",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-mocks-import",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-restricted-jest-methods",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-restricted-matchers",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-standalone-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-test-prefixes",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-test-return-statement",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-unneeded-async-expect-function",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/no-untyped-mock-factory",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/padding-around-after-all-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/padding-around-test-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-called-with",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-comparison-matcher",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-each",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-ending-with-an-expect",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-equality-matcher",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-expect-assertions",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-expect-resolves",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-hooks-in-order",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-hooks-on-top",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-importing-jest-globals",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-jest-mocked",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-lowercase-title",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-mock-promise-shorthand",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-mock-return-shorthand",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-snapshot-hint",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-spy-on",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-strict-equal",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-to-be",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-to-contain",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-to-have-been-called",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-to-have-been-called-times",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-to-have-length",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/prefer-todo",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/require-hook",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/require-to-throw-message",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/require-top-level-describe",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/valid-describe-callback",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/valid-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/valid-expect-in-promise",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jest/valid-title",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vitestとnode:testを使用するためJest固有のAPIは対象外。"
+  },
+  {
+    "rule": "jsdoc/check-access",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/check-property-names",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/check-tag-names",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/empty-tags",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/implements-on-classes",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/no-blank-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/no-defaults",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-param",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "型はTypeScriptを原本とし、JSDocに同じ型契約の二重管理を要求しない。"
+  },
+  {
+    "rule": "jsdoc/require-param-description",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-param-name",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-param-type",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-property",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-property-description",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-property-name",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-property-type",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-returns",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "型はTypeScriptを原本とし、JSDocに同じ型契約の二重管理を要求しない。"
+  },
+  {
+    "rule": "jsdoc/require-returns-description",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-returns-type",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-throws-description",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-throws-type",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-yields",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-yields-description",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsdoc/require-yields-type",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/alt-text",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/anchor-ambiguous-text",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/anchor-has-content",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/anchor-is-valid",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/aria-activedescendant-has-tabindex",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/aria-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/aria-proptypes",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/aria-role",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/aria-unsupported-elements",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/autocomplete-valid",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/click-events-have-key-events",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/control-has-associated-label",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/heading-has-content",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/html-has-lang",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/iframe-has-title",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/img-redundant-alt",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/interactive-supports-focus",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/label-has-associated-control",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/lang",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/media-has-caption",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/mouse-events-have-key-events",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-access-key",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-aria-hidden-on-focusable",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-autofocus",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-distracting-elements",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-interactive-element-to-noninteractive-role",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-noninteractive-element-interactions",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-noninteractive-element-to-interactive-role",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-noninteractive-tabindex",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-redundant-roles",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/no-static-element-interactions",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/prefer-tag-over-role",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/role-has-required-aria-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/role-supports-aria-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/scope",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "jsx_a11y/tabindex-no-positive",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "nextjs/google-font-display",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/google-font-preconnect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/inline-script-id",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/next-script-for-ga",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-assign-module-variable",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-async-client-component",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-before-interactive-script-outside-document",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-css-tags",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-document-import-in-page",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-duplicate-head",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-head-element",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-head-import-in-document",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-html-link-for-pages",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-img-element",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-page-custom-font",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-script-component-in-head",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-styled-jsx-in-document",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-sync-scripts",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-title-in-document-head",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-typos",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "nextjs/no-unwanted-polyfillio",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "TanStack Startを使用しNext.js API/routingを使用しない。"
+  },
+  {
+    "rule": "node/callback-return",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "子プロセス・イベントAPIをPromiseへ接続し、終了イベントと後処理を明示する。"
+  },
+  {
+    "rule": "node/exports-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/global-require",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/handle-callback-err",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/no-exports-assign",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/no-mixed-requires",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/no-new-require",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/no-path-concat",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "node/no-process-env",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "CLI・生成器・テスト起動ではNode API、同期初期化、環境変数、top-level awaitが必要。Worker境界はビルドで検査する。"
+  },
+  {
+    "rule": "node/no-sync",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "CLI・生成器・テスト起動ではNode API、同期初期化、環境変数、top-level awaitが必要。Worker境界はビルドで検査する。"
+  },
+  {
+    "rule": "node/no-top-level-await",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "CLI・生成器・テスト起動ではNode API、同期初期化、環境変数、top-level awaitが必要。Worker境界はビルドで検査する。"
+  },
+  {
+    "rule": "oxc/approx-constant",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-array-method-on-arguments",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-bitwise-operator",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-char-at-comparison",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-comparison-sequence",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-match-all-arg",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-min-max-func",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-object-literal-comparison",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/bad-replace-all-arg",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/branches-sharing-code",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/const-comparisons",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/double-comparisons",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/erasing-op",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/misrefactored-assign-op",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/missing-throw",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-accumulating-spread",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-async-await",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "Node26とWorkersが対応するasync・optional chaining・immutableなspreadを使用する設計。"
+  },
+  {
+    "rule": "oxc/no-async-endpoint-handlers",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-barrel-file",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-const-enum",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-map-spread",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/no-optional-chaining",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "Node26とWorkersが対応するasync・optional chaining・immutableなspreadを使用する設計。"
+  },
+  {
+    "rule": "oxc/no-rest-spread-properties",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "Node26とWorkersが対応するasync・optional chaining・immutableなspreadを使用する設計。"
+  },
+  {
+    "rule": "oxc/no-this-in-exported-function",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/number-arg-out-of-range",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/only-used-in-recursion",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "oxc/uninvoked-array-callback",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/always-return",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/avoid-new",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "子プロセス・イベントAPIをPromiseへ接続し、終了イベントと後処理を明示する。"
+  },
+  {
+    "rule": "promise/catch-or-return",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-callback-in-promise",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-multiple-resolved",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-nesting",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-new-statics",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-promise-in-callback",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-return-in-finally",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/no-return-wrap",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/param-names",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/prefer-await-to-callbacks",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "子プロセス・イベントAPIをPromiseへ接続し、終了イベントと後処理を明示する。"
+  },
+  {
+    "rule": "promise/prefer-await-to-then",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "子プロセス・イベントAPIをPromiseへ接続し、終了イベントと後処理を明示する。"
+  },
+  {
+    "rule": "promise/prefer-catch",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/spec-only",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "promise/valid-params",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/button-has-type",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/capitalized-calls",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/checked-requires-onchange-or-readonly",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/display-name",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/error-boundaries",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/exhaustive-deps",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/exhaustive-effect-dependencies",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "未使用のReact Compilerが内部IRで行う最適化前提の検査。React Compilerを導入していないため適用対象外。通常React Hooksの依存・呼出し規則は維持する。"
+  },
+  {
+    "rule": "react/forbid-component-props",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/forbid-dom-props",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/forbid-elements",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/forward-ref-uses-ref",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/function-component-definition",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/globals",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/hook-use-state",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/hooks",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/iframe-missing-sandbox",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/immutability",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/incompatible-library",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/invariant",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-boolean-value",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-curly-brace-presence",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-filename-extension",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-fragments",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-handler-names",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-key",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-max-depth",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React自動JSX変換、日本語の単一言語UI、TanStackファイルルートと補助コンポーネントを使用する。"
+  },
+  {
+    "rule": "react/jsx-no-comment-textnodes",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-constructed-context-values",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-duplicate-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-literals",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React自動JSX変換、日本語の単一言語UI、TanStackファイルルートと補助コンポーネントを使用する。"
+  },
+  {
+    "rule": "react/jsx-no-script-url",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-target-blank",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-undef",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-no-useless-fragment",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-pascal-case",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-props-no-spread-multi",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/jsx-props-no-spreading",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/memo-dependencies",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-array-index-key",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-children-prop",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-clone-element",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-danger",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-danger-with-children",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-deriving-state-in-effects",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-did-mount-set-state",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-did-update-set-state",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-direct-mutation-state",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-find-dom-node",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-is-mounted",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-multi-comp",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React自動JSX変換、日本語の単一言語UI、TanStackファイルルートと補助コンポーネントを使用する。"
+  },
+  {
+    "rule": "react/no-namespace",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-object-type-as-default-prop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-react-children",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-redundant-should-component-update",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-render-return-value",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-set-state",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-string-refs",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-this-in-sfc",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-unescaped-entities",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-unknown-property",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-unsafe",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-unstable-nested-components",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/no-will-update-set-state",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/only-export-components",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React自動JSX変換、日本語の単一言語UI、TanStackファイルルートと補助コンポーネントを使用する。"
+  },
+  {
+    "rule": "react/prefer-es6-class",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/prefer-function-component",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/preserve-manual-memoization",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/purity",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/react-in-jsx-scope",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React自動JSX変換、日本語の単一言語UI、TanStackファイルルートと補助コンポーネントを使用する。"
+  },
+  {
+    "rule": "react/refs",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "未使用のReact Compilerが内部IRで行う最適化前提の検査。React Compilerを導入していないため適用対象外。通常React Hooksの依存・呼出し規則は維持する。"
+  },
+  {
+    "rule": "react/require-render-return",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/rule-suppression",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React Compilerが抑制を含む関数を最適化対象から外すことを通知する規則。未使用のCompiler最適化の適格性は対象外。個別のHooks依存規則と理由付き局所例外は維持する。"
+  },
+  {
+    "rule": "react/rules-of-hooks",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/self-closing-comp",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/set-state-in-effect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "未使用のReact Compilerが内部IRで行う最適化前提の検査。React Compilerを導入していないため適用対象外。通常React Hooksの依存・呼出し規則は維持する。"
+  },
+  {
+    "rule": "react/set-state-in-render",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/state-in-constructor",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/static-components",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/style-prop-object",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/syntax",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/todo",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "React Compilerがfinally・論理代入・hoisted functionを未対応として報告する内部TODO診断であり、実行時Reactで有効な構文を検査できない。"
+  },
+  {
+    "rule": "react/unsupported-syntax",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/use-memo",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/void-dom-elements-no-children",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react/void-use-memo",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react_perf/jsx-no-jsx-as-prop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react_perf/jsx-no-new-array-as-prop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react_perf/jsx-no-new-function-as-prop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "react_perf/jsx-no-new-object-as-prop",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/adjacent-overload-signatures",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/array-type",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/await-thenable",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/ban-ts-comment",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/ban-tslint-comment",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/ban-types",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/class-literal-property-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/consistent-generic-constructors",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/consistent-indexed-object-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/consistent-return",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/consistent-type-assertions",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/consistent-type-definitions",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/consistent-type-exports",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/consistent-type-imports",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/dot-notation",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/explicit-function-return-type",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの推論を利用する。公開APIの型はTypeSpecから生成し、別の手書き型を要求しない。"
+  },
+  {
+    "rule": "typescript/explicit-member-accessibility",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの推論を利用する。公開APIの型はTypeSpecから生成し、別の手書き型を要求しない。"
+  },
+  {
+    "rule": "typescript/explicit-module-boundary-types",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypeScriptの推論を利用する。公開APIの型はTypeSpecから生成し、別の手書き型を要求しない。"
+  },
+  {
+    "rule": "typescript/method-signature-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-array-delete",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-base-to-string",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-confusing-non-null-assertion",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-confusing-void-expression",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-deprecated",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-duplicate-enum-values",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-duplicate-type-constituents",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-dynamic-delete",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-empty-interface",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-empty-object-type",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-explicit-any",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-extra-non-null-assertion",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-extraneous-class",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-floating-promises",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-for-in-array",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-generated-empty-object-type",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-implied-eval",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-import-type-side-effects",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-inferrable-types",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-invalid-void-type",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-meaningless-void-operator",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-misused-new",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-misused-promises",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-misused-spread",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-mixed-enums",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-namespace",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-non-null-asserted-nullish-coalescing",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-non-null-asserted-optional-chain",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-non-null-assertion",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-redundant-type-constituents",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-require-imports",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-restricted-types",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-this-alias",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-unnecessary-boolean-literal-compare",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-condition",
+    "category": "nursery",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-parameter-property-assignment",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-unnecessary-qualifier",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-template-expression",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-type-arguments",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-type-assertion",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-type-constraint",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-unnecessary-type-conversion",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unnecessary-type-parameters",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-argument",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-assignment",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-call",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-declaration-merging",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-unsafe-enum-assignment",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-enum-comparison",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-function-type",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-unsafe-member-access",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-return",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-type-assertion",
+    "category": "suspicious",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-unsafe-unary-minus",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-useless-default-assignment",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/no-useless-empty-export",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-var-requires",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/no-wrapper-object-types",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/non-nullable-type-assertion-style",
+    "category": "restriction",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/only-throw-error",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/parameter-properties",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-as-const",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-enum-initializers",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-find",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-for-of",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-function-type",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-includes",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-literal-enum-member",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-namespace-keyword",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/prefer-nullish-coalescing",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-optional-chain",
+    "category": "nursery",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-promise-reject-errors",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-readonly",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-readonly-parameter-types",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "exception",
+    "reason": "外部SDK、DB、Worker APIの可変型を受け取る。独自immutableルールで引数の再代入を拒否する。"
+  },
+  {
+    "rule": "typescript/prefer-reduce-type-parameter",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-regexp-exec",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-return-this-type",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-string-starts-ends-with",
+    "category": "style",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/prefer-ts-expect-error",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/promise-function-async",
+    "category": "restriction",
+    "typeAware": true,
+    "status": "exception",
+    "reason": "Promiseを継承したfluent DB fixtureの返値をasyncで包むとメソッドが失われる。同期throw境界も維持する。"
+  },
+  {
+    "rule": "typescript/related-getter-setter-pairs",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/require-array-sort-compare",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/require-await",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "exception",
+    "reason": "基底require-awaitと同じく、外部非同期インターフェースを実装する同期fixture・診断プロバイダでもPromise契約を維持する。async削除は同期throwとfluent Promiseの契約を変える。"
+  },
+  {
+    "rule": "typescript/restrict-plus-operands",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/restrict-template-expressions",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/return-await",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/strict-boolean-expressions",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/strict-void-return",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/switch-exhaustiveness-check",
+    "category": "pedantic",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/triple-slash-reference",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/unbound-method",
+    "category": "correctness",
+    "typeAware": true,
+    "status": "scoped",
+    "reason": "型情報があるTypeScriptに適用。checkJs対象外のJSと生成先で型解決するAPIルート原本templateは対象外。実行時ガードの静的誤報は理由付き該当行だけ除外する。"
+  },
+  {
+    "rule": "typescript/unified-signatures",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "typescript/use-unknown-in-catch-callback-variable",
+    "category": "restriction",
+    "typeAware": true,
+    "status": "exception",
+    "reason": "既存のunknown禁止ポリシーと矛盾する。"
+  },
+  {
+    "rule": "unicorn/catch-error-name",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/consistent-assert",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/consistent-date-clone",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/consistent-empty-array-spread",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/consistent-existence-index-check",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/consistent-function-scoping",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "非同期インターフェース、逐次状態操作、テスト内closureを維持する。並列化で意味を変えない。"
+  },
+  {
+    "rule": "unicorn/consistent-template-literal-escape",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/custom-error-definition",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/empty-brace-spaces",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "整形とimport順序はoxfmtに一元化し競合する書換えを避ける。"
+  },
+  {
+    "rule": "unicorn/error-message",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/escape-case",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/explicit-length-check",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/explicit-timer-delay",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/filename-case",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/import-style",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/max-nested-calls",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "状態遷移・検証schema・表駆動fixtureの機械的分割を強制しない。責務の分割はレビュー基準で評価する。"
+  },
+  {
+    "rule": "unicorn/new-for-builtins",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-abusive-eslint-disable",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-accessor-recursion",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-anonymous-default-export",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-callback-reference",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-fill-with-reference-type",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-for-each",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-method-this-argument",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-reduce",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-reverse",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-array-sort",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-await-expression-member",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "非同期インターフェース、逐次状態操作、テスト内closureを維持する。並列化で意味を変えない。"
+  },
+  {
+    "rule": "unicorn/no-await-in-promise-methods",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-confusing-array-with",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-console-spaces",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-document-cookie",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-empty-file",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-hex-escape",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-immediate-mutation",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-instanceof-array",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-instanceof-builtins",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-invalid-fetch-options",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-invalid-remove-event-listener",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-length-as-slice-end",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-lonely-if",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-magic-array-flat-depth",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-negated-condition",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-negation-in-equality-check",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-nested-ternary",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "unicorn/no-new-array",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-new-buffer",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-null",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "const主体の条件式、nullableなDB/API契約、明示したfire-and-forget境界を表現する。"
+  },
+  {
+    "rule": "unicorn/no-object-as-default-parameter",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-process-exit",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-single-promise-in-promise-methods",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-static-only-class",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-thenable",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-this-assignment",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-typeof-undefined",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unnecessary-array-flat-depth",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unnecessary-array-splice-count",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unnecessary-await",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unnecessary-slice-end",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unreadable-array-destructuring",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-unreadable-iife",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-collection-argument",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-error-capture-stack-trace",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-fallback-in-spread",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-iterator-to-array",
+    "category": "nursery",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-length-check",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-promise-resolve-reject",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-spread",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-switch-case",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/no-useless-undefined",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "欠損入力の回帰試験と必須引数のundefinedを明示する。"
+  },
+  {
+    "rule": "unicorn/no-zero-fractions",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/number-literal-case",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "固定版はhexをuppercaseに強制する設定不可の規則で、oxfmtのlowercase出力と相互矛盾する。数値literalの整形はoxfmtを原本とする。"
+  },
+  {
+    "rule": "unicorn/numeric-separators-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-add-event-listener",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-array-find",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-array-flat",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-array-flat-map",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-array-index-of",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-array-some",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-at",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-bigint-literals",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-blob-reading-methods",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-class-fields",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-classlist-toggle",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-code-point",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-date-now",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-default-parameters",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-dom-node-append",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-dom-node-dataset",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-dom-node-remove",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-dom-node-text-content",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-event-target",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-export-from",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-global-this",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-import-meta-properties",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-includes",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-keyboard-event-key",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-logical-operator-over-ternary",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-math-min-max",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-math-trunc",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-modern-dom-apis",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-modern-math-apis",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-module",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-native-coercion-functions",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-negative-index",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-node-protocol",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-number-coercion",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-number-properties",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-object-from-entries",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-optional-catch-binding",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-prototype-methods",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-query-selector",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-reflect-apply",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-regexp-test",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-response-static-json",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-set-has",
+    "category": "perf",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-set-size",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-single-call",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-spread",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "TypedArray.sliceをArray spreadへ変えるとbufferとバイナリ形式が失われる誤修正を実測した。"
+  },
+  {
+    "rule": "unicorn/prefer-string-raw",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-string-replace-all",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-string-slice",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-string-starts-ends-with",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-string-trim-start-end",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-structured-clone",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-ternary",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-top-level-await",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/prefer-type-error",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/relative-url-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/require-array-join-separator",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/require-module-attributes",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/require-module-specifiers",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/require-number-to-fixed-digits-argument",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/require-post-message-target-origin",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/switch-case-braces",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/switch-case-break-position",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/text-encoding-identifier-case",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "unicorn/throw-new-error",
+    "category": "style",
+    "typeAware": false,
+    "status": "enabled"
+  },
+  {
+    "rule": "vitest/consistent-each-for",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/consistent-test-filename",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/consistent-test-it",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/consistent-vitest-vi",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/expect-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/hoisted-apis-on-top",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/max-expects",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "日本語の表駆動回帰テスト・障害注入・分岐ごとの複数不変条件を検証する。"
+  },
+  {
+    "rule": "vitest/max-nested-describe",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-alias-methods",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-commented-out-tests",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-conditional-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-conditional-in-test",
+    "category": "pedantic",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "日本語の表駆動回帰テスト・障害注入・分岐ごとの複数不変条件を検証する。"
+  },
+  {
+    "rule": "vitest/no-conditional-tests",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-disabled-tests",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-duplicate-hooks",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-focused-tests",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-hooks",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/no-identical-title",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-import-node-test",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "Compiler API互換性検査はNode標準testで実行する。"
+  },
+  {
+    "rule": "vitest/no-importing-vitest-globals",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/no-interpolation-in-snapshots",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-large-snapshots",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-mocks-import",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-restricted-matchers",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-restricted-vi-methods",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-standalone-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-test-prefixes",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-test-return-statement",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/no-unneeded-async-expect-function",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/padding-around-after-all-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/padding-around-test-blocks",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-called-exactly-once-with",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-called-once",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-called-times",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-called-with",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-comparison-matcher",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-describe-function-title",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-each",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-equality-matcher",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-expect-assertions",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/prefer-expect-resolves",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-expect-type-of",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-hooks-in-order",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-hooks-on-top",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-import-in-mock",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "Node組込みmoduleの部分mockでdefault exportの型合成が実際の置換契約と一致しないため文字列指定を維持する。"
+  },
+  {
+    "rule": "vitest/prefer-importing-vitest-globals",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-lowercase-title",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "日本語の表駆動回帰テスト・障害注入・分岐ごとの複数不変条件を検証する。"
+  },
+  {
+    "rule": "vitest/prefer-mock-promise-shorthand",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-mock-return-shorthand",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "mockImplementationの遅延参照をmockReturnValueの即時評価へ変えると更新後の状態を観測できない。"
+  },
+  {
+    "rule": "vitest/prefer-snapshot-hint",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-spy-on",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-strict-boolean-matchers",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-strict-equal",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-be",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-be-falsy",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-be-object",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-be-truthy",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-contain",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-have-been-called-times",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-to-have-length",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/prefer-todo",
+    "category": "style",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/require-awaited-expect-poll",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/require-hook",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/require-local-test-context-for-concurrent-snapshots",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/require-mock-type-parameters",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "日本語の表駆動回帰テスト・障害注入・分岐ごとの複数不変条件を検証する。"
+  },
+  {
+    "rule": "vitest/require-test-timeout",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/require-to-throw-message",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/require-top-level-describe",
+    "category": "style",
+    "typeAware": false,
+    "status": "exception",
+    "reason": "明示importしたVitestで独立testを使用する。fixture生成と後片付けは各testかhookで表現し、runnerのtimeoutを共通設定する。"
+  },
+  {
+    "rule": "vitest/valid-describe-callback",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/valid-expect",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/valid-expect-in-promise",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/valid-title",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vitest/warn-todo",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "scoped",
+    "reason": "VitestのTS/TSX/JS/MJS/CJSテストに適用。node:testのCompiler API互換性検査は除外。"
+  },
+  {
+    "rule": "vue/component-definition-name-casing",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/define-emits-declaration",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/define-props-declaration",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/define-props-destructuring",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/max-props",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/next-tick-style",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-arrow-functions-in-watch",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-async-in-computed-properties",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-computed-properties-in-data",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-data-object-declaration",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-delete-set",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-destroyed-lifecycle",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-events-api",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-model-definition",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-props-default-this",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-deprecated-vue-config-keycodes",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-dupe-keys",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-export-in-script-setup",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-expose-after-await",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-import-compiler-macros",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-lifecycle-after-await",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-multiple-slot-args",
+    "category": "restriction",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-required-prop-with-default",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-reserved-component-names",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-reserved-keys",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-reserved-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-shared-component-data",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-side-effects-in-computed-properties",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-this-in-before-route-enter",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/no-watch-after-await",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/prefer-import-from-vue",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/prop-name-casing",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-default-export",
+    "category": "suspicious",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-default-prop",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-direct-export",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-prop-type-constructor",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-prop-types",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-render-return",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-slots-as-functions",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/require-typed-ref",
+    "category": "style",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/return-in-computed-property",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/return-in-emits-validator",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/valid-define-emits",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/valid-define-options",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/valid-define-props",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  },
+  {
+    "rule": "vue/valid-next-tick",
+    "category": "correctness",
+    "typeAware": false,
+    "status": "not-applicable",
+    "reason": "Vueのソース・runtimeを使用しない。"
+  }
+]

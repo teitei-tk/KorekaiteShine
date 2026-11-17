@@ -1,3 +1,4 @@
+import { requireValue } from './required.ts';
 import { readInlineHistory } from './history.ts';
 import { loadSnapshot } from './snapshot.ts';
 import { appendFileSync, mkdirSync } from 'node:fs';
@@ -19,7 +20,7 @@ export async function prepareReview(
     if (!api && !env.GH_TOKEN) {
       throw new ReviewFailure('AUTH_FAILED', 'GitHub認証がありません');
     }
-    const client = api ?? githubApi(env.GH_TOKEN!);
+    const client = api ?? githubApi(requireValue(env.GH_TOKEN));
     const result = await target(client, Number(env.SOURCE_RUN_ID));
     if (result.status !== 'ready') {
       writeStatusReport(
@@ -28,10 +29,10 @@ export async function prepareReview(
         'gate',
         result.status === 'already-complete' ? 'ALREADY_COMPLETE' : 'SKIPPED',
       );
-      appendFileSync(env.GITHUB_OUTPUT!, 'allowed=false\n');
+      appendFileSync(requireValue(env.GITHUB_OUTPUT), 'allowed=false\n');
       return;
     }
-    const pr = result.pr;
+    const { pr } = result;
     if (mode === 'collect' && env.AI_REVIEW_MODE === 'review') {
       targetIdContext.targetId = 'collect';
       targetIdContext.fallback = 'INPUT_INVALID';
@@ -50,7 +51,7 @@ export async function prepareReview(
         [...history.issues, ...history.inline].some(
           (c) =>
             ownComment(c) &&
-            /<!-- generation:v2:\d+:\d+:/.test(c.body) &&
+            /<!-- generation:v2:\d+:\d+:/u.test(c.body) &&
             c.body.includes(`:${pr.head.sha}:${pr.base.sha} -->`),
         )
       ) {
@@ -58,10 +59,10 @@ export async function prepareReview(
       }
       targetIdContext.targetId = 'collect';
       targetIdContext.fallback = 'COLLECTION_FAILED';
-      collectMaterial(pr, directory, history, env.SOURCE_RUN_ID!);
+      collectMaterial(pr, directory, history, requireValue(env.SOURCE_RUN_ID));
     }
     appendFileSync(
-      env.GITHUB_OUTPUT!,
+      requireValue(env.GITHUB_OUTPUT),
       `allowed=true\npr=${pr.number}\nhead=${pr.head.sha}\nbase=${pr.base.sha}\n`,
     );
   } catch (error) {

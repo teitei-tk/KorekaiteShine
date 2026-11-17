@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsrs --fast --noEmit"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

@@ -78,3 +78,9 @@ test('setup-nodeのwith自体が欠けた場合もNode版の参照漏れとし�
     '.github/workflows/check.yml (check): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください',
   ]);
 });
+
+test('manifestのNode設定が文字列でなければ形式エラーとして拒否する', async () => {
+  await expect(inspect({ 'package.json': '{"engines":{"node":26}}' })).rejects.toThrow(
+    'engines.node',
+  );
+});

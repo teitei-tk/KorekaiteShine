@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "ESNext.Temporal"],
+    "lib": ["ES2023", "ESNext.Temporal"],
     "module": "NodeNext",
     "strict": true,
     "noEmit": true,
@@ -9,5 +9,5 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "isolation/*.ts"]
+  "include": ["*.ts", "isolation/*.ts", "tests/**/*.ts"]
 }

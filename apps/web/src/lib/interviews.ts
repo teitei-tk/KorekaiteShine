@@ -7,6 +7,7 @@ export async function getInterviews(
   fetcher: typeof fetch = fetch,
 ): Promise<components['schemas']['InterviewList']> {
   const client = createClient<paths>({ baseUrl, fetch: fetcher });
+  // oxlint-disable-next-line eslint/new-cap -- openapi-fetchの生成HTTPメソッド名に従う。
   const { data, response } = await client.GET('/api/interviews');
   if (!response.ok || !data) {
     throw new Error('面接一覧を取得できませんでした。');

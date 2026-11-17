@@ -7,13 +7,14 @@ import { createPrimaryDb } from '@korekaite/database/connection';
 import { createInterviewSession } from '../application/interview-session';
 import { createInterviewRoom } from '../application/interview-room';
 import { evaluationConfiguration } from '../application/evaluation-configuration';
-import { createLiveConnection, type LiveHandlers } from './live-connection';
+import { createLiveConnection } from './live-connection';
+import type { LiveHandlers } from './live-connection';
 import { loadInterview } from './repositories/interviews';
 
 // 接続を失ったときに稼働確認前の時間を計上しないため、面接中のみ5秒ごとに記録する。
 const audioCheckpointMs = 5000;
 
-interface Bindings {
+type Bindings = {
   DB: D1Database;
   APP_ENV: string;
   INTERVIEW_SESSION: DurableObjectNamespace;
@@ -21,11 +22,11 @@ interface Bindings {
   RESPONSES_MODEL?: string;
   EVALUATION_MODEL?: string;
   LIVE_VOICE?: string;
-}
-interface Identity {
+};
+type Identity = {
   actorId: string;
   interviewId: string;
-}
+};
 
 export class InterviewObject extends DurableObject<Bindings> {
   private room?: ReturnType<typeof createInterviewRoom>;
@@ -33,16 +34,20 @@ export class InterviewObject extends DurableObject<Bindings> {
 
   protected settings() {
     const voice = this.env.LIVE_VOICE ?? 'marin';
-    if (!['marin', 'harema', 'shida'].includes(voice) || !this.env.RESPONSES_MODEL?.trim()) {
+    if (
+      (voice !== 'marin' && voice !== 'harema' && voice !== 'shida') ||
+      !this.env.RESPONSES_MODEL?.trim()
+    ) {
       throw new Error('面接モデルの設定が必要です。');
     }
     return {
       apiKey: this.env.OPENAI_API_KEY ?? '',
       responsesModel: this.env.RESPONSES_MODEL,
-      voice: voice as 'marin' | 'harema' | 'shida',
+      voice,
       evaluation: evaluationConfiguration(this.env.EVALUATION_MODEL ?? ''),
-    };
+    } as const;
   }
+  // oxlint-disable-next-line eslint/class-methods-use-this -- 診断用サブクラスが接続実装を差し替えるprotected拡張点。
   protected connectLive(
     options: Parameters<typeof createLiveConnection>[0],
     handlers: LiveHandlers,
@@ -62,6 +67,7 @@ export class InterviewObject extends DurableObject<Bindings> {
         return;
       }
       const db = createPrimaryDb(this.env.DB);
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!(await loadInterview(db, identity.actorId, identity.interviewId))) {
         throw new Error('面接が見つかりません。');
       }
@@ -87,7 +93,7 @@ export class InterviewObject extends DurableObject<Bindings> {
             .orderBy(asc(transcriptFragments.sequence)),
         schedule: async (state) => {
           const now = Temporal.Now.instant().epochMilliseconds;
-          const deadline = state.deadline ?? (state.status === 'ending' ? now + 30000 : null);
+          const deadline = state.deadline ?? (state.status === 'ending' ? now + 30_000 : null);
           if (deadline === null) {
             await this.ctx.storage.deleteAlarm();
           } else {
@@ -100,7 +106,10 @@ export class InterviewObject extends DurableObject<Bindings> {
         },
       });
     });
-    return this.room!;
+    if (!this.room) {
+      throw new Error('面接ルームの初期化に失敗しました。');
+    }
+    return this.room;
   }
   async fetch(request: Request): Promise<Response> {
     // Web Workerが本人確認後にこの内部bindingへ転送し、本人ヘッダーを上書きする。
@@ -127,6 +136,7 @@ export class InterviewObject extends DurableObject<Bindings> {
             eq(deletedInterviews.actorId, actorId),
           ),
         );
+      // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
       if (!marked) {
         return new Response(null, { status: 404 });
       }
@@ -142,6 +152,7 @@ export class InterviewObject extends DurableObject<Bindings> {
     if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response(null, { status: 426 });
     }
+    // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
     if (!(await loadInterview(createPrimaryDb(this.env.DB), actorId, interviewId))) {
       return new Response(null, { status: 404 });
     }
@@ -157,7 +168,9 @@ export class InterviewObject extends DurableObject<Bindings> {
         this.ctx.waitUntil(room.receive(id, message.data));
       }
     });
-    const detach = () => this.ctx.waitUntil(room.detach(id));
+    const detach = () => {
+      this.ctx.waitUntil(room.detach(id));
+    };
     server.addEventListener('close', detach);
     server.addEventListener('error', detach);
     server.binaryType = 'arraybuffer';
@@ -165,8 +178,12 @@ export class InterviewObject extends DurableObject<Bindings> {
     try {
       await room.attach(id, {
         questionBoundaries: new URL(request.url).searchParams.has('questionBoundaries'),
-        send: (data) => server.send(data),
-        close: () => server.close(1000),
+        send: (data) => {
+          server.send(data);
+        },
+        close: () => {
+          server.close(1000);
+        },
       });
     } catch {
       server.close(1011);

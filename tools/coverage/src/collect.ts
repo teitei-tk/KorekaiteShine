@@ -7,11 +7,11 @@ import { mergeMeasurements } from './merge.ts';
 import { prepareRun } from './prepare.ts';
 import { writeReports } from './report.ts';
 
-export interface CoverageCommand {
+export type CoverageCommand = {
   suite: string;
   command: string;
   args: readonly string[];
-}
+};
 
 export async function collectCoverage(options: {
   root: string;
@@ -50,7 +50,9 @@ export async function collectCoverage(options: {
       });
       child.once('error', reject);
       child.once('close', resolve);
-    }).finally(() => closeSync(output));
+    }).finally(() => {
+      closeSync(output);
+    });
     capture.finish({}, status === 0 ? 'complete' : 'failed');
     if (status !== 0) {
       throw new Error(`計測suiteが失敗しました: ${command.suite} (${logPath})`);

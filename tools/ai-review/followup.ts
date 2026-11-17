@@ -12,32 +12,39 @@ export function latestFollowupStatus(
   const replies = original.replyTo
     ? inline.filter((c) => c.in_reply_to_id === original.replyTo)
     : issues;
-  const latest = replies
+  const [latest] = replies
     .filter((c) => {
       if (!ownComment(c) || !Number.isSafeInteger(c.id)) {
         return false;
       }
-      const marker = /^<!-- followup:(.+):([a-f0-9]{40}):([a-f0-9]{40}) -->$/m.exec(c.body);
+      const marker =
+        /^<!-- followup:(?<capture1>.+):(?<capture2>[a-f0-9]{40}):(?<capture3>[a-f0-9]{40}) -->$/mu.exec(
+          c.body,
+        );
       return marker?.[1] === original.id;
     })
-    .sort((a, b) => b.id - a.id)[0];
+    .toSorted((a, b) => b.id - a.id);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- noUncheckedIndexedAccess=falseでは空配列を型で表現できないため、DB検索や配列先頭の欠損ガードを維持する。
   if (!latest) {
-    return;
+    return undefined;
   }
-  const state = /^<!-- followup-state:v1:(fixed|unfixed|unverified) -->$/m.exec(latest.body)?.[1];
+  const state = /^<!-- followup-state:v1:(?<capture1>fixed|unfixed|unverified) -->$/mu.exec(
+    latest.body,
+  )?.[1];
   if (state === 'fixed' || state === 'unfixed' || state === 'unverified') {
     return state;
   }
   // 投稿済みの旧形式も読めるように、固定見出し・固定ラベルを読む。
-  if (/^### ☑️: 修正を確認しました$/m.test(latest.body) && /^修正済み: /m.test(latest.body)) {
+  if (/^### ☑️: 修正を確認しました$/mu.test(latest.body) && /^修正済み: /mu.test(latest.body)) {
     return 'fixed';
   }
-  if (/^### 修正が確認できません$/m.test(latest.body)) {
-    if (/^未修正: /m.test(latest.body)) {
+  if (/^### 修正が確認できません$/mu.test(latest.body)) {
+    if (/^未修正: /mu.test(latest.body)) {
       return 'unfixed';
     }
-    if (/^確認不能: /m.test(latest.body)) {
+    if (/^確認不能: /mu.test(latest.body)) {
       return 'unverified';
     }
   }
+  return undefined;
 }

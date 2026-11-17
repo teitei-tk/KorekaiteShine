@@ -23,7 +23,9 @@ function database() {
     onConflictDoNothing = vi.fn();
     returning = vi.fn();
     batch = vi.fn(async () => [[], [], [{ attemptNumber: 1 }]]);
-  })((resolve) => resolve([]));
+  })((resolve) => {
+    resolve([]);
+  });
   for (const method of [
     query.select,
     query.from,
@@ -45,6 +47,7 @@ test('実行権取得の保存後に所有ジョブを確認できなければ�
   const db = database();
   expect(
     await acquireExecution(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
       db as object as Parameters<typeof acquireExecution>[0],
       'job',
       'evaluation',
@@ -53,12 +56,15 @@ test('実行権取得の保存後に所有ジョブを確認できなければ�
     ),
   ).toBeNull();
   expect(db.batch).toHaveBeenCalledTimes(1);
+  // oxlint-disable-next-line typescript/no-unsafe-assignment -- Vitestの非対称matcherはany型だが、この値は期待値専用で業務データとして使用しない。
   expect(db.select).toHaveBeenLastCalledWith({ generation: expect.anything() });
 });
 
 test('診断初期化の対象がなければ保存を開始しない', async () => {
   const db = database();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   vi.mocked(createPrimaryDb).mockReturnValue(db as object as ReturnType<typeof createPrimaryDb>);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await expect(requireDiagnosticInitialization({} as D1Database, 'job')).rejects.toThrow(
     '診断の初期化対象を確認できません。',
   );
@@ -67,7 +73,9 @@ test('診断初期化の対象がなければ保存を開始しない', async ()
 
 test('D1の初期化更新後に観測結果がなければ確定済みとして扱わない', async () => {
   const db = database();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   vi.mocked(createPrimaryDb).mockReturnValue(db as object as ReturnType<typeof createPrimaryDb>);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
   await expect(confirmDiagnosticInitialization({} as D1Database, 'job', 0)).rejects.toThrow(
     'DO保存の観測結果を確定できません。',
   );

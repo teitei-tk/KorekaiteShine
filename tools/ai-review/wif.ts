@@ -1,26 +1,18 @@
+import { parseJson, isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
+import { requireValue } from './required.ts';
 import { appendFileSync } from 'node:fs';
 import { REPOSITORY } from './policy.ts';
 
-interface OidcClaims {
-  iss: string;
-  aud: string;
-  repository: string;
-  repository_id: string;
-  repository_owner_id: string;
-  ref: string;
-  workflow_ref: string;
-  event_name: string;
-  sub?: string;
-  iat?: number;
-  exp?: number;
-}
 type Settings = Record<string, string | undefined>;
 export async function authenticate(
   env: Settings,
   mode: string,
   request: typeof fetch = fetch,
-  mask: (secret: string) => void = () => {},
-): Promise<{ claims: Partial<OidcClaims> }> {
+  mask: (secret: string) => void = () => {
+    /* この実装では追加の処理を行わない。 */
+  },
+): Promise<{ claims: Record<string, JsonInput> }> {
   if (mode !== 'claims') {
     throw new Error('WIFモードが不正です');
   }
@@ -32,11 +24,11 @@ export async function authenticate(
   if (required.some((key) => !env[key])) {
     throw new Error('WIF設定が不足しています');
   }
-  const url = new URL(env.ACTIONS_ID_TOKEN_REQUEST_URL!);
+  const url = new URL(requireValue(env.ACTIONS_ID_TOKEN_REQUEST_URL));
   if (url.protocol !== 'https:') {
     throw new Error('OIDC URLが不正です');
   }
-  url.searchParams.set('audience', env.OPENAI_WIF_AUDIENCE!);
+  url.searchParams.set('audience', requireValue(env.OPENAI_WIF_AUDIENCE));
   const oidc = await request(url, {
     headers: { Authorization: `Bearer ${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
     signal: AbortSignal.timeout(15_000),
@@ -45,14 +37,16 @@ export async function authenticate(
   if (!oidc.ok) {
     throw new Error(`OIDC HTTP ${oidc.status}`);
   }
-  const token = ((await oidc.json()) as { value?: string }).value;
+  const body = parseJson(await oidc.text());
+  const token = isJsonObject(body) ? body.value : undefined;
   if (typeof token !== 'string' || token.split('.').length !== 3) {
     throw new Error('OIDC応答が不正です');
   }
   mask(token);
-  const claims = JSON.parse(
-    Buffer.from(token.split('.')[1], 'base64url').toString('utf8'),
-  ) as OidcClaims;
+  const claims = parseJson(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+  if (!isJsonObject(claims)) {
+    throw new Error('OIDC応答が不正です');
+  }
   const expected = {
     iss: 'https://token.actions.githubusercontent.com',
     aud: env.OPENAI_WIF_AUDIENCE,
@@ -63,16 +57,13 @@ export async function authenticate(
     workflow_ref: `${REPOSITORY}/.github/workflows/ai-review.yml@refs/heads/main`,
     event_name: 'workflow_run',
   };
-  for (const [key, value] of Object.entries(expected) as [keyof typeof expected, string][]) {
+  for (const [key, value] of Object.entries(expected)) {
     if (claims[key] !== value) {
       throw new Error(`OIDCクレーム不一致: ${key}`);
     }
   }
   const selected = Object.fromEntries(
-    ([...Object.keys(expected), 'sub', 'iat', 'exp'] as (keyof OidcClaims)[]).map((key) => [
-      key,
-      claims[key],
-    ]),
+    [...Object.keys(expected), 'sub', 'iat', 'exp'].map((key) => [key, claims[key]] as const),
   );
   // ローカルのdecodeは署名検証ではない。交換時にOpenAIが署名とマッピングを検証する。
   return { claims: selected };
@@ -93,13 +84,13 @@ if (import.meta.main) {
       },
     );
     appendFileSync(
-      process.env.GITHUB_STEP_SUMMARY!,
-      `### OIDCクレーム（秘密値なし）\n\n\x60\x60\x60json\n${JSON.stringify(result.claims, null, 2)}\n\x60\x60\x60\n`,
+      requireValue(process.env.GITHUB_STEP_SUMMARY),
+      `### OIDCクレーム（秘密値なし）\n\n\u0060\u0060\u0060json\n${JSON.stringify(result.claims, null, 2)}\n\u0060\u0060\u0060\n`,
     );
   } catch (error) {
     // fetch由来の例外や外部応答本文は出さない。
     const message =
-      error instanceof Error && /^(WIF|OIDC)/.test(error.message)
+      error instanceof Error && /^(?<capture1>WIF|OIDC)/u.test(error.message)
         ? error.message
         : 'WIF処理に失敗しました';
     console.error(message);

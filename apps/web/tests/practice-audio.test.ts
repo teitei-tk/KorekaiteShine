@@ -1,4 +1,5 @@
-import { expect, test, vi } from 'vitest';
+// oxlint-disable-next-line eslint/max-classes-per-file -- 各テストの異なるSocket・Worker・Audio API代替を同一suite内に閉じ込める。
+import { assert, expect, test, vi } from 'vitest';
 import {
   encodeMicrophoneFrame,
   createPlayback,
@@ -16,8 +17,8 @@ test('入力の世代ヘッダーとPCM16のバイト順を保ち、空・過大
 });
 
 test('AudioWorkletは24kHzの入力を20msごとのPCM16に変換する', async () => {
-  const send = vi.fn();
-  type Processor = new () => { process(inputs: Float32Array[][]): boolean };
+  const send = vi.fn<(data: ArrayBuffer) => void>();
+  type Processor = new () => { process: (inputs: Float32Array[][]) => boolean };
   const register = vi.fn<(name: string, processor: Processor) => void>();
   vi.stubGlobal(
     'AudioWorkletProcessor',
@@ -32,7 +33,7 @@ test('AudioWorkletは24kHzの入力を20msごとのPCM16に変換する', async 
   } finally {
     vi.unstubAllGlobals();
   }
-  const [name, Processor] = register.mock.lastCall!;
+  const [name, Processor] = register.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   expect(name).toBe('interview-microphone');
   const processor = new Processor();
   expect(processor.process([])).toBe(true);
@@ -43,8 +44,8 @@ test('AudioWorkletは24kHzの入力を20msごとのPCM16に変換する', async 
   processor.process([[new Float32Array(128).fill(0.5)]]);
   const view = new DataView(send.mock.calls[0][0]);
   expect(view.byteLength).toBe(960);
-  expect(view.getInt16(0, true)).toBe(-32768);
-  expect(view.getInt16(256, true)).toBe(32767);
+  expect(view.getInt16(0, true)).toBe(-32_768);
+  expect(view.getInt16(256, true)).toBe(32_767);
 });
 
 test('再生が自然に終了した位置だけ確認し、停止した音声は確認しない', () => {
@@ -71,12 +72,13 @@ test('再生が自然に終了した位置だけ確認し、停止した音声�
       return source;
     },
   };
-  const playback = createPlayback(context as never);
-  const acknowledge = vi.fn();
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
+  const playback = createPlayback(context as object as AudioContext);
+  const acknowledge = vi.fn<(offset: number) => void>();
   playback.play(new ArrayBuffer(960), () => acknowledge(20));
   playback.play(new ArrayBuffer(960), () => acknowledge(40));
   expect(sources[1].start.mock.calls[0][0]).toBeCloseTo(1.02);
-  const ended = sources[0].onended!;
+  const ended = sources[0].onended ?? assert.fail('必須のテスト値がありません。');
   ended();
   ended();
   playback.stop();
@@ -92,21 +94,29 @@ test('再生バッファの不正なサイズ、5秒の遅延、256個を超え�
     }),
     createBufferSource: () => ({ connect: vi.fn(), start: vi.fn() }),
   };
-  const playback = createPlayback(context as never);
-  for (const length of [0, 1, 98306]) {
-    expect(() => playback.play(new ArrayBuffer(length), vi.fn())).toThrow('形式');
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
+  const playback = createPlayback(context as object as AudioContext);
+  for (const length of [0, 1, 98_306]) {
+    expect(() => {
+      playback.play(new ArrayBuffer(length), vi.fn<() => void>());
+    }).toThrow('形式');
   }
-  playback.play(new ArrayBuffer(98304), vi.fn());
-  playback.play(new ArrayBuffer(98304), vi.fn());
-  expect(() => playback.play(new ArrayBuffer(98304), vi.fn())).toThrow('追いついて');
-  const queue = createPlayback(context as never);
-  for (const _ of Array(256).keys()) {
-    queue.play(new ArrayBuffer(2), vi.fn());
+  playback.play(new ArrayBuffer(98_304), vi.fn<() => void>());
+  playback.play(new ArrayBuffer(98_304), vi.fn<() => void>());
+  expect(() => {
+    playback.play(new ArrayBuffer(98_304), vi.fn<() => void>());
+  }).toThrow('追いついて');
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
+  const queue = createPlayback(context as object as AudioContext);
+  for (const _ of Array.from({ length: 256 }).keys()) {
+    queue.play(new ArrayBuffer(2), vi.fn<() => void>());
   }
-  expect(() => queue.play(new ArrayBuffer(2), vi.fn())).toThrow('追いついて');
+  expect(() => {
+    queue.play(new ArrayBuffer(2), vi.fn<() => void>());
+  }).toThrow('追いついて');
 });
 
-function microphone(sampleRate = 24000) {
+function microphone(sampleRate = 24_000) {
   const track = new (class extends EventTarget {
     stop = vi.fn();
   })();
@@ -114,7 +124,7 @@ function microphone(sampleRate = 24000) {
   const input = { connect: vi.fn(), disconnect: vi.fn() };
   const port = { close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
   const getUserMedia = vi.fn(async () => stream);
-  const close = vi.fn().mockRejectedValue(new Error('already closed'));
+  const close = vi.fn<() => void>().mockRejectedValue(new Error('already closed'));
   vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
   vi.stubGlobal(
     'AudioContext',
@@ -122,6 +132,7 @@ function microphone(sampleRate = 24000) {
       sampleRate = sampleRate;
       resume = vi.fn().mockResolvedValue(undefined);
       audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+      // oxlint-disable-next-line eslint/class-methods-use-this -- テスト対象のインスタンスAPIを置換する部分モックで、共有fixtureから値を返す。
       createMediaStreamSource = () => input;
       close = close;
     },
@@ -140,10 +151,10 @@ function microphone(sampleRate = 24000) {
 test('取得した音声だけを転送し、トラック終了と解放を一度ずつ通知する', async () => {
   const { track, port, close } = microphone();
   try {
-    const captured = vi.fn();
-    const lost = vi.fn();
+    const captured = vi.fn<(data: ArrayBuffer) => void>();
+    const lost = vi.fn<() => void>();
     const audio = await openInterviewAudio(new AbortController().signal, captured, lost);
-    const deliver = port.onmessage!;
+    const deliver = port.onmessage ?? assert.fail('必須のテスト値がありません。');
     const event = new MessageEvent('message', { data: new ArrayBuffer(2) });
     deliver(event);
     track.dispatchEvent(new Event('ended'));
@@ -162,17 +173,25 @@ test('取得した音声だけを転送し、トラック終了と解放を一�
 });
 
 test('マイク権限待ちの中断と非対応レートでトラックを解放する', async () => {
-  const { track, stream, getUserMedia } = microphone(44100);
+  const { track, stream, getUserMedia } = microphone(44_100);
   try {
     const abort = new AbortController();
     const permission = Promise.withResolvers<typeof stream>();
     getUserMedia.mockReturnValueOnce(permission.promise);
-    const opening = openInterviewAudio(abort.signal, vi.fn(), vi.fn());
+    const opening = openInterviewAudio(
+      abort.signal,
+      vi.fn<(data: ArrayBuffer) => void>(),
+      vi.fn<() => void>(),
+    );
     abort.abort();
     permission.resolve(stream);
     await expect(opening).rejects.toMatchObject({ name: 'AbortError' });
     await expect(
-      openInterviewAudio(new AbortController().signal, vi.fn(), vi.fn()),
+      openInterviewAudio(
+        new AbortController().signal,
+        vi.fn<(data: ArrayBuffer) => void>(),
+        vi.fn<() => void>(),
+      ),
     ).rejects.toThrow('24 kHz');
     expect(track.stop).toHaveBeenCalledTimes(2);
   } finally {

@@ -11,8 +11,7 @@ export function modelCliFixture(directory: string, scenario = 'normal') {
     event_name: 'workflow_run',
     workflow_ref: 'teitei-tk/KorekaiteShine/.github/workflows/ai-review.yml@refs/heads/main',
   };
-  const token =
-    'fixture.' + Buffer.from(JSON.stringify(claims)).toString('base64url') + '.signature';
+  const token = `fixture.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.signature`;
   return {
     env: {
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fixture',
@@ -20,14 +19,11 @@ export function modelCliFixture(directory: string, scenario = 'normal') {
       OPENAI_WIF_AUDIENCE: claims.aud,
       OPENAI_IDENTITY_PROVIDER_ID: 'idp_fixture',
       OPENAI_SERVICE_ACCOUNT_ID: 'account-fixture',
-      GITHUB_STEP_SUMMARY: directory + '/summary',
+      GITHUB_STEP_SUMMARY: `${directory}/summary`,
       MODEL_OUTPUT: '{"status":"ok"}',
     },
     replies: { fetch: { body: { value: token } } },
-    bootstrap:
-      `const authFetch = globalThis.fetch;\n` +
-      lifecycleBootstrap(scenario) +
-      `
+    bootstrap: `const authFetch = globalThis.fetch;\n${lifecycleBootstrap(scenario)}
 const modelDir = root + '/model', dumpDir = modelDir + '/dump';
 const modelSchema = { type: 'object', properties: { status: { type: 'string', enum: ['ok'] } }, required: ['status'], additionalProperties: false };
 files.set(modelDir + '/state.json', JSON.stringify({ proxy: { pid: 32102, start: '99' }, infoPath: home + '/20.json', startedAt: '0', hash: digest('trusted config'), rejected: scenario !== 'not-rejected' }));

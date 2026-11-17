@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { expect, onTestFinished, test } from 'vitest';
+import { assert, expect, onTestFinished, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
 import { lockEnvironment } from '../src/lock.ts';
@@ -30,16 +30,24 @@ test('保持プロセスを強制終了すると環境ロックを再取得で�
     ],
     { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
   );
-  const stopped = new Promise<void>((resolve) => child.once('exit', () => resolve()));
+  const stopped = new Promise<void>((resolve) => {
+    child.once('exit', () => {
+      resolve();
+    });
+  });
   const stderrState = { stderr: '' };
-  child.stderr!.on('data', (chunk: Buffer) => {
+  (child.stderr ?? assert.fail('必須のテスト値がありません。')).on('data', (chunk: Buffer) => {
     stderrState.stderr += chunk.toString();
   });
   try {
     await new Promise<void>((resolve, reject) => {
-      child.once('message', () => resolve());
+      child.once('message', () => {
+        resolve();
+      });
       child.once('error', reject);
-      child.once('exit', () => reject(new Error(stderrState.stderr)));
+      child.once('exit', () => {
+        reject(new Error(stderrState.stderr));
+      });
     });
     await expect(lockEnvironment(config)).rejects.toThrow('環境は使用中です');
     child.kill('SIGKILL');

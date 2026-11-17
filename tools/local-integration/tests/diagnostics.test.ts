@@ -1,3 +1,11 @@
+import {
+  readJson,
+  readCheckAccepted,
+  readCheckStatus,
+  readCheckNotFound,
+  readCheckUnavailable,
+  readCheckValidationError,
+} from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -33,7 +41,7 @@ test('同じ冪等キーの同時要求はローカルD1のジョブと初期化
       responses.map(async (response) => {
         expect(response.status).toBe(202);
         expect(response.headers.get('Cache-Control')).toBe('no-store');
-        const body = await response.json();
+        const body = await readCheckAccepted(response);
         expect(validateCheckAccepted(body)).toBe(true);
         expect(response.headers.get('Location')).toBe(`/api/diagnostics/check-jobs/${body.jobId}`);
         return body;
@@ -81,7 +89,7 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
       });
       expect(response.status, fixture.name).toBe(fixture.status);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
-      const body = await response.json();
+      const body = await readCheckValidationError(response);
       expect(validateCheckValidationError(body), fixture.name).toBe(true);
       expect(body.error.details, fixture.name).toContainEqual(
         expect.objectContaining({
@@ -96,7 +104,7 @@ test('不正入力は契約どおりの詳細を返し、修正後に同じキ�
       unsupportedMediaTypeRequest,
     );
     expect(media.status).toBe(415);
-    expect(validateCheckUnsupportedMediaType(await media.json())).toBe(true);
+    expect(validateCheckUnsupportedMediaType(await readJson(media))).toBe(true);
     const corrected = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
       method: 'POST',
       headers: {
@@ -131,11 +139,11 @@ test('受付済みジョブの状態を必須null項目と観測結果付きで�
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const status = await response.json();
+    const status = await readCheckStatus(response);
     expect(validateCheckStatus(status)).toBe(true);
     expect(status).toEqual({
       ...accepted,
@@ -172,7 +180,7 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
   try {
     const invalid = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/invalid`);
     expect(invalid.status).toBe(400);
-    const invalidBody = await invalid.json();
+    const invalidBody = await readCheckValidationError(invalid);
     expect(validateCheckValidationError(invalidBody)).toBe(true);
     expect(invalidBody.error.details).toContainEqual(
       expect.objectContaining({ location: 'path', path: 'jobId', code: 'INVALID_FORMAT' }),
@@ -183,14 +191,14 @@ test('状態取得は不正IDを400、参照範囲外を同じ404として返す
       body: '{"scenario":"success"}',
     });
     expect(accepted.status).toBe(202);
-    const body = await accepted.json();
+    const body = await readCheckAccepted(accepted);
     expect(validateCheckAccepted(body)).toBe(true);
     const requestIds = new Set<string>();
     const expectNotFound = async (id: string) => {
       const response = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${id}`);
       expect(response.status).toBe(404);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
-      const error = await response.json();
+      const error = await readCheckNotFound(response);
       expect(validateCheckNotFound(error)).toBe(true);
       requestIds.add(error.error.requestId);
     };
@@ -230,7 +238,7 @@ test('同じキーと入力の逐次再送はJSONの空白によらず元の受�
         body,
       });
       expect(response.status).toBe(202);
-      results.push({ body: await response.json(), location: response.headers.get('Location') });
+      results.push({ body: await readJson(response), location: response.headers.get('Location') });
     }
     expect(results[1]).toEqual(results[0]);
     await runDatabaseCommand(config, [
@@ -265,17 +273,17 @@ test('同じキーで異なるscenarioを送ると409となり元のジョブを
       });
     const first = await post('success');
     expect(first.status).toBe(202);
-    const accepted = await first.json();
+    const accepted = await readCheckAccepted(first);
     const conflict = await post('exhaust_retries');
     expect(conflict.status).toBe(409);
     expect(conflict.headers.get('Cache-Control')).toBe('no-store');
-    expect(validateCheckConflict(await conflict.json())).toBe(true);
+    expect(validateCheckConflict(await readJson(conflict))).toBe(true);
     const replay = await post('success');
     expect(replay.status).toBe(202);
-    expect(await replay.json()).toEqual(accepted);
+    expect(await readJson(replay)).toEqual(accepted);
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     expect(status.status).toBe(200);
-    expect(await status.json()).toMatchObject({
+    expect(await readCheckStatus(status)).toMatchObject({
       scenario: 'success',
       status: 'pending',
       attemptCount: 0,
@@ -310,7 +318,7 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
       });
     const first = await post(key);
     expect(first.status).toBe(202);
-    const accepted = await first.json();
+    const accepted = await readCheckAccepted(first);
     for (const state of ['completed', 'failed', 'cancelled']) {
       // ここではローカルD1上の終端状態に対する受付の保証を検証する。
       await runDatabaseCommand(config, [
@@ -319,12 +327,12 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
       ]);
       const replay = await post(key);
       expect(replay.status).toBe(202);
-      expect(await replay.json()).toEqual(accepted);
+      expect(await readJson(replay)).toEqual(accepted);
       const response = await fetch(
         `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
+      expect(await readCheckStatus(response)).toMatchObject({
         status: state,
         attemptCount: 1,
         finishedAt: '2026-11-02T00:00:00.000Z',
@@ -336,7 +344,7 @@ test('終端ジョブへの同じキーの再送は再実行せず、新しい�
     ]);
     const fresh = await post(randomUUID());
     expect(fresh.status).toBe(202);
-    expect((await fresh.json()).jobId).not.toBe(accepted.jobId);
+    expect((await readCheckAccepted(fresh)).jobId).not.toBe(accepted.jobId);
     await runDatabaseCommand(config, [
       'execute',
       `CREATE TEMP TABLE new_key_assertion (count INTEGER CHECK (count = 2)); INSERT INTO new_key_assertion SELECT COUNT(*) FROM jobs; INSERT INTO new_key_assertion SELECT COUNT(*) FROM job_outbox;`,
@@ -374,19 +382,19 @@ test('D1障害は503で返し、内部例外を公開せずrequestIdでログを
     const unavailable = await post();
     expect(unavailable.status).toBe(503);
     expect(unavailable.headers.get('Cache-Control')).toBe('no-store');
-    const failure = await unavailable.json();
+    const failure = await readCheckUnavailable(unavailable);
     expect(validateCheckUnavailable(failure)).toBe(true);
     expect(JSON.stringify(failure)).not.toContain('private_database_failure');
     await runDatabaseCommand(config, ['execute', 'DROP TRIGGER fail_accept;']);
     const recovered = await post();
     expect(recovered.status).toBe(202);
-    const accepted = await recovered.json();
+    const accepted = await readCheckAccepted(recovered);
     await runDatabaseCommand(config, ['execute', 'DROP TABLE diagnostic_checks;']);
     const readFailure = await fetch(
       `${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
     );
     expect(readFailure.status).toBe(503);
-    const readBody = await readFailure.json();
+    const readBody = await readCheckUnavailable(readFailure);
     expect(validateCheckUnavailable(readBody)).toBe(true);
     expect(JSON.stringify(readBody)).not.toContain('diagnostic_checks');
     expect(readBody.error.requestId).not.toBe(failure.error.requestId);
@@ -412,7 +420,7 @@ test('ヘッダー不正で本文を拒否した後も、次の要求へ契約�
   const runtime = await startRuntime(config, 'dev', { manualDiagnostics: true });
 
   try {
-    for (const _ of Array(40).keys()) {
+    for (const _ of Array.from({ length: 40 }).keys()) {
       const rejected = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

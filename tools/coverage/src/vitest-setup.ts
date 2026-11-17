@@ -1,13 +1,20 @@
+/* eslint-disable no-underscore-dangle -- Istanbulが生成する既定のグローバル名との互換性を維持する。 */
+import { readCoverageConfig, required } from './schema.ts';
 import { readFileSync } from 'node:fs';
 import { afterAll } from 'vitest';
 import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
 import { startCapture } from './capture.ts';
-import type { CoverageRun } from './merge.ts';
 
-const { directory, run }: { directory: string; run: CoverageRun } = JSON.parse(
-  readFileSync(process.env.KOREKAITE_COVERAGE_RUN!, 'utf8'),
+const settings = readCoverageConfig(
+  readFileSync(required(process.env.KOREKAITE_COVERAGE_RUN, 'KOREKAITE_COVERAGE_RUN'), 'utf8'),
 );
-const capture = startCapture(run, process.env.KOREKAITE_COVERAGE_SUITE!, directory);
+const { run } = settings;
+const directory = required(settings.directory, 'directory');
+const capture = startCapture(
+  run,
+  required(process.env.KOREKAITE_COVERAGE_SUITE, 'KOREKAITE_COVERAGE_SUITE'),
+  directory,
+);
 const host = globalThis as typeof globalThis & {
   __coverage__?: Record<string, SourceCoverageData>;
 };
@@ -15,6 +22,7 @@ const host = globalThis as typeof globalThis & {
 // journal と同じカウンターに書くと、PCM の各サンプル処理まで同期 I/O になる。
 const inherited = host.__coverage__;
 host.__coverage__ = {};
+
 afterAll(() => {
   try {
     capture.finish(host.__coverage__ ?? {}, 'complete');

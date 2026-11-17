@@ -1,13 +1,22 @@
+import { parseObject, objectAt } from '../scripts/schema-input.ts';
 import { readFile } from 'node:fs/promises';
 import { expect, test } from 'vitest';
 
 test('HTTPの分析結果は保存IDを返し、AI出力に保存IDを要求しない', async () => {
-  const document = JSON.parse(
+  const document = parseObject(
     await readFile(new URL('../generated/http/openapi.json', import.meta.url), 'utf8'),
   );
   expect(
-    document.paths['/api/materials/analyze'].post.responses['200'].content['application/json']
-      .schema,
+    objectAt(
+      document,
+      'paths',
+      '/api/materials/analyze',
+      'post',
+      'responses',
+      '200',
+      'content',
+      'application/json',
+    ).schema,
   ).toEqual({ $ref: '#/components/schemas/SavedMaterialAnalysis' });
   const { validateSavedMaterialAnalysis } =
     await import('../generated/http/materials-validators.mjs');
@@ -30,7 +39,7 @@ test('生成validatorは未確認入力や不正な候補を補正せず拒否�
     { markdown: '材料', confirmed: false },
     { markdown: '材料' },
     { markdown: '', confirmed: true },
-    { markdown: 'a'.repeat(32769), confirmed: true },
+    { markdown: 'a'.repeat(32_769), confirmed: true },
     { markdown: '材料', confirmed: true, model: 'arbitrary-model' },
     null,
   ]) {
@@ -53,13 +62,14 @@ test('生成validatorは未確認入力や不正な候補を補正せず拒否�
 });
 
 test('材料分析は送信確認を必須とし、本文・候補・エラーを契約化する', async () => {
-  const document = JSON.parse(
+  const document = parseObject(
     await readFile(new URL('../generated/http/openapi.json', import.meta.url), 'utf8'),
   );
-  const analyze = document.paths['/api/materials/analyze']?.post;
+  const analyze = objectAt(document, 'paths', '/api/materials/analyze', 'post');
   expect(analyze).toBeDefined();
-  expect(analyze.requestBody.required).toBe(true);
-  expect(Object.keys(analyze.responses).sort()).toEqual([
+  expect(objectAt(analyze.requestBody).required).toBe(true);
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、Object.keysが作成した配列だけを整列する。
+  expect(Object.keys(objectAt(analyze.responses)).sort()).toEqual([
     '200',
     '400',
     '403',
@@ -69,17 +79,21 @@ test('材料分析は送信確認を必須とし、本文・候補・エラー�
     '502',
     '503',
   ]);
-  const request = document.components.schemas.MaterialAnalysisRequest;
+  const request = objectAt(document, 'components', 'schemas', 'MaterialAnalysisRequest');
   expect(request.required).toEqual(['markdown', 'confirmed']);
-  expect(request.properties.confirmed.enum).toEqual([true]);
+  expect(objectAt(request, 'properties', 'confirmed').enum).toEqual([true]);
   expect(request.additionalProperties).toBe(false);
-  expect(document.components.schemas.MaterialAnalysisResult.required).toEqual(['themes']);
-  expect(document.components.schemas.MaterialTheme.required).toEqual([
+  expect(objectAt(document, 'components', 'schemas', 'MaterialAnalysisResult').required).toEqual([
+    'themes',
+  ]);
+  expect(objectAt(document, 'components', 'schemas', 'MaterialTheme').required).toEqual([
     'title',
     'heading',
     'excerpt',
   ]);
-  for (const response of Object.values(analyze.responses) as { headers: object }[]) {
+  for (const response of Object.values(objectAt(analyze.responses)).map((value) =>
+    objectAt(value),
+  )) {
     expect(response.headers).toHaveProperty('Cache-Control');
   }
 });

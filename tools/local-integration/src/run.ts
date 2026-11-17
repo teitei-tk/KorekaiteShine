@@ -3,14 +3,12 @@ import { resolveRuntime } from '@korekaite/runtime-config';
 import { buildRuntime, runDatabaseCommand, startRuntime } from './runtime.ts';
 
 async function main(): Promise<void> {
-  const [command, ...extra] = process.argv.slice(2);
-  if (extra.length) {
+  const [command = '', ...extra] = process.argv.slice(2);
+  if (extra.length > 0) {
     throw new Error('追加引数は受け付けません。ローカル専用の操作入口です。');
   }
   if (
-    !['dev', 'build', 'preview', 'db:generate', 'db:migrate', 'db:reset-seed'].includes(
-      command ?? '',
-    )
+    !['dev', 'build', 'preview', 'db:generate', 'db:migrate', 'db:reset-seed'].includes(command)
   ) {
     throw new Error(
       '操作を指定してください: dev / build / preview / db:generate / db:migrate / db:reset-seed',
@@ -31,7 +29,7 @@ async function main(): Promise<void> {
     await runDatabaseCommand(config, [command === 'db:generate' ? 'generate' : 'migrate']);
   } else {
     const runtime = await startRuntime(config, command === 'preview' ? 'preview' : 'dev', {
-      port: command === 'dev' && config.environment === 'development' ? 63286 : 0,
+      port: command === 'dev' && config.environment === 'development' ? 63_286 : 0,
     });
     const stoppingState = { stopping: false };
     const scheduledAbort = new AbortController();
@@ -88,7 +86,14 @@ async function main(): Promise<void> {
   console.log(`生成物とログ: ${config.artifactDirectory}`);
 }
 
-main().catch((error: Error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+// dev/previewの長時間mainはmoduleのimport完了を待たせず起動する。
+async function startCli(): Promise<void> {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+// eslint-disable-next-line unicorn/prefer-top-level-await -- 長時間CLIのimport完了を待たせると、呼出側の停止シグナル登録と検証がdeadlockする。
+void startCli();

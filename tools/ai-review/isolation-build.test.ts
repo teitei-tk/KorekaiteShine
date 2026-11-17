@@ -3,20 +3,20 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { expect, it } from 'vitest';
+import { assert, expect, it } from 'vitest';
 
 // prepare.shのコンパイル呼び出しをそのまま実行し、通常の型検査とは別の出力経路を検査する。
 it('隔離用コードをTemporalの型を含めてコンパイルし、出力したJSから待機処理を実行できる', () => {
   const root = fileURLToPath(new URL('../..', import.meta.url));
-  const source = readFileSync(new URL('./isolation/prepare.sh', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('isolation/prepare.sh', import.meta.url), 'utf8');
   const compile = source
-    .replace(/\\\n/g, ' ')
+    .replaceAll('\\\n', ' ')
     .split('\n')
     .find((line) => line.startsWith('pnpm --dir tools/ai-review '));
   expect(compile).toBeDefined();
   const directory = mkdtempSync(join(tmpdir(), 'ai-isolation-build-'));
   try {
-    execFileSync('bash', ['-eu', '-c', compile!], {
+    execFileSync('bash', ['-eu', '-c', compile ?? assert.fail('必須のテスト値がありません。')], {
       cwd: root,
       env: { ...process.env, RUNNER_TEMP: directory },
       stdio: 'pipe',

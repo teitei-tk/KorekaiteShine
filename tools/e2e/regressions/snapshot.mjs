@@ -18,7 +18,7 @@ import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const [directory, cause, ...extra] = process.argv.slice(2);
-if (!directory || extra.length) {
+if (!directory || extra.length > 0) {
   throw new Error('使い方: node snapshot.mjs <対象Git作業ツリー> [原因名]');
 }
 const source = realpathSync(directory);
@@ -48,7 +48,7 @@ function linkDependencies(folder) {
     mkdirSync(join(target, name));
     for (const pkg of readdirSync(join(original, name))) {
       const path = relative(source, realpathSync(join(original, name, pkg)));
-      if (!path.startsWith('packages' + sep) || !existsSync(join(snapshot, path, 'package.json'))) {
+      if (!path.startsWith(`packages${sep}`) || !existsSync(join(snapshot, path, 'package.json'))) {
         throw new Error('ワークスペース依存の原本を特定できません。');
       }
       symlinkSync(join(snapshot, path), join(target, name, pkg));
@@ -58,7 +58,7 @@ function linkDependencies(folder) {
 
 try {
   const workspaces = new Set(['.']);
-  for (const name of [...new Set(files.filter(Boolean))].sort()) {
+  for (const name of [...new Set(files.filter(Boolean))].toSorted()) {
     const original = join(source, name);
     if (privatePath.test(name) || !existsSync(original)) {
       continue;
@@ -85,7 +85,7 @@ try {
     recursive: true,
   });
   if (cause) {
-    const apply = fileURLToPath(new URL('./apply.mjs', import.meta.url));
+    const apply = fileURLToPath(new URL('apply.mjs', import.meta.url));
     execFileSync(process.execPath, [apply, snapshot, cause], { stdio: ['ignore', 2, 2] });
     if (cause === 'audio-event') {
       const cwd = join(snapshot, contracts);

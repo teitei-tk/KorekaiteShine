@@ -13,24 +13,24 @@ test('無音や短い物音では案内せず、発話後に応答が途絶え�
   monitor.capture(quiet, 0);
   monitor.capture(voice, 20);
   monitor.capture(quiet, 40);
-  expect(monitor.isWaitingTooLong(60000)).toBe(false);
-  for (const t of frameTimes(60000, 60200)) {
+  expect(monitor.isWaitingTooLong(60_000)).toBe(false);
+  for (const t of frameTimes(60_000, 60_200)) {
     monitor.capture(voice, t);
   }
-  expect(monitor.isWaitingTooLong(70000)).toBe(false);
-  expect(monitor.isWaitingTooLong(81000)).toBe(true);
+  expect(monitor.isWaitingTooLong(70_000)).toBe(false);
+  expect(monitor.isWaitingTooLong(81_000)).toBe(true);
   monitor.reset();
-  expect(monitor.isWaitingTooLong(120000)).toBe(false);
+  expect(monitor.isWaitingTooLong(120_000)).toBe(false);
 });
 
 test('最初の質問は無音や100msの断片では待機を解除せず、再生済みの音声を合算する', () => {
   const monitor = createResponseMonitor();
   monitor.expectOpening(0);
-  monitor.played(new Int16Array(12000).buffer);
+  monitor.played(new Int16Array(12_000).buffer);
   monitor.played(new Int16Array(2400).fill(1200).buffer);
-  expect(monitor.isWaitingTooLong(20000)).toBe(true);
+  expect(monitor.isWaitingTooLong(20_000)).toBe(true);
   monitor.played(new Int16Array(7200).fill(1200).buffer);
-  expect(monitor.isWaitingTooLong(20001)).toBe(false);
+  expect(monitor.isWaitingTooLong(20_001)).toBe(false);
 });
 
 test('小声の回答を検知し、一定の背景音が続いても案内が先送りされない', () => {
@@ -39,23 +39,23 @@ test('小声の回答を検知し、一定の背景音が続いても案内が�
   for (const t of frameTimes(0, 200)) {
     monitor.capture(quietVoice, t);
   }
-  expect(monitor.isWaitingTooLong(20200)).toBe(true);
+  expect(monitor.isWaitingTooLong(20_200)).toBe(true);
   monitor.reset();
-  for (const t of frameTimes(0, 24000)) {
+  for (const t of frameTimes(0, 24_000)) {
     monitor.capture(new Int16Array(480).fill(t < 200 ? 1500 : 490).buffer, t);
   }
-  expect(monitor.isWaitingTooLong(24000)).toBe(true);
+  expect(monitor.isWaitingTooLong(24_000)).toBe(true);
 });
 
 test('強弱のある回答を20秒以上話し続けている間は待機案内を出さない', () => {
   const monitor = createResponseMonitor();
   const loud = new Int16Array(480).fill(1600).buffer;
   const soft = new Int16Array(480).fill(200).buffer;
-  for (const t of frameTimes(0, 30000)) {
+  for (const t of frameTimes(0, 30_000)) {
     monitor.capture(t % 400 < 200 ? loud : soft, t);
   }
-  expect(monitor.isWaitingTooLong(30000)).toBe(false);
-  expect(monitor.isWaitingTooLong(51000)).toBe(true);
+  expect(monitor.isWaitingTooLong(30_000)).toBe(false);
+  expect(monitor.isWaitingTooLong(51_000)).toBe(true);
 });
 
 test('先に届いた質問の再生終了で、重ねて話した回答の待機を解除しない', () => {
@@ -66,14 +66,14 @@ test('先に届いた質問の再生終了で、重ねて話した回答の待�
   for (const t of frameTimes(1000, 1500)) {
     monitor.capture(bytes, t);
   }
-  monitor.played(new Int16Array(24000).fill(1200).buffer, question);
-  expect(monitor.isWaitingTooLong(22000)).toBe(true);
+  monitor.played(new Int16Array(24_000).fill(1200).buffer, question);
+  expect(monitor.isWaitingTooLong(22_000)).toBe(true);
 });
 
 test('言い換えを依頼する前の音声は新しい返答に数えない', () => {
   const monitor = createResponseMonitor();
   const old = monitor.playbackVersion();
   monitor.expectOpening(2000);
-  monitor.played(new Int16Array(24000).fill(1200).buffer, old);
-  expect(monitor.isWaitingTooLong(22500)).toBe(true);
+  monitor.played(new Int16Array(24_000).fill(1200).buffer, old);
+  expect(monitor.isWaitingTooLong(22_500)).toBe(true);
 });

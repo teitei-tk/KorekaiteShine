@@ -5,16 +5,18 @@ const sha = 'a'.repeat(40);
 export function prFixture() {
   return {
     number: 7,
-    user: { id: 1324680, type: 'User' },
+    user: { id: 1_324_680, type: 'User' },
     state: 'open',
     draft: false,
-    head: { sha, repo: { id: 1426899426 } },
-    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1426899426 } },
+    head: { sha, repo: { id: 1_426_899_426 } },
+    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1_426_899_426 } },
   };
 }
 
 describe('認証前のPR制限', () => {
-  it('本人の同一リポジトリPRだけを許可する', () => expect(eligible(prFixture())).toBe(true));
+  it('本人の同一リポジトリPRだけを許可する', () => {
+    expect(eligible(prFixture())).toBe(true);
+  });
   it.each(['other', 'fork', 'bot', 'draft', 'closed', 'base', 'missing'])(
     '%sを拒否する',
     (kind) => {
@@ -70,7 +72,9 @@ it('未確認事項を保持して表示し、空の説明は拒否する', () =
 });
 
 describe('モデル出力の境界', () => {
-  it('変更行にある指摘を受け入れる', () => expect(validReview(result, lines)).toEqual(result));
+  it('変更行にある指摘を受け入れる', () => {
+    expect(validReview(result, lines)).toEqual(result);
+  });
   it.each(['line', 'path', 'count', 'status', 'empty'])('%sが不正なら投稿しない', (kind) => {
     const r = structuredClone(result);
     if (kind === 'line') {
@@ -80,7 +84,7 @@ describe('モデル出力の境界', () => {
       r.findings[0].path = '../secret';
     }
     if (kind === 'count') {
-      r.findings = Array(4).fill(r.findings[0]);
+      r.findings = Array.from({ length: 4 }, () => r.findings[0]);
     }
     if (kind === 'status') {
       r.status = 'anything';

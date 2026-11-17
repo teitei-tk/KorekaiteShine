@@ -7,11 +7,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { lockEnvironment } from '../src/lock.ts';
 
 async function processTable() {
+  // oxlint-disable-next-line typescript/strict-void-return -- Node execFileはpromisify対応のoverloadを公開する標準API。
   const { stdout } = await promisify(execFile)('ps', ['-eo', 'pid=,ppid=,pgid=,stat='], {
     timeout: 5000,
   });
@@ -20,7 +21,7 @@ async function processTable() {
     .split('\n')
     .map((line) => {
       const [pid, parent, group, state] = line.trim().split(/\s+/u);
-      return { pid: Number(pid), parent: Number(parent), group: Number(group), state: state! };
+      return { pid: Number(pid), parent: Number(parent), group: Number(group), state };
     });
 }
 
@@ -56,8 +57,12 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
     ],
     { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
   );
-  launcher.stderr!.resume();
-  const exited = new Promise<void>((resolve) => launcher.once('exit', () => resolve()));
+  (launcher.stderr ?? assert.fail('必須のテスト値がありません。')).resume();
+  const exited = new Promise<void>((resolve) => {
+    launcher.once('exit', () => {
+      resolve();
+    });
+  });
   const descendants = new Set<number>();
   const groups = new Set<number>();
 
@@ -69,7 +74,7 @@ test('起動元をSIGKILLしても子ランタイムを停止し、その終了�
       }),
     ]);
     const rows = await processTable();
-    const tree = new Set([launcher.pid!]);
+    const tree = new Set([launcher.pid ?? assert.fail('必須のテスト値がありません。')]);
     while (true) {
       const previous = tree.size;
       for (const row of rows) {
@@ -164,9 +169,11 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
   launcher.stderr.on('data', (chunk: Buffer) => {
     outputContext.errors += chunk.toString();
   });
-  const exited = new Promise<number | null>((resolve) =>
-    launcher.once('exit', (code) => resolve(code)),
-  );
+  const exited = new Promise<number | null>((resolve) => {
+    launcher.once('exit', (code) => {
+      resolve(code);
+    });
+  });
   const descendants = new Set<number>();
   const groups = new Set<number>();
 
@@ -177,7 +184,7 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
       })
       .toBe(true);
     const rows = await processTable();
-    const tree = new Set([launcher.pid!]);
+    const tree = new Set([launcher.pid ?? assert.fail('必須のテスト値がありません。')]);
     while (true) {
       const previous = tree.size;
       for (const row of rows) {
@@ -201,7 +208,7 @@ test('Viteの異常終了を起動CLIへ伝え、残りの子プロセスとロ�
     expect(groups.size).toBeGreaterThan(0);
     await expect(lockEnvironment(config)).rejects.toThrow('環境は使用中です');
     // グループ全体ではなくViteだけを落とし、残ったworkerdの停止を管理側へ任せる。
-    killOwned([...groups][0]!);
+    killOwned([...groups][0] ?? assert.fail('必須のテスト値がありません。'));
     await expect.poll(() => launcher.exitCode, { timeout: 15_000 }).toBe(1);
     expect(await exited).toBe(1);
     expect(outputContext.errors).toContain('予期せず終了');

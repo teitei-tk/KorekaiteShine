@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-test('TypeScript 7系のツール環境でもOpenAPIから必須プロパティの型を生成できる', async () => {
+void test('TypeScript 7系のツール環境でもOpenAPIから必須プロパティの型を生成できる', async () => {
   const { default: openapiTS, astToString } = await import('openapi-typescript');
   const output = astToString(
     await openapiTS({
@@ -19,5 +19,5 @@ test('TypeScript 7系のツール環境でもOpenAPIから必須プロパティ�
       },
     }),
   );
-  assert.match(output, /id: string;/);
+  assert.match(output, /id: string;/u);
 });

@@ -1,3 +1,6 @@
+import { readObject, textField, identityField } from './input.ts';
+import { parseJson, isJsonObject } from '../json.ts';
+import type { JsonInput } from '../json.ts';
 // 固定版公式プロキシとActionの受け入れ検証専用。独自の認証・モデル実行器ではない。
 import {
   mkdirSync,
@@ -28,7 +31,7 @@ const directory = '/opt/ai-review-probe/private/model';
 const dumpDir = `${directory}/dump`;
 const statePath = `${directory}/state.json`;
 const schemaPath = '/opt/ai-review-probe/pr/schema.json';
-const WAIT_MS = 3660000; // 固定版auth.rsのMAX_FEDERATED_TOKEN_LIFETIME=3600秒を超える。
+const WAIT_MS = 3_660_000; // 固定版auth.rsのMAX_FEDERATED_TOKEN_LIFETIME=3600秒を超える。
 export const schema = {
   type: 'object',
   properties: { status: { type: 'string', enum: ['ok'] } },
@@ -36,18 +39,6 @@ export const schema = {
   additionalProperties: false,
 };
 type Usage = { input_tokens: number; output_tokens: number; total_tokens: number };
-type RequestDump = {
-  body?: { model?: string; text?: { format?: { type?: string; schema?: object } } };
-};
-type ResponseDump = { status?: number; body?: string };
-type Event = {
-  type?: string;
-  response?: {
-    status?: string;
-    usage?: Partial<Usage>;
-    output?: { type?: string; content?: { type?: string; text?: string }[] }[];
-  };
-};
 type State = {
   proxy: { pid: number; start: string };
   infoPath: string;
@@ -59,59 +50,91 @@ export function renewalDue(elapsedMs: number): boolean {
   return Number.isFinite(elapsedMs) && elapsedMs >= WAIT_MS;
 }
 export function verifyModelEvidence(
-  request: RequestDump,
-  response: ResponseDump,
+  request: JsonInput,
+  response: JsonInput,
   output: string,
 ): Usage {
-  const format = request.body?.text?.format;
+  const body = isJsonObject(request) && isJsonObject(request.body) ? request.body : null;
+  const text = body !== null && isJsonObject(body.text) ? body.text : null;
+  const format = text && isJsonObject(text.format) ? text.format : null;
   if (
-    request.body?.model !== 'gpt-6-luna' ||
+    body?.model !== 'gpt-6-luna' ||
     format?.type !== 'json_schema' ||
     !isDeepStrictEqual(format.schema, schema) ||
+    !isJsonObject(response) ||
     response.status !== 200 ||
     typeof response.body !== 'string'
   ) {
     throw new Error('model or schema request failed');
   }
-  const events: Event[] = response.body
+  const events = response.body
     .split('\n')
     .filter((line) => line.startsWith('data:') && line.slice(5).trim() !== '[DONE]')
-    .map((line) => JSON.parse(line.slice(5)));
-  const completed = events.filter((event) => event?.type === 'response.completed');
+    .map((line) => parseJson(line.slice(5)));
+  const completed = events.filter(
+    (event) => isJsonObject(event) && event.type === 'response.completed',
+  );
   if (
     completed.length !== 1 ||
-    events.some((event) =>
-      ['error', 'response.failed', 'response.incomplete'].includes(event?.type ?? ''),
+    events.some(
+      (event) =>
+        isJsonObject(event) &&
+        typeof event.type === 'string' &&
+        ['error', 'response.failed', 'response.incomplete'].includes(event.type),
     )
   ) {
     throw new Error('model did not complete');
   }
-  const result = completed[0].response;
-  const texts = result?.output
-    ?.flatMap((item) => item.content ?? [])
-    .filter((item) => item.type === 'output_text');
+  const [event] = completed;
+  const result = isJsonObject(event) && isJsonObject(event.response) ? event.response : null;
+  const texts = Array.isArray(result?.output)
+    ? result.output
+        .flatMap((item) => (isJsonObject(item) && Array.isArray(item.content) ? item.content : []))
+        .filter((item) => isJsonObject(item) && item.type === 'output_text')
+    : [];
+  const [content] = texts;
   if (
     result?.status !== 'completed' ||
-    texts?.length !== 1 ||
-    !isDeepStrictEqual(JSON.parse(texts[0].text ?? ''), { status: 'ok' }) ||
-    !isDeepStrictEqual(JSON.parse(output), { status: 'ok' })
+    texts.length !== 1 ||
+    !isJsonObject(content) ||
+    typeof content.text !== 'string' ||
+    !isDeepStrictEqual(parseJson(content.text), { status: 'ok' }) ||
+    !isDeepStrictEqual(parseJson(output), { status: 'ok' })
   ) {
     throw new Error('model output does not match schema');
   }
-  const usage = result.usage;
+  const { usage } = result;
   if (
-    !usage ||
+    !isJsonObject(usage) ||
+    typeof usage.input_tokens !== 'number' ||
+    typeof usage.output_tokens !== 'number' ||
+    typeof usage.total_tokens !== 'number' ||
     ![usage.input_tokens, usage.output_tokens, usage.total_tokens].every(
-      (value) => Number.isSafeInteger(value) && value! >= 0,
+      (value) => Number.isSafeInteger(value) && value >= 0,
     ) ||
-    usage.total_tokens !== usage.input_tokens! + usage.output_tokens!
+    usage.total_tokens !== usage.input_tokens + usage.output_tokens
   ) {
     throw new Error('missing or invalid usage');
   }
-  return usage as Usage;
+  return {
+    input_tokens: usage.input_tokens,
+    output_tokens: usage.output_tokens,
+    total_tokens: usage.total_tokens,
+  };
 }
+
 function state(): State {
-  return JSON.parse(readFileSync(statePath, 'utf8'));
+  const value = readObject(readFileSync(statePath, 'utf8'));
+  if (typeof value.rejected !== 'boolean') {
+    throw new TypeError('invalid model state');
+  }
+  return {
+    proxy: identityField(value.proxy),
+    infoPath: textField(value.infoPath),
+    startedAt: textField(value.startedAt),
+    hash: textField(value.hash),
+    rejected: value.rejected,
+  };
 }
 function save(value: State): void {
   writeFileSync(statePath, JSON.stringify(value), { mode: 0o600 });
@@ -125,6 +148,7 @@ function checkLive(value: State): void {
   }
   for (const file of [value.infoPath, `${home}/config.toml`]) {
     const stat = statSync(file);
+    // oxlint-disable-next-line eslint/no-bitwise -- Unix権限のgroup/other書込みビットをマスクして保護を確認する。
     if (stat.uid !== 0 || (stat.mode & 0o022) !== 0) {
       throw new Error('writable proxy configuration');
     }
@@ -142,7 +166,7 @@ async function prepare(runId: string): Promise<void> {
   );
   const proxy = identity(pid);
   try {
-    const info = await readInfo(infoPath, 60000);
+    const info = await readInfo(infoPath, 60_000);
     if (info.pid !== pid || !alive(proxy)) {
       throw new Error('WIF proxy identity mismatch');
     }
@@ -201,7 +225,7 @@ async function waitAndReject(): Promise<void> {
   const value = state();
   while (!renewalDue(elapsed(value))) {
     checkLive(value);
-    await delay(Math.min(30000, WAIT_MS - elapsed(value)));
+    await delay(Math.min(30_000, WAIT_MS - elapsed(value)));
   }
   checkLive(value);
   const info = await readInfo(value.infoPath);
@@ -217,7 +241,7 @@ async function waitAndReject(): Promise<void> {
       method: 'POST',
       body: '{}',
       redirect: 'error',
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(45_000),
     });
     if (
       response.status !== 502 ||
@@ -230,7 +254,7 @@ async function waitAndReject(): Promise<void> {
     value.rejected = true;
     save(value);
   } finally {
-    for (const program of installed.reverse()) {
+    for (const program of installed.toReversed()) {
       firewall(program, '-D');
     }
   }
@@ -249,7 +273,7 @@ async function finish(outcome: string): Promise<void> {
       }
       verifyProxyIsolation(info, value.infoPath, [process.pid], [schemaPath]);
       const files = readdirSync(dumpDir);
-      const requests = files.filter((file) => file.endsWith('-request.json')).sort();
+      const requests = files.filter((file) => file.endsWith('-request.json')).toSorted();
       const responses = files.filter((file) => file.endsWith('-response.json'));
       if (
         requests.length !== 2 ||
@@ -259,8 +283,8 @@ async function finish(outcome: string): Promise<void> {
         throw new Error('unexpected model request count');
       }
       const usage = verifyModelEvidence(
-        JSON.parse(readFileSync(`${dumpDir}/${requests[1]}`, 'utf8')),
-        JSON.parse(readFileSync(`${dumpDir}/${responses[0]}`, 'utf8')),
+        parseJson(readFileSync(`${dumpDir}/${requests[1]}`, 'utf8')),
+        parseJson(readFileSync(`${dumpDir}/${responses[0]}`, 'utf8')),
         process.env.MODEL_OUTPUT ?? '',
       );
       console.log(
@@ -281,7 +305,7 @@ async function finish(outcome: string): Promise<void> {
           redirect: 'error',
           signal: AbortSignal.timeout(3000),
         });
-        for (const _ of Array(60)) {
+        for (const _ of Array.from({ length: 60 })) {
           if (!alive(value.proxy)) {
             break;
           }
@@ -309,11 +333,13 @@ if (import.meta.main) {
       throw new Error('requires disposable Linux root');
     }
     const [command, argument] = process.argv.slice(2);
-    if (command === 'prepare' && /^\d+$/.test(argument ?? '')) {
+    // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvは実行時に欠損するため検査を維持する。
+    if (command === 'prepare' && /^\d+$/u.test(argument ?? '')) {
       await prepare(argument);
     } else if (command === 'wait') {
       await waitAndReject();
     } else if (command === 'finish') {
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- argvは実行時に欠損するため検査を維持する。
       await finish(argument ?? '');
     } else {
       throw new Error('invalid probe command');

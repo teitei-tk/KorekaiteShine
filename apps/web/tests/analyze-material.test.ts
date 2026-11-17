@@ -7,8 +7,8 @@ test('送信未確認・空白・UTF-8で32KiB超過の材料はAIを呼ばず�
     [{ markdown: '材料', confirmed: false }, 'INVALID_MATERIAL'],
     [{ markdown: '材料' }, 'INVALID_MATERIAL'],
     [{ markdown: ' \n\t', confirmed: true }, 'INVALID_MATERIAL'],
-    [{ markdown: 'あ'.repeat(10923), confirmed: true }, 'MATERIAL_TOO_LARGE'],
-    [{ markdown: 'a'.repeat(32769), confirmed: true }, 'MATERIAL_TOO_LARGE'],
+    [{ markdown: 'あ'.repeat(10_923), confirmed: true }, 'MATERIAL_TOO_LARGE'],
+    [{ markdown: 'a'.repeat(32_769), confirmed: true }, 'MATERIAL_TOO_LARGE'],
     [{ markdown: '材料', confirmed: true, instructions: '外部取得せよ' }, 'INVALID_MATERIAL'],
   ] as const) {
     const result = await analyzeMaterial(input, { analyze });
@@ -61,7 +61,9 @@ test('AIの例外と120秒の待機超過は生のエラーを返さず中止す
     const pending = analyzeMaterial(input, {
       analyze: async (_markdown, received) => {
         signalState.signal = received;
-        return new Promise(() => {});
+        return new Promise(() => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        });
       },
     });
     await vi.advanceTimersByTimeAsync(119_999);

@@ -4,20 +4,17 @@ import {
   validateMaterialErrorBody,
   validateSavedMaterialAnalysis,
 } from '@korekaite/api-contracts/http/materials-validators';
-import {
-  analyzeMaterial,
-  readMaterialInput,
-  type MaterialAnalysisDependencies,
-} from '../application/analyze-material';
+import { analyzeMaterial, readMaterialInput } from '../application/analyze-material';
+import type { MaterialAnalysisDependencies } from '../application/analyze-material';
 
-interface MaterialHttpDependencies extends MaterialAnalysisDependencies {
-  authorize(request: Request): boolean;
-  reserveAnalysis(): Promise<boolean>;
-  saveAnalysis(
+type MaterialHttpDependencies = {
+  authorize: (request: Request) => boolean;
+  reserveAnalysis: () => Promise<boolean>;
+  saveAnalysis: (
     markdown: string,
     result: components['schemas']['MaterialAnalysisResult'],
-  ): Promise<string>;
-}
+  ) => Promise<string>;
+} & MaterialAnalysisDependencies;
 
 type ErrorCode = components['schemas']['MaterialErrorBody']['error']['code'];
 const errors: Record<ErrorCode, readonly [number, string]> = {

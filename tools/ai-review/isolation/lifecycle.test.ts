@@ -17,7 +17,7 @@ it.each([
   },
 );
 
-it.each([180000, Number.NaN, -1])(
+it.each([180_000, Number.NaN, -1])(
   'Actionの時間切れや不正な経過時間を拒否成功としない: %s',
   (elapsed) => {
     expect(lifecyclePassed('reject', 'failure', { count: 1, authOk: true }, '', elapsed)).toBe(

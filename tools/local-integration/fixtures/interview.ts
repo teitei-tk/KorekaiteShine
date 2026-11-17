@@ -5,10 +5,8 @@ import { validateJobNotification } from '@korekaite/api-contracts/messages/valid
 import { DurableObject } from 'cloudflare:workers';
 import { db } from 'void/db';
 import { connectionChecks } from '@korekaite/database';
-import {
-  CheckObject,
-  type CheckInitialized,
-} from '../../../apps/interview/src/diagnostics/check-object';
+import { CheckObject } from '../../../apps/interview/src/diagnostics/check-object';
+import type { CheckInitialized } from '../../../apps/interview/src/diagnostics/check-object';
 
 export class InspectableCheckObject extends CheckObject {
   constructor(
@@ -60,6 +58,7 @@ export class TopologyObject extends DurableObject<{
     return { enqueued: true };
   }
 
+  // oxlint-disable-next-line class-methods-use-this -- Worker RPCはinstance methodを名前で解決するためstatic化できない。
   async writeShared() {
     await db
       .insert(connectionChecks)
@@ -73,4 +72,5 @@ export class TopologyObject extends DurableObject<{
   }
 }
 
-export default {};
+const fixtureWorker = {};
+export default fixtureWorker;

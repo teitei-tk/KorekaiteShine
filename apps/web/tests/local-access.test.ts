@@ -61,11 +61,11 @@ test('空のcookie、余分なcookie、認可しないメソッドやUpgradeを�
       headers: { Origin: 'https://localhost', Cookie: cookie, ...extras },
     });
   expect(access.actor(new Request(path), 'read')).toBeNull();
-  expect(access.actor(get('HEAD', { Cookie: 'preference=x; ' + cookie }), 'read')).toBe(
+  expect(access.actor(get('HEAD', { Cookie: `preference=x; ${cookie}` }), 'read')).toBe(
     'local-developer',
   );
   expect(access.actor(get('POST'), 'read')).toBeNull();
   expect(access.actor(get('GET'), 'websocket')).toBeNull();
   expect(access.actor(get('GET'), 'write')).toBeNull();
-  expect(access.actor(get('GET', { Cookie: cookie + '; ' + cookie }), 'read')).toBeNull();
+  expect(access.actor(get('GET', { Cookie: `${cookie}; ${cookie}` }), 'read')).toBeNull();
 });

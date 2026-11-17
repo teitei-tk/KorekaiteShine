@@ -24,6 +24,7 @@ export async function requireDiagnosticInitialization(
       ),
     )
     .limit(1);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!job) {
     throw new Error('診断の初期化対象を確認できません。');
   }
@@ -128,6 +129,7 @@ export async function confirmDiagnosticInitialization(
       ),
   ]);
   const [confirmation] = await confirmed;
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (!confirmation) {
     throw new Error('DO保存の観測結果を確定できません。');
   }
@@ -154,6 +156,7 @@ export async function pendingCheckNotification(binding: D1Database, jobId: strin
       ),
     )
     .limit(1);
+  // oxlint-disable-next-line typescript/no-unnecessary-condition -- DBの空結果・外部入力・非同期更新を実行時に検査する。
   return pending ?? null;
 }
 

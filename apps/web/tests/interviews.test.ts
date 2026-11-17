@@ -1,4 +1,6 @@
-import { expect, test } from 'vitest';
+import { validateList } from '@korekaite/api-contracts/http/validators';
+import { jsonObject, parseObject } from './helpers/json';
+import { assert, expect, test } from 'vitest';
 import { listInterviews } from '../src/server/interviews.ts';
 import { readFile } from 'node:fs/promises';
 import {
@@ -10,7 +12,7 @@ import {
 test('面接一覧を新しい順に取得し、limitで件数を制限できる', async () => {
   const response = listInterviews(new Request('http://localhost/api/interviews?limit=1'));
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({
+  expect(parseObject(await response.text())).toEqual({
     items: [
       {
         id: 'interview-002',
@@ -30,11 +32,17 @@ test.each(interviewCases)('HTTP契約: $query → $status', async (example) => {
 });
 
 test('OpenAPIに定義したすべての応答に検証コードと実行ケースがある', async () => {
-  const document = JSON.parse(
+  const document = parseObject(
     await readFile(new URL(import.meta.resolve('@korekaite/api-contracts/http/openapi')), 'utf8'),
   );
-  const statuses = Object.keys(document.paths['/api/interviews'].get.responses).sort();
+  const statusKeys = Object.keys(
+    jsonObject(jsonObject(jsonObject(jsonObject(document.paths)['/api/interviews']).get).responses),
+  );
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持し、新しいテスト配列だけを整列する。
+  const statuses = statusKeys.sort();
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。
   expect(Object.keys(interviewResponseValidators).sort()).toEqual(statuses);
+  // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持するため、新しく作ったテスト用配列だけをsortする。共有データは変更しない。
   expect([...new Set(interviewCases.map((example) => String(example.status)))].sort()).toEqual(
     statuses,
   );
@@ -43,8 +51,7 @@ test('OpenAPIに定義したすべての応答に検証コードと実行ケー�
 test('移行先の一覧APIが日時の降順で2件返す', async () => {
   const response = listInterviews(new Request('http://localhost/api/interviews'));
   expect(response.status).toBe(200);
-  expect((await response.json()).items.map((item: { id: string }) => item.id)).toEqual([
-    'interview-002',
-    'interview-001',
-  ]);
+  const body = parseObject(await response.text());
+  assert.ok(validateList(body));
+  expect(body.items.map((item) => item.id)).toEqual(['interview-002', 'interview-001']);
 });

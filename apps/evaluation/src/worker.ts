@@ -4,10 +4,8 @@ import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { consumeJob } from './application/consume-job';
-import {
-  dispatchNotifications,
-  type NotificationDependencies,
-} from './application/dispatch-notifications';
+import { dispatchNotifications } from './application/dispatch-notifications';
+import type { NotificationDependencies } from './application/dispatch-notifications';
 import { recoverExecutions } from './application/recover-executions';
 import { recoverOverdueNotifications } from './server/repositories/outbox';
 import { isQuarantinedDelivery } from './server/repositories/delivery-anomalies';
@@ -15,18 +13,18 @@ import { createJobEvaluator } from './server/evaluate-job';
 import { createInterviewEvaluator } from './server/openai-interview-evaluator';
 import type { EvaluationGenerator } from './application/evaluate-interview';
 
-export interface EvaluationEnvironment {
+export type EvaluationEnvironment = {
   DB: D1Database;
   EVALUATION_QUEUE_NAME: string;
   EVALUATION_DLQ_NAME: string;
   EVALUATION_QUEUE: Pick<Queue<JobNotification>, 'send'>;
   EVALUATION_DLQ: Pick<Queue<JobNotification>, 'send'>;
   OPENAI_API_KEY?: string;
-}
-interface EvaluationBatch {
+};
+type EvaluationBatch = {
   queue: string;
   messages: readonly Pick<Message<JobNotification>, 'id' | 'body' | 'ack' | 'retry'>[];
-}
+};
 
 export function createEvaluationWorker(
   options: {

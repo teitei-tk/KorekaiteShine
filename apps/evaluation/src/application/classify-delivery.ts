@@ -17,9 +17,11 @@ export async function classifyDelivery(
     .select()
     .from(deletedJobs)
     .where(eq(deletedJobs.jobId, notification.jobId));
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   if (deleted) {
     return { kind: 'deleted' };
   }
   const [job] = await db.select().from(jobs).where(eq(jobs.jobId, notification.jobId));
+  // oxlint-disable-next-line typescript/no-unnecessary-condition, typescript/strict-boolean-expressions -- DBの空結果・外部入力・非同期更新を実行時に検査する。 DBの空結果・外部入力・非同期更新を実行時に検査する。
   return job ? { kind: 'job', job } : { kind: 'missing' };
 }

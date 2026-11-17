@@ -14,8 +14,12 @@ export async function runTestProcess(args: readonly string[], cwd: string): Prom
     interruptedState.interrupted = signal;
     child.kill(signal);
   };
-  const sigint = () => interrupt('SIGINT');
-  const sigterm = () => interrupt('SIGTERM');
+  const sigint = () => {
+    interrupt('SIGINT');
+  };
+  const sigterm = () => {
+    interrupt('SIGTERM');
+  };
   process.on('SIGINT', sigint);
   process.on('SIGTERM', sigterm);
   try {
@@ -35,38 +39,36 @@ export async function runTestProcess(args: readonly string[], cwd: string): Prom
 
 export async function discoverTestFiles(cwd: string): Promise<string[]> {
   const root = realpathSync(cwd);
-  const vitest = await createVitest({ root, watch: false });
+  const context = await createVitest({ root, watch: false });
   try {
-    return (await vitest.globTestSpecifications()).map((spec) =>
+    return (await context.globTestSpecifications()).map((spec) =>
       relative(root, spec.moduleId).replaceAll('\\', '/'),
     );
   } finally {
-    await vitest.close();
+    await context.close();
   }
 }
 
 async function main() {
   const [suite = '', ...extra] = process.argv.slice(2);
   const shard =
-    extra[0] !== undefined && !extra[0].startsWith('-') ? Number(extra.shift()) : undefined;
+    extra.at(0) !== undefined && !extra[0].startsWith('-') ? Number(extra.shift()) : undefined;
   const cwd = fileURLToPath(new URL('../', import.meta.url));
   validateTestFiles(await discoverTestFiles(cwd));
   const files = selectTestFiles(suite, shard);
   const list = extra.indexOf('--list');
-  if (list >= 0) {
+  if (list !== -1) {
     extra.splice(list, 1);
   }
   const vitest = fileURLToPath(new URL('../node_modules/vitest/vitest.mjs', import.meta.url));
-  return runTestProcess([vitest, list >= 0 ? 'list' : 'run', ...files, ...extra], cwd);
+  return runTestProcess([vitest, list === -1 ? 'run' : 'list', ...files, ...extra], cwd);
 }
 
 if (import.meta.main) {
-  main()
-    .then((code) => {
-      process.exitCode = code;
-    })
-    .catch((error: Error) => {
-      console.error(error.message);
-      process.exitCode = 1;
-    });
+  try {
+    process.exitCode = await main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
 }

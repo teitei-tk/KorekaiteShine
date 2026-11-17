@@ -21,9 +21,12 @@ const row = {
 };
 function dependencies() {
   return {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- このテスト専用の部分モックは呼ばれるAPIのみ実装し、未使用のプラットフォームAPIは省略する。
     database: {} as D1Database,
     now: vi.fn(() => 0),
-    sendNotification: vi.fn(async () => {}),
+    sendNotification: vi.fn(async () => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    }),
   };
 }
 
@@ -60,7 +63,9 @@ test('操作を指定した配送は他の操作を未送信のまま残す', as
 });
 
 test('契約違反の通知は保留し、後続の正常な通知は送信する', async () => {
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   vi.mocked(pendingNotifications).mockResolvedValue([
     { notification: { ...row, jobId: 'invalid' }, nextAttemptAt: null },
     { notification: row, nextAttemptAt: null },

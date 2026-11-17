@@ -1,3 +1,5 @@
+import { readWorkerConfig } from '../src/records.ts';
+import { parseObject, objectAt, stringValue } from './helpers/config-json.ts';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,7 +21,9 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
   try {
     const project = await buildProductionArtifacts(directory);
     const report = await verifyProductionArtifacts(project);
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
     expect(report.environments.sort()).toEqual(['client', 'evaluation', 'interview', 'ssr']);
+    // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
     expect(report.routes.sort()).toEqual([
       '__root.tsx',
       'api.interview-history.ts',
@@ -32,23 +36,24 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
       'index.tsx',
       'practice.tsx',
     ]);
-    const config = JSON.parse(
+    const config = parseObject(
       await readFile(
         join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
         'utf8',
       ),
     );
-    expect(config.env.APP_ENV).toEqual({ type: 'text', value: 'production' });
+    expect(objectAt(config.env).APP_ENV).toEqual({ type: 'text', value: 'production' });
     expect(config.name).toBe('korekaite-web-prod');
     const interviewConfigPath = join(
       project,
       '.cloudflare/output/v0/workers/korekaite-interview-prod/worker.config.json',
     );
-    const interviewConfig = JSON.parse(await readFile(interviewConfigPath, 'utf8'));
-    interviewConfig.env.INTERVIEW_SESSION.exportName = 'UnexpectedObject';
+    const interviewConfig = parseObject(await readFile(interviewConfigPath, 'utf8'));
+    objectAt(interviewConfig, 'env', 'INTERVIEW_SESSION').exportName = 'UnexpectedObject';
     await writeFile(interviewConfigPath, JSON.stringify(interviewConfig));
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('本番の面接DO設定に不整合');
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
@@ -64,6 +69,7 @@ test('監査記録にない配信ファイルを後から追加した場合も�
     await writeFile(join(extra, 'diagnostics.js'), 'export const scenario = "exhaust_retries";');
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('未記録の本番配信物');
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
@@ -126,7 +132,7 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
         INSERT INTO preserved SELECT COUNT(*) FROM connection_checks WHERE writer = 'preserve' AND value = 'original';
       `,
       ]);
-      const web = JSON.parse(
+      const web = parseObject(
         await readFile(
           join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
           'utf8',
@@ -134,8 +140,9 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
       );
       // HTTP入口にDO・他Worker・Queueの呼出し能力がないことも、実際の配置設定で確認する。
       expect(
-        Object.values(web.env as Record<string, { type: string }>)
-          .map((binding: { type: string }) => binding.type)
+        Object.values(objectAt(web.env))
+          .map((binding) => stringValue(objectAt(binding).type))
+          // oxlint-disable-next-line unicorn/no-array-sort -- ES2022対象を維持する。検査用配列の整列で、後続処理が共有する値は変更しない。
           .sort(),
       ).toEqual(['d1', 'text']);
       expect(web.triggers ?? []).toEqual([]);
@@ -143,6 +150,7 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
       await runtime.stop();
     }
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
@@ -175,6 +183,7 @@ test('3 Workersの本番入口へ診断importを混入させると、未使用�
       }
     }
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
@@ -195,10 +204,11 @@ test('本番入口へ計測ツールのimportが混入した場合は未使用�
       '本番モジュールへ診断・検証コードが混入',
     );
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
-}, 90000);
+}, 90_000);
 
 test('本番成果物へ計測カウンターを挿入した場合も拒否する', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-counter-'));
@@ -206,13 +216,32 @@ test('本番成果物へ計測カウンターを挿入した場合も拒否す�
   try {
     const project = await buildProductionArtifacts(directory);
     const entry = join(project, 'interview.production.ts');
-    await writeFile(entry, (await readFile(entry, 'utf8')) + '\nglobalThis.__coverage__ = {};\n');
+    await writeFile(entry, `${await readFile(entry, 'utf8')}\nglobalThis.__coverage__ = {};\n`);
     await runProductionBuild(project);
     await expect(verifyProductionArtifacts(project)).rejects.toThrow(
       '本番配信物へ診断コードが混入',
     );
   } finally {
+    // 成功時に後段で削除する、既存の実行順を維持する。
   }
 
   await rm(directory, { recursive: true, force: true });
-}, 90000);
+}, 90_000);
+
+test('Worker設定の構造が不正ならビルド成果物として採用しない', () => {
+  const config = {
+    name: 'worker',
+    env: { APP_ENV: { type: 'text', value: 'production' } },
+    extra: '保持する',
+  };
+  expect(readWorkerConfig(config)).toBe(config);
+  for (const value of [
+    null,
+    {},
+    { name: 'worker', env: [] },
+    { name: 'worker', env: { APP_ENV: false } },
+    { name: 'worker', env: {}, triggers: [false] },
+  ]) {
+    expect(() => readWorkerConfig(value)).toThrow();
+  }
+});

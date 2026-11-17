@@ -1,5 +1,11 @@
+import { readJsonObject } from './tests/helpers/json-object.ts';
 import { expect, it } from 'vitest';
 import { runVersion } from './run-version.ts';
+
+const code = 'a'.repeat(40),
+  head = 'b'.repeat(40),
+  base = 'c'.repeat(40),
+  expected = 'd'.repeat(40);
 
 it('比較応答にstatusがなければ包含確認成功として扱わない', () => {
   const f = fixture();
@@ -11,7 +17,7 @@ it('比較応答にstatusがなければ包含確認成功として扱わない'
 it('元CIの対象もheadも不明ならSHAを表示せず対象不明とする', () => {
   const f = fixture();
   const result = runVersion('20', undefined, (path) => {
-    const body = JSON.parse(f.read(path));
+    const body = readJsonObject(f.read(path));
     if (path.endsWith('/10/attempts/2')) {
       body.pull_requests = [];
     }
@@ -25,7 +31,7 @@ it('表示名と元CIの試行番号が異なれば対象を拒否する', () =>
   const f = fixture();
   expect(() =>
     runVersion('20', expected, (path) => {
-      const body = JSON.parse(f.read(path));
+      const body = readJsonObject(f.read(path));
       if (path.endsWith('/10/attempts/2')) {
         body.run_attempt = 3;
       }
@@ -38,16 +44,13 @@ it('レビュー実行の表示名が欠落していれば元CIを推測しな�
   const f = fixture();
   expect(() =>
     runVersion('20', expected, (path) => {
-      const body = JSON.parse(f.read(path));
+      const body = readJsonObject(f.read(path));
       delete body.display_title;
       return JSON.stringify(body);
     }),
   ).toThrow('Invalid source');
 });
-const code = 'a'.repeat(40),
-  head = 'b'.repeat(40),
-  base = 'c'.repeat(40),
-  expected = 'd'.repeat(40);
+
 function fixture(status = 'ahead', workflow = '.github/workflows/docs.yml') {
   const paths: string[] = [];
   const read = (path: string) => {

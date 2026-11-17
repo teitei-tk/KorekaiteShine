@@ -1,8 +1,8 @@
+import type { JsonValue } from '@korekaite/api-contracts/json';
 import {
   validateMaterialAnalysisRequest,
   validateMaterialAnalysisResult,
 } from '@korekaite/api-contracts/http/materials-validators';
-import type { components } from '@korekaite/api-contracts/http';
 
 type MaterialInputValue =
   | string
@@ -14,20 +14,18 @@ type MaterialInputValue =
       [key: string]: MaterialInputValue;
     };
 
-export interface MaterialAnalysisInput {
+export type MaterialAnalysisInput = {
   markdown?: string;
   confirmed?: boolean;
   // 未検証の追加項目は受け取れるが、生成validatorで拒否する。
   [key: string]: MaterialInputValue | undefined;
-}
+};
 
-export interface MaterialAnalysisCandidate {
-  themes?: Partial<components['schemas']['MaterialTheme']>[] | null;
-}
+export type MaterialAnalysisCandidate = JsonValue;
 
-export interface MaterialAnalysisDependencies {
-  analyze(markdown: string, signal: AbortSignal): Promise<MaterialAnalysisCandidate | null>;
-}
+export type MaterialAnalysisDependencies = {
+  analyze: (markdown: string, signal: AbortSignal) => Promise<MaterialAnalysisCandidate | null>;
+};
 
 export function readMaterialInput(input: MaterialAnalysisInput | null) {
   if (!validateMaterialAnalysisRequest(input)) {
@@ -43,7 +41,7 @@ export function readMaterialInput(input: MaterialAnalysisInput | null) {
   if (!input.markdown.trim()) {
     return { ok: false, code: 'INVALID_MATERIAL' } as const;
   }
-  if (new TextEncoder().encode(input.markdown).byteLength > 32768) {
+  if (new TextEncoder().encode(input.markdown).byteLength > 32_768) {
     return { ok: false, code: 'MATERIAL_TOO_LARGE' } as const;
   }
   return { ok: true, value: input } as const;
@@ -84,7 +82,7 @@ export async function analyzeMaterial(
   const headings = new Set<string>();
   const lines = markdown.split(/\r?\n/u);
   for (const [index, line] of lines.entries()) {
-    const atx = /^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/u.exec(line);
+    const atx = /^ {0,3}#{1,6}\s+(?<heading>.+?)\s*#*\s*$/u.exec(line);
     if (atx) {
       headings.add(atx[1].trim());
     } else if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/u.test(line) && lines[index - 1].trim()) {

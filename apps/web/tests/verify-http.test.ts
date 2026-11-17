@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { listInterviews } from '../src/server/interviews.ts';
 
 const script = fileURLToPath(new URL('../scripts/verify-http.ts', import.meta.url));
@@ -14,7 +14,7 @@ async function run(args: string[], preload?: string) {
     [...(preload ? ['--import', preload] : []), script, ...args],
     {
       stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 10000,
+      timeout: 10_000,
     },
   );
   const stdoutContext = { stdout: '', stderr: '' };
@@ -33,7 +33,10 @@ async function run(args: string[], preload?: string) {
 
 async function serve(page = '面接一覧') {
   const server = createServer((request, response) => {
-    const url = new URL(request.url!, 'http://localhost');
+    const url = new URL(
+      request.url ?? assert.fail('必須のテスト値がありません。'),
+      'http://localhost',
+    );
     const result =
       url.pathname === '/api/interviews' ? listInterviews(new Request(url)) : new Response(page);
     response.writeHead(result.status, Object.fromEntries(result.headers));
@@ -50,9 +53,15 @@ async function serve(page = '面接一覧') {
   return {
     url: `http://127.0.0.1:${address.port}`,
     close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      ),
+      new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      }),
   };
 }
 
@@ -67,7 +76,7 @@ test('HTTP確認CLIが指定URLの一覧順序・全クエリ契約・HTMLを確
   } finally {
     await server.close();
   }
-}, 15000);
+}, 15_000);
 
 test('HTTP確認CLIはHTMLが契約と異なる場合に成功表示せず失敗終了する', async () => {
   const server = await serve('別のページ');
@@ -80,7 +89,7 @@ test('HTTP確認CLIはHTMLが契約と異なる場合に成功表示せず失敗
   } finally {
     await server.close();
   }
-}, 15000);
+}, 15_000);
 
 test('HTTP確認CLIはURL省略時に既定のローカル接続先を使う', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'verify-http-default-'));
@@ -106,4 +115,4 @@ globalThis.fetch = async (input) => {
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
-}, 15000);
+}, 15_000);

@@ -7,20 +7,20 @@ import { pendingNotifications, markNotificationSent } from '../server/repositori
 
 // Cloudflare Queuesと固定版MiniflareのdelaySeconds上限。
 export const maximumQueueDelaySeconds = 86_400;
-export interface NotificationDependencies {
+export type NotificationDependencies = {
   database: D1Database;
-  now(): number;
-  sendNotification(
+  now: () => number;
+  sendNotification: (
     purpose: JobPurpose,
     operation: 'notify' | 'notify_dlq',
     notification: JobNotification,
     delaySeconds: number,
-  ): Promise<void>;
-}
-export interface RecoverySummary {
+  ) => Promise<void>;
+};
+export type RecoverySummary = {
   outboxSent: number;
   outboxDeferred: number;
-}
+};
 export async function dispatchNotifications(
   deps: NotificationDependencies,
   options: {
@@ -32,7 +32,7 @@ export async function dispatchNotifications(
 ): Promise<RecoverySummary> {
   const db = createPrimaryDb(deps.database);
   const summary = { outboxSent: 0, outboxDeferred: 0 };
-  const horizon = deps.now() + (options.includeFuture ? maximumQueueDelaySeconds * 1_000 : 0);
+  const horizon = deps.now() + (options.includeFuture ? maximumQueueDelaySeconds * 1000 : 0);
   for (const { notification: row, nextAttemptAt } of await pendingNotifications(
     db,
     horizon,
@@ -54,7 +54,7 @@ export async function dispatchNotifications(
       }
       const delaySeconds = Math.max(
         0,
-        Math.ceil((Math.max(row.scheduledAt, nextAttemptAt ?? 0) - deps.now()) / 1_000),
+        Math.ceil((Math.max(row.scheduledAt, nextAttemptAt ?? 0) - deps.now()) / 1000),
       );
       if (delaySeconds > maximumQueueDelaySeconds) {
         continue;

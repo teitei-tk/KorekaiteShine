@@ -1,8 +1,9 @@
+import { readJson, readJob, readCheckAccepted, readCheckStatus } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -27,15 +28,15 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
       body: '{"scenario":"retry_then_success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const status = async () =>
-      (
+      readCheckStatus(
         await fetch(
           `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
-        )
-      ).json();
+        ),
+      );
     await expect
-      .poll(status, { timeout: 8_000, interval: 100 })
+      .poll(status, { timeout: 8000, interval: 100 })
       .toMatchObject({ status: 'retry_wait', attemptCount: 1 });
     await runtimeContext.runtime.stop();
     // 独立test DBだけで時刻を進め、配送と回復の接続を検証する。
@@ -49,7 +50,7 @@ test('再起動後のscheduledが期限到来した再試行通知を送り、Qu
     ]);
     runtimeContext.runtime = await startRuntime(config);
     await runtimeContext.runtime.runScheduled();
-    await expect.poll(status, { timeout: 8_000, interval: 100 }).toMatchObject({
+    await expect.poll(status, { timeout: 8000, interval: 100 }).toMatchObject({
       status: 'completed',
       attemptCount: 2,
       lastErrorCode: 'SIMULATED_AI_FAILURE',
@@ -87,11 +88,13 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
       body: '{"scenario":"retry_then_success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const status = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
+      readCheckStatus(
+        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+      );
     await expect
-      .poll(status, { timeout: 8_000, interval: 100 })
+      .poll(status, { timeout: 8000, interval: 100 })
       .toMatchObject({ status: 'retry_wait', attemptCount: 1 });
     await expect
       .poll(
@@ -106,19 +109,22 @@ test('評価失敗直後に遅延通知を送り、scheduledを待たずに2回�
             return false;
           }
         },
-        { timeout: 5_000, interval: 100 },
+        { timeout: 5000, interval: 100 },
       )
       .toBe(true);
     const waiting = await status();
     expect(waiting).toMatchObject({ status: 'retry_wait', attemptCount: 1 });
-    const nextAttemptAt = Temporal.Instant.from(waiting.nextAttemptAt).epochMilliseconds;
+    const nextAttemptAt = Temporal.Instant.from(
+      waiting.nextAttemptAt ?? assert.fail('必要な日時がありません。'),
+    ).epochMilliseconds;
     await expect
       .poll(status, { timeout: 40_000, interval: 250 })
       .toMatchObject({ status: 'completed', attemptCount: 2 });
     const completed = await status();
-    expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
-      nextAttemptAt,
-    );
+    expect(
+      Temporal.Instant.from(completed.finishedAt ?? assert.fail('必要な日時がありません。'))
+        .epochMilliseconds,
+    ).toBeGreaterThanOrEqual(nextAttemptAt);
   } finally {
     await runtime.stop();
   }
@@ -143,14 +149,14 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
       body: JSON.stringify({ scenario: 'success' }),
     });
     expect(response.status).toBe(202);
-    const { jobId } = await response.json();
+    const { jobId } = await readJob(response);
     await expect
       .poll(
         async () =>
-          (
-            await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${jobId}`)
-          ).json(),
-        { timeout: 8_000, interval: 100 },
+          readJson(
+            await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${jobId}`),
+          ),
+        { timeout: 8000, interval: 100 },
       )
       .toMatchObject({ message: { jobId } });
     await runtimeContext.runtime.stop();
@@ -164,7 +170,9 @@ test('送信済みで未実行の期限到来通知を並行scheduledで回復�
       runtimeContext.runtime.runScheduled(),
     ]);
     const status = async () =>
-      (await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`)).json();
+      readCheckStatus(
+        await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${jobId}`),
+      );
     await expect
       .poll(status, { timeout: 10_000, interval: 100 })
       .toMatchObject({ status: 'completed', attemptCount: 1 });

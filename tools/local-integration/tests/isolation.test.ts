@@ -1,3 +1,4 @@
+import { parseObject, objectAt, objectArray, stringValue } from './helpers/config-json.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -29,7 +30,7 @@ test('開発DBを保持しながら並列test二環境のD1・DO・Queue・出�
   expect(await modifiedAt(), '統合検査から開発ランタイムの起動・準備を行ってはいけません').toEqual(
     developmentBefore,
   );
-  const report = JSON.parse(await readFile(resultPath, 'utf8'));
+  const report = parseObject(await readFile(resultPath, 'utf8'));
   expect(report).toMatchObject({
     environment: 'test',
     case: 'parallel-isolation',
@@ -42,18 +43,24 @@ test('開発DBを保持しながら並列test二環境のD1・DO・Queue・出�
       outputMarkersIsolated: true,
     },
   });
-  expect(report.actual.developmentAfter).toEqual(report.actual.developmentBefore);
-  expect(report.actual.testEnvironments).toHaveLength(2);
-  expect(report.actual.testEnvironments.map((entry: { slot: number }) => entry.slot)).toEqual([
+  expect(objectAt(report.actual).developmentAfter).toEqual(
+    objectAt(report.actual).developmentBefore,
+  );
+  expect(objectAt(report.actual).testEnvironments).toHaveLength(2);
+  expect(objectArray(objectAt(report.actual).testEnvironments).map((entry) => entry.slot)).toEqual([
     0, 1,
   ]);
   expect(
-    report.actual.testEnvironments.every(
-      (entry: { status: string; attemptCount: number; queueMatches: boolean }) =>
-        entry.status === 'completed' && entry.attemptCount === 1 && entry.queueMatches,
+    objectArray(objectAt(report.actual).testEnvironments).every(
+      (entry) =>
+        entry.status === 'completed' && entry.attemptCount === 1 && entry.queueMatches === true,
     ),
   ).toBe(true);
   expect(
-    new Set(report.actual.testEnvironments.map((entry: { queue: string }) => entry.queue)).size,
+    new Set(
+      objectArray(objectAt(report.actual).testEnvironments).map((entry) =>
+        stringValue(entry.queue),
+      ),
+    ).size,
   ).toBe(2);
 }, 180_000);

@@ -1,4 +1,5 @@
-import { expect, test, vi } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test, vi } from 'vitest';
 import { interviews } from '@korekaite/database';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import {
@@ -25,12 +26,21 @@ async function setup() {
     generation: 1,
     streamGeneration: 1,
     activeSince: 0,
-    deadline: 1200000,
+    deadline: 1_200_000,
     createdAt: 0,
     updatedAt: 0,
   });
   return database;
 }
+
+const evaluation = {
+  model: 'test-model',
+  promptVersion: 'v1',
+  rubricVersion: 'v1',
+  instructions: '発言に基づいて評価する。',
+  rubric: '架空の評価基準',
+};
+const jobId = '00000000-0000-4000-8000-000000000001';
 
 test('原文を順序付きで追記し、再送では上書きせず、終了待ちの最後の断片を保存する', async () => {
   const database = await setup();
@@ -51,7 +61,7 @@ test('原文を順序付きで追記し、再送では上書きせず、終了�
       appendTranscript(database.db, 'actor', { ...fragment, content: '変更された原文' }),
     ).rejects.toThrow();
     expect(await appendTranscript(database.db, 'other', fragment)).toBeNull();
-    const row = (await loadInterview(database.db, 'actor', 'interview'))!;
+    const row = await loadInterview(database.db, 'actor', 'interview');
     expect(row.revision).toBe(1);
     const ending = {
       ...row,
@@ -118,8 +128,10 @@ test('終了保存直前に会話が変わったら古い入力を固定せず�
       count: 0,
     });
     expect(await finishInterview(database.db, 'actor', 'interview', options, 11)).toBe(jobId);
-    const row = database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get()!;
-    expect(JSON.parse(String(row.input_json)).fragments).toMatchObject([
+    const row =
+      database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get() ??
+      assert.fail('必須のテスト値がありません。');
+    expect(parseObject(String(row.input_json)).fragments).toMatchObject([
       { content: '最後の回答です。' },
     ]);
   } finally {
@@ -167,8 +179,10 @@ test('終了保存の途中で失敗してもジョブや終了状態が残ら�
     });
     database.sqlite.exec('DROP TRIGGER fail_outbox');
     expect(await finishInterview(database.db, 'actor', 'interview', options, 11)).toBe(jobId);
-    const row = database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get()!;
-    expect(JSON.parse(String(row.input_json)).transcriptIncomplete).toBe(true);
+    const row =
+      database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get() ??
+      assert.fail('必須のテスト値がありません。');
+    expect(parseObject(String(row.input_json)).transcriptIncomplete).toBe(true);
   } finally {
     database.close();
   }
@@ -193,15 +207,6 @@ test('同時に届いた同じ終了要求はどちらも同じ初回ジョブ�
   }
 });
 
-const evaluation = {
-  model: 'test-model',
-  promptVersion: 'v1',
-  rubricVersion: 'v1',
-  instructions: '発言に基づいて評価する。',
-  rubric: '架空の評価基準',
-};
-const jobId = '00000000-0000-4000-8000-000000000001';
-
 test('終了時の会話・評価入力・ジョブ・通知を固定し、終了再送で同じジョブを返す', async () => {
   const database = await setup();
   try {
@@ -214,7 +219,7 @@ test('終了時の会話・評価入力・ジョブ・通知を固定し、終�
       content: '比較して決めました。',
       receivedAt: 10,
     });
-    const active = (await loadInterview(database.db, 'actor', 'interview'))!;
+    const active = await loadInterview(database.db, 'actor', 'interview');
     const ending = {
       ...active,
       status: 'ending' as const,
@@ -252,12 +257,12 @@ test('終了時の会話・評価入力・ジョブ・通知を固定し、終�
       ),
     ).toBe(jobId);
     expect(await finishInterview(database.db, 'other', 'interview', options, 24)).toBeNull();
-    const saved = database.sqlite
-      .prepare('SELECT input_json, last_sequence FROM evaluation_inputs')
-      .get()!;
+    const saved =
+      database.sqlite.prepare('SELECT input_json, last_sequence FROM evaluation_inputs').get() ??
+      assert.fail('必須のテスト値がありません。');
     expect(saved.last_sequence).toBe(1);
     expect(String(saved.input_json)).not.toContain('fixture-secret');
-    expect(JSON.parse(String(saved.input_json))).toMatchObject({
+    expect(parseObject(String(saved.input_json))).toMatchObject({
       schemaVersion: 1,
       evaluation,
       transcriptIncomplete: false,
@@ -308,8 +313,10 @@ test('接続欠落の記録は終了時に引き継ぎ、呼出側のfalseで消
       },
       10,
     );
-    const row = database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get()!;
-    expect(JSON.parse(String(row.input_json)).transcriptIncomplete).toBe(true);
+    const row =
+      database.sqlite.prepare('SELECT input_json FROM evaluation_inputs').get() ??
+      assert.fail('必須のテスト値がありません。');
+    expect(parseObject(String(row.input_json)).transcriptIncomplete).toBe(true);
   } finally {
     database.close();
   }
@@ -341,7 +348,7 @@ test('同時到着した原文と再生確認を一度だけ保存し、旧世�
       ]),
     ).toEqual([true, true]);
     expect(await recordPlayback(database.db, 'actor', { ...input, generation: 10 })).toBe(false);
-    const state = (await loadInterview(database.db, 'actor', 'interview'))!;
+    const state = await loadInterview(database.db, 'actor', 'interview');
     await expect(
       saveInterviewState(database.db, 'actor', { ...state, status: 'ended' }, state.revision),
     ).rejects.toThrow('一体');
@@ -374,7 +381,7 @@ test('未完了の質問操作は同じ音声接続で更新し、古い世代�
     setPendingQuestionOperation(database.db, actorId, 'interview', generation, operation, 10);
   try {
     expect(
-      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
+      (await loadInterview(database.db, 'actor', 'interview')).pendingQuestionOperation,
     ).toBeNull();
     expect(await write(1, 'rephrase')).toBe(true);
     expect(await write(1, 'skip')).toBe(true);
@@ -386,7 +393,7 @@ test('未完了の質問操作は同じ音声接続で更新し、古い世代�
     });
     expect(await write(1, null)).toBe(true);
     expect(
-      (await loadInterview(database.db, 'actor', 'interview'))?.pendingQuestionOperation,
+      (await loadInterview(database.db, 'actor', 'interview')).pendingQuestionOperation,
     ).toBeNull();
   } finally {
     database.close();

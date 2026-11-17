@@ -1,10 +1,11 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { createInterviewEvaluator } from '../src/server/openai-interview-evaluator.ts';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { result, snapshot } from './fixtures/evaluation';
 import { evaluateInterview } from '../src/application/evaluate-interview.ts';
 
 test('保存された原文に基づく五軸評価を返し、捏造引用と状態・点数の不整合を拒否する', async () => {
-  const signal = new AbortController().signal;
+  const { signal } = new AbortController();
   const good = result();
   expect(await evaluateInterview(snapshot, signal, async () => good)).toMatchObject({
     ok: true,
@@ -41,7 +42,8 @@ test('固定入力と採点基準をstore:falseで送り、秘密値や外部エ
   const generate = createInterviewEvaluator({
     apiKey: 'fixture-key',
     fetcher: async (_url, init) => {
-      sentState.sent = String(init?.body);
+      assert.ok(typeof init?.body === 'string');
+      sentState.sent = init.body;
       return Response.json({
         status: 'completed',
         output: [
@@ -58,7 +60,7 @@ test('固定入力と採点基準をstore:falseで送り、秘密値や外部エ
   expect(await evaluateInterview(snapshot, new AbortController().signal, generate)).toMatchObject({
     ok: true,
   });
-  expect(JSON.parse(sentState.sent)).toMatchObject({
+  expect(parseJson(sentState.sent)).toMatchObject({
     model: 'test-model',
     store: false,
     tools: [],
@@ -79,7 +81,7 @@ test('固定入力と採点基準をstore:falseで送り、秘密値や外部エ
   });
   expect(await evaluateInterview(snapshot, new AbortController().signal, limited)).toEqual({
     ok: false,
-    error: { code: 'AI_RATE_LIMITED', retryable: true, retryAfterMs: 120000 },
+    error: { code: 'AI_RATE_LIMITED', retryable: true, retryAfterMs: 120_000 },
   });
 });
 
@@ -89,11 +91,11 @@ test('日付形式のRetry-Afterも尊重し、不明な指定で早期再試行
   const generate = createInterviewEvaluator({
     apiKey: 'fixture-key',
     fetcher,
-    now: () => 1793923200000,
+    now: () => 1_793_923_200_000,
   });
   expect(await evaluateInterview(snapshot, new AbortController().signal, generate)).toEqual({
     ok: false,
-    error: { code: 'AI_RATE_LIMITED', retryable: true, retryAfterMs: 120000 },
+    error: { code: 'AI_RATE_LIMITED', retryable: true, retryAfterMs: 120_000 },
   });
   const invalid = createInterviewEvaluator({
     apiKey: 'fixture-key',
@@ -174,7 +176,7 @@ test('外部応答の形式・件数・役割・本文を確認してから評�
 });
 
 test('無効なAPI設定では送信を止め、HTTPエラーから再試行の可否を判定する', async () => {
-  const signal = new AbortController().signal;
+  const { signal } = new AbortController();
   for (const [apiKey, model] of [
     [' ', 'model'],
     ['fixture', ' '],
@@ -229,7 +231,7 @@ test('評価開始前と実行中の中断を検知する', async () => {
 });
 
 test('材料の引用、連続した発言、整合性評価の二つの根拠を保存内容と照合する', async () => {
-  const base = snapshot.fragments[0];
+  const [base] = snapshot.fragments;
   const input = {
     ...snapshot,
     fragments: [
@@ -260,7 +262,7 @@ test('材料の引用、連続した発言、整合性評価の二つの根拠�
     [transcript(['missing']), false],
     [transcript(['f1', 'f4']), false],
     [transcript(['f4', 'f5']), false],
-    [transcript(['f1', 'f2'], base.content + '次の回答'), true],
+    [transcript(['f1', 'f2'], `${base.content}次の回答`), true],
   ] as const) {
     expect(await evaluate({ strengths: [{ text: '観察', evidence: [evidence] }] })).toBe(expected);
   }

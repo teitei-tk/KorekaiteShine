@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -29,20 +30,22 @@ export async function runNodeCommand(input: {
   };
   child.stdout.on('data', collect);
   child.stderr.on('data', collect);
-  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
+  const closed = new Promise<void>((resolve) => {
+    child.once('close', () => {
+      resolve();
+    });
+  });
   const exited = new Promise<number | null>((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', resolve);
   });
   const { promise: interrupted, reject } = Promise.withResolvers<never>();
-  const onAbort = () => reject(aborted());
-  const timer = setTimeout(
-    () =>
-      reject(
-        new Error(`${input.label}がタイムアウトしました。${input.logPath}を確認してください。`),
-      ),
-    input.timeoutMs,
-  );
+  const onAbort = () => {
+    reject(aborted());
+  };
+  const timer = setTimeout(() => {
+    reject(new Error(`${input.label}がタイムアウトしました。${input.logPath}を確認してください。`));
+  }, input.timeoutMs);
   try {
     input.signal?.addEventListener('abort', onAbort, { once: true });
     if (input.signal?.aborted) {

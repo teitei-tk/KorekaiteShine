@@ -1,8 +1,9 @@
+import { readJson, readBootstrap, readAnalysis } from './helpers/json.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rm, readFile, readdir } from 'node:fs/promises';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { buildRuntime, startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -20,8 +21,10 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
     expect((await fetch(`${runtime.baseUrl}/api/interview-history`)).status).toBe(403);
     const bootstrap = await fetch(`${runtime.baseUrl}/api/local-session`);
     expect(bootstrap.status).toBe(200);
-    const { operationToken } = await bootstrap.json();
-    const cookie = bootstrap.headers.get('Set-Cookie')!.split(';')[0];
+    const { operationToken } = await readBootstrap(bootstrap);
+    const [cookie] = (
+      bootstrap.headers.get('Set-Cookie') ?? assert.fail('必須のテスト値がありません。')
+    ).split(';');
     const headers = {
       Cookie: cookie,
       Origin: runtime.baseUrl,
@@ -36,7 +39,7 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
       });
     const analyzed = await analysisRequest();
     expect(analyzed.status).toBe(200);
-    const { analysisId } = await analyzed.json();
+    const { analysisId } = await readAnalysis(analyzed);
     const results = await Promise.all(Array.from({ length: 11 }, analysisRequest));
     expect(results.filter((response) => response.status === 200)).toHaveLength(9);
     expect(results.filter((response) => response.status === 429)).toHaveLength(2);
@@ -56,12 +59,12 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
       body,
     });
     expect(created.status).toBe(200);
-    expect(await created.json()).toMatchObject({ interviewId: 'formal-one', status: 'ready' });
+    expect(await readJson(created)).toMatchObject({ interviewId: 'formal-one', status: 'ready' });
     const history = await fetch(`${runtime.baseUrl}/api/interview-history`, {
       headers: { Cookie: cookie },
     });
     expect(history.status).toBe(200);
-    expect(await history.json()).toMatchObject({
+    expect(await readJson(history)).toMatchObject({
       items: [{ interviewId: 'formal-one' }],
       next: null,
     });
@@ -69,7 +72,7 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
       headers: { Cookie: cookie },
     });
     expect(detail.status).toBe(200);
-    expect(await detail.json()).toMatchObject({
+    expect(await readJson(detail)).toMatchObject({
       session: { interviewId: 'formal-one' },
       material: { excerpt: '架空の経験' },
       transcripts: [],
@@ -92,8 +95,11 @@ test('正式HTTPでローカル認可から面接作成・履歴・詳細を実D
     await runtime.stop();
   }
 
-  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-}, 90000);
+  await rm(dirname(config.stateDirectory ?? assert.fail('必須のテスト値がありません。')), {
+    recursive: true,
+    force: true,
+  });
+}, 90_000);
 
 test('架空のAIキーは3 Workersに届き、生成設定・キャッシュ・ログ・状態に保存されない', async () => {
   const config = resolveRuntime({
@@ -116,7 +122,7 @@ test('架空のAIキーは3 Workersに届き、生成設定・キャッシュ・
     const digest = createHash('sha256').update(key).digest('hex');
     const response = await fetch(`${runtime.baseUrl}/api/ai-binding-test?digest=${digest}`);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    expect(await readJson(response)).toEqual({
       web: { matches: true, models: ['MATERIAL_MODEL'] },
       interview: { matches: true, models: ['RESPONSES_MODEL', 'EVALUATION_MODEL', 'LIVE_VOICE'] },
       evaluation: { matches: true, models: [] },
@@ -124,7 +130,7 @@ test('架空のAIキーは3 Workersに届き、生成設定・キャッシュ・
   } finally {
     await runtime.stop();
   }
-  const directory = dirname(config.stateDirectory!);
+  const directory = dirname(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'));
   async function scan(path: string): Promise<void> {
     for (const file of await readdir(path, { withFileTypes: true })) {
       const name = join(path, file.name);
@@ -147,4 +153,4 @@ test('架空のAIキーは3 Workersに届き、生成設定・キャッシュ・
   }
   await scan(directory);
   await rm(directory, { recursive: true, force: true });
-}, 90000);
+}, 90_000);

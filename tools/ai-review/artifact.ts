@@ -1,23 +1,20 @@
+import { parseJson, isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
+import { requireValue } from './required.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { digest, normalizeSnapshot, snapshotRevision, type Snapshot } from './snapshot.ts';
+import { digest, normalizeSnapshot, snapshotRevision } from './snapshot.ts';
+import type { Snapshot } from './snapshot.ts';
 import { reviewHistory, historyMarker } from './history.ts';
 import { latestFollowupStatus } from './followup.ts';
-import {
-  REPOSITORY,
-  MARKER,
-  safe,
-  validReview,
-  renderReview,
-  type Review,
-  type ReviewInput,
-} from './policy.ts';
-export interface GenerationOrigin {
+import { REPOSITORY, MARKER, safe, validReview, renderReview } from './policy.ts';
+import type { Review } from './policy.ts';
+export type GenerationOrigin = {
   run: string;
   attempt: string;
   sha: string;
-}
-export interface Metadata {
+};
+export type Metadata = {
   version: 2;
   repository: string;
   number: number;
@@ -26,7 +23,7 @@ export interface Metadata {
   sourceRun: string;
   lines: Record<string, number[]>;
   history: Snapshot;
-}
+};
 export type Operation = {
   id: string;
   kind: 'finding' | 'reply' | 'summary';
@@ -50,37 +47,63 @@ export type ReviewArtifact = {
 export const generationMarker = (m: Metadata, o: GenerationOrigin) =>
   `<!-- generation:v2:${o.run}:${o.attempt}:${m.head}:${m.base} -->`;
 export const operationMarker = (id: string) => `<!-- operation:v2:${id} -->`;
-function validOrigin(o: GenerationOrigin): boolean {
+export function validOrigin(o: JsonInput): o is GenerationOrigin {
   return (
-    !!o && /^[1-9]\d*$/.test(o.run) && /^[1-9]\d*$/.test(o.attempt) && /^[a-f0-9]{40}$/.test(o.sha)
+    isJsonObject(o) &&
+    typeof o.run === 'string' &&
+    /^[1-9]\d*$/u.test(o.run) &&
+    typeof o.attempt === 'string' &&
+    /^[1-9]\d*$/u.test(o.attempt) &&
+    typeof o.sha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(o.sha)
   );
 }
-export function validateMetadata(m: Metadata): Metadata {
+export function validateMetadata(m: JsonInput): Metadata {
   if (
-    !m ||
+    !isJsonObject(m) ||
     m.version !== 2 ||
     m.repository !== REPOSITORY ||
+    typeof m.number !== 'number' ||
     !Number.isSafeInteger(m.number) ||
     m.number < 1 ||
-    ![m.head, m.base].every((s) => typeof s === 'string' && /^[a-f0-9]{40}$/.test(s)) ||
-    !/^[1-9]\d*$/.test(m.sourceRun) ||
-    !m.lines ||
-    typeof m.lines !== 'object' ||
-    Array.isArray(m.lines) ||
-    Object.entries(m.lines).some(
-      ([p, lines]) =>
-        !p || !Array.isArray(lines) || lines.some((n) => !Number.isSafeInteger(n) || n < 1),
-    )
+    typeof m.head !== 'string' ||
+    !/^[a-f0-9]{40}$/u.test(m.head) ||
+    typeof m.base !== 'string' ||
+    !/^[a-f0-9]{40}$/u.test(m.base) ||
+    typeof m.sourceRun !== 'string' ||
+    !/^[1-9]\d*$/u.test(m.sourceRun) ||
+    !isJsonObject(m.lines)
   ) {
     throw new Error('成果物の対象が不正です');
   }
-  return { ...m, history: normalizeSnapshot(m.history) };
+  const lines: Record<string, number[]> = {};
+  for (const [path, values] of Object.entries(m.lines)) {
+    if (
+      path.length === 0 ||
+      !Array.isArray(values) ||
+      !values.every((n): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 1)
+    ) {
+      throw new Error('成果物の対象が不正です');
+    }
+    lines[path] = values;
+  }
+  return {
+    ...m,
+    version: m.version,
+    repository: m.repository,
+    number: m.number,
+    head: m.head,
+    base: m.base,
+    sourceRun: m.sourceRun,
+    lines,
+    history: normalizeSnapshot(m.history),
+  };
 }
 export function createArtifact(
-  metadata: Metadata,
-  input: ReviewInput,
+  metadata: JsonInput,
+  input: JsonInput,
   origin: GenerationOrigin,
-  usage: ReviewArtifact['usage'],
+  usage: JsonInput,
 ): ReviewArtifact {
   const m = validateMetadata(metadata);
   if (!validOrigin(origin)) {
@@ -91,25 +114,29 @@ export function createArtifact(
   if (review.status !== 'complete') {
     throw new Error('未完了の結果は投稿できません');
   }
-  if (
-    usage !== null &&
-    (!usage ||
-      ![usage.input, usage.output, usage.total].every((n) => Number.isSafeInteger(n) && n >= 0) ||
-      usage.total !== usage.input + usage.output)
-  ) {
+  const validUsage = (value: JsonInput): value is ReviewArtifact['usage'] =>
+    value === null ||
+    (isJsonObject(value) &&
+      typeof value.input === 'number' &&
+      typeof value.output === 'number' &&
+      typeof value.total === 'number' &&
+      [value.input, value.output, value.total].every((n) => Number.isSafeInteger(n) && n >= 0) &&
+      value.total === value.input + value.output);
+  if (!validUsage(usage)) {
     throw new Error('利用量が不正です');
   }
+  const checkedUsage = usage;
   const resultHash = digest(JSON.stringify(review));
   const operations: Operation[] = [];
   function add(
     kind: Operation['kind'],
     target: string,
     body: string,
-    extra: Partial<Pick<Operation, 'path' | 'line' | 'replyTo'>> = {},
+    extra?: Partial<Pick<Operation, 'path' | 'line' | 'replyTo'>>,
   ) {
     const id = digest(JSON.stringify([origin, resultHash, kind, target]));
     const text = [body, generationMarker(m, origin), operationMarker(id)].join('\n\n');
-    if (text.length > 60000) {
+    if (text.length > 60_000) {
       throw new Error('GitHubコメント上限を超えました');
     }
     operations.push({ id, kind, body: text, bodyHash: digest(text), ...extra });
@@ -126,7 +153,7 @@ export function createArtifact(
     );
   }
   for (const check of review.checks ?? []) {
-    const original = prior.find((f) => f.id === check.id)!;
+    const original = requireValue(prior.find((f) => f.id === check.id));
     if (
       (latestFollowupStatus(original, m.history.issues, m.history.inline) ?? 'unfixed') ===
       check.status
@@ -173,16 +200,13 @@ export function createArtifact(
     resultHash,
     review,
     operations,
-    usage,
+    usage: checkedUsage,
     cost: null,
   };
 }
-export function validateArtifact(
-  value: ReviewArtifact,
-  expected: GenerationOrigin,
-): ReviewArtifact {
+export function validateArtifact(value: JsonInput, expected: GenerationOrigin): ReviewArtifact {
   if (
-    !value ||
+    !isJsonObject(value) ||
     value.version !== 2 ||
     !validOrigin(expected) ||
     JSON.stringify(value.origin) !== JSON.stringify(expected)
@@ -197,7 +221,7 @@ export function validateArtifact(
 }
 export function readArtifact(directory: string, expected: GenerationOrigin): ReviewArtifact {
   return validateArtifact(
-    JSON.parse(readFileSync(join(directory, 'review-v2.json'), 'utf8')),
+    parseJson(readFileSync(join(directory, 'review-v2.json'), 'utf8')),
     expected,
   );
 }

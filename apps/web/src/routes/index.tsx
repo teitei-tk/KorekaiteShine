@@ -12,7 +12,9 @@ export function InterviewPage() {
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const activeState = { active: true };
-    getInterviews(window.location.origin).then(
+    // oxlint-disable-next-line promise/catch-or-return, promise/prefer-catch -- thenの第2引数で拒否を処理する終端のUI更新。 成功処理内の例外と元のPromiseの拒否を同じ失敗処理へ混同しない。
+    getInterviews(globalThis.location.origin).then(
+      // oxlint-disable-next-line promise/always-return -- 終端の副作用コールバックであり、値は後続へ渡さない。
       (data) => {
         if (activeState.active) {
           setResult(data);
@@ -60,11 +62,11 @@ export function InterviewPage() {
       </button>
       {error ? (
         <p role="alert">{error}</p>
-      ) : !result ? (
-        <p role="status">読み込み中…</p>
-      ) : (
+      ) : result ? (
         <>
-          <p role="status">{result.items.length}件の面接</p>
+          <output style={{ display: 'block', marginBlock: '1em' }}>
+            {result.items.length}件の面接
+          </output>
           <table cellPadding={12}>
             <thead>
               <tr>
@@ -88,6 +90,8 @@ export function InterviewPage() {
             </tbody>
           </table>
         </>
+      ) : (
+        <output style={{ display: 'block', marginBlock: '1em' }}>読み込み中…</output>
       )}
     </main>
   );

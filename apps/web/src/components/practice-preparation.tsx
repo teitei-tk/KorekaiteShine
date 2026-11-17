@@ -5,7 +5,7 @@ import { analyzeMarkdown, prepareInterview } from '../lib/practice';
 export function PracticePreparation({
   onCreated,
 }: {
-  onCreated(session: components['schemas']['InterviewSession']): void;
+  onCreated: (session: components['schemas']['InterviewSession']) => void;
 }) {
   const [markdown, setMarkdown] = useState('');
   const [confirmed, setConfirmed] = useState(false);
@@ -31,8 +31,8 @@ export function PracticePreparation({
     setPending(true);
     try {
       await action();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '操作を完了できませんでした。');
+    } catch (error_) {
+      setError(error_ instanceof Error ? error_.message : '操作を完了できませんでした。');
     } finally {
       setPending(false);
     }
@@ -53,7 +53,7 @@ export function PracticePreparation({
             event.currentTarget.value = '';
             if (file) {
               void perform(async () => {
-                if (file.size > 32768) {
+                if (file.size > 32_768) {
                   throw new Error('32 KiB 以下のファイルを選んでください。');
                 }
                 changeMaterial(await file.text());
@@ -69,7 +69,9 @@ export function PracticePreparation({
             rows={10}
             style={{ display: 'block', width: '100%' }}
             value={markdown}
-            onChange={(event) => changeMaterial(event.target.value)}
+            onChange={(event) => {
+              changeMaterial(event.target.value);
+            }}
           />
         </label>
         <small>{bytes.toLocaleString()} / 32,768 バイト</small>
@@ -78,14 +80,16 @@ export function PracticePreparation({
         <input
           type="checkbox"
           checked={confirmed}
-          onChange={(event) => setConfirmed(event.target.checked)}
+          onChange={(event) => {
+            setConfirmed(event.target.checked);
+          }}
         />{' '}
         この内容をテーマ分析のためにOpenAIへ送信することを確認しました
       </label>
       <p>
         <button
           type="button"
-          disabled={!confirmed || !markdown.trim() || bytes > 32768}
+          disabled={!confirmed || !markdown.trim() || bytes > 32_768}
           onClick={() =>
             void perform(async () => {
               const result = await analyzeMarkdown(markdown);
@@ -102,6 +106,7 @@ export function PracticePreparation({
         <section>
           <h2>面接のテーマ</h2>
           {analysis.themes.map((theme, index) => (
+            // oxlint-disable-next-line react/no-array-index-key -- 状態を持たない表示専用の行。重複する本文も別々に表示する。
             <div key={index}>
               <label>
                 <input
@@ -159,7 +164,7 @@ export function PracticePreparation({
           </p>
         </section>
       )}
-      {pending && <p role="status">処理中…</p>}
+      {pending && <output style={{ display: 'block', marginBlock: '1em' }}>処理中…</output>}
       {error && <p role="alert">{error}</p>}
     </fieldset>
   );

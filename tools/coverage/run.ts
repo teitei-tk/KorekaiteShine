@@ -60,7 +60,7 @@ export async function main(
 export async function cli(args: readonly string[]) {
   try {
     const coverage = await main(args);
-    writeSync(1, JSON.stringify(coverage.getCoverageSummary().toJSON(), null, 2) + '\n');
+    writeSync(1, `${JSON.stringify(coverage.getCoverageSummary().toJSON(), null, 2)}\n`);
   } catch (error) {
     writeSync(2, `${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

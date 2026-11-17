@@ -1,10 +1,19 @@
+import type * as LintTypeModule0 from 'node:fs';
+import type * as LintTypeModule1 from '../isolation-probe.ts';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { writeFileSync, writeSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { probeIsolation, type IsolationReport } from '../isolation-probe.ts';
+import { probeIsolation } from '../isolation-probe.ts';
 
 const state = vi.hoisted(() => ({
-  input: { parentPidNamespace: 'pid:[100]' },
+  input: {
+    expectedUid: 2001,
+    protectedFiles: [],
+    readOnlyDirectories: [],
+    parentPid: 100,
+    port: 4321,
+    parentPidNamespace: 'pid:[100]',
+  },
   report: {
     passed: true,
     pidNamespace: 'pid:[100]',
@@ -13,24 +22,31 @@ const state = vi.hoisted(() => ({
       { name: 'network', passed: false },
       { name: 'protected-file-0', passed: true },
     ],
-  } as IsolationReport,
+  } as LintTypeModule1.IsolationReport,
 }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule0>()),
   readFileSync: () => JSON.stringify(state.input),
   writeSync: vi.fn(),
   writeFileSync: vi.fn(),
 }));
 vi.mock('node:child_process', () => ({ spawnSync: vi.fn() }));
 vi.mock('../isolation-probe.ts', async (original) => ({
-  ...(await original<typeof import('../isolation-probe.ts')>()),
+  ...(await original<typeof LintTypeModule1>()),
   probeIsolation: vi.fn(async () => state.report),
 }));
 
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  state.input = { parentPidNamespace: 'pid:[100]' };
+  state.input = {
+    expectedUid: 2001,
+    protectedFiles: [],
+    readOnlyDirectories: [],
+    parentPid: 100,
+    port: 4321,
+    parentPidNamespace: 'pid:[100]',
+  };
   state.report = {
     passed: true,
     pidNamespace: 'pid:[100]',
@@ -58,7 +74,9 @@ beforeEach(() => {
     stdout: { write: vi.fn() },
     stderr: { write: vi.fn() },
   });
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.mocked(spawnSync).mockReturnValue({
     pid: 0,
     output: [],
@@ -77,6 +95,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 it('sandbox起動失敗では出力がなくても安全に終了する', async () => {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- NodeのEventEmitter API互換な部分mockを検証する。実API全体の実装やEventTargetへの置換は行わない。
   vi.mocked(spawnSync).mockReturnValueOnce({
     pid: 0,
     error: new Error('fixture'),
@@ -87,13 +106,16 @@ it('sandbox起動失敗では出力がなくても安全に終了する', async 
     signal: null,
   } as object as ReturnType<typeof spawnSync>);
   await expect(import('./action-probe.ts')).rejects.toThrow('fixture exit');
+  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.stdout.write).toHaveBeenCalledWith('');
+  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.stderr.write).toHaveBeenCalledWith('');
   expect(writeFileSync).not.toHaveBeenCalled();
 });
 it('Action境界で資格情報保護に失敗したらsandboxへ進まない', async () => {
   state.report.checks[2].passed = false;
   await expect(import('./action-probe.ts')).rejects.toThrow('fixture exit');
+  // oxlint-disable-next-line typescript/unbound-method -- Vitestのmock呼出し履歴をmatcherで検査し、メソッドを実行しない。
   expect(process.exit).toHaveBeenCalledWith(1);
   expect(spawnSync).not.toHaveBeenCalled();
 });

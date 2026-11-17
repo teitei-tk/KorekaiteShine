@@ -5,12 +5,12 @@ const workflow = (name: string) =>
   readFileSync(new URL(`../../.github/workflows/${name}.yml`, import.meta.url), 'utf8');
 it('AIレビュー表示を通常CIから独立したPR Workflowにする', () => {
   const monitor = workflow('ai-review-check');
-  expect(monitor).toMatch(/^name: AI review\n/);
+  expect(monitor).toMatch(/^name: AI review\n/u);
   expect(monitor).toContain('pull_request:');
   expect(monitor).not.toContain('workflow_run:');
   expect(monitor).toContain('node tools/ai-review/wait-review.ts wait');
   expect(monitor).toContain('node tools/ai-review/wait-review.ts finish');
-  expect(workflow('ci')).toMatch(/^name: CI\n/);
+  expect(workflow('ci')).toMatch(/^name: CI\n/u);
 });
 it('監視は信頼済みbaseのコードを使い、書き込み・OIDC権限を持たない', () => {
   const monitor = workflow('ai-review-check');
@@ -20,15 +20,15 @@ it('監視は信頼済みbaseのコードを使い、書き込み・OIDC権限�
   expect(monitor).toContain('actions: read');
   expect(monitor).toContain('contents: read');
   expect(monitor).toContain('pull-requests: read');
-  expect(monitor).not.toMatch(/:\s*write\b|secrets\.|id-token:/);
+  expect(monitor).not.toMatch(/:\s*write\b|secrets\.|id-token:/u);
   expect(monitor).not.toContain('pnpm install');
 });
 it('モデルと投稿をmainの後続Workflowに残す', () => {
   const backend = workflow('ai-review');
   expect(backend).toContain('workflow_run:');
   expect(backend).toContain('workflows: [Documentation checks, CI]');
-  const generate = backend.split('\n  generate:')[1].split('\n  publish:')[0];
-  const publish = backend.split('\n  publish:')[1];
+  const [generate] = backend.split('\n  generate:')[1].split('\n  publish:');
+  const [, publish] = backend.split('\n  publish:');
   expect(generate).toContain('id-token: write');
   expect(generate).not.toContain('pull-requests: write');
   expect(publish).toContain('pull-requests: write');
@@ -50,14 +50,14 @@ it('Draft解除時にも通常CIと監視を同時に起動する', () => {
 });
 it('通常生成も公式Actionと隔離境界を使い、同じ成果物を投稿再開する', () => {
   const backend = workflow('ai-review');
-  const generate = backend.split('\n  generate:')[1].split('\n  publish:')[0];
+  const [generate] = backend.split('\n  generate:')[1].split('\n  publish:');
   expect(generate).toContain('uses: openai/codex-action@v1.13');
   expect(generate).toContain('safety-strategy: unprivileged-user');
   expect(generate).toContain('sandbox: read-only');
   expect(generate).toContain('output-schema-file: /opt/ai-review/context/schema.json');
   expect(generate).toContain('output-file: /home/ai-review/.codex/tmp/review.json');
   expect(generate).toContain('/ai-review-material/review-v2.json');
-  expect(generate).not.toMatch(/orchestrate.ts|budget-result.json|tools\/ai-review-retired/);
+  expect(generate).not.toMatch(/orchestrate.ts|budget-result.json|tools\/ai-review-retired/u);
   expect(backend).toContain('cancel-in-progress: false');
 });
 
@@ -69,7 +69,7 @@ it('失敗通知は終了イベントから信頼済みコードだけで実行�
   expect(notify).toContain('persist-credentials: false');
   expect(notify).toContain('actions: read');
   expect(notify).toContain('pull-requests: write');
-  expect(notify).not.toMatch(/id-token:|checks: write|pnpm install|secrets\./);
+  expect(notify).not.toMatch(/id-token:|checks: write|pnpm install|secrets\./u);
   expect(notify).toContain('node tools/ai-review/failure-notify.ts prepare');
   expect(notify).toContain('node tools/ai-review/failure-notify.ts publish');
   expect(notify).toContain('run-id: ${{ github.event.workflow_run.id }}');
@@ -81,7 +81,7 @@ it('失敗通知は終了イベントから信頼済みコードだけで実行�
 });
 
 it('root実行の固定診断を保存し、後続の汎用失敗で上書きしない', () => {
-  const generate = workflow('ai-review').split('\n  generate:')[1].split('\n  publish:')[0];
+  const [generate] = workflow('ai-review').split('\n  generate:')[1].split('\n  publish:');
   const calls = generate
     .split('\n')
     .filter(
@@ -90,7 +90,7 @@ it('root実行の固定診断を保存し、後続の汎用失敗で上書きし
     );
   expect(calls).toHaveLength(3);
   for (const call of calls) {
-    const preserved = call.match(/--preserve-env=([^ ]+)/)?.[1].split(',');
+    const preserved = /--preserve-env=(?<capture1>[^ ]+)/u.exec(call)?.[1].split(',');
     expect(preserved).toEqual(
       expect.arrayContaining([
         'RUNNER_TEMP',
@@ -117,5 +117,5 @@ it('長時間検査を通常CIとAIレビューの開始待ちに含めない', 
   expect(realtime).not.toContain('continue-on-error');
   expect(realtime).toContain('needs: [changes, realtime]');
   expect(realtime).toContain('if: always()');
-  expect(realtime).not.toMatch(/:\s*write\b|secrets\.|id-token:/);
+  expect(realtime).not.toMatch(/:\s*write\b|secrets\.|id-token:/u);
 });

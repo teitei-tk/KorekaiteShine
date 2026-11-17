@@ -39,16 +39,16 @@ const feature = readFileSync(
   new NodeURL('../features/voice-interview.feature', import.meta.url),
   'utf8',
 );
-const [background, ...scenarios] = feature.split(/^[ \t]*シナリオ: /m);
+const [background, ...scenarios] = feature.split(/^[ \t]*シナリオ: /mu);
 const stepNames = (section) =>
-  [...section.matchAll(/^\s*(?:前提|もし|かつ|ならば) (.+)$/gm)].map((match) => match[1]);
+  [...section.matchAll(/^\s*(?:前提|もし|かつ|ならば) (?<step>.+)$/gmu)].map((match) => match[1]);
 afterEach(() => {
   vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllEnvs();
   document.body.replaceChildren();
-  delete window.restoreInterviewNetwork;
-  delete window.voiceE2e;
+  delete globalThis.restoreInterviewNetwork;
+  delete globalThis.voiceE2e;
 });
 
 // 同じ受け入れ条件に模擬ブラウザの観測結果を与え、失敗を検知する側も検証する。
@@ -166,7 +166,7 @@ async function observer() {
         }
         questionState.currentQuestion = questions[name];
         transcript('assistant', questionState.currentQuestion, true);
-        window.voiceE2e.playedFrequencies.push(440);
+        globalThis.voiceE2e.playedFrequencies.push(440);
       }
       if (
         ['このタブで引き継ぐ', 'マイクを許可して再開'].includes(name) &&
@@ -174,7 +174,7 @@ async function observer() {
       ) {
         timeContext.generation++;
         transcript('assistant', questionState.currentQuestion, true);
-        window.voiceE2e.playedFrequencies.push(440);
+        globalThis.voiceE2e.playedFrequencies.push(440);
       }
       if (name === 'マイクを許可して開始' && timeContext.refused) {
         emit({ type: 'error', code: 'AUDIO_CONNECT_FAILED' });
@@ -201,8 +201,12 @@ async function observer() {
     },
   });
   page.getByRole = (_role, options) => locator(options?.name);
-  page.getByLabel = page.getByText = page.locator = locator;
-  page.waitForFunction.mockImplementation((fn, arg) => expect(fn(arg)).toBe(true));
+  page.getByLabel = locator;
+  page.getByText = locator;
+  page.locator = locator;
+  page.waitForFunction.mockImplementation((fn, arg) => {
+    expect(fn(arg)).toBe(true);
+  });
   page.waitForResponse.mockImplementation(async (predicate) => {
     const response = (path, method, value) => ({
       ok: () => true,
@@ -217,17 +221,17 @@ async function observer() {
       response('/api/interviews', 'POST', { interviewId: 'one', theme: '題材' }),
       response('/api/interviews/one', 'GET', {
         session: { interviewId: 'one', activeMs: timeContext.active },
-        audioRemainingMs: 3600000 - timeContext.active,
+        audioRemainingMs: 3_600_000 - timeContext.active,
         transcripts: [...transcripts],
       }),
     ];
-    const match = responses.find(predicate);
+    const match = responses.find((response) => predicate(response));
     expect(match).toBeDefined();
     return match;
   });
-  window.voiceE2e = { speaking: true, playedFrequencies: [] };
+  globalThis.voiceE2e = { speaking: true, playedFrequencies: [] };
   await hooks.before.call(world);
-  const relay = page.routeWebSocket.mock.calls[0][1];
+  const [[, relay]] = page.routeWebSocket.mock.calls;
   relay(client);
   const voice = Buffer.alloc(12);
   voice.writeInt16LE(500, 10);
@@ -244,9 +248,9 @@ async function observer() {
     transcripts.push(event);
     emit(event);
   }
-  window.voiceE2e.speak = () => inputContext.input(voice);
+  globalThis.voiceE2e.speak = () => inputContext.input(voice);
   speak.mockImplementation(async () => {
-    for (const _ of Array(3).keys()) {
+    for (const _ of Array.from({ length: 3 }).keys()) {
       inputContext.input(voice);
     }
     if (!questionState.silent) {
@@ -285,7 +289,7 @@ test('停止中の通信を拒否し、失敗の診断には状態とエラー�
   vi.stubEnv('E2E_CHROME_PATH', '/test/chrome');
   const { world, page, relay, client, input, output, server, emit, browser } = await observer();
   const route = { abort: vi.fn(), continue: vi.fn() };
-  const request = page.route.mock.calls[0][1];
+  const [[, request]] = page.route.mock.calls;
   request(route);
   world.offline = true;
   request(route);
@@ -296,7 +300,9 @@ test('停止中の通信を拒否し、失敗の診断には状態とエラー�
   input('sync');
   output(Buffer.alloc(1));
   expect(server.send).toHaveBeenCalledWith('sync');
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   emit({ type: 'state', status: 'active' });
   emit({ type: 'transcript', content: '非公開' });
   emit({ type: 'error', code: 'STALE_STATE' });
@@ -332,7 +338,7 @@ test('質問を切り替えた後の見出し・保存世代・音声を検査�
   await step('架空の経験Markdownからテーマを選び面接を準備した');
   await step('回答せずに質問を言い換えて見送る');
   await step('最後の質問だけが現在の質問になり、前の質問も会話に残る');
-  window.voiceE2e.playedFrequencies.push(880);
+  globalThis.voiceE2e.playedFrequencies.push(880);
   await expect(
     step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る'),
   ).rejects.toThrow('旧接続の遅延音声');

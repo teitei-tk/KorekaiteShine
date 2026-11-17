@@ -1,12 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, readlinkSync } from 'node:fs';
+import { platform } from 'node:os';
+import { basename } from 'node:path';
 
 interface InspectorEndpoint {
   id: string;
   webSocketDebuggerUrl: string;
 }
 
-/** Linux上の自分の子workerdが所有するソケットだけから直接Inspectorを探す。 */
+/** 自分の子workerdが所有するソケットだけから直接Inspectorを探す。 */
 export async function findWorkerdInspector(
   parentPid: number,
   names: readonly string[],
@@ -30,28 +32,15 @@ export async function findWorkerdInspector(
       break;
     }
   }
-  const inodes = new Set<string>();
-  for (const row of rows.filter((row) => children.has(row.pid) && row.command === 'workerd')) {
-    for (const fd of readdirSync(`/proc/${row.pid}/fd`)) {
-      try {
-        const socket = readlinkSync(`/proc/${row.pid}/fd/${fd}`).match(/^socket:\[(\d+)\]$/u);
-        if (socket) {
-          inodes.add(socket[1]);
-        }
-      } catch (error) {
-        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
-          throw error;
-        }
-      }
-    }
-  }
-  const ports = readFileSync('/proc/net/tcp', 'utf8')
-    .trim()
-    .split('\n')
-    .slice(1)
-    .map((row) => row.trim().split(/\s+/u))
-    .filter((row) => row[3] === '0A' && inodes.has(row[9]))
-    .map((row) => Number.parseInt(row[1].split(':')[1], 16));
+  const workerdPids = rows
+    .filter((row) => children.has(row.pid) && basename(row.command) === 'workerd')
+    .map((row) => row.pid);
+  const ports =
+    workerdPids.length === 0
+      ? []
+      : platform() === 'darwin'
+        ? darwinPorts(workerdPids)
+        : linuxPorts(workerdPids);
   for (const port of ports) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
@@ -72,4 +61,45 @@ export async function findWorkerdInspector(
     }
   }
   throw new Error('子workerdの直接Inspectorが見つかりません');
+}
+
+function darwinPorts(pids: readonly number[]): number[] {
+  const output = execFileSync(
+    'lsof',
+    ['-nP', '-a', '-p', pids.join(','), '-iTCP', '-sTCP:LISTEN', '-Fn'],
+    { encoding: 'utf8' },
+  );
+  return [
+    ...new Set(
+      output.split('\n').flatMap((line) => {
+        const match = line.match(/^n.+:(\d+)$/u);
+        return match ? [Number(match[1])] : [];
+      }),
+    ),
+  ];
+}
+
+function linuxPorts(pids: readonly number[]): number[] {
+  const inodes = new Set<string>();
+  for (const pid of pids) {
+    for (const fd of readdirSync(`/proc/${pid}/fd`)) {
+      try {
+        const socket = readlinkSync(`/proc/${pid}/fd/${fd}`).match(/^socket:\[(\d+)\]$/u);
+        if (socket) {
+          inodes.add(socket[1]);
+        }
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+          throw error;
+        }
+      }
+    }
+  }
+  return readFileSync('/proc/net/tcp', 'utf8')
+    .trim()
+    .split('\n')
+    .slice(1)
+    .map((row) => row.trim().split(/\s+/u))
+    .filter((row) => row[3] === '0A' && inodes.has(row[9]))
+    .map((row) => Number.parseInt(row[1].split(':')[1], 16));
 }

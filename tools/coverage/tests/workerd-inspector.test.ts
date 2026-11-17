@@ -18,6 +18,26 @@ test('所有ソケットを読めない権限エラーを欠落扱いで隠さ�
   expect(fetch).not.toHaveBeenCalled();
 });
 
+test.each(['linux', 'darwin'] as const)(
+  '%sで子孫workerdがなければ別プロセスのソケットを探索せず失敗する',
+  async (os) => {
+    vi.mocked(platform).mockReturnValue(os);
+    vi.mocked(execFileSync).mockReturnValue('200 100 node\n300 99 workerd');
+
+    await expect(findWorkerdInspector(100, ['worker'])).rejects.toThrow(
+      '子workerdの直接Inspectorが見つかりません',
+    );
+
+    expect(execFileSync).toHaveBeenCalledExactlyOnceWith('ps', ['-eo', 'pid=,ppid=,comm='], {
+      encoding: 'utf8',
+    });
+    expect(readdirSync).not.toHaveBeenCalled();
+    expect(readlinkSync).not.toHaveBeenCalled();
+    expect(readFileSync).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  },
+);
+
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('node:os', () => ({ platform: vi.fn() }));
 vi.mock('node:fs', async (original) => ({

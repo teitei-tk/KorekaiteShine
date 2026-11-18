@@ -88,6 +88,10 @@ After(async function ({ result }) {
       .filter((e) => e.type === 'state' || e.type === 'error')
       .map((e) => (e.type === 'state' ? e.status : e.code));
     console.log('面接の状態:', states.join(' → '));
+    console.log(
+      'ブラウザ側の切断:',
+      await this.page?.evaluate(() => globalThis.voiceE2e?.socketClosures),
+    );
   }
   try {
     await this.browser?.close();

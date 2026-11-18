@@ -21,6 +21,13 @@ export async function installMediaProbe(context) {
       audibleSeconds: 0,
       completedSeconds: 0,
       playedFrequencies: [],
+      socketClosures: [],
+    };
+    // 失敗時だけ切断元の呼出位置を報告する。通信内容は記録しない。
+    const closeSocket = WebSocket.prototype.close;
+    WebSocket.prototype.close = function (...args) {
+      meter.socketClosures.push(new Error('ブラウザ側の切断').stack);
+      return closeSocket.apply(this, args);
     };
     const tracks = new Set();
     const acquire = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);

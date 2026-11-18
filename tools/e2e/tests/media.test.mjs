@@ -10,6 +10,14 @@ import {
 
 beforeEach(() => {
   vi.stubGlobal('voiceE2e', undefined);
+  vi.stubGlobal(
+    'WebSocket',
+    class {
+      close() {
+        return 'closed';
+      }
+    },
+  );
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -38,6 +46,10 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   vi.stubGlobal('AudioNode', FakeNode);
   vi.stubGlobal('AudioBufferSourceNode', class extends FakeNode {});
   await installMediaProbe(context);
+  const socket = new WebSocket();
+  expect(socket.close()).toBe('closed');
+  expect(globalThis.voiceE2e.socketClosures).toHaveLength(1);
+  expect(globalThis.voiceE2e.socketClosures[0]).toContain('media.test.mjs');
   expect(() => globalThis.voiceE2e.speak()).toThrow('マイク');
   await navigator.mediaDevices.getUserMedia({ audio: true });
   expect(track.enabled).toBe(false);

@@ -301,6 +301,7 @@ export function createInterviewRoom(options: {
         return Promise.resolve();
       }
       if (room.queuedEvents >= 64 || room.queuedBytes + bytes > 524_288) {
+        console.info('interview_input_backpressure');
         return detach(id);
       }
       room.queuedEvents += 1;

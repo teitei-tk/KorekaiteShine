@@ -22,6 +22,7 @@ export async function startVoiceRuntime({ profile }) {
           'PR用ランタイムの診断:',
           Object.fromEntries(
             [
+              'interview_input_backpressure',
               'optimized dependencies changed',
               'new dependencies optimized',
               'server restarted',

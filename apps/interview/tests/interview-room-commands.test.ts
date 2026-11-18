@@ -264,3 +264,16 @@ test('質問操作IDの再送で二重接続せず、切替中にタブを閉じ
   await Promise.all([changing, left]);
   expect(session.start).toHaveBeenCalledTimes(2);
 });
+
+test('入力の滞留による切断は内容を含めず理由だけを記録する', async () => {
+  const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+  try {
+    const { room, peer } = fixture();
+    await room.attach('peer', peer);
+    await Promise.all(Array.from({ length: 65 }, () => room.receive('peer', '{}')));
+    expect(peer.close).toHaveBeenCalledTimes(1);
+    expect(info).toHaveBeenCalledWith('interview_input_backpressure');
+  } finally {
+    info.mockRestore();
+  }
+});

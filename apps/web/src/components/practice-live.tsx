@@ -62,7 +62,8 @@ export function PracticeLive({
   const reconnect = useRef({ until: 0, delay: 1000, resume: false });
   const [revision, setRevision] = useState(0);
   const [pending, setPending] = useState(false);
-  const [now, setNow] = useState(0);
+  const [clock, setClock] = useState({ instant: 0, monotonic: 0 });
+  const now = clock.instant;
   const ended = useRef(onEnded);
   const removed = useRef(onDeleted);
   useEffect(() => {
@@ -304,7 +305,10 @@ export function PracticeLive({
                 void begin('resume');
               }
               setState(event);
-              setNow(Temporal.Now.instant().epochMilliseconds);
+              setClock({
+                instant: Temporal.Now.instant().epochMilliseconds,
+                monotonic: performance.now(),
+              });
               if (event.status === 'ended') {
                 retryTimerContext.terminal = true;
                 ended.current();
@@ -412,7 +416,7 @@ export function PracticeLive({
       return undefined;
     }
     const timer = setInterval(() => {
-      setNow(Temporal.Now.instant().epochMilliseconds);
+      setClock({ instant: Temporal.Now.instant().epochMilliseconds, monotonic: performance.now() });
     }, 500);
     return () => {
       clearInterval(timer);
@@ -499,7 +503,7 @@ export function PracticeLive({
   const waitingForText =
     questionChange.current?.hasAudio &&
     !questionChange.current.hasText &&
-    performance.now() - questionChange.current.requestedAt >= 20_000;
+    clock.monotonic - questionChange.current.requestedAt >= 20_000;
   const elapsed =
     (state?.activeMs ?? 0) +
     (state?.status === 'active' && state.activeSince !== null
@@ -584,7 +588,7 @@ export function PracticeLive({
                     質問の文字がまだ届いていません。「音声をつなぎ直す」を押して再開できます。
                   </output>
                 ) : (
-                  responseMonitor.isWaitingTooLong(performance.now()) && (
+                  responseMonitor.isWaitingTooLong(clock.monotonic) && (
                     <output style={{ display: 'block', marginBlock: '1em' }}>
                       面接官の音声を待っています。聞こえない場合は「音声をつなぎ直す」を押し、マイクを許可して再開してください。
                     </output>

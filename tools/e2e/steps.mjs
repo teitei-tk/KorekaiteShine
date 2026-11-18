@@ -96,7 +96,7 @@ After(async function ({ result }) {
   try {
     await this.browser?.close();
   } finally {
-    await this.runtime?.stop();
+    await this.runtime?.stop({ diagnostics: result?.status === 'FAILED' });
   }
 });
 
@@ -133,6 +133,7 @@ async function detail(world) {
 
 Given('架空の経験Markdownからテーマを選び面接を準備した', async function () {
   await this.page.goto(new URL('/practice', this.runtime.url).href);
+  await this.page.evaluate(() => globalThis.voiceE2e?.traceSocket());
   await this.page.getByText('保存された面接はありません。', { exact: true }).waitFor();
   await this.page.getByLabel('ファイルを選ぶ').setInputFiles({
     name: 'experience.md',

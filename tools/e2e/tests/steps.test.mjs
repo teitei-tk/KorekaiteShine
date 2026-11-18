@@ -229,7 +229,7 @@ async function observer() {
     expect(match).toBeDefined();
     return match;
   });
-  globalThis.voiceE2e = { speaking: true, playedFrequencies: [] };
+  globalThis.voiceE2e = { speaking: true, playedFrequencies: [], traceSocket: vi.fn() };
   await hooks.before.call(world);
   const [[, relay]] = page.routeWebSocket.mock.calls;
   relay(client);

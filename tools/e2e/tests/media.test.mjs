@@ -46,6 +46,7 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   vi.stubGlobal('AudioNode', FakeNode);
   vi.stubGlobal('AudioBufferSourceNode', class extends FakeNode {});
   await installMediaProbe(context);
+  globalThis.voiceE2e.traceSocket();
   const socket = new WebSocket();
   expect(socket.close()).toBe('closed');
   expect(globalThis.voiceE2e.socketClosures).toHaveLength(1);

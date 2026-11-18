@@ -411,3 +411,29 @@ test('アラームを挟んだ音声は期限確認より前に集約しない',
     session.sendAudio.mock.invocationCallOrder[2],
   );
 });
+
+test('20ms入力より遅い30ms処理でも滞留を解消して接続を保つ', async () => {
+  vi.useFakeTimers();
+  try {
+    const { room, peer, command, session } = fixture();
+    await room.attach('peer', peer);
+    await command('start');
+    session.sendAudio.mockImplementation(async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 30);
+      });
+      return true;
+    });
+    const pending = [];
+    for (const index of Array.from({ length: 250 }).keys()) {
+      pending.push(room.receive('peer', audioFrame(index % 256, 960)));
+      await vi.advanceTimersByTimeAsync(20);
+    }
+    await vi.runAllTimersAsync();
+    await Promise.all(pending);
+    expect(peer.close).not.toHaveBeenCalled();
+    expect(session.sendAudio.mock.calls.length).toBeLessThan(250);
+  } finally {
+    vi.useRealTimers();
+  }
+});

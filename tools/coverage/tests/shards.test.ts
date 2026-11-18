@@ -120,3 +120,10 @@ test('全シャードが成功しても未実行分岐があれば100%判定で�
   }
   await expect(mergeSavedShards(root, [path], run.revision)).rejects.toThrow('カバレッジ不足');
 });
+
+test('番号だけ変えて同じ計測実行を複製したシャードを拒否する', () => {
+  const { run, shards } = fixture();
+  shards[1].run = structuredClone(shards[0].run);
+  shards[1].records = structuredClone(shards[0].records);
+  expect(() => combineShards(run, shards)).toThrow('実行ID');
+});

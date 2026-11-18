@@ -28,6 +28,9 @@ export function combineShards(current: CoverageRun, shards: readonly Shard[]) {
   ) {
     throw new Error('カバレッジのシャードに欠落・重複・不正番号があります。');
   }
+  if (new Set(shards.map((shard) => shard.run.runId)).size !== shards.length) {
+    throw new Error('シャードの実行IDが重複しています。');
+  }
   for (const shard of shards) {
     if (
       shard.run.revision !== current.revision ||

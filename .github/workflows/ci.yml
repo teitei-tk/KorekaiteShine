@@ -291,6 +291,12 @@ jobs:
       matrix: ${{ fromJSON(needs.test-plan.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    container:
+      image: ${{ matrix.runnerClass == 'e2e' && 'mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579' || '' }}
+      options: --init --shm-size=1g
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -329,9 +335,22 @@ jobs:
       - name: Prepare integration sentinel
         if: matrix.runnerClass == 'integration'
         run: pnpm prepare:integration
-      - name: Prepare browser
+      - name: Verify preinstalled browser
         if: matrix.runnerClass == 'e2e'
-        run: pnpm --filter @korekaite/e2e exec playwright install --with-deps chromium
+        working-directory: tools/e2e
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          import { chromium } from 'playwright';
+          const require = createRequire(import.meta.url);
+          const image = JSON.parse(readFileSync('/ms-playwright/.docker-info', 'utf8'));
+          assert.equal(image.driverVersion, require('playwright/package.json').version);
+          const browser = await chromium.launch();
+          console.log(`Preinstalled Chromium ${browser.version()}`);
+          await browser.close();
+          JS
       - name: Run selected tests
         env:
           SHARD_ID: ${{ matrix.id }}

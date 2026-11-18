@@ -23,6 +23,14 @@ async function fixture() {
   }
   await writeFile(join(source, 'tools/local-integration/package.json'), '{"type":"module"}');
   await writeFile(
+    join(source, 'tools/local-integration/tsconfig.json'),
+    '{"compilerOptions":{"target":"ES2022"}}',
+  );
+  await writeFile(
+    join(source, 'tools/local-integration/fixtures/tsconfig.json'),
+    '{"extends":"../tsconfig.json"}',
+  );
+  await writeFile(
     join(source, 'packages/runtime-config/src/resources.ts'),
     'export const resolveRuntime = value => value;',
   );
@@ -58,6 +66,13 @@ test.each(['pr', 'live'])(
     try {
       const runtime = await startVoiceRuntime({ profile });
       const root = await readFile(join(source, 'root.txt'), 'utf8');
+      const fixtureConfig = JSON.parse(
+        await readFile(join(root, 'tools/local-integration/fixtures/tsconfig.json'), 'utf8'),
+      );
+      const parentConfig = join(root, 'tools/local-integration/fixtures', fixtureConfig.extends);
+      expect(await readFile(parentConfig, 'utf8')).toBe(
+        await readFile(join(source, 'tools/local-integration/tsconfig.json'), 'utf8'),
+      );
       const recorded = () => readFile(join(root, 'call.json'), 'utf8').then(JSON.parse);
       const start = await recorded();
       expect(start.config.appEnv).toBe(profile === 'pr' ? 'test' : 'development');

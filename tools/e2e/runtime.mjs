@@ -40,6 +40,7 @@ export async function startVoiceRuntime({ profile }) {
       'dir',
     );
     await cp(join(source, 'tools/local-integration/package.json'), join(local, 'package.json'));
+    await cp(join(source, 'tools/local-integration/tsconfig.json'), join(local, 'tsconfig.json'));
     const runtimePath = join(local, 'src/runtime.ts');
     const optionsState = { options: {} };
     if (profile === 'pr') {

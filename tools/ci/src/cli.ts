@@ -110,7 +110,7 @@ async function makePlan(): Promise<Plan> {
     worker: 3,
     boundary: 4,
     integration: 3,
-    e2e: 1,
+    e2e: 4,
   };
   for (const kind of runnerClasses) {
     const group = tests.filter(

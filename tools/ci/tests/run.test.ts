@@ -154,9 +154,9 @@ test('実runnerは成功・失敗を結果JSONと終了コードへ伝え、部�
     await mkdir(resolve(root, 'tools/e2e'), { recursive: true });
     await writeFile(
       resolve(root, 'tools/e2e/run.mjs'),
-      "import assert from 'node:assert/strict';assert.equal(process.argv[2],'pr');",
+      "import assert from 'node:assert/strict';assert.equal(process.argv[2],'pr');assert.equal(process.argv[3],'--location=features/voice.feature:7');",
     );
-    const e2eTest = { ...test, suite: 'e2e', runnerClass: 'e2e' };
+    const e2eTest = { ...test, suite: 'features/voice.feature:7', runnerClass: 'e2e' };
     await writeFile(
       resolve(root, '.ci/plan.json'),
       JSON.stringify({

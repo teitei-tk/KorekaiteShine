@@ -1,3 +1,5 @@
+import { isScenarioLocation } from '../../e2e/location.ts';
+import { execFileSync } from 'node:child_process';
 import { parseJson, isRecord } from './json.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { globSync } from 'node:fs';
@@ -108,13 +110,27 @@ export async function inventory(root: string): Promise<Test[]> {
       }
     }
   }
-  tests.push({
-    id: 'e2e:tools/e2e:pr:tools/e2e/run.mjs',
-    file: 'tools/e2e/run.mjs',
-    project: 'tools/e2e',
-    suite: 'pr',
-    runnerClass: 'e2e',
-  });
+  const locations = parseJson(
+    execFileSync(process.execPath, ['tools/e2e/list.mjs'], {
+      cwd: root,
+      encoding: 'utf8',
+    }),
+  );
+  if (!Array.isArray(locations) || locations.length === 0) {
+    throw new Error('E2Eシナリオ一覧が不正です。');
+  }
+  for (const location of locations) {
+    if (typeof location !== 'string' || !isScenarioLocation(location)) {
+      throw new Error('E2Eシナリオの位置が不正です。');
+    }
+    tests.push({
+      id: `e2e:tools/e2e:pr:${location}`,
+      file: 'tools/e2e/run.mjs',
+      project: 'tools/e2e',
+      suite: location,
+      runnerClass: 'e2e',
+    });
+  }
   if (new Set(tests.map((test) => test.id)).size !== tests.length) {
     throw new Error('テストIDが重複しています。');
   }

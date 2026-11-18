@@ -1,3 +1,4 @@
+import { isScenarioLocation } from '../../e2e/location.ts';
 import path from 'node:path';
 
 import { spawn } from 'node:child_process';
@@ -68,21 +69,30 @@ export async function runShard(root: string, plan: Plan, shard: Shard): Promise<
         continue;
       }
       if (shard.runnerClass === 'e2e') {
-        const e2eStarted = performance.now();
-        const status = await new Promise<number>((resolve, reject) => {
-          const child = spawn(process.execPath, ['tools/e2e/run.mjs', 'pr'], {
-            cwd: root,
-            stdio: 'inherit',
+        for (const test of group) {
+          if (!isScenarioLocation(test.suite)) {
+            throw new Error('E2Eシナリオの位置が不正です。');
+          }
+          const e2eStarted = performance.now();
+          const status = await new Promise<number>((resolve, reject) => {
+            const child = spawn(
+              process.execPath,
+              ['tools/e2e/run.mjs', 'pr', `--location=${test.suite}`],
+              {
+                cwd: root,
+                stdio: 'inherit',
+              },
+            );
+            child.once('error', reject);
+            child.once('exit', (code) => resolve(code ?? 1));
           });
-          child.once('error', reject);
-          child.once('exit', (code) => resolve(code ?? 1));
-        });
-        if (status !== 0) {
-          throw new Error(`E2Eが失敗しました: ${status}`);
+          if (status !== 0) {
+            throw new Error(`E2Eが失敗しました: ${status}`);
+          }
+          result.executed.push(test.id);
+          result.durations[test.id] = performance.now() - e2eStarted;
+          result.timings.runMs += result.durations[test.id];
         }
-        result.executed.push(...group.map((test) => test.id));
-        result.durations[group[0].id] = performance.now() - e2eStarted;
-        result.timings.runMs += result.durations[group[0].id];
         continue;
       }
       const prepareStarted = performance.now();

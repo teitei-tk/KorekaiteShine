@@ -40,5 +40,5 @@ export function createMergeFixture() {
     };
   });
 
-  return { path, target, run, records };
+  return { path, source, target, run, records };
 }

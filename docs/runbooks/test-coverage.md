@@ -56,3 +56,11 @@ pnpm test:coverage:node
 5. 本当に不足するテストを1件ずつRed/Greenで追加します。行を通すだけでなく、戻り値・保存結果・副作用を検証します。
 
 V8方式を既存Vitestへ追加する構成です。Workers Vitest統合ではV8方式は非対応でIstanbul方式が必要と[Cloudflare公式資料](https://developers.cloudflare.com/workers/testing/vitest-integration/known-issues/)に記載されています。既存の別プロセスWorkerへproviderを変更するだけでは計測できません。Workerでの計装・回収・元ソースへの対応付けと、Node側結果との統合を別途検証する必要があります。
+
+## 長時間CIの分割計測
+
+`Worker real-time checks`は`pnpm test:coverage --shard=N/4`を4台で並行実行します。各台は生成・準備・buildを独立して行い、Vitestの全テストをファイル単位で4分割します。実時間30・120・300秒の再試行とDLQ検査を含み、待機時間は変更しません。各台の最大2ワーカーを維持します。
+
+`pnpm test:coverage --merge-shards`は`coverage/shards/1.json`から`4.json`を読み、現在のrevision・対象ソース・計測コード・必須suite・各収集片の完了を検証して統合します。欠落・重複・失敗・未完了は拒否し、統合後に各ファイルの行・文・関数・分岐100%を要求します。通常のローカル`pnpm test:coverage`と`pnpm check:coverage`も引き続き使用できます。
+
+各suiteの開始・終了・所要時間をActionsログへ出し、詳細ログは3日間のartifactへ保存します。Guard・固定lockfile・信頼ポリシーを維持する依存storeキャッシュを収集・統合ジョブで使います。キャッシュ命中でも現在のポリシー検証を省略しません。

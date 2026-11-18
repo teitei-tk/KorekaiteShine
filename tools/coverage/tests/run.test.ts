@@ -11,6 +11,7 @@ vi.mock('node:fs', async (importOriginal) => ({
   ...(await importOriginal<typeof LintTypeModule0>()),
   writeSync: vi.fn(),
 }));
+vi.mock('../src/shards.ts', () => ({ mergeSavedShards: vi.fn() }));
 vi.mock('../src/verify.ts', () => ({ verifySavedCoverage: vi.fn() }));
 const collect = vi.hoisted(() => vi.fn<typeof collectCoverage>());
 vi.mock('../src/collect.ts', () => ({ collectCoverage: collect }));
@@ -62,3 +63,27 @@ test('checkは再収集せず現在の対象とrevisionで保存結果を検査�
   expect(verifySavedCoverage).toHaveBeenCalledWith('/fixture', ['src/example.ts'], 'revision');
   expect(collect).not.toHaveBeenCalled();
 });
+
+test('分割計測は全準備を維持しVitestに4分割の番号を渡す', async () => {
+  collect.mockResolvedValue(createCoverageMap({}));
+  await main(['--shard=2/4']);
+  const [call] = collect.mock.calls;
+  expect(call[0].shard).toBe(2);
+  expect(call[0].commands.at(-1)?.args).toContain('--shard=2/4');
+});
+
+test('分割統合は再収集せず保存された成果物を検証する', async () => {
+  const { mergeSavedShards } = await import('../src/shards.ts');
+  vi.mocked(mergeSavedShards).mockResolvedValue(createCoverageMap({}));
+  await main(['--merge-shards'], '/fixture');
+  expect(mergeSavedShards).toHaveBeenCalledWith('/fixture', ['src/example.ts'], 'revision');
+  expect(collect).not.toHaveBeenCalled();
+});
+
+test.each(['--shard=0/4', '--shard=5/4', '--shard=1/3'])(
+  '範囲外の分割指定%sを拒否する',
+  async (argument) => {
+    await expect(main([argument])).rejects.toThrow('使い方');
+    expect(collect).not.toHaveBeenCalled();
+  },
+);

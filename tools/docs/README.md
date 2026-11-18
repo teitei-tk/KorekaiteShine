@@ -152,6 +152,14 @@ gh actions-lock --verify
 
 `pnpm check:coverage`は、現在のコミット・対象集合・元ソースと計測コードのハッシュが一致する保存結果だけを検査します。全体と各ファイルの4指標を実数で判定し、1件でも未網羅なら失敗します。必須suiteの欠落、失敗・未完了の収集、空のレポートも成功扱いしません。計測要素がない個別ファイルは理由を記録し、到達済みには数えません。
 
-通常CIの境界4分割・結合3分割と、各パッケージの型検査・テストは維持します。両コマンドは独立した`Worker real-time checks`で順に実行し、長時間の全体計測と100%判定を担当します。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
+通常CIの境界4分割・結合3分割と、各パッケージの型検査・テストは維持します。独立した`Worker real-time checks`は分割収集と統合時の100%判定を担当します。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
 
 通常CIは境界4分割と通常結合3分割を含みます。450秒の再試行待機1件と全体カバレッジ検査は `Worker real-time checks` に分離し、夜間・手動・関連変更のPRで実行します。通常CIの成功と長時間検査の結果は独立しています。全件のローカル検査は引き続き `pnpm check`、`pnpm prepare:integration`、`pnpm test:integration` です。
+
+## 長時間CIの分割計測
+
+`Worker real-time checks`は`pnpm test:coverage --shard=N/4`を4台で並行実行します。各台は生成・準備・buildを独立して行い、Vitestの全テストをファイル単位で4分割します。実時間30・120・300秒の再試行とDLQ検査を含み、待機時間は変更しません。各台の最大2ワーカーを維持します。
+
+`pnpm test:coverage --merge-shards`は`coverage/shards/1.json`から`4.json`を読み、現在のrevision・対象ソース・計測コード・必須suite・各収集片の完了を検証して統合します。欠落・重複・失敗・未完了は拒否し、統合後に各ファイルの行・文・関数・分岐100%を要求します。通常のローカル`pnpm test:coverage`と`pnpm check:coverage`も引き続き使用できます。
+
+各suiteの開始・終了・所要時間をActionsログへ出し、詳細ログは3日間のartifactへ保存します。Guard・固定lockfile・信頼ポリシーを維持する依存storeキャッシュを収集・統合ジョブで使います。キャッシュ命中でも現在のポリシー検証を省略しません。

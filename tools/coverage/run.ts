@@ -4,20 +4,28 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectCoverage } from './src/collect.ts';
+import { mergeSavedShards } from './src/shards.ts';
 import { verifySavedCoverage } from './src/verify.ts';
 
 export async function main(
   args: readonly string[],
   root = fileURLToPath(new URL('../../', import.meta.url)),
 ) {
-  if (args.length > 1 || (args.length === 1 && args[0] !== '--check')) {
-    throw new Error('使い方: node tools/coverage/run.ts [--check]');
+  const shard = /^--shard=[1-4]\/4$/u.test(args[0] ?? '');
+  if (
+    args.length > 1 ||
+    (args.length === 1 && args[0] !== '--check' && args[0] !== '--merge-shards' && !shard)
+  ) {
+    throw new Error('使い方: node tools/coverage/run.ts [--check] | --shard=N/4 | --merge-shards');
   }
   const git = (args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
   const paths = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0')
     .filter(Boolean);
   const revision = git(['rev-parse', 'HEAD']).trim();
+  if (args[0] === '--merge-shards') {
+    return mergeSavedShards(root, paths, revision);
+  }
   if (args[0] === '--check') {
     return verifySavedCoverage(root, paths, revision);
   }
@@ -27,6 +35,7 @@ export async function main(
     root,
     paths,
     revision,
+    ...(shard ? { shard: Number(args[0].slice(8, 9)) } : {}),
     commands: [
       {
         suite: 'generate',
@@ -51,7 +60,13 @@ export async function main(
       {
         suite: 'tests',
         command: process.execPath,
-        args: [vitest, 'run', '--config', join(root, 'vitest.coverage.config.ts')],
+        args: [
+          vitest,
+          'run',
+          '--config',
+          join(root, 'vitest.coverage.config.ts'),
+          ...(shard ? [args[0]] : []),
+        ],
       },
     ],
   });

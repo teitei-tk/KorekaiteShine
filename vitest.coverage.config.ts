@@ -14,5 +14,6 @@ export default vitestCoverageConfig(runPath, [
   'tools/docs',
   'tools/e2e',
   'tools/coverage',
+  'tools/ci',
   'tools/local-integration',
 ]);

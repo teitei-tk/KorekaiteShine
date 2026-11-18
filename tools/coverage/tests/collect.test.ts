@@ -40,6 +40,7 @@ test.each([undefined, ''])(
         root,
         paths: ['choose.mjs'],
         revision: 'revision',
+        shard: 1,
         commands: [
           {
             suite: 'node',
@@ -53,6 +54,7 @@ test.each([undefined, ''])(
         ],
       });
       expect(result.fileCoverageFor('choose.mjs').b['0']).toEqual([1, 0]);
+      expect(readFileSync(join(root, 'coverage/shards/1.json'), 'utf8')).toContain('choose.mjs');
       expect(
         readCoverageConfig(readFileSync(join(root, 'coverage/run.json'), 'utf8')).run
           .requiredSuites,

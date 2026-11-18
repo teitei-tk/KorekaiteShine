@@ -33,11 +33,15 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node tools/local-integration/src/ci-selection.ts >> "$GITHUB_OUTPUT"
   realtime:
-    name: Full coverage, real-time retry and DLQ
+    name: Coverage shard (${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.required == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -50,16 +54,43 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+            .github/workflows/ci-realtime.yml
       - name: Verify Guard registry
         run: node tools/docs/check-guard.ts --registry-only
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: node tools/ci/src/install-dependencies.ts
       - name: Generate shared contracts
         run: pnpm --filter @korekaite/api-contracts generate
       - name: Measure all tests including real-time retry and DLQ
-        run: pnpm test:coverage
-      - name: Require all four metrics to reach 100 percent
-        run: pnpm check:coverage
+        timeout-minutes: 25
+        run: pnpm test:coverage --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage-${{ github.run_id }}-${{ matrix.shard }}
+          path: coverage/shards/${{ matrix.shard }}.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3
+      - name: Save suite logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage-logs-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
+          path: coverage/runs/*/*.log
+          retention-days: 3
       - name: Show coverage suite failures
         if: failure()
         run: |
@@ -69,9 +100,59 @@ jobs:
             tail -n 200 "$log"
             echo "::endgroup::"
           done
+  coverage:
+    name: Merge coverage and require 100 percent
+    needs: [changes, realtime]
+    if: needs.changes.outputs.required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+            .github/workflows/ci-realtime.yml
+      - name: Verify Guard registry
+        run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies
+        run: node tools/ci/src/install-dependencies.ts
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          pattern: coverage-${{ github.run_id }}-[1-4]
+          path: coverage/shards
+          merge-multiple: true
+      - name: Verify all shards and require all four metrics to reach 100 percent
+        run: pnpm test:coverage --merge-shards
+      - name: Save coverage report
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coverage-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: coverage/combined
+          retention-days: 3
   result:
     name: Realtime result
-    needs: [changes, realtime]
+    needs: [changes, realtime, coverage]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -87,5 +168,5 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           DETECTION_RESULT: ${{ needs.changes.result }}
           REQUIRED: ${{ needs.changes.outputs.required }}
-          TEST_RESULT: ${{ needs.realtime.result }}
+          TEST_RESULT: ${{ needs.realtime.result == 'success' && needs.coverage.result || needs.realtime.result }}
         run: node tools/local-integration/src/ci-selection.ts result

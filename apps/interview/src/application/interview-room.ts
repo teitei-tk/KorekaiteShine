@@ -22,6 +22,13 @@ export type InterviewPeer = {
   close: () => void;
 };
 
+type PendingAudio = {
+  id: string;
+  generation: number;
+  data: ArrayBuffer;
+  result: Promise<void>;
+};
+
 export function createInterviewRoom(options: {
   createSession: (hooks: Hooks) => Session;
   schedule: (state: State) => Promise<void>;
@@ -37,6 +44,7 @@ export function createInterviewRoom(options: {
     pending: Promise.resolve(),
     queuedBytes: 0,
     queuedEvents: 0,
+    pendingAudio: null as PendingAudio | null,
     initialized: undefined as Promise<void> | undefined,
   };
 
@@ -124,6 +132,7 @@ export function createInterviewRoom(options: {
     },
   });
   function serial<T>(operation: () => Promise<T>): Promise<T> {
+    room.pendingAudio = null;
     const result = room.pending.then(operation);
     room.pending = result.then(
       () => {
@@ -297,6 +306,7 @@ export function createInterviewRoom(options: {
       const bytes =
         typeof data === 'string' ? new TextEncoder().encode(data).byteLength : data.byteLength;
       if (bytes > (typeof data === 'string' ? 8192 : 9608)) {
+        room.pendingAudio = null;
         error(id, null, 'INVALID_EVENT');
         return Promise.resolve();
       }
@@ -306,14 +316,46 @@ export function createInterviewRoom(options: {
       }
       room.queuedEvents += 1;
       room.queuedBytes += bytes;
-      return serial(async () => {
+      const completed = () => {
+        room.queuedEvents -= 1;
+        room.queuedBytes -= bytes;
+      };
+      const generation =
+        typeof data !== 'string' && data.byteLength >= 10 && data.byteLength % 2 === 0
+          ? new DataView(data).getFloat64(0)
+          : null;
+      const validAudio = generation !== null && Number.isSafeInteger(generation) && generation >= 1;
+      const waiting = room.pendingAudio;
+      if (
+        validAudio &&
+        typeof data !== 'string' &&
+        waiting?.id === id &&
+        waiting.generation === generation &&
+        waiting.data.byteLength + data.byteLength - 8 <= 9608
+      ) {
+        const joined = new Uint8Array(waiting.data.byteLength + data.byteLength - 8);
+        joined.set(new Uint8Array(waiting.data));
+        joined.set(new Uint8Array(data, 8), waiting.data.byteLength);
+        waiting.data = joined.buffer;
+        return waiting.result.finally(completed);
+      }
+      const audio: PendingAudio | null =
+        validAudio && typeof data !== 'string'
+          ? { id, generation, data, result: Promise.resolve() }
+          : null;
+      // 待ち時間は追加せず、実行開始前の連続入力だけをまとめる。操作は必ず境界にする。
+      const operation = serial(async () => {
+        if (room.pendingAudio === audio) {
+          room.pendingAudio = null;
+        }
+        const message = audio?.data ?? data;
         if (!peers.has(id)) {
           return;
         }
         const commandIdState = { commandId: null as string | null };
         try {
-          if (typeof data === 'string') {
-            const event = parseEvent(data);
+          if (typeof message === 'string') {
+            const event = parseEvent(message);
             if (!validateInterviewClientEvent(event)) {
               error(id, null, 'INVALID_EVENT');
               return;
@@ -322,16 +364,16 @@ export function createInterviewRoom(options: {
             await command(id, event);
           } else {
             // PCM16の前に8byteのbig-endian float64で接続世代を付ける。
-            if (data.byteLength < 10 || data.byteLength % 2 !== 0) {
+            if (message.byteLength < 10 || message.byteLength % 2 !== 0) {
               error(id, null, 'INVALID_EVENT');
               return;
             }
-            const generation = new DataView(data).getFloat64(0);
+            const generation = new DataView(message).getFloat64(0);
             if (room.owner !== id || !Number.isSafeInteger(generation) || generation < 1) {
               error(id, null, 'NOT_OWNER');
               return;
             }
-            if (!(await session.sendAudio(generation, new Uint8Array(data, 8)))) {
+            if (!(await session.sendAudio(generation, new Uint8Array(message, 8)))) {
               room.state = await session.state();
               if (room.state.generation !== generation || room.state.status !== 'active') {
                 sendState(id);
@@ -347,10 +389,12 @@ export function createInterviewRoom(options: {
             error_ instanceof AudioUsageLimitError ? 'AUDIO_USAGE_LIMIT' : 'UNAVAILABLE',
           );
         }
-      }).finally(() => {
-        room.queuedEvents -= 1;
-        room.queuedBytes -= bytes;
       });
+      if (audio) {
+        audio.result = operation;
+        room.pendingAudio = audio;
+      }
+      return operation.finally(completed);
     },
     discard(interviewId: string) {
       room.discarded = true;

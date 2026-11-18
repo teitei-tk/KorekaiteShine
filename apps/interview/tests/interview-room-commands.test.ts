@@ -50,7 +50,7 @@ function fixture(startsQuestion = false) {
     start: vi.fn(snapshot),
     pause: vi.fn(snapshot),
     finish: vi.fn(async () => 'job'),
-    tick: snapshot,
+    tick: vi.fn(snapshot),
     disconnect: vi.fn(snapshot),
     discard: vi.fn(),
     playback: vi.fn(async () => true),
@@ -276,4 +276,138 @@ test('入力の滞留による切断は内容を含めず理由だけを記録�
   } finally {
     info.mockRestore();
   }
+});
+
+function audioFrame(value: number, size = 2, generation = 1) {
+  const frame = new ArrayBuffer(8 + size);
+  new DataView(frame).setFloat64(0, generation);
+  new Uint8Array(frame, 8).fill(value);
+  return frame;
+}
+
+test('処理待ちの連続音声を世代と順序を保ってまとめる', async () => {
+  const { room, peer, command, session } = fixture();
+  await room.attach('peer', peer);
+  await command('start');
+  const held = Promise.withResolvers<boolean>();
+  session.sendAudio.mockImplementationOnce(() => held.promise);
+  const first = room.receive('peer', audioFrame(1));
+  await vi.waitFor(() => expect(session.sendAudio).toHaveBeenCalledTimes(1));
+  const second = room.receive('peer', audioFrame(2));
+  const third = room.receive('peer', audioFrame(3));
+  held.resolve(true);
+  await Promise.all([first, second, third]);
+  expect(session.sendAudio.mock.calls).toEqual([
+    [1, Uint8Array.from([1, 1])],
+    [1, Uint8Array.from([2, 2, 3, 3])],
+  ]);
+});
+
+test('音声の集約は操作・接続・世代の境界を越えない', async () => {
+  const { room, peer, command, session } = fixture();
+  await room.attach('peer', peer);
+  await room.attach('observer', {
+    send: vi.fn<(data: string | ArrayBuffer) => void>(),
+    close: vi.fn<() => void>(),
+  });
+  await command('start');
+  const held = Promise.withResolvers<boolean>();
+  session.sendAudio.mockImplementationOnce(() => held.promise);
+  const first = room.receive('peer', audioFrame(1));
+  await vi.waitFor(() => expect(session.sendAudio).toHaveBeenCalledTimes(1));
+  const pending = [
+    room.receive('peer', audioFrame(2)),
+    command('playback'),
+    room.receive('peer', audioFrame(3)),
+    room.receive('observer', audioFrame(9)),
+    room.receive('peer', audioFrame(4)),
+    room.receive('peer', new ArrayBuffer(9610)),
+    room.receive('peer', audioFrame(7)),
+    room.receive('peer', audioFrame(5, 2, 2)),
+    room.receive('peer', audioFrame(6)),
+  ];
+  held.resolve(true);
+  await Promise.all([first, ...pending]);
+  expect(session.sendAudio.mock.calls).toEqual([
+    [1, Uint8Array.from([1, 1])],
+    [1, Uint8Array.from([2, 2])],
+    [1, Uint8Array.from([3, 3])],
+    [1, Uint8Array.from([4, 4])],
+    [1, Uint8Array.from([7, 7])],
+    [2, Uint8Array.from([5, 5])],
+    [1, Uint8Array.from([6, 6])],
+  ]);
+  expect(session.sendAudio.mock.invocationCallOrder[1]).toBeLessThan(
+    session.playback.mock.invocationCallOrder[0],
+  );
+  expect(session.playback.mock.invocationCallOrder[0]).toBeLessThan(
+    session.sendAudio.mock.invocationCallOrder[2],
+  );
+});
+
+test('集約後の音声も9600バイトを超えない', async () => {
+  const { room, peer, command, session } = fixture();
+  await room.attach('peer', peer);
+  await command('start');
+  const held = Promise.withResolvers<boolean>();
+  session.sendAudio.mockImplementationOnce(() => held.promise);
+  const first = room.receive('peer', audioFrame(1));
+  await vi.waitFor(() => expect(session.sendAudio).toHaveBeenCalledTimes(1));
+  const pending = Array.from({ length: 5 }, (_, index) =>
+    room.receive('peer', audioFrame(index + 2, 2400)),
+  );
+  held.resolve(true);
+  await Promise.all([first, ...pending]);
+  expect(session.sendAudio.mock.calls).toEqual([
+    [1, new Uint8Array(2).fill(1)],
+    [
+      1,
+      Uint8Array.from([2, 3, 4, 5].flatMap((value) => Array.from({ length: 2400 }, () => value))),
+    ],
+    [1, new Uint8Array(2400).fill(6)],
+  ]);
+});
+
+test('音声を集約しても元の入力64件の上限で切断する', async () => {
+  vi.spyOn(console, 'info').mockImplementation(() => undefined);
+  try {
+    const { room, peer, command, session } = fixture();
+    await room.attach('peer', peer);
+    await command('start');
+    const held = Promise.withResolvers<boolean>();
+    session.sendAudio.mockImplementationOnce(() => held.promise);
+    const first = room.receive('peer', audioFrame(1));
+    await vi.waitFor(() => expect(session.sendAudio).toHaveBeenCalledTimes(1));
+    const pending = Array.from({ length: 63 }, () => room.receive('peer', audioFrame(2)));
+    expect(peer.close).not.toHaveBeenCalled();
+    const overflow = room.receive('peer', audioFrame(3));
+    expect(peer.close).toHaveBeenCalledOnce();
+    held.resolve(true);
+    await Promise.all([first, ...pending, overflow]);
+    expect(session.sendAudio).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.restoreAllMocks();
+  }
+});
+
+test('アラームを挟んだ音声は期限確認より前に集約しない', async () => {
+  const { room, peer, command, session } = fixture();
+  await room.attach('peer', peer);
+  await command('start');
+  const held = Promise.withResolvers<boolean>();
+  session.sendAudio.mockImplementationOnce(() => held.promise);
+  const first = room.receive('peer', audioFrame(1));
+  await vi.waitFor(() => expect(session.sendAudio).toHaveBeenCalledTimes(1));
+  const second = room.receive('peer', audioFrame(2));
+  const alarm = room.alarm();
+  const third = room.receive('peer', audioFrame(3));
+  held.resolve(true);
+  await Promise.all([first, second, alarm, third]);
+  expect(session.sendAudio).toHaveBeenCalledTimes(3);
+  expect(session.sendAudio.mock.invocationCallOrder[1]).toBeLessThan(
+    session.tick.mock.invocationCallOrder[0],
+  );
+  expect(session.tick.mock.invocationCallOrder[0]).toBeLessThan(
+    session.sendAudio.mock.invocationCallOrder[2],
+  );
 });

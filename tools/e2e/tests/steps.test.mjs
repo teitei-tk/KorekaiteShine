@@ -377,3 +377,16 @@ test('応答待ちの一時停止と長い質問中の発話を検査する', as
   await step('「{word}」の質問が単独で表示され音声を聞いて回答できる', '質問を見送る');
   await step('長い質問を聞きながら返事をして音声AIが応答しなくなる');
 });
+
+test('失敗時の診断を取得できなくてもブラウザとランタイムを停止する', async () => {
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const world = {
+    events: [],
+    page: { evaluate: vi.fn().mockRejectedValue(new Error('ページが閉じています')) },
+    browser: { close: vi.fn() },
+    runtime: { stop: vi.fn() },
+  };
+  await expect(hooks.after.call(world, { result: { status: 'FAILED' } })).resolves.toBeUndefined();
+  expect(world.browser.close).toHaveBeenCalledOnce();
+  expect(world.runtime.stop).toHaveBeenCalledWith({ diagnostics: true });
+});

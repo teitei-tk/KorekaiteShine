@@ -154,7 +154,7 @@ export function createViteProfiler() {
               ...descriptor,
               get: wrap('miniflare', 'ready', descriptor.get, 'worker'),
             });
-            for (const method of ['setOptions']) {
+            for (const method of ['setOptions', 'dispatchFetch']) {
               if (typeof prototype[method] === 'function') {
                 prototype[method] = wrap('miniflare', method, prototype[method], 'worker');
               }

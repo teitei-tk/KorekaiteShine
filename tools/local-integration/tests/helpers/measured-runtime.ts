@@ -7,7 +7,7 @@ import * as production from '../../src/production.ts';
 import { measureOperation, recordStartupTiming } from './runtime-timing.ts';
 
 export async function startRuntime(...args: Parameters<typeof runtime.startRuntime>) {
-  const [config, mode, options] = args;
+  const [config, mode = 'dev', options] = args;
   const profileStartup = config.environment === 'test';
   const started = performance.now();
   const result = await measureOperation('startup', () =>

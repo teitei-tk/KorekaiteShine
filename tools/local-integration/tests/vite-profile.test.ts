@@ -70,6 +70,9 @@ test('Workerの初期化とMiniflareの準備待ちを別に記録し停止後�
     async setOptions() {
       return `${this.value}-updated`;
     }
+    async dispatchFetch() {
+      return this.value;
+    }
   }
   const environment = {
     name: 'ssr',
@@ -83,12 +86,14 @@ test('Workerの初期化とMiniflareの準備待ちを別に記録し停止後�
   const runtime = new Runtime();
   await expect(environment.initRunner(runtime)).resolves.toBe('ready');
   await expect(runtime.setOptions()).resolves.toBe('ready-updated');
+  await expect(runtime.dispatchFetch()).resolves.toBe('ready');
   const before = profiler.snapshot(0, Number.MAX_SAFE_INTEGER);
   expect(before.hooks).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ name: 'ssr', hook: 'initRunner', count: 1 }),
       expect.objectContaining({ name: 'miniflare', hook: 'ready', count: 1 }),
       expect.objectContaining({ name: 'miniflare', hook: 'setOptions', count: 1 }),
+      expect.objectContaining({ name: 'miniflare', hook: 'dispatchFetch', count: 1 }),
     ]),
   );
   profiler.stop();

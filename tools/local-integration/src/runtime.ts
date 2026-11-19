@@ -1,3 +1,4 @@
+import { createStartupTiming } from './startup-timing.ts';
 import { requireValue } from './required.ts';
 import {
   coverageEnvironment,
@@ -29,6 +30,7 @@ export type LocalRuntime = {
 };
 
 export type LocalRuntimeOptions = {
+  profileStartup?: boolean;
   port?: number;
   /** 面接DOの上流音声だけを独立test環境で代替する。 */
   interviewVoiceMock?: boolean;
@@ -64,6 +66,7 @@ async function prepareRuntime(
   options: LocalRuntimeOptions = {},
   signal?: AbortSignal,
   aiBindings: Record<string, string> = {},
+  timing?: ReturnType<typeof createStartupTiming>,
 ): Promise<string> {
   signal?.throwIfAborted();
   if (
@@ -83,7 +86,9 @@ async function prepareRuntime(
     throw new Error('ローカル環境だけを起動できます。');
   }
   await claimArtifactDirectory(config);
+  timing?.mark('artifactMs');
   await runDatabaseCommand(config, ['migrate'], { signal });
+  timing?.mark('databaseMs');
   const project = join(config.artifactDirectory, 'web');
   await mkdir(project, { recursive: true });
   await rm(join(project, 'src'), { recursive: true, force: true });
@@ -358,6 +363,7 @@ export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(
 ] });
 `,
   );
+  timing?.mark('filesAndConfigMs');
   return project;
 }
 
@@ -391,6 +397,7 @@ async function startUnlockedRuntime(
   mode: 'dev' | 'preview',
   options: LocalRuntimeOptions,
   signal?: AbortSignal,
+  timing?: ReturnType<typeof createStartupTiming>,
 ): Promise<LocalRuntime> {
   const aiBindings = localAiEnvironment(
     config.environment,
@@ -398,7 +405,7 @@ async function startUnlockedRuntime(
     process.env,
     options.testAiBindings,
   );
-  const project = await prepareRuntime(config, options, signal, aiBindings);
+  const project = await prepareRuntime(config, options, signal, aiBindings, timing);
   signal?.throwIfAborted();
   const child = spawn(
     process.execPath,
@@ -418,6 +425,7 @@ async function startUnlockedRuntime(
       detached: true,
     },
   );
+  timing?.mark('spawnMs');
   const outputContext = {
     output: '',
     stopping: false,
@@ -474,14 +482,23 @@ async function startUnlockedRuntime(
       );
     });
     const baseUrl = await ready.finally(() => signal?.removeEventListener('abort', onAbort));
+    timing?.mark('urlReadyMs');
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
+    timing?.mark('httpReadyMs');
     if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
       const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
       outputContext.finishCoverage = await startRuntimeCapture(
         requireValue(child.pid),
         baseUrl,
         Object.values(config.workers),
+      );
+    }
+    timing?.mark('coverageMs');
+    if (timing) {
+      await writeFile(
+        join(config.artifactDirectory, 'startup-timing.json'),
+        JSON.stringify(timing.finish()),
       );
     }
     signal?.throwIfAborted();
@@ -515,6 +532,10 @@ export async function startRuntimeInProcess(
   signal?: AbortSignal,
 ): Promise<LocalRuntime> {
   signal?.throwIfAborted();
+  if (options.profileStartup && config.environment !== 'test') {
+    throw new Error('起動計測は独立test環境だけで利用できます。');
+  }
+  const timing = options.profileStartup ? createStartupTiming() : undefined;
   if (
     mode === 'preview' &&
     (options.materialAnalysisMock ||
@@ -529,8 +550,9 @@ export async function startRuntimeInProcess(
     throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
   }
   const release = await lockEnvironment(config);
+  timing?.mark('lockMs');
   try {
-    const runtime = await startUnlockedRuntime(config, mode, options, signal);
+    const runtime = await startUnlockedRuntime(config, mode, options, signal, timing);
     return {
       ...runtime,
       async stop() {

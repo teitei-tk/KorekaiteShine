@@ -31,6 +31,7 @@ const boundaryGroups = [
     'ci-selection',
     'test-suites',
     'runtime-timing',
+    'startup-timing',
     'run-test-suite',
   ],
   [

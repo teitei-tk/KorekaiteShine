@@ -2,7 +2,7 @@ import type * as LintTypeModule0 from 'node:child_process';
 import type * as LintTypeModule1 from 'node:fs/promises';
 import { SystemError } from '../../testing/system-error.mts';
 import { ChildProcess, spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -20,7 +20,7 @@ vi.mock('node:child_process', async (importOriginal) => ({
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
   const original = await importOriginal<typeof LintTypeModule1>();
-  return { ...original, symlink: vi.fn(original.symlink) };
+  return { ...original, symlink: vi.fn(original.symlink), writeFile: vi.fn(original.writeFile) };
 });
 vi.mock('../src/database.ts', () => ({ runDatabaseCommand: vi.fn() }));
 vi.mock('../src/lock.ts', () => ({ lockEnvironment: vi.fn() }));
@@ -309,4 +309,21 @@ test('診断DOの環境拒否とQueueプローブを独立テストのWorker設�
   } finally {
     await runtime.stop();
   }
+});
+
+test('起動計測の保存中に中断された場合も起動成功を返さない', async () => {
+  const fixture = await runtimeFixture();
+  const controller = new AbortController();
+  const actual = await vi.importActual<typeof LintTypeModule1>('node:fs/promises');
+  vi.mocked(writeFile).mockImplementation(async (...args) => {
+    await actual.writeFile(...args);
+    if (typeof args[0] === 'string' && args[0].endsWith('/startup-timing.json')) {
+      controller.abort();
+    }
+  });
+  await expect(
+    startRuntimeInProcess(fixture.config, 'dev', { profileStartup: true }, controller.signal),
+  ).rejects.toThrow();
+  expect(stopProcessGroup).toHaveBeenCalledWith(fixture.child);
+  expect(fixture.release).toHaveBeenCalledTimes(1);
 });

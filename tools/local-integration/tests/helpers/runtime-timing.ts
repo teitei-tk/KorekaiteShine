@@ -1,9 +1,22 @@
+import type { StartupTiming } from '../../src/startup-timing.ts';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { test as baseTest } from 'vitest';
 
 type Phase = 'startup' | 'database' | 'build' | 'shutdown';
 type Span = { phase: Phase; start: number; end: number };
 const context = new AsyncLocalStorage<Span[]>();
+const startupDetails = new WeakMap<
+  Span[],
+  (StartupTiming & { ownerAndIpcMs: number; outerMs: number })[]
+>();
+export function recordStartupTiming(timing: StartupTiming, outerMs: number): void {
+  const spans = context.getStore();
+  if (spans) {
+    startupDetails
+      .get(spans)
+      ?.push({ ...timing, ownerAndIpcMs: Math.max(0, outerMs - timing.totalMs), outerMs });
+  }
+}
 function covered(spans: Span[]): number {
   const state = { end: 0, duration: 0 };
   const ordered: Span[] = [];
@@ -41,6 +54,8 @@ export async function profileCase<T>(
   operation: () => Promise<T> | T,
 ): Promise<T> {
   const spans: Span[] = [];
+  const details: (StartupTiming & { ownerAndIpcMs: number; outerMs: number })[] = [];
+  startupDetails.set(spans, details);
   const start = performance.now();
   try {
     return await context.run(spans, operation);
@@ -60,6 +75,7 @@ export async function profileCase<T>(
         shutdownMs: times[3],
         checksMs: Math.max(0, totalMs - busyMs),
         overlapMs: Math.max(0, times.reduce((sum, value) => sum + value, 0) - busyMs),
+        ...(details.length > 0 ? { startupDetails: details } : {}),
         calls: Object.fromEntries(
           phases.map((phase) => [phase, spans.filter((span) => span.phase === phase).length]),
         ),

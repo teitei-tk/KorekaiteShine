@@ -1,3 +1,4 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
 import {
   readJson,
   readCheckAccepted,
@@ -10,12 +11,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { validateCheckAccepted } from '@korekaite/api-contracts/http/diagnostics-validators';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('diagnostics');
 
 test('同じ冪等キーの同時要求はローカルD1のジョブと初期化outbox各1件へ集約する', async () => {
   const config = resolveRuntime({

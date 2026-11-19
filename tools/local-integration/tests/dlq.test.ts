@@ -1,13 +1,16 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
 import { readJson, readJob, readCheckStatus } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('dlq');
 
 test('DLQ確認の初回変更と公開更新日時を一体保存し、保存失敗と重複受信では日時を変えない', async () => {
   const config = resolveRuntime({

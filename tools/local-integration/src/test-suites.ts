@@ -30,6 +30,7 @@ const boundaryGroups = [
     'migrations',
     'ci-selection',
     'test-suites',
+    'runtime-timing',
     'run-test-suite',
   ],
   [

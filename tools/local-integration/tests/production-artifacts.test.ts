@@ -1,3 +1,4 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
 import { readWorkerConfig } from '../src/records.ts';
 import { parseObject, objectAt, stringValue } from './helpers/config-json.ts';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -6,14 +7,16 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { runDatabaseCommand } from '../src/database.ts';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import {
+  runDatabaseCommand,
   buildProductionArtifacts,
   runProductionBuild,
   startProductionPreview,
   verifyProductionArtifacts,
-} from '../src/production.ts';
+} from './helpers/measured-runtime.ts';
+
+const test = measuredTests('production-artifacts');
 
 test('本番ビルドの4環境のモジュール・ルート・配信物・Worker設定に診断を含めない', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'korekaite-production-'));

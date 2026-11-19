@@ -1,13 +1,16 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
 import { readJson, readJob } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('delivery-anomalies');
 
 test('存在しないジョブの通知は配送異常を保存してackし、ジョブや評価を作らない', async () => {
   const config = resolveRuntime({

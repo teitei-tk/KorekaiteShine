@@ -1,3 +1,4 @@
+import { measuredTests, measureSyncOperation } from './helpers/runtime-timing.ts';
 import { parseJson } from '@korekaite/api-contracts/json';
 import { parseObject, stringValue } from './helpers/config-json.ts';
 import { randomUUID } from 'node:crypto';
@@ -6,11 +7,13 @@ import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { assert, expect, test } from 'vitest';
+import { assert, expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, buildRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, buildRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('topology');
 
 test('Webから別WorkerのDOを呼び、DOの保存値を読み戻せる', async () => {
   const config = resolveRuntime({
@@ -265,12 +268,14 @@ test('明示したreset-seedだけが既存データを消して固定データ�
     expect(beforeRows).toContainEqual({ writer: 'temporary', value: 'remove-me' });
     expect(beforeRows).not.toContainEqual({ writer: 'fixture', value: 'local-only' });
     await runtimeContext.runtime.stop();
-    const seeded = spawnSync('pnpm', ['db:reset-seed'], {
-      cwd: repositoryRoot,
-      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
-      encoding: 'utf8',
-      timeout: 30_000,
-    });
+    const seeded = measureSyncOperation('database', () =>
+      spawnSync('pnpm', ['db:reset-seed'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+        encoding: 'utf8',
+        timeout: 30_000,
+      }),
+    );
     expect(seeded.status, seeded.stderr).toBe(0);
     runtimeContext.runtime = await startRuntime(config);
     const after = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
@@ -298,12 +303,14 @@ test('起動中の環境では別プロセスのreset-seedを拒否しデータ�
       'execute',
       "INSERT INTO connection_checks (writer, value) VALUES ('active', 'retained')",
     ]);
-    const attempted = spawnSync('pnpm', ['db:reset-seed'], {
-      cwd: repositoryRoot,
-      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
-      encoding: 'utf8',
-      timeout: 30_000,
-    });
+    const attempted = measureSyncOperation('database', () =>
+      spawnSync('pnpm', ['db:reset-seed'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+        encoding: 'utf8',
+        timeout: 30_000,
+      }),
+    );
     expect(attempted.status).toBe(1);
     expect(attempted.stderr).toContain('環境は使用中です');
     const response = await fetch(`${runtime.baseUrl}/api/database-topology`);

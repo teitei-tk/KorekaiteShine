@@ -1,3 +1,4 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
 import type { JsonValue } from '@korekaite/api-contracts/json';
 import {
   readJson,
@@ -9,11 +10,13 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('check-object');
 
 test('Webの非同期初期化が失敗しても受付を保持し、scheduledで回復する', async () => {
   const config = resolveRuntime({

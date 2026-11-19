@@ -154,11 +154,23 @@ export function createViteProfiler() {
               ...descriptor,
               get: wrap('miniflare', 'ready', descriptor.get, 'worker'),
             });
-            for (const method of ['setOptions', 'dispatchFetch']) {
+            for (const method of ['setOptions']) {
               if (typeof prototype[method] === 'function') {
                 prototype[method] = wrap('miniflare', method, prototype[method], 'worker');
               }
             }
+          }
+          if (!workers.has(miniflare)) {
+            workers.add(miniflare);
+            if (typeof miniflare.dispatchFetch !== 'function') {
+              throw new TypeError('Miniflare.dispatchFetchの計測点が見つかりません。');
+            }
+            miniflare.dispatchFetch = wrap(
+              'miniflare',
+              'dispatchFetch',
+              miniflare.dispatchFetch,
+              'worker',
+            );
           }
           return Reflect.apply(original, this, args);
         },

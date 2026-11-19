@@ -70,9 +70,7 @@ test('Workerの初期化とMiniflareの準備待ちを別に記録し停止後�
     async setOptions() {
       return `${this.value}-updated`;
     }
-    async dispatchFetch() {
-      return this.value;
-    }
+    dispatchFetch = async () => this.value;
   }
   const environment = {
     name: 'ssr',

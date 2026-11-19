@@ -85,6 +85,10 @@ async function observer() {
         questionState.held = resolve;
       }),
     muteReplies: vi.fn(),
+    restoreResponses: vi.fn(() => {
+      expect(timeContext.started).toBeNull();
+      questionState.silent = false;
+    }),
     silenceCurrentConnections: () => {
       questionState.silent = true;
     },
@@ -389,4 +393,16 @@ test('失敗時の診断を取得できなくてもブラウザとランタイ�
   await expect(hooks.after.call(world, { result: { status: 'FAILED' } })).resolves.toBeUndefined();
   expect(world.browser.close).toHaveBeenCalledOnce();
   expect(world.runtime.stop).toHaveBeenCalledWith({ diagnostics: true });
+});
+
+test('音声復帰では一時停止後に故障注入を解除してから手動で再開する', async () => {
+  const { world } = await observer();
+  const step = (name) => hooks.steps.get(name).call(world);
+  await step('架空の経験Markdownからテーマを選び面接を準備した');
+  await step('会話を一往復して双方の発言が確定している');
+  await step('音声AIが接続を閉じずに回答を受け流す');
+  expect(world.runtime.restoreResponses).not.toHaveBeenCalled();
+  await step('応答待ちの案内から音声をつなぎ直してもう一度話す');
+  expect(world.runtime.restoreResponses).toHaveBeenCalledOnce();
+  await step('ブラウザで新しい音声応答が再生される');
 });

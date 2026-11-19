@@ -59,6 +59,7 @@ test.each(['pr', 'live'])(
       extendNextOpening: vi.fn(),
       omitNextOpening: vi.fn(),
       muteReplies: vi.fn(),
+      restoreResponses: vi.fn(),
       silenceCurrentConnections: vi.fn(),
       holdNextQuestion: vi.fn(() => held),
     };
@@ -84,6 +85,7 @@ test.each(['pr', 'live'])(
           'extendNextOpening',
           'omitNextOpening',
           'muteReplies',
+          'restoreResponses',
           'silenceCurrentConnections',
         ]) {
           runtime[operation]();

@@ -414,6 +414,7 @@ async function recoverAudio() {
   await this.page.getByRole('status').filter({ hasText: '面接官の音声を待っています' }).waitFor();
   await button(this, '音声をつなぎ直す').click();
   await status(this, '一時停止中').waitFor();
+  this.runtime.restoreResponses();
   await button(this, 'マイクを許可して再開').click();
   await status(this, '面接中').waitFor();
 }

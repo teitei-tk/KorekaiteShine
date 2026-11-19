@@ -115,6 +115,9 @@ export class MockInterviewObject extends InterviewObject {
       silenceCurrentConnections() {
         providerContext.provider.silenceCurrentConnections();
       },
+      restoreResponses() {
+        providerContext.provider.restoreResponses();
+      },
       async rejectDials(value) {
         if (!providerContext.provider) {
           throw new Error('接続拒否はPRプロファイル専用です。');

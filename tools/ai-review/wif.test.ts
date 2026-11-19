@@ -100,3 +100,12 @@ it('廃止した独自交換モードでは通信を始めない', async () => {
   await expect(authenticate(env, 'review', request)).rejects.toThrow('WIFモードが不正');
   expect(callsState.calls).toBe(0);
 });
+
+it.each([null, [], { value: `header.${Buffer.from('[]').toString('base64url')}.signature` }])(
+  'オブジェクトでないOIDC応答・クレームを拒否する: %s',
+  async (body) => {
+    await expect(
+      authenticate(env, 'claims', vi.fn<typeof fetch>().mockResolvedValue(Response.json(body))),
+    ).rejects.toThrow('OIDC応答が不正');
+  },
+);

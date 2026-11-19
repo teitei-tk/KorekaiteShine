@@ -44,10 +44,10 @@ export function normalizeSnapshot(input: JsonInput): Snapshot {
   const issues = input.issues.map(comment).toSorted((a, b) => a.id - b.id);
   const inline = input.inline
     .map((c): ReviewComment => {
-      const base = comment(c);
       if (!isJsonObject(c)) {
         throw new Error('履歴コメントが不正です');
       }
+      const base = comment(c);
       if (
         typeof c.path !== 'string' ||
         typeof c.commit_id !== 'string' ||
@@ -93,7 +93,7 @@ export function normalizeSnapshot(input: JsonInput): Snapshot {
     new Set(threads.map((t) => t.id)).size !== threads.length ||
     new Set(threads.map((t) => t.root)).size !== roots.length ||
     threads.length !== roots.length ||
-    inline.some((c) => Boolean(c.in_reply_to_id) && !roots.includes(c.in_reply_to_id ?? 0))
+    inline.some((c) => c.in_reply_to_id !== undefined && !roots.includes(c.in_reply_to_id))
   ) {
     throw new Error('履歴の関連が欠落・重複しています');
   }

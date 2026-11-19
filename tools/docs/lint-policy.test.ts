@@ -139,3 +139,21 @@ it('inline抑制の再導入を追跡ソース検査で拒否する', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it('inline検査は引数なしでGit管理対象を列挙し、普通のコメントを許可する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'lint-tracked-'));
+  try {
+    writeFileSync(join(directory, 'normal.ts'), '// 普通のコメント\nexport const value = 1;');
+    expect(spawnSync('git', ['init', '--quiet'], { cwd: directory }).status).toBe(0);
+    expect(spawnSync('git', ['add', 'normal.ts'], { cwd: directory }).status).toBe(0);
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'tools/lint/check-inline-directives.mjs')],
+      { cwd: directory, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('inline検査抑制: 0件');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

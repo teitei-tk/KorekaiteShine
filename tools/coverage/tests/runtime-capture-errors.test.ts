@@ -100,3 +100,15 @@ test('親が生存している間はプロキシ経由で回収する', async ()
   });
   expect(readCaptures(directory)[0].status).toBe('complete');
 });
+
+test('プロキシまたは直接接続先が欠落したWorkerは開始しない', async () => {
+  setup();
+  await expect(startRuntimeCapture(12_345, 'http://fixture', ['missing'])).rejects.toThrow(
+    'Inspector接続先がありません: missing',
+  );
+  vi.mocked(findWorkerdInspector).mockResolvedValue([]);
+  await expect(startRuntimeCapture(12_345, 'http://fixture', ['worker'])).rejects.toThrow(
+    'Inspector接続先がありません: worker',
+  );
+  expect(readWorkerCoverage).not.toHaveBeenCalled();
+});

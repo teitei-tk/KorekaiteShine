@@ -84,3 +84,12 @@ test('manifestのNode設定が文字列でなければ形式エラーとして�
     'engines.node',
   );
 });
+
+test('workflowのstepsが配列でない場合は検査を拒否する', async () => {
+  await expect(
+    inspect({ '.github/workflows/invalid.yml': 'jobs:\n  check:\n    steps: invalid\n' }),
+  ).rejects.toThrow('stepsは配列');
+});
+test('manifestがオブジェクトでない場合はラベル付きで拒否する', async () => {
+  await expect(inspect({ 'package.json': '[]' })).rejects.toThrow('オブジェクトが必要');
+});

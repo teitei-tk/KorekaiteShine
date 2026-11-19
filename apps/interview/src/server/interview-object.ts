@@ -54,7 +54,7 @@ export class InterviewObject extends DurableObject<Bindings> {
     return createLiveConnection(options, handlers);
   }
   private async getRoom(identity: Identity) {
-    await this.ctx.blockConcurrencyWhile(async () => {
+    return this.ctx.blockConcurrencyWhile(async () => {
       const saved = this.identity ?? (await this.ctx.storage.get<Identity>('identity'));
       if (
         saved &&
@@ -63,7 +63,7 @@ export class InterviewObject extends DurableObject<Bindings> {
         throw new Error('面接の対応が一致しません。');
       }
       if (this.room) {
-        return;
+        return this.room;
       }
       const db = createPrimaryDb(this.env.DB);
       if (!(await loadInterview(db, identity.actorId, identity.interviewId))) {
@@ -103,11 +103,8 @@ export class InterviewObject extends DurableObject<Bindings> {
           }
         },
       });
+      return this.room;
     });
-    if (!this.room) {
-      throw new Error('面接ルームの初期化に失敗しました。');
-    }
-    return this.room;
   }
   async fetch(request: Request): Promise<Response> {
     // Web Workerが本人確認後にこの内部bindingへ転送し、本人ヘッダーを上書きする。

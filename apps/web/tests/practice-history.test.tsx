@@ -313,3 +313,59 @@ test.each(['履歴', '詳細'])('%sの読取中に画面を閉じた後の成功
     expect(screen.queryByRole('alert')).toBeNull();
   }
 });
+
+test('評価待ちの記録は3秒後に再取得し、取消確定後はポーリングを止める', async () => {
+  const detail = {
+    session: { interviewId: 'one', theme: '面接', status: 'ended', createdAt: 10, activeMs: 100 },
+    material: { title: '題', heading: '見出し', excerpt: '引用' },
+    background: '',
+    transcriptIncomplete: false,
+    transcripts: [],
+    playback: [],
+    evaluation: {
+      jobId: 'job',
+      status: 'pending',
+      attemptCount: 0,
+      nextAttemptAt: null,
+      lastErrorCode: null,
+      result: null,
+    },
+  };
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(detail))
+    .mockResolvedValueOnce(
+      Response.json({ ...detail, evaluation: { ...detail.evaluation, status: 'cancelled' } }),
+    );
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(async (url, init) =>
+      url === '/api/local-session'
+        ? Response.json({ operationToken: 'a'.repeat(64) })
+        : fetcher(url, init),
+    ),
+  );
+  vi.useFakeTimers();
+  try {
+    await act(async () => {
+      render(<PracticeRecord id="one" onDeleted={vi.fn<() => void>()} />);
+    });
+    expect(screen.getByText('評価待ち')).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2999);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('評価待ち')).toBeNull();
+    expect(screen.getByText('評価取消')).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6000);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});

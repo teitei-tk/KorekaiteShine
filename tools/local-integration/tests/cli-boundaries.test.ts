@@ -176,3 +176,10 @@ test('追加引数をローカル操作へ渡さず拒否する', async () => {
   expect(fixture.error).toHaveBeenCalledWith(expect.stringContaining('追加引数'));
   expect(startRuntime).not.toHaveBeenCalled();
 });
+
+test('CLIは非Error例外も文字列化して失敗終了する', async () => {
+  vi.mocked(buildRuntime).mockRejectedValue('build rejected');
+  const fixture = await cliFixture(['build']);
+  expect(fixture.channel.exitCode).toBe(1);
+  expect(fixture.error).toHaveBeenCalledWith('build rejected');
+});

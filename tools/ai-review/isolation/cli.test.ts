@@ -137,7 +137,13 @@ it('lifecycleは不正な操作・モードと実行権限不足を拒否する'
   ).toBe(1);
 });
 it('lifecycleは外側とsandbox両方の隔離検査に成功を要求する', () => {
-  for (const scenario of ['outside-error', 'bad-isolation', 'inside-error']) {
+  for (const scenario of [
+    'outside-error',
+    'bad-isolation',
+    'inside-error',
+    'invalid-checks',
+    'invalid-check',
+  ]) {
     const fixture = cliFixture();
     const result = fixture.run('isolation/lifecycle.ts', {
       args: ['prepare', 'complete', '20'],
@@ -283,4 +289,25 @@ it('lifecycleのprepareは公式プロキシと境界検査の完了を確認す
   expect(result.stdout).toContain(
     'official proxy memory, config and server-info isolation: passed',
   );
+});
+
+it('不正な上流レポートを受理せずプロキシを終了する', () => {
+  const fixture = cliFixture();
+  const result = fixture.run('isolation/lifecycle.ts', {
+    args: ['finish', 'complete', 'success'],
+    bootstrap: lifecycleBootstrap('invalid-report'),
+  });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('invalid fixture report');
+});
+
+it('不正なモデル保存状態を固定理由で拒否する', () => {
+  const fixture = cliFixture();
+  const result = fixture.run('isolation/model.ts', {
+    ...modelCliFixture(fixture.directory, 'invalid-state'),
+    args: ['finish', 'success'],
+  });
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('WIF model verification failed');
+  expect(result.stdout).not.toContain('"stage":"wif-model"');
 });

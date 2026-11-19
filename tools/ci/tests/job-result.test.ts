@@ -39,3 +39,23 @@ test('失敗、cancel、不明skip、計画欠損、不正JSONは失敗する', 
   delete missing.build;
   expect(() => validateJobs(JSON.stringify(missing))).toThrow(/./u);
 });
+
+test('testsの欠落とCLI環境の欠落を失敗にする', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const missing = jobs();
+  delete missing.tests;
+  expect(() => validateJobs(JSON.stringify(missing))).toThrow('テストジョブ');
+  for (const needs of [undefined, JSON.stringify(jobs()), 'invalid']) {
+    const env = { ...process.env };
+    delete env.NEEDS_JSON;
+    if (needs !== undefined) {
+      env.NEEDS_JSON = needs;
+    }
+    const result = spawnSync(
+      process.execPath,
+      [new URL('../src/job-result.ts', import.meta.url).pathname],
+      { env, encoding: 'utf8' },
+    );
+    expect(result.status).toBe(needs === JSON.stringify(jobs()) ? 0 : 1);
+  }
+});

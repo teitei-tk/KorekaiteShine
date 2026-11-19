@@ -24,7 +24,8 @@ export function DiagnosticPage() {
   // 再描画前の連続操作も同時実行させない。
   const inFlight = useRef(false);
 
-  async function submit(newRun: boolean) {
+  const previousRun = run.current;
+  async function submit(newRun: boolean, selectRun: () => ReturnType<typeof createDiagnosticRun>) {
     if (!ready || inFlight.current) {
       return;
     }
@@ -32,16 +33,13 @@ export function DiagnosticPage() {
     setBusy(true);
     setError('');
     try {
+      const current = selectRun();
+      run.current = current;
       if (newRun) {
-        run.current = createDiagnosticRun(scenario, { baseUrl: globalThis.location.origin });
         setAccepted(null);
         setResult(null);
       }
-      // 新規作成の失敗はcatchへ進み、再送ボタンはrunがある場合だけ有効になる。
-      if (!run.current) {
-        throw new Error('診断を開始してから再送してください。');
-      }
-      setAccepted(await run.current.start());
+      setAccepted(await current.start());
     } catch (error_) {
       if (error_ instanceof DiagnosticValidationError && error_.code === 'VALIDATION_ERROR') {
         const locations = error_.details.map(
@@ -108,13 +106,21 @@ export function DiagnosticPage() {
         <option value="exhaust_retries">{scenarioLabels.exhaust_retries}</option>
       </select>
       <p>
-        <button type="button" disabled={!ready || busy} onClick={() => void submit(true)}>
+        <button
+          type="button"
+          disabled={!ready || busy}
+          onClick={() =>
+            void submit(true, () =>
+              createDiagnosticRun(scenario, { baseUrl: globalThis.location.origin }),
+            )
+          }
+        >
           新しい実行を開始
         </button>{' '}
         <button
           type="button"
           disabled={!ready || busy || !run.current || accepted !== null}
-          onClick={() => void submit(false)}
+          onClick={previousRun ? () => void submit(false, () => previousRun) : undefined}
         >
           同じ実行を再送
         </button>{' '}

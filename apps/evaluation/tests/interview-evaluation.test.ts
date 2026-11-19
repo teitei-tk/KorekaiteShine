@@ -160,6 +160,7 @@ test('外部応答の形式・件数・役割・本文を確認してから評�
         { type: 'refusal' },
         { type: 'output_text' },
         { type: 'output_text', text: 'invalid json' },
+        { type: 'output_text', text: 'true' },
       ].map((content) => [{ ...message, content: [content] }]),
     ].map((output) => ({ status: 'completed', output })),
   ];

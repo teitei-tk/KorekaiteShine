@@ -146,7 +146,7 @@ async function makePlan(): Promise<Plan> {
   }
   return plan;
 }
-async function main() {
+export async function main() {
   await mkdir(resolve(root, '.ci/results'), { recursive: true });
   const [command, id] = process.argv.slice(2);
   if (command === 'plan') {

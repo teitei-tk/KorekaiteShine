@@ -319,3 +319,13 @@ it('setupはPRと文脈をコピーしてroot所有の信頼設定を保存す�
   });
   expect(status()).toEqual({});
 });
+
+it('保存状態が不正なら終了時に成果物を作成しない', async () => {
+  fixture.files.set('/opt/ai-review/private/state.json', '{}');
+  expect(await executeRuntime('finish', '/fixture/artifact', 'success', reportEnv)).toBe(false);
+  expect(writeFileSync).not.toHaveBeenCalledWith(
+    '/fixture/artifact',
+    expect.anything(),
+    expect.anything(),
+  );
+});

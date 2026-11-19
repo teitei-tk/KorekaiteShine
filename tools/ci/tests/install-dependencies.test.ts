@@ -41,3 +41,30 @@ test('再実行でもメタデータと検証状態は共有せず、失敗時�
   expect(new Set(metadataPaths).size).toBe(2);
   expect(metadataPaths.every((directory) => !existsSync(directory))).toBe(true);
 });
+
+test('既定runnerとCLIはregistry検査後にinstallを実行する', async () => {
+  const { mkdtempSync, writeFileSync, rmSync, copyFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const root = mkdtempSync(join(tmpdir(), 'ci-install-command-'));
+  try {
+    writeFileSync(
+      join(root, 'pnpm'),
+      '#!/bin/sh\nif [ "$1" = "config" ]; then echo https://npm.flatt.tech/; exit 0; fi\nif [ "$1" = "install" ]; then exit 0; fi\nexit 2\n',
+      { mode: 0o755 },
+    );
+    copyFileSync(join(root, 'pnpm'), join(root, 'npm'));
+    const result = spawnSync(
+      process.execPath,
+      [new URL('../src/install-dependencies.ts', import.meta.url).pathname],
+      { env: { ...process.env, PATH: `${root}:${process.env.PATH}` }, encoding: 'utf8' },
+    );
+    expect({ status: result.status, stderr: result.stderr }).toStrictEqual({
+      status: 0,
+      stderr: '',
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

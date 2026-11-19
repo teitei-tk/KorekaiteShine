@@ -67,7 +67,7 @@ export { PendingRuntimeCleanupError as PendingRuntimeCleanup };
 
 async function prepareRuntime(
   config: RuntimeConfig,
-  options: LocalRuntimeOptions = {},
+  options: LocalRuntimeOptions,
   signal?: AbortSignal,
   aiBindings: Record<string, string> = {},
   timing?: ReturnType<typeof createStartupTiming>,
@@ -399,7 +399,7 @@ function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, st
 
 async function buildUnlockedRuntime(
   config: RuntimeConfig,
-  options: Pick<LocalRuntimeOptions, 'boundaryBuild'> = {},
+  options: Pick<LocalRuntimeOptions, 'boundaryBuild'>,
   signal?: AbortSignal,
 ): Promise<void> {
   const project = await prepareRuntime(config, options, signal);

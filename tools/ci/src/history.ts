@@ -154,12 +154,14 @@ export function mergeHistory(previous: unknown, current: History): History {
     ).id !== null;
   const old = trusted && isHistory(previous) ? previous : null;
   const samples = [
-    ...(old?.samples ?? []).map((sample) => ({
-      id: sample.id,
-      identity: sample.identity,
-      durationMs: sample.durationMs,
-      sampledAt: sample.sampledAt ?? old?.createdAt,
-    })),
+    ...(old
+      ? old.samples.map((sample) => ({
+          id: sample.id,
+          identity: sample.identity,
+          durationMs: sample.durationMs,
+          sampledAt: sample.sampledAt ?? old.createdAt,
+        }))
+      : []),
     ...current.samples.map((sample) => ({
       id: sample.id,
       identity: sample.identity,
@@ -170,7 +172,7 @@ export function mergeHistory(previous: unknown, current: History): History {
   for (const sample of samples) {
     const epoch = (() => {
       try {
-        return Temporal.Instant.from(sample.sampledAt ?? '').epochMilliseconds;
+        return Temporal.Instant.from(sample.sampledAt).epochMilliseconds;
       } catch {
         return Number.NaN;
       }

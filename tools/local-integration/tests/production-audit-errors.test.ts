@@ -142,3 +142,15 @@ test('本番面接Workerに面接DOのbindingが欠落した場合は拒否す�
     '本番の面接DO設定がありません',
   );
 });
+
+test('外部JSONの非オブジェクトと必須値欠落を境界で拒否する', async () => {
+  const { readObject } = await import('../src/records.ts');
+  const { requireValue } = await import('../src/required.ts');
+  for (const value of [null, [], 'invalid']) {
+    expect(() => readObject(value)).toThrow('JSONオブジェクト');
+  }
+  expect(readObject({ value: 1 })).toEqual({ value: 1 });
+  expect(() => requireValue(null)).toThrow('必須値');
+  expect(() => requireValue(undefined)).toThrow('必須値');
+  expect(requireValue(false)).toBe(false);
+});

@@ -157,6 +157,27 @@ test('ケース側のコード・フラグ・保存先を分離し共有ビル�
       join(directory, 'boundary-bundle.json'),
       JSON.stringify({ schema: 1, runId, coverage: await boundaryCoverageIdentity() }),
     );
+    await expect(stageBoundaryBundle(directory, build, {})).rejects.toThrow('保存先を分離');
+    await stageBoundaryBundle(directory, a, {});
+    await rm(join(first, 'node_modules'));
+    await symlink(directory, join(first, 'node_modules'), 'dir');
+    await expect(stageBoundaryBundle(directory, a, {})).rejects.toThrow();
+    await rm(join(first, 'node_modules'));
+    const duplicatePath = join(
+      directory,
+      output,
+      'workers',
+      build.workers.interview,
+      'worker.config.json',
+    );
+    const originalWorker = await readFile(duplicatePath, 'utf8');
+    await writeFile(duplicatePath, await readFile(join(directory, configPath), 'utf8'));
+    await expect(stageBoundaryBundle(directory, a, {})).rejects.toThrow('Workerが重複');
+    await writeFile(duplicatePath, originalWorker);
+    const extra = join(directory, output, 'workers', 'extra');
+    await mkdir(extra);
+    await expect(stageBoundaryBundle(directory, a, {})).rejects.toThrow('3 Worker');
+    await rm(extra, { recursive: true });
     await symlink(join(directory, file), join(directory, output, 'shared-link.js'));
     await expect(stageBoundaryBundle(directory, a, {})).rejects.toThrow();
   } finally {
@@ -222,5 +243,105 @@ test('共有ビルドの開始前から中断を監視してビルドへ渡し�
     expect(process.listenerCount('SIGTERM')).toBe(listeners);
   } finally {
     vi.mocked(buildRuntime).mockReset();
+  }
+});
+
+test('外部設定の構造・環境・triggerを検証する', () => {
+  const base = {
+    name: source.workers.web,
+    env: {
+      APP_ENV: { type: 'text', value: 'test' },
+      DB: { type: 'd1', id: source.d1.id, name: source.d1.name },
+    },
+  };
+  const inputs: JsonValue[] = [
+    null,
+    [],
+    { ...base, env: { ...base.env, APP_ENV: { value: 'production' } } },
+    { ...base, triggers: {} },
+    { ...base, triggers: [{ type: 'http' }] },
+    ...[null, 17, 'foreign'].map((deadLetterQueue) => ({
+      name: base.name,
+      env: base.env,
+      triggers: [{ type: 'queue', name: source.queues.evaluation.queue, deadLetterQueue }],
+    })),
+  ];
+  for (const input of inputs) {
+    expect(() => rebindBoundaryConfig(input, source, target, {})).toThrow();
+  }
+  expect(
+    rebindBoundaryConfig(
+      {
+        ...base,
+        triggers: [{ type: 'scheduled' }, { type: 'queue', name: source.queues.evaluation.queue }],
+      },
+      source,
+      target,
+      {},
+    ),
+  ).toMatchObject({ triggers: [{ type: 'scheduled' }, { name: target.queues.evaluation.queue }] });
+});
+
+test('共有ビルドは埋込み接続先と計測設定の途中変更を拒否する', async () => {
+  const { mkdir, writeFile, rm, access } = await import('node:fs/promises');
+  const { join, dirname } = await import('node:path');
+  const { createBoundaryBundle } = await import('../src/boundary-bundle.ts');
+  for (const outcome of ['identity', 'coverage', 'interrupt', 'success'] as const) {
+    const state = { directory: '' };
+    const log = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    vi.mocked(buildRuntime).mockImplementation(async (config, _options, signal) => {
+      state.directory = config.artifactDirectory;
+      const output = join(config.artifactDirectory, 'web/.cloudflare/output/v0');
+      await mkdir(output, { recursive: true });
+      await writeFile(
+        join(output, 'worker.js'),
+        outcome === 'identity' ? config.d1.id : 'export default {};',
+      );
+      await writeFile(join(output, 'asset.txt'), config.d1.id);
+      if (outcome === 'coverage') {
+        const path = join(config.artifactDirectory, 'coverage.json');
+        await writeFile(path, '{}');
+        vi.stubEnv('KOREKAITE_COVERAGE_RUN', path);
+      }
+      if (outcome === 'interrupt') {
+        process.emit('SIGTERM');
+        signal?.throwIfAborted();
+      }
+    });
+    try {
+      if (outcome === 'success') {
+        const bundle = await createBoundaryBundle();
+        expect(bundle.directory).toBe(join(state.directory, 'web'));
+        await expect(access(dirname(state.directory))).resolves.toBeUndefined();
+        await bundle.dispose();
+        await expect(access(dirname(state.directory))).rejects.toMatchObject({ code: 'ENOENT' });
+      } else {
+        const causes = {
+          identity: 'ビルド済みコードにビルド元の接続先が埋め込まれています。',
+          coverage: 'ビルド中にcoverage設定が変更されました。',
+          interrupt: '境界ビルドを中断しました。',
+        };
+        const build = createBoundaryBundle();
+        await expect(build).rejects.toThrow('境界ビルドが失敗');
+        await expect(build).rejects.toMatchObject({ cause: { message: causes[outcome] } });
+      }
+    } finally {
+      vi.unstubAllEnvs();
+      vi.mocked(buildRuntime).mockReset();
+      log.mockRestore();
+      if (state.directory) {
+        await rm(dirname(state.directory), { recursive: true, force: true });
+      }
+    }
+  }
+});
+
+test('計測しない起動には計測設定の識別子を付けない', async () => {
+  const { boundaryCoverageIdentity } = await import('../src/boundary-bundle.ts');
+  vi.stubEnv('KOREKAITE_COVERAGE_RUN', '');
+  try {
+    await expect(boundaryCoverageIdentity()).resolves.toBeNull();
+  } finally {
+    vi.unstubAllEnvs();
   }
 });

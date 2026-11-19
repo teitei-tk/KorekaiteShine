@@ -91,3 +91,11 @@ test('統合準備コマンドの追加引数はDB操作前に拒否する', asy
   expect((await fixture.run(['--reset'])).exitCode).toBe(1);
   expect(runDatabaseCommand).not.toHaveBeenCalled();
 });
+
+test('準備処理の非Error例外を表示しロックを解放する', async () => {
+  const fixture = await preparationFixture();
+  vi.mocked(runDatabaseCommand).mockRejectedValue('database rejected');
+  expect((await fixture.run()).exitCode).toBe(1);
+  expect(fixture.error).toHaveBeenCalledWith('database rejected');
+  expect(fixture.release).toHaveBeenCalledTimes(1);
+});

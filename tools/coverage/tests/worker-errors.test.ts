@@ -1,6 +1,8 @@
+import { runInNewContext } from 'node:vm';
 import { parse, readObject } from '../src/schema.ts';
 import { assert, beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { readWorkerCoverage } from '../src/worker.ts';
+const originalParse = JSON.parse;
 const modeState = { mode: 'normal' };
 class InspectorSocket extends EventTarget {
   static instances: InspectorSocket[] = [];
@@ -21,6 +23,19 @@ class InspectorSocket extends EventTarget {
     if (typeof id !== 'number' || typeof method !== 'string') {
       throw new TypeError('Inspector request fixtureが不正です。');
     }
+    if (modeState.mode.startsWith('malformed-')) {
+      const replies: Record<string, object | null> = {
+        'malformed-object': null,
+        'malformed-id': { id: 'bad' },
+        'malformed-method': { method: 1 },
+        'malformed-context': { method: 'Runtime.executionContextCreated', params: {} },
+        'malformed-value': { id, result: { result: { value: 123 } } },
+      };
+      this.dispatchEvent(
+        new MessageEvent('message', { data: JSON.stringify(replies[modeState.mode]) }),
+      );
+      return;
+    }
     if (modeState.mode === 'reply-timeout') {
       return;
     }
@@ -36,6 +51,10 @@ class InspectorSocket extends EventTarget {
       this.message({ id, error: { message: 'private fixture' } });
     } else if (modeState.mode === 'exception') {
       this.message({ id, result: { exceptionDetails: { text: 'private fixture' } } });
+    } else if (method === 'Runtime.evaluate' && modeState.mode === 'missing-value') {
+      this.message({ id });
+    } else if (method === 'Runtime.evaluate' && modeState.mode === 'invalid-snapshot') {
+      this.message({ id, result: { result: { value: 'null' } } });
     } else {
       this.message({ id, result: { result: { value: JSON.stringify({ data: {} }) } } });
     }
@@ -111,4 +130,42 @@ test('Inspector接続エラーで収集を成功扱いせずソケットを閉�
   expect(
     (InspectorSocket.instances.at(-1) ?? assert.fail('必須のテスト値がありません。')).closed,
   ).toBe(true);
+});
+
+test.each([
+  ['malformed-object', 'Inspector応答が不正'],
+  ['malformed-id', 'Inspector応答が不正'],
+  ['malformed-method', 'Inspector応答が不正'],
+  ['malformed-context', 'Inspectorコンテキストが不正'],
+  ['malformed-value', 'Inspector値が不正'],
+  ['missing-value', 'Inspector値がありません'],
+  ['invalid-snapshot', 'snapshotが不正'],
+])('不正なInspector応答を拒否して接続を閉じる: %s', async (mode, message) => {
+  modeState.mode = mode;
+  await expect(readWorkerCoverage('ws://fixture')).rejects.toThrow(message);
+  expect(InspectorSocket.instances.at(-1)?.closed).toBe(true);
+});
+
+test('WebSocketコンストラクターがソケットを返さなければ拒否する', async () => {
+  vi.stubGlobal('WebSocket', new Proxy(InspectorSocket, { construct: () => ({}) }));
+  await expect(readWorkerCoverage('ws://fixture')).rejects.toThrow(
+    'Inspectorソケットを作成できません',
+  );
+});
+
+test('別realmの例外でも収集を拒否しソケットを閉じる', async () => {
+  const { stringify } = JSON;
+  vi.spyOn(JSON, 'parse').mockImplementation((text) => {
+    if (text === stringify({ id: 101 })) {
+      throw runInNewContext('new Error("invalid inspector payload")');
+    }
+    const result: ReturnType<typeof parse> = originalParse(text);
+    return result;
+  });
+  try {
+    await expect(readWorkerCoverage('ws://fixture')).rejects.toThrow('invalid inspector payload');
+    expect(InspectorSocket.instances.at(-1)?.closed).toBe(true);
+  } finally {
+    vi.restoreAllMocks();
+  }
 });

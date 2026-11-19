@@ -51,21 +51,19 @@ export function startCapture(
           throw new Error(`台帳にない計測対象: ${key}`);
         }
       }
-      record.files = run.targets
-        .filter((target) => data[target.path])
-        .flatMap((target) => {
-          const coverage = data[target.path];
-          return coverage === undefined
-            ? []
-            : [
-                {
-                  path: target.path,
-                  sourceHash: target.sourceHash,
-                  instrumentationHash: target.instrumentationHash,
-                  coverage,
-                },
-              ];
-        });
+      record.files = run.targets.flatMap((target) => {
+        const coverage = data[target.path];
+        return coverage === undefined
+          ? []
+          : [
+              {
+                path: target.path,
+                sourceHash: target.sourceHash,
+                instrumentationHash: target.instrumentationHash,
+                coverage,
+              },
+            ];
+      });
       record.status = status;
       record.failure = failure;
       save();

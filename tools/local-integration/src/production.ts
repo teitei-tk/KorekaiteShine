@@ -1,3 +1,4 @@
+import { requireValue } from './required.ts';
 import { readBuildAudit, readWorkerConfig } from './records.ts';
 import { parseJson } from '@korekaite/api-contracts/json';
 import { localProcessEnvironment } from './local-environment.ts';
@@ -278,8 +279,8 @@ export async function verifyProductionArtifacts(
       ) {
         throw new Error(`本番Worker設定に不整合があります: ${environment}`);
       }
-      const bindings = Object.entries(config.env).flatMap(([name, binding]) =>
-        binding === undefined ? [] : [[name, binding] as const],
+      const bindings = Object.entries(config.env).map(
+        ([name, binding]) => [name, requireValue(binding)] as const,
       );
       const databases = bindings.filter(([, binding]) => binding.type === 'd1');
       if (

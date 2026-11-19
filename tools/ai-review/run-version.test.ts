@@ -140,3 +140,15 @@ it('改名後のCIからレビュー対象のheadとbaseを確認できる', () 
   expect(result.output).toContain(`レビュー対象head SHA: ${head}`);
   expect(result.output).toContain(`レビュー対象base SHA: ${base}`);
 });
+
+it.each(['id', 'run_attempt'])('元CIの%sが文字列なら記録の値を照合する', (field) => {
+  const f = fixture();
+  const result = runVersion('20', undefined, (path) => {
+    const body = readJsonObject(f.read(path));
+    if (path.endsWith('/10/attempts/2')) {
+      body[field] = field === 'id' ? '10' : '2';
+    }
+    return JSON.stringify(body);
+  });
+  expect(result.eligible).toBe(true);
+});

@@ -276,3 +276,10 @@ test('runとtestの別名はスクリプト呼び出しとして照合する', a
     'README.md:1: スクリプトが存在しない: config (package.json)',
   ]);
 });
+
+test('scripts項目自体がないmanifestは未定義スクリプトとして報告する', async () => {
+  const root = await fixture({ 'README.md': '`pnpm missing`', 'package.json': '{}' });
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:1: スクリプトが存在しない: missing (package.json)',
+  ]);
+});

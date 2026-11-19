@@ -299,3 +299,9 @@ test('起動と終了の時間を検査・待機の時間から分離する', as
     report.durationMs,
   );
 });
+
+test('Queue観測の名前が文字列でなければ配送成功として扱わない', async () => {
+  const fixture = scenarioFixture('success');
+  fixture.replies.receipt = () => Response.json({ ...fixture.receipt, queue: null });
+  await fixture.fails('QUEUE_RECEIPT_MISMATCH');
+});

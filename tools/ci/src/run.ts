@@ -137,11 +137,12 @@ export async function runShard(root: string, plan: Plan, shard: Shard): Promise<
           run.testModules,
           group.map((test) => path.resolve(root, test.file)),
         );
+        const plannedModules = group.map((test) => ({
+          moduleId: path.resolve(root, test.file),
+          test,
+        }));
         for (const module of completed) {
-          const test = group.find((test) => path.resolve(root, test.file) === module.moduleId);
-          if (!test) {
-            throw new Error('実行対象にないテストです。');
-          }
+          const [{ test }] = exactSpecifications(plannedModules, [module.moduleId]);
           if (module.state() !== 'passed') {
             throw new Error(`テストが完了していません: ${test.id} (${module.state()})`);
           }

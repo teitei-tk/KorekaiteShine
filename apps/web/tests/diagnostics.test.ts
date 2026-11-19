@@ -50,7 +50,7 @@ test('予期しない内部例外は詳細を公開せず500と追跡ログを�
   expect(JSON.stringify(log.mock.calls)).not.toContain('private_internal_failure');
 });
 
-test('本文を読み取れない要求は保存せず400と追跡情報を返す', async () => {
+test.each(['読取失敗', '不正JSON'])('本文が%sの要求は保存せず400と追跡情報を返す', async (kind) => {
   const requestId = crypto.randomUUID();
   const log = vi.spyOn(console, 'info').mockImplementation(() => {
     /* このテストでは呼出しに副作用を持たせない。 */
@@ -66,11 +66,14 @@ test('本文を読み取れない要求は保存せず400と追跡情報を返�
     method: 'POST',
     duplex: 'half',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-    body: new ReadableStream<Uint8Array>({
-      pull(controller) {
-        controller.error(new Error('private_body_read_failure'));
-      },
-    }),
+    body:
+      kind === '不正JSON'
+        ? '{'
+        : new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new Error('private_body_read_failure'));
+            },
+          }),
   };
   const response = await acceptCheck(
     new Request('http://localhost/api/diagnostics/check-jobs', init),

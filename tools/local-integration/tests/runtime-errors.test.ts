@@ -1,3 +1,4 @@
+import { stageBoundaryBundle } from '../src/boundary-bundle.ts';
 import { runDatabaseCommand } from '../src/database.ts';
 import type * as LintTypeModule0 from 'node:child_process';
 import type * as LintTypeModule1 from 'node:fs/promises';
@@ -23,6 +24,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const original = await importOriginal<typeof LintTypeModule1>();
   return { ...original, symlink: vi.fn(original.symlink), writeFile: vi.fn(original.writeFile) };
 });
+vi.mock('../src/boundary-bundle.ts', () => ({ stageBoundaryBundle: vi.fn() }));
 vi.mock('../src/database.ts', () => ({ runDatabaseCommand: vi.fn() }));
 vi.mock('../src/lock.ts', () => ({ lockEnvironment: vi.fn() }));
 vi.mock('../src/process.ts', () => ({ stopProcessGroup: vi.fn(), runNodeCommand: vi.fn() }));
@@ -359,4 +361,61 @@ test('共有ビルドはtest previewと対応する障害注入だけに限定�
   ).rejects.toThrow();
   expect(spawn).not.toHaveBeenCalled();
   expect(runDatabaseCommand).not.toHaveBeenCalled();
+});
+
+test('Vite詳細計測のIPC完了を待って起動を返す', async () => {
+  const fixture = await runtimeFixture();
+  Object.defineProperty(fixture.child, 'connected', { value: true });
+  const send = vi.fn((_message: object, callback: (error: Error | null) => void) => {
+    callback(null);
+    queueMicrotask(() => {
+      fixture.child.emit('message', 'vite-startup-snapshot-saved');
+    });
+    return true;
+  });
+  Object.defineProperty(fixture.child, 'send', { value: send });
+  const runtime = await startRuntimeInProcess(fixture.config, 'dev', { profileVite: true });
+  expect(send).toHaveBeenCalled();
+  expect(
+    await readFile(join(fixture.config.artifactDirectory, 'web/vite.config.ts'), 'utf8'),
+  ).toContain('await profileVitePlugins(');
+  await runtime.stop();
+});
+
+test('共有ビルドと未対応の停止注入・AI秘密設定を併用しない', async () => {
+  const fixture = await runtimeFixture();
+  for (const options of [{ stopAfterResultBeforeAck: true }, { testAiBindings: {} }]) {
+    await expect(
+      startRuntimeInProcess(fixture.config, 'preview', { boundaryBundle: '/bundle', ...options }),
+    ).rejects.toThrow('事前ビルド');
+  }
+  for (const options of [{ manualDiagnostics: true }, { probeOnlyEvaluation: true }]) {
+    await expect(startRuntimeInProcess(fixture.config, 'preview', options)).rejects.toThrow(
+      '自動初期化',
+    );
+  }
+  expect(spawn).not.toHaveBeenCalled();
+});
+
+test('共有成果物を独立保存先へ配置してからpreviewを起動する', async () => {
+  const fixture = await runtimeFixture();
+  vi.mocked(stageBoundaryBundle).mockResolvedValue(join(fixture.config.artifactDirectory, 'web'));
+  const runtime = await startRuntimeInProcess(fixture.config, 'preview', {
+    boundaryBundle: '/fixture/bundle',
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+    profileStartup: true,
+  });
+  expect(stageBoundaryBundle).toHaveBeenCalledWith(
+    '/fixture/bundle',
+    fixture.config,
+    expect.objectContaining({ manualDiagnostics: true, probeOnlyEvaluation: true }),
+  );
+  expect(runDatabaseCommand).toHaveBeenCalledWith(fixture.config, ['migrate'], expect.any(Object));
+  expect(spawn).toHaveBeenCalledWith(
+    process.execPath,
+    expect.arrayContaining(['preview']),
+    expect.objectContaining({ cwd: join(fixture.config.artifactDirectory, 'web') }),
+  );
+  await runtime.stop();
 });

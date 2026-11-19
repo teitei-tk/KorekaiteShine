@@ -91,3 +91,21 @@ it.each([
 ])('権限エラー・Schema違反・利用量欠損を成功扱いしない', (req, res, output) => {
   expect(() => verifyModelEvidence(req, res, output)).toThrow();
 });
+
+it('要求本文がない場合にモデル証拠を拒否する', () => {
+  expect(() => verifyModelEvidence(null, response, '{"status":"ok"}')).toThrow(
+    'model or schema request failed',
+  );
+});
+it.each([null, { status: 'completed' }])('完了イベントの応答・出力欠落を拒否する: %s', (result) => {
+  expect(() =>
+    verifyModelEvidence(
+      request,
+      {
+        status: 200,
+        body: `data: ${JSON.stringify({ type: 'response.completed', response: result })}`,
+      },
+      '{"status":"ok"}',
+    ),
+  ).toThrow('model output does not match schema');
+});

@@ -191,3 +191,24 @@ test('管理ホストは起動を一度だけ受け付け停止を確認してIP
   expect(fixture.runtime.stop).toHaveBeenCalledTimes(1);
   expect(fixture.channel.disconnect).toHaveBeenCalledTimes(1);
 });
+
+test('終了確認Promiseの失敗を通知してランタイムを停止する', async () => {
+  for (const error of [new Error('closed failed'), 'private detail']) {
+    const fixture = await hostFixture();
+    const closed = Promise.withResolvers<{ exitCode: 0 | 1 }>();
+    fixture.runtime.closed = closed.promise;
+    fixture.start();
+    await fixture.settle();
+    closed.reject(error);
+    await fixture.settle();
+    expect(fixture.channel.send).toHaveBeenCalledWith(
+      {
+        type: 'error',
+        message: error instanceof Error ? 'closed failed' : 'ランタイムの終了確認に失敗しました。',
+      },
+      expect.any(Function),
+    );
+    expect(fixture.runtime.stop).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  }
+});

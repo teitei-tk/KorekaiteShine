@@ -116,3 +116,16 @@ afterEach(() => {
 it('必須のWIF設定が欠けていれば起動引数を作らない', () => {
   expect(() => wifProxyArgs({}, '/fixture/info')).toThrow('missing WIF settings');
 });
+
+it('起動した子と情報ファイルのPIDが異なる場合は隔離検査前に回収する', async () => {
+  const child = createChild();
+  vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ pid: 1, port: 43_210 }));
+  const inspect = vi.fn<() => void>();
+  await expect(authenticateProxy(env, '/fixture/info', inspect, 1000, () => child)).rejects.toThrow(
+    'proxy identity mismatch',
+  );
+  expect(inspect).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+  expect(rmSync).toHaveBeenLastCalledWith('/fixture/info', { force: true });
+});

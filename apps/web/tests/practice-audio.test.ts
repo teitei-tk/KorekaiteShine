@@ -119,6 +119,13 @@ function microphone(sampleRate = 24_000) {
   const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
   const input = { connect: vi.fn(), disconnect: vi.fn() };
   const port = { close: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
+  const source = {
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    onended: null as (() => void) | null,
+  };
   const getUserMedia = vi.fn(async () => stream);
   const close = vi.fn<() => void>().mockRejectedValue(new Error('already closed'));
   vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
@@ -126,6 +133,11 @@ function microphone(sampleRate = 24_000) {
     'AudioContext',
     class {
       sampleRate = sampleRate;
+      currentTime = 0;
+      createBuffer = (_channels: number, length: number) => ({
+        getChannelData: () => new Float32Array(length),
+      });
+      createBufferSource = () => source;
       resume = vi.fn().mockResolvedValue(undefined);
       audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
       createMediaStreamSource = () => input;
@@ -140,7 +152,7 @@ function microphone(sampleRate = 24_000) {
       disconnect = vi.fn();
     },
   );
-  return { track, stream, input, port, getUserMedia, close };
+  return { track, stream, input, port, getUserMedia, close, source };
 }
 
 test('取得した音声だけを転送し、トラック終了と解放を一度ずつ通知する', async () => {
@@ -189,6 +201,28 @@ test('マイク権限待ちの中断と非対応レートでトラックを解�
       ),
     ).rejects.toThrow('24 kHz');
     expect(track.stop).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test('音声接続の再生と停止を再生器へ渡し、停止した再生は完了通知しない', async () => {
+  const { source } = microphone();
+  try {
+    const audio = await openInterviewAudio(
+      new AbortController().signal,
+      vi.fn<(data: ArrayBuffer) => void>(),
+      vi.fn<() => void>(),
+    );
+    const completed = vi.fn<() => void>();
+    audio.play(new ArrayBuffer(960), completed);
+    expect(source.start).toHaveBeenCalledWith(0);
+    const ended = source.onended ?? assert.fail('再生完了ハンドラーがありません。');
+    audio.stopPlayback();
+    ended();
+    expect(source.stop).toHaveBeenCalledOnce();
+    expect(completed).not.toHaveBeenCalled();
+    audio.close();
   } finally {
     vi.unstubAllGlobals();
   }

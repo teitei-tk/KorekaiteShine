@@ -161,3 +161,23 @@ syncBuiltinESMExports();
   expect(result.stderr.trim()).toBe('fixture failure');
   expect(result.stdout).toBe('');
 });
+
+test('文書CLIはError以外の読み取り失敗も報告して失敗する', async () => {
+  const root = await fixture();
+  const preload = join(root, 'read-doc-failure.mjs');
+  await writeFile(
+    preload,
+    `import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
+const original = fs.readFile;
+fs.readFile = (...args) => String(args[0]).endsWith('/README.md') ? Promise.reject('fixture document failure') : original(...args);
+syncBuiltinESMExports();`,
+  );
+  const result = spawnSync(
+    process.execPath,
+    ['--import', preload, fileURLToPath(new URL('check.ts', import.meta.url))],
+    { encoding: 'utf8', timeout: 10_000 },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('文書検査失敗: fixture document failure');
+});

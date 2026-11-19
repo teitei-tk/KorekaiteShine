@@ -179,13 +179,8 @@ export function required(value: string | undefined, name: string): string {
 }
 export type InspectorEndpoint = { id: string; webSocketDebuggerUrl: string };
 export function readEndpoints(value: unknown): InspectorEndpoint[] {
-  if (
-    !Array.isArray(value) ||
-    !value.every(
-      (entry: unknown) => object(entry) && string(entry.id) && string(entry.webSocketDebuggerUrl),
-    )
-  ) {
-    throw new Error('Inspector一覧が不正です。');
+  if (!Array.isArray(value)) {
+    throw new TypeError('Inspector一覧が不正です。');
   }
   return value.map((entry: unknown) => {
     if (!object(entry) || !string(entry.id) || !string(entry.webSocketDebuggerUrl)) {

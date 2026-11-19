@@ -1,3 +1,4 @@
+import type * as FileSystem from 'node:fs/promises';
 import { parseObject, objectAt } from './helpers/config-json.ts';
 import type * as LintTypeModule0 from 'node:module';
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
@@ -14,6 +15,10 @@ vi.mock('node:module', () => ({
     resolve: { paths: (name: string) => boundary.paths(from, name) },
   }),
 }));
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const original = await importOriginal<typeof FileSystem>();
+  return { ...original, readFile: vi.fn(original.readFile) };
+});
 afterEach(() => vi.resetAllMocks());
 
 async function fixture() {
@@ -56,4 +61,24 @@ test('実際の依存解決位置から固定版とロックファイルの証�
   expect(versions.cloudflareVite).toMatch(/^\d+\.\d+\.\d+/u);
   expect(versions.miniflare).toMatch(/^\d+\.\d+\.\d+/u);
   expect(versions.lockfileSha256).toMatch(/^[a-f0-9]{64}$/u);
+});
+
+test('検索先の欠落とオブジェクトでないmanifestを拒否する', async () => {
+  boundary.paths.mockReturnValue(null);
+  await expect(runtimeVersions()).rejects.toThrow('必須値');
+  await writeFile(await fixture(), 'null');
+  await expect(runtimeVersions()).rejects.toThrow('JSONオブジェクト');
+});
+
+test('packageManagerが欠けたルートmanifestを証拠として採用しない', async () => {
+  const actualModule = await vi.importActual<typeof LintTypeModule0>('node:module');
+  const actualFs = await vi.importActual<typeof FileSystem>('node:fs/promises');
+  boundary.paths.mockImplementation((from, name) =>
+    actualModule.createRequire(from).resolve.paths(name),
+  );
+  const rootManifest = new URL('../../../package.json', import.meta.url).pathname;
+  vi.mocked(readFile).mockImplementation((path, options) =>
+    path === rootManifest ? Promise.resolve('{}') : actualFs.readFile(path, options),
+  );
+  await expect(runtimeVersions()).rejects.toThrow('PACKAGE_MANAGER_NOT_FOUND');
 });

@@ -292,7 +292,7 @@ export function createLiveConnection(
     }
     connection.draining = true;
     try {
-      while (queue.length > 0 && !connection.finished) {
+      while (!connection.finished) {
         const item = queue.shift();
         if (item === undefined) {
           break;

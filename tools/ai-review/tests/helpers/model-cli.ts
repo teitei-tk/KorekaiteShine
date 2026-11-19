@@ -26,7 +26,7 @@ export function modelCliFixture(directory: string, scenario = 'normal') {
     bootstrap: `const authFetch = globalThis.fetch;\n${lifecycleBootstrap(scenario)}
 const modelDir = root + '/model', dumpDir = modelDir + '/dump';
 const modelSchema = { type: 'object', properties: { status: { type: 'string', enum: ['ok'] } }, required: ['status'], additionalProperties: false };
-files.set(modelDir + '/state.json', JSON.stringify({ proxy: { pid: 32102, start: '99' }, infoPath: home + '/20.json', startedAt: '0', hash: digest('trusted config'), rejected: scenario !== 'not-rejected' }));
+files.set(modelDir + '/state.json', JSON.stringify({ proxy: { pid: 32102, start: '99' }, infoPath: home + '/20.json', startedAt: '0', hash: digest('trusted config'), rejected: scenario === 'invalid-state' ? null : scenario !== 'not-rejected' }));
 if (scenario === 'finish-pid') files.set(home + '/20.json', JSON.stringify({ pid: 1, port: 43210 }));
 const infoRead = fs.readFileSync;
 fs.readFileSync = (path, ...args) => { const value = infoRead(path, ...args); if (scenario === 'expired-proxy' && path === home + '/20.json') alive.delete(32102); return value; };

@@ -642,14 +642,12 @@ export async function runDiagnosticScenario(input: {
       !isJsonObject(receipt) ||
       !validateJobNotification(receipt.message) ||
       receipt.message.jobId !== accepted.jobId ||
+      typeof receipt.queue !== 'string' ||
       receipt.queue !==
         (input.scenario === 'exhaust_retries'
           ? config.queues.diagnostics?.dlq
           : config.queues.diagnostics?.queue)
     ) {
-      throw new IntegrationFailureError('QUEUE_RECEIPT_MISMATCH');
-    }
-    if (typeof receipt.queue !== 'string') {
       throw new IntegrationFailureError('QUEUE_RECEIPT_MISMATCH');
     }
     report.actual.queue = receipt.queue;

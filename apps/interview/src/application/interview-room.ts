@@ -168,11 +168,7 @@ export function createInterviewRoom(options: {
   ) {
     send(id, { type: 'error', commandId, code });
   }
-  async function command(id: string, event: InterviewClientEvent) {
-    const cache = commands.get(id);
-    if (!cache) {
-      throw new Error('接続のコマンド履歴がありません。');
-    }
+  async function command(id: string, event: InterviewClientEvent, cache: Map<string, string>) {
     const encoded = JSON.stringify(event);
     const replay = cache.get(event.commandId);
     if (replay !== undefined) {
@@ -258,10 +254,8 @@ export function createInterviewRoom(options: {
     }
     cache.set(event.commandId, encoded);
     if (cache.size > 100) {
-      const oldest = cache.keys().next();
-      if (!oldest.done) {
-        cache.delete(oldest.value);
-      }
+      const [oldest] = cache.keys();
+      cache.delete(oldest);
     }
     send(id, { type: 'ack', commandId: event.commandId });
   }
@@ -349,7 +343,8 @@ export function createInterviewRoom(options: {
           room.pendingAudio = null;
         }
         const message = audio?.data ?? data;
-        if (!peers.has(id)) {
+        const cache = commands.get(id);
+        if (!cache) {
           return;
         }
         const commandIdState = { commandId: null as string | null };
@@ -361,7 +356,7 @@ export function createInterviewRoom(options: {
               return;
             }
             commandIdState.commandId = event.commandId;
-            await command(id, event);
+            await command(id, event, cache);
           } else {
             // PCM16の前に8byteのbig-endian float64で接続世代を付ける。
             if (message.byteLength < 10 || message.byteLength % 2 !== 0) {

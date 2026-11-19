@@ -21,7 +21,7 @@ export type TargetEntry = {
 
 function exclusionReason(path: string): string | undefined {
   const parts = path.split('/');
-  const name = parts.at(-1) ?? '';
+  const name = path.slice(path.lastIndexOf('/') + 1);
   if (!/\.[cm]?[jt]sx?$/u.test(name)) {
     return '対象言語外';
   } else if (/\.d\.[cm]?ts$/u.test(name)) {

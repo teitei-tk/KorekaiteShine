@@ -66,3 +66,31 @@ test('終了処理がなくても同期記録した文・関数・分岐の回�
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('対象より先のcountを再生しない', () => {
+  const path = journalPath();
+  writeFileSync(
+    path,
+    JSON.stringify({ type: 'count', path: 'missing.ts', kind: 's', id: '0', index: 0, value: 1 }),
+  );
+  expect(() => replayCounterJournal(path)).toThrow('対象記録がありません');
+});
+
+test('moduleを開始ヘッダーとして信用しない', () => {
+  const path = journalPath();
+  const { target } = createMergeFixture();
+  writeFileSync(path, JSON.stringify({ type: 'module', file: target }));
+  expect(() => counterJournalOwnerIsRunning(path)).toThrow('開始記録が不正');
+});
+
+test('壊れたイベントと未知のイベントを拒否する', () => {
+  const path = journalPath();
+  for (const event of [
+    null,
+    { type: 'other' },
+    { type: 'count', path: 'x', kind: 's', id: '0', index: 0, value: -1 },
+  ]) {
+    writeFileSync(path, JSON.stringify(event));
+    expect(() => replayCounterJournal(path)).toThrow('計測journalが不正');
+  }
+});

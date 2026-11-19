@@ -26,7 +26,10 @@ export function buildGraph(files: Map<string, string>): Graph {
     graph.reverse.set(dependency, values);
   };
   const configs = new Map<string, ts.CompilerOptions>();
-  const workspace = new Map<string, { directory: string; exports: JsonValue }>();
+  const workspace = new Map<
+    string,
+    { directory: string; exports: string | Record<string, JsonValue | undefined> }
+  >();
   for (const [file, body] of files) {
     if (file.endsWith('/package.json')) {
       try {
@@ -37,7 +40,7 @@ export function buildGraph(files: Map<string, string>): Graph {
             exports:
               typeof manifest.exports === 'string' ||
               (manifest.exports !== undefined && isRecord(manifest.exports))
-                ? parseJson(JSON.stringify(manifest.exports))
+                ? manifest.exports
                 : {},
           });
         }
@@ -87,7 +90,10 @@ export function buildGraph(files: Map<string, string>): Graph {
         .filter(([dir]) => dir === '.' || file.startsWith(`${dir}/`))
         .toSorted(([a], [b]) => b.length - a.length)[0]?.[1] ?? {};
     const add = (rawSpecifier: string) => {
-      const specifier = rawSpecifier.split('?')[0] ?? rawSpecifier;
+      const specifier = rawSpecifier.slice(
+        0,
+        rawSpecifier.includes('?') ? rawSpecifier.indexOf('?') : rawSpecifier.length,
+      );
 
       const entry = [...workspace].find(
         ([name]) => specifier === name || specifier.startsWith(`${name}/`),
@@ -96,11 +102,7 @@ export function buildGraph(files: Map<string, string>): Graph {
         const [name, manifest] = entry;
         const subpath = specifier === name ? '.' : `.${specifier.slice(name.length)}`;
         const value =
-          typeof manifest.exports === 'string'
-            ? manifest.exports
-            : isRecord(manifest.exports)
-              ? manifest.exports[subpath]
-              : undefined;
+          typeof manifest.exports === 'string' ? manifest.exports : manifest.exports[subpath];
         const targets = (value: JsonValue | undefined): string[] =>
           typeof value === 'string'
             ? [value]
@@ -202,14 +204,14 @@ export function buildGraph(files: Map<string, string>): Graph {
         const argument = node.arguments.at(0);
         if (argument && ts.isStringLiteralLike(argument)) {
           add(argument.text);
-        } else if (
-          argument !== undefined &&
-          ts.isIdentifier(argument) &&
-          literalBindings.has(argument.text)
-        ) {
-          add(literalBindings.get(argument.text) ?? '');
         } else {
-          graph.uncertain.add(file);
+          const binding =
+            argument && ts.isIdentifier(argument) ? literalBindings.get(argument.text) : undefined;
+          if (binding === undefined) {
+            graph.uncertain.add(file);
+          } else {
+            add(binding);
+          }
         }
       }
       ts.forEachChild(node, visit);

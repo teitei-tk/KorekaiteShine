@@ -36,19 +36,19 @@ const failureReasons: Readonly<Record<string, string>> = {
   INVALID_AI_RESULT: '評価結果の形式または引用の根拠を確認できませんでした。',
   EVALUATION_INPUT_UNAVAILABLE: '固定した評価入力を読み込めませんでした。',
 };
-const axes = {
-  problem: '課題・制約',
-  alternatives: '選択肢とトレードオフ',
-  reasoning: '判断の根拠',
-  action: '本人の行動・合意形成',
-  learning: '結果・学び',
-} as const;
-const observations = {
-  strengths: '強み',
-  gaps: '改善点',
-  unconfirmed: '確認できなかった点',
-  practiceQuestions: '次に練習する質問',
-} as const;
+const axes = [
+  ['problem', '課題・制約'],
+  ['alternatives', '選択肢とトレードオフ'],
+  ['reasoning', '判断の根拠'],
+  ['action', '本人の行動・合意形成'],
+  ['learning', '結果・学び'],
+] as const;
+const observations = [
+  ['strengths', '強み'],
+  ['gaps', '改善点'],
+  ['unconfirmed', '確認できなかった点'],
+  ['practiceQuestions', '次に練習する質問'],
+] as const;
 function timestamp(ms: number) {
   return Temporal.Instant.fromEpochMilliseconds(ms)
     .toZonedDateTimeISO('Asia/Tokyo')
@@ -173,16 +173,7 @@ function Report({
     <section>
       <h2>評価結果</h2>
       <p>{report.summary}</p>
-      {Object.entries(axes).map(([key, title]) => {
-        if (
-          key !== 'problem' &&
-          key !== 'alternatives' &&
-          key !== 'reasoning' &&
-          key !== 'action' &&
-          key !== 'learning'
-        ) {
-          throw new Error('評価軸が不正です。');
-        }
+      {axes.map(([key, title]) => {
         const axis = report.axes[key];
         return (
           <section key={key}>
@@ -199,15 +190,7 @@ function Report({
           </section>
         );
       })}
-      {Object.entries(observations).map(([key, title]) => {
-        if (
-          key !== 'strengths' &&
-          key !== 'gaps' &&
-          key !== 'unconfirmed' &&
-          key !== 'practiceQuestions'
-        ) {
-          throw new Error('観察項目が不正です。');
-        }
+      {observations.map(([key, title]) => {
         const items = report[key];
         return (
           items.length > 0 && (

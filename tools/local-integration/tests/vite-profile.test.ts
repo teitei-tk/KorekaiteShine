@@ -168,3 +168,165 @@ test('finallyを持たないawait可能な戻り値も元の成功値と失敗�
   await expect(Promise.resolve(plugin.load())).resolves.toBe('loaded');
   await expect(Promise.resolve(plugin.transform())).rejects.toThrow(failure);
 });
+
+test('後処理・重複登録・保留中のフックと記録上限を保持する', async () => {
+  const profiler = createViteProfiler();
+  expect(Reflect.apply(profiler.instrument, profiler, [null])).toBeNull();
+  const pending = Promise.withResolvers<string>();
+  const plugin = profiler.instrument({
+    name: 'lifecycle',
+    configureServer: () => () => 'post',
+    load: () => pending.promise,
+    config: () => undefined,
+  });
+  expect(profiler.instrument(plugin)).toBe(plugin);
+  expect(plugin.configureServer()()).toBe('post');
+  const loading = plugin.load();
+  expect(profiler.snapshot(0, Number.MAX_SAFE_INTEGER).pending).toBe(1);
+  pending.resolve('loaded');
+  await expect(loading).resolves.toBe('loaded');
+  Array.from({ length: 100_001 }, () => plugin.config());
+  expect(profiler.snapshot(0, Number.MAX_SAFE_INTEGER)).toMatchObject({ pending: 0, dropped: 4 });
+});
+
+test('環境の取得・依存最適化とプラグイン登録を計測する', () => {
+  const profiler = createViteProfiler();
+  const plugin = { name: 'environment-plugin', load: () => 'module' };
+  const optimizer = { init: () => 'initialized', run: false };
+  const environment = {
+    name: 'client',
+    plugins: [plugin],
+    depsOptimizer: optimizer,
+    fetchWorkerExportTypes: () => 'types',
+    fetchModule: () => 'module',
+  };
+  const configHook = profiler.plugin.configResolved;
+  const serverHook = profiler.plugin.configureServer;
+  if (
+    !configHook ||
+    typeof configHook === 'function' ||
+    !serverHook ||
+    typeof serverHook === 'function'
+  ) {
+    throw new Error('object hooks missing');
+  }
+  Reflect.apply(configHook.handler, profiler.plugin, [{ plugins: [plugin] }]);
+  Reflect.apply(serverHook.handler, profiler.plugin, [{ environments: { client: environment } }]);
+  const other = { name: 'other', plugins: [], depsOptimizer: optimizer };
+  profiler.instrumentEnvironment(other);
+  expect(environment.fetchWorkerExportTypes()).toBe('types');
+  expect(environment.fetchModule()).toBe('module');
+  expect(optimizer.init()).toBe('initialized');
+  expect(plugin.load()).toBe('module');
+  expect(profiler.snapshot(0, Number.MAX_SAFE_INTEGER).hooks).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ hook: 'fetchWorkerExportTypes', category: 'worker' }),
+      expect.objectContaining({ hook: 'fetchModule', category: 'module' }),
+      expect.objectContaining({ hook: 'depsOptimizer:init' }),
+    ]),
+  );
+});
+
+test('Miniflareの計測点が欠けた環境を拒否し、同じインスタンスは再ラップしない', () => {
+  for (const mode of ['missing-ready', 'fixed-ready', 'missing-fetch', 'valid'] as const) {
+    const profiler = createViteProfiler();
+    const prototype = {};
+    if (mode !== 'missing-ready') {
+      Object.defineProperty(prototype, 'ready', {
+        configurable: mode !== 'fixed-ready',
+        get: () => 'ready',
+      });
+    }
+    const runtime: { dispatchFetch?: () => string } = {};
+    Object.setPrototypeOf(runtime, prototype);
+    if (mode === 'valid') {
+      runtime.dispatchFetch = () => 'response';
+    }
+    const environment = { name: 'ssr', plugins: [], initRunner: () => 'initialized' };
+    profiler.instrumentEnvironment(environment);
+    if (mode === 'valid') {
+      expect(Reflect.apply(environment.initRunner, environment, [runtime])).toBe('initialized');
+      const fetch = runtime.dispatchFetch;
+      expect(Reflect.apply(environment.initRunner, environment, [runtime])).toBe('initialized');
+      expect(runtime.dispatchFetch).toBe(fetch);
+    } else {
+      expect(() => {
+        Reflect.apply(environment.initRunner, environment, [runtime]);
+      }).toThrow(/計測点/u);
+    }
+  }
+});
+
+test('IPCの通知以外を無視し、送信失敗とプロセスエラーで終了する', async () => {
+  for (const failure of [false, true]) {
+    const child = new ChildProcess();
+    Object.defineProperty(child, 'connected', { value: true });
+    const error = new Error('ipc failure');
+    Object.defineProperty(child, 'send', {
+      value: vi.fn((_message: object, callback: (error: Error | null) => void) => {
+        callback(failure ? error : null);
+        return true;
+      }),
+    });
+    const pending = requestViteSnapshot(child, 1, 2, 3);
+    const rejected = expect(pending).rejects.toThrow(error);
+    child.emit('message', 'unrelated');
+    if (!failure) {
+      child.emit('error', error);
+    }
+    await rejected;
+    expect(child.listenerCount('message')).toBe(0);
+  }
+});
+
+test('計測要求を検証し、入れ子の非同期プラグインと二つの区間を保存する', async () => {
+  const { profileVitePlugins } = await import('../src/vite-profile.mjs');
+  const { mkdtemp, readFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const directory = await mkdtemp(join(tmpdir(), 'vite-profile-'));
+  const original = Object.getOwnPropertyDescriptor(process, 'send');
+  const send = vi.fn();
+  Object.defineProperty(process, 'send', { configurable: true, value: send });
+  const before = new Set(process.listeners('message'));
+  try {
+    const plugin = { name: 'async-plugin', load: () => 'ok' };
+    const result = await profileVitePlugins(
+      [Promise.resolve([plugin]), false],
+      join(directory, 'result.json'),
+    );
+    expect(result[0]).toMatchObject({ name: 'korekaite-startup-profile' });
+    expect(plugin.load()).toBe('ok');
+    const listener = process.listeners('message').find((entry) => !before.has(entry));
+    expect(listener).toBeTypeOf('function');
+    if (!listener) {
+      throw new Error('snapshot listener missing');
+    }
+    Reflect.apply(listener, process, [{ type: 'other' }]);
+    for (const [start, url, end] of [
+      [Number.NaN, 2, 3],
+      [3, 2, 4],
+      [1, 4, 3],
+    ]) {
+      expect(() => {
+        Reflect.apply(listener, process, [{ type: 'vite-startup-snapshot', start, url, end }]);
+      }).toThrow('計測区間');
+    }
+    Reflect.apply(listener, process, [{ type: 'vite-startup-snapshot', start: 0, url: 1, end: 2 }]);
+    expect(await readFile(join(directory, 'result.json'), 'utf8')).toContain('"totalMs":1');
+    expect(send).toHaveBeenCalledWith('vite-startup-snapshot-saved');
+    expect(process.listeners('message')).not.toContain(listener);
+  } finally {
+    for (const listener of process.listeners('message')) {
+      if (!before.has(listener)) {
+        process.off('message', listener);
+      }
+    }
+    if (original) {
+      Object.defineProperty(process, 'send', original);
+    } else {
+      Reflect.deleteProperty(process, 'send');
+    }
+    await rm(directory, { recursive: true, force: true });
+  }
+});

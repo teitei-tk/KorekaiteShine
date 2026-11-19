@@ -46,3 +46,8 @@ it('固定IDと行範囲で構成した診断を受理し資料・確認対象�
   expect(rendered).toContain('行: 2-4、版: base, head');
   expect(rendered).toContain(`確認対象ID: ${'b'.repeat(16)}`);
 });
+
+it('scopeの資料サンプルがオブジェクトでなければ拒否する', () => {
+  const value = scoped();
+  expect(validDiagnostic({ ...value, scope: { ...value.scope, sources: [null] } })).toBe(false);
+});

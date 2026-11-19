@@ -327,3 +327,15 @@ test('起動計測の保存中に中断された場合も起動成功を返さ�
   expect(stopProcessGroup).toHaveBeenCalledWith(fixture.child);
   expect(fixture.release).toHaveBeenCalledTimes(1);
 });
+
+test('Vite詳細計測をdevelopmentとpreviewでは開始しない', async () => {
+  const development = await runtimeFixture('development');
+  await expect(
+    startRuntimeInProcess(development.config, 'dev', { profileVite: true }),
+  ).rejects.toThrow('独立test環境');
+  const preview = await runtimeFixture();
+  await expect(
+    startRuntimeInProcess(preview.config, 'preview', { profileVite: true }),
+  ).rejects.toThrow('dev起動');
+  expect(spawn).not.toHaveBeenCalled();
+});

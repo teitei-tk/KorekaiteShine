@@ -32,6 +32,7 @@ const boundaryGroups = [
     'test-suites',
     'runtime-timing',
     'startup-timing',
+    'vite-profile',
     'run-test-suite',
   ],
   [

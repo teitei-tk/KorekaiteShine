@@ -11,7 +11,11 @@ export async function startRuntime(...args: Parameters<typeof runtime.startRunti
   const profileStartup = config.environment === 'test';
   const started = performance.now();
   const result = await measureOperation('startup', () =>
-    runtime.startRuntime(config, mode, { ...options, profileStartup }),
+    runtime.startRuntime(config, mode, {
+      ...options,
+      profileStartup,
+      profileVite: profileStartup && mode === 'dev',
+    }),
   );
   const outerMs = performance.now() - started;
   if (profileStartup) {
@@ -20,6 +24,12 @@ export async function startRuntime(...args: Parameters<typeof runtime.startRunti
         parseJson(await readFile(join(config.artifactDirectory, 'startup-timing.json'), 'utf8')),
       );
       recordStartupTiming(timing, outerMs);
+      if (mode === 'dev') {
+        const profile = parseJson(
+          await readFile(join(config.artifactDirectory, 'vite-profile.json'), 'utf8'),
+        );
+        process.stdout.write(`vite-startup-timing ${JSON.stringify(profile)}\n`);
+      }
     } catch (error) {
       await result.stop();
       throw error;

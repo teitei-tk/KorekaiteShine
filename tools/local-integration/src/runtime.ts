@@ -1,3 +1,4 @@
+import { requestViteSnapshot, monotonicMilliseconds } from './vite-profile-host.ts';
 import { createStartupTiming } from './startup-timing.ts';
 import { requireValue } from './required.ts';
 import {
@@ -31,6 +32,7 @@ export type LocalRuntime = {
 
 export type LocalRuntimeOptions = {
   profileStartup?: boolean;
+  profileVite?: boolean;
   port?: number;
   /** 面接DOの上流音声だけを独立test環境で代替する。 */
   interviewVoiceMock?: boolean;
@@ -353,14 +355,15 @@ import { defineConfig } from 'vite';
 import { voidPlugin } from 'void';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
+${options.profileVite ? `import { profileVitePlugins } from ${JSON.stringify(join(repositoryRoot, 'tools/local-integration/src/vite-profile.mjs'))};` : ''}
 ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `import { runtimeCoveragePlugin } from ${JSON.stringify(join(repositoryRoot, 'tools/coverage/src/runtime-plugin.ts'))};` : ''}
-export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: [
+export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: ${options.profileVite ? 'await profileVitePlugins(' : ''}[
   ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `runtimeCoveragePlugin(${JSON.stringify(project)}),` : ''}
   voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: [
     { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
     { config: ${JSON.stringify(evaluation)}, viteEnvironment: { name: 'evaluation' } },
   ] }), tanstackStart(), react(),
-] });
+]${options.profileVite ? `, ${JSON.stringify(join(config.artifactDirectory, 'vite-profile.json'))})` : ''} });
 `,
   );
   timing?.mark('filesAndConfigMs');
@@ -407,6 +410,7 @@ async function startUnlockedRuntime(
   );
   const project = await prepareRuntime(config, options, signal, aiBindings, timing);
   signal?.throwIfAborted();
+  const viteStarted = monotonicMilliseconds();
   const child = spawn(
     process.execPath,
     [
@@ -421,7 +425,7 @@ async function startUnlockedRuntime(
     {
       cwd: project,
       env: runtimeEnvironment(config, aiBindings),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: options.profileVite ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
       detached: true,
     },
   );
@@ -467,8 +471,8 @@ async function startUnlockedRuntime(
         resolve(found[0]);
       }
     };
-    child.stdout.on('data', collect);
-    child.stderr.on('data', collect);
+    requireValue(child.stdout).on('data', collect);
+    requireValue(child.stderr).on('data', collect);
     child.once('error', (error) => {
       clearTimeout(timeout);
       reject(error);
@@ -482,10 +486,15 @@ async function startUnlockedRuntime(
       );
     });
     const baseUrl = await ready.finally(() => signal?.removeEventListener('abort', onAbort));
+    const viteUrl = monotonicMilliseconds();
     timing?.mark('urlReadyMs');
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
+    const viteHttp = monotonicMilliseconds();
     timing?.mark('httpReadyMs');
+    if (options.profileVite) {
+      await requestViteSnapshot(child, viteStarted, viteUrl, viteHttp, signal);
+    }
     if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
       const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
       outputContext.finishCoverage = await startRuntimeCapture(
@@ -532,8 +541,11 @@ export async function startRuntimeInProcess(
   signal?: AbortSignal,
 ): Promise<LocalRuntime> {
   signal?.throwIfAborted();
-  if (options.profileStartup && config.environment !== 'test') {
+  if ((options.profileStartup || options.profileVite) && config.environment !== 'test') {
     throw new Error('起動計測は独立test環境だけで利用できます。');
+  }
+  if (options.profileVite && mode !== 'dev') {
+    throw new Error('Vite詳細計測はdev起動だけで利用できます。');
   }
   const timing = options.profileStartup ? createStartupTiming() : undefined;
   if (

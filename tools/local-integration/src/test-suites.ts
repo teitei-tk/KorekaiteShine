@@ -1,5 +1,11 @@
 const integrationGroups = [
-  ['restart'],
+  [
+    'restart-response-loss',
+    'restart-after-acceptance',
+    'restart-after-do-save',
+    'restart-after-queue-send',
+    'restart-after-result-before-ack',
+  ],
   ['cli-recovery', 'isolation'],
   [
     'end-to-end',

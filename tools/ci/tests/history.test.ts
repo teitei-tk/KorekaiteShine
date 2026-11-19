@@ -138,7 +138,7 @@ test('main実測を優先し未計測IDだけ確認済み初期値で補う', as
   expect(readWeights(null, null, context, identity).durations).toStrictEqual({});
 });
 
-test('確認済み250件の初期実測値を使っても全対象を一度だけ配分する', async () => {
+test('確認済み254件の初期実測値を使っても全対象を一度だけ配分する', async () => {
   const { readFile } = await import('node:fs/promises');
   const { parseJson } = await import('../src/json.ts');
   const { readWeights } = await import('../src/history.ts');
@@ -147,7 +147,7 @@ test('確認済み250件の初期実測値を使っても全対象を一度だ�
   const context = {
     repository: 'teitei-tk/KorekaiteShine',
     workflow: 'CI',
-    now: Temporal.Instant.from('2026-11-19T00:00:00Z').epochMilliseconds,
+    now: Temporal.Instant.from('2026-11-19T12:00:00Z').epochMilliseconds,
   };
   const weights = readWeights(null, seed, context, 'boundary:linux:node26:workers2');
   const ids = Object.keys(weights.durations);
@@ -156,5 +156,5 @@ test('確認済み250件の初期実測値を使っても全対象を一度だ�
   expect(bins.flat().toSorted()).toStrictEqual(ids.toSorted());
   const totals = bins.map((bin) => bin.reduce((sum, id) => sum + weights.durations[id], 0));
   expect(Math.max(...totals) / Math.min(...totals)).toBeLessThan(1.05);
-  expect(weights.sources).toStrictEqual(['reviewed-run:44344193908:1']);
+  expect(weights.sources).toStrictEqual(['reviewed-run:44509486336:1']);
 });

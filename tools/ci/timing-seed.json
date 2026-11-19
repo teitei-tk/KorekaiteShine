@@ -1,1265 +1,1290 @@
 {
   "schema": 1,
-  "id": "reviewed-run:44344193908:1",
+  "id": "reviewed-run:44509486336:1",
   "repository": "teitei-tk/KorekaiteShine",
   "workflow": "CI",
-  "createdAt": "2026-11-18T16:19:58Z",
+  "createdAt": "2026-11-19T10:58:29Z",
   "source": {
-    "runId": 44344193908,
+    "runId": 44509486336,
     "attempt": 1,
-    "headSha": "7d325e7bcd1602a80b1b56013ebdedc06d4601a3",
+    "headSha": "8c3f73079939ea4f39c9c9e80938288d7cd67b3e",
     "conclusion": "success"
+  },
+  "derivation": {
+    "sourceTestId": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart.test.ts",
+    "jobId": 135510092752,
+    "method": "restart-timing totalMs per case; unchanged test bodies split into files"
   },
   "samples": [
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/build-audit.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 57.38352600000002
+      "durationMs": 38.732819000000006
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/check-object-guards.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 48943.71825600001
+      "durationMs": 34776.45745399999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/check-object.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 236148.702673
+      "durationMs": 156810.73730900002
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/ci-selection.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 982.4581039999999
+      "durationMs": 1242.097237
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/cli-boundaries.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 111.13742800000003
+      "durationMs": 69.60468100000001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/commands.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 356.8372810000001
+      "durationMs": 361.545053
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/database-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 55.13044999999998
+      "durationMs": 46.230397999999994
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/delivery-anomalies.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 136838.642153
+      "durationMs": 113501.86238500001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/development-snapshot.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 139.793816
+      "durationMs": 63.219036
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/diagnostics.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 146782.62528500002
+      "durationMs": 138454.472227
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/dispatch-notifications.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 61043.91395999999
+      "durationMs": 66028.80700500001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/dlq.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 136102.650161
+      "durationMs": 112059.61080699999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/evaluation-exception.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 17121.614963999997
+      "durationMs": 11606.620723999999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/evidence.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 52.81990499999999
+      "durationMs": 40.944102000000015
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/execution.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 120493.816679
+      "durationMs": 132248.497734
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/http-contract-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 128.28794399999998
+      "durationMs": 122.979341
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/http-contract.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 94204.990184
+      "durationMs": 71727.90732800002
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/integration-failures.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 549.948176
+      "durationMs": 506.26106000000004
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/integration-run.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 38.754171000000014
+      "durationMs": 27.55601999999999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/interview-schema.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 42.30067700000002
+      "durationMs": 47.80402199999999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/isolation-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 78.84807299999997
+      "durationMs": 60.358582
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/lease.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 131673.662308
+      "durationMs": 127216.04053800002
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/lock.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 131.46982899999998
+      "durationMs": 200.896405
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/migrations.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 17664.802768
+      "durationMs": 19557.646707000004
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/notification-runtime-lifecycle.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 107.08860100000001
+      "durationMs": 74.142682
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/notification-runtime.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 20374.851155
+      "durationMs": 13529.442740000002
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/prepare-integration-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 68.22687099999997
+      "durationMs": 77.99342700000001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/process-command-boundaries.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 47.128237
+      "durationMs": 36.878101999999984
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/process-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 42.18047299999999
+      "durationMs": 33.621567999999996
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/process.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 6362.072526
+      "durationMs": 6343.161534000001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/production-artifacts.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 109008.275177
+      "durationMs": 63251.69338599999
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/production-audit-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 180.343072
+      "durationMs": 254.356088
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/production-preview-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 174.666749
+      "durationMs": 179.584876
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/readiness.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 234.904197
+      "durationMs": 223.05719000000005
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/recovery.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 110771.407587
+      "durationMs": 86500.605246
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/run-test-suite.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 2514.048188
+      "durationMs": 3354.486089
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/runtime-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 1013.0818240000001
+      "durationMs": 865.428816
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/runtime-owner-errors.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 98.162381
+      "durationMs": 89.65807399999997
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/runtime-owner-host.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 78.16807999999997
+      "durationMs": 108.50472699999997
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/runtime-owner.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 22169.575724
+      "durationMs": 28560.902644
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/scheduled-interval.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 52.001701
+      "durationMs": 39.140366
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/schema.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 34662.739041999994
+      "durationMs": 21804.004484
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/source-sync.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 44488.847014
+      "durationMs": 46121.10402300001
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/test-suites.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 219.54756000000003
+      "durationMs": 310.433141
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/topology.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 201368.302356
+      "durationMs": 222817.079625
     },
     {
       "id": "boundary:tools/local-integration:boundary:tools/local-integration/tests/versions.test.ts",
       "identity": "boundary:linux:node26:workers2",
-      "durationMs": 70.989091
+      "durationMs": 62.23662900000001
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:16",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 12809.978293
+      "durationMs": 12171.753528000001
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:24",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 26977.248226
+      "durationMs": 21615.568258
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:31",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 24584.753448
+      "durationMs": 19979.213649000005
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:40",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 22324.227662
+      "durationMs": 19764.203618
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:47",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 59101.344251999995
+      "durationMs": 57651.541390000006
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:56",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 35825.2258
+      "durationMs": 32837.618717000005
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:62",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 45256.335565999994
+      "durationMs": 40900.22262
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-interview.feature:7",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 16837.702388
+      "durationMs": 16040.182845000003
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:13",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 35287.237582
+      "durationMs": 32601.25823900001
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:20",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 53771.825535
+      "durationMs": 51867.973572999996
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:33",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 17597.194636999993
+      "durationMs": 14092.237878999993
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:34",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 14900.016665999996
+      "durationMs": 14289.759011000002
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:35",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 15683.101858000009
+      "durationMs": 14707.850258999999
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:36",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 16056.416696
+      "durationMs": 13999.791675999993
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:39",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 17054.460720000003
+      "durationMs": 12448.706804000001
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-questions.feature:7",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 15499.647950999999
+      "durationMs": 13495.394474999994
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-takeover.feature:13",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 17848.277512
+      "durationMs": 13249.372674999999
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-takeover.feature:14",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 24324.14783
+      "durationMs": 14668.560728999997
     },
     {
       "id": "e2e:tools/e2e:pr:features/voice-takeover.feature:17",
       "identity": "e2e:linux:node26:workers2",
-      "durationMs": 17672.441231000004
+      "durationMs": 13743.158719999992
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/cli-recovery.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 162487.03930899999
+      "durationMs": 163969.876028
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/dlq-restart.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 50972.169726
+      "durationMs": 50602.977122000004
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/end-to-end.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 45868.084653
+      "durationMs": 51548.346421
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/formal-routing.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 46273.844269
+      "durationMs": 54450.966497
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/interview-evaluation-worker.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 14910.888092999998
+      "durationMs": 14481.563215999999
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/interview-http.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 29994.262121
+      "durationMs": 37825.14801700001
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/isolation.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 15904.501349
+      "durationMs": 14884.66704
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/queue-retry.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 110309.51845499998
+      "durationMs": 107727.392295
     },
     {
-      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart.test.ts",
+      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart-after-acceptance.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 288827.73424900003
+      "durationMs": 82303.47510099999
+    },
+    {
+      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart-after-do-save.test.ts",
+      "identity": "integration:linux:node26:workers2",
+      "durationMs": 85805.97358900002
+    },
+    {
+      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart-after-queue-send.test.ts",
+      "identity": "integration:linux:node26:workers2",
+      "durationMs": 85721.13294400001
+    },
+    {
+      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart-after-result-before-ack.test.ts",
+      "identity": "integration:linux:node26:workers2",
+      "durationMs": 52394.40519000002
+    },
+    {
+      "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/restart-response-loss.test.ts",
+      "identity": "integration:linux:node26:workers2",
+      "durationMs": 12605.890796
     },
     {
       "id": "integration:tools/local-integration:integration-pr:tools/local-integration/tests/voice-interview.test.ts",
       "identity": "integration:linux:node26:workers2",
-      "durationMs": 21213.667801000003
+      "durationMs": 18181.259115
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/application-http.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 81.26708099999998
+      "durationMs": 91.660784
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/diagnostics.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 183.101657
+      "durationMs": 220.37865600000003
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/evaluation.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 52.89097599999997
+      "durationMs": 28.191688000000013
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/generation-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 572.3196660000001
+      "durationMs": 869.2439880000001
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/interview-events.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 28.04382799999999
+      "durationMs": 132.052394
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/interviews.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 86.488199
+      "durationMs": 51.36104
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/json.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 20.233778
+      "durationMs": 25.717061000000015
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/live-events.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 95.50308599999998
+      "durationMs": 110.75093799999999
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/materials.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 96.31478899999998
+      "durationMs": 107.66987499999998
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/messages.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 24.097516999999996
+      "durationMs": 37.96748600000002
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/reachable-schema.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 52.42530799999999
+      "durationMs": 62.79038000000003
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/schema-input.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 27.62169599999997
+      "durationMs": 31.572938999999977
     },
     {
       "id": "node:packages/api-contracts:unit:packages/api-contracts/tests/standalone-esm.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 159.01631299999997
+      "durationMs": 166.41652800000003
     },
     {
       "id": "node:packages/runtime-config:unit:packages/runtime-config/tests/artifacts-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 41.449946
+      "durationMs": 45.01618300000001
     },
     {
       "id": "node:packages/runtime-config:unit:packages/runtime-config/tests/artifacts.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 47.98610600000001
+      "durationMs": 22.972782999999993
     },
     {
       "id": "node:packages/runtime-config:unit:packages/runtime-config/tests/resources.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 27.399353999999988
+      "durationMs": 39.48749200000002
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/artifact.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 52.994303
+      "durationMs": 49.58351599999996
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/check-cli-boundaries.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 88.245852
+      "durationMs": 78.70634
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/check-run.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 172.32853599999999
+      "durationMs": 163.91489599999997
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/check-settings.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 224.35143399999995
+      "durationMs": 318.42928900000004
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/check-status.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 59.098252
+      "durationMs": 47.960250999999985
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/cli.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 6112.678838
+      "durationMs": 6734.1380309999995
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/coverage-diagnostic.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 109.039115
+      "durationMs": 99.13542799999999
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/diagnostics.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 37.39113000000002
+      "durationMs": 24.296104000000014
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/failure-notify.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 129.69301799999997
+      "durationMs": 137.264205
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/failure.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 19.18547599999998
+      "durationMs": 34.51948900000002
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/followup.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 46.10139000000001
+      "durationMs": 55.719723
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/github-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 49.95339200000001
+      "durationMs": 50.30385300000002
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/github.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 33.83852800000001
+      "durationMs": 48.09581899999999
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/history.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 59.481972999999996
+      "durationMs": 52.763949999999994
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation-build.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 257.421784
+      "durationMs": 294.481008
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation-probe-boundaries.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 56.84136099999999
+      "durationMs": 64.25157800000002
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation-probe.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 108.86437500000001
+      "durationMs": 117.97159900000003
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/cli.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 6189.103476999999
+      "durationMs": 5077.440971
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/entrypoints.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 66.796758
+      "durationMs": 74.402684
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/lifecycle.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 65.23471600000003
+      "durationMs": 47.68933999999997
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/model.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 67.90274100000002
+      "durationMs": 98.37631299999997
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/run.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 87.926538
+      "durationMs": 119.021034
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/startup.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 197.861965
+      "durationMs": 152.161585
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/wif-boundaries.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 67.60948699999999
+      "durationMs": 102.11828100000001
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/isolation/wif.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 730.3994960000001
+      "durationMs": 771.203344
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/material-collect.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 59.99534
+      "durationMs": 51.30341499999999
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/material.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 65.79929099999998
+      "durationMs": 37.574541999999994
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/policy.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 44.05028500000003
+      "durationMs": 43.67084000000001
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/prepare.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 237.42866
+      "durationMs": 223.21584600000003
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/resume.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 84.81288899999998
+      "durationMs": 202.024221
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/run-version.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 53.56203099999999
+      "durationMs": 88.782764
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/runtime-boundaries.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 226.92029100000002
+      "durationMs": 152.879951
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/runtime-diagnostic.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 129.34117899999995
+      "durationMs": 190.06480499999998
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/runtime.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 65.49153100000002
+      "durationMs": 94.142998
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/snapshot.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 63.18403600000002
+      "durationMs": 61.761756999999974
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/status-report.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 32.213842
+      "durationMs": 48.664507000000015
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/wait-review.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 109.97113
+      "durationMs": 129.88811299999998
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/wif.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 96.56662499999997
+      "durationMs": 55.98178800000001
     },
     {
       "id": "node:tools/ai-review:unit:tools/ai-review/workflow.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 24.226709999999983
+      "durationMs": 33.41729800000002
     },
     {
       "id": "node:tools/api-codegen:node-test:tools/api-codegen/compatibility.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 446.8086320000002
+      "durationMs": 557.8151339999995
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/cache-policy.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 432.742606
+      "durationMs": 669.768779
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/graph.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 258.62462099999993
+      "durationMs": 431.952222
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/history.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 29.127648000000008
+      "durationMs": 43.608013
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/install-dependencies.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 28.814251999999996
+      "durationMs": 28.79235700000001
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/job-result.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 31.718829999999997
+      "durationMs": 34.385209
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/plan.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 29.795960000000008
+      "durationMs": 30.40686199999999
     },
     {
       "id": "node:tools/ci:unit:tools/ci/tests/run.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 2110.769014
+      "durationMs": 2112.904391
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/capture.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 91.43720500000002
+      "durationMs": 124.060727
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/check.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 85.249577
+      "durationMs": 113.145102
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/cli.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 172.54991900000002
+      "durationMs": 179.170623
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/collect.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 483.83426299999985
+      "durationMs": 666.136096
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/config-adapters.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 80.20295400000002
+      "durationMs": 93.83075099999999
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/journal.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 83.65798099999998
+      "durationMs": 70.73138599999999
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/measurement.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 56.795039
+      "durationMs": 96.73783100000003
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/merge.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 176.07778000000002
+      "durationMs": 184.082266
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/node-loader-boundaries.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 738.309489
+      "durationMs": 563.716777
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/node-loader-hooks.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 97.92495000000001
+      "durationMs": 111.23632
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/node-loader.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 567.5300879999999
+      "durationMs": 540.2317259999999
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/pnpm-hook.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 132.49658599999995
+      "durationMs": 124.72334999999998
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/preload.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 341.395348
+      "durationMs": 438.166916
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/prepare.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 45.29101600000001
+      "durationMs": 75.58869399999999
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/report-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 105.30077999999999
+      "durationMs": 96.946902
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/report.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 82.137577
+      "durationMs": 94.59681600000002
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/run.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 47.24679500000002
+      "durationMs": 70.40687200000002
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/runtime-capture-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 177.52583300000003
+      "durationMs": 168.110325
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/runtime-collection.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 19114.747372
+      "durationMs": 23461.562447
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/runtimes.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 709.6693730000001
+      "durationMs": 655.044892
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/schema.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 71.21153500000003
+      "durationMs": 60.788219
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/shards.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 232.48516099999998
+      "durationMs": 275.81461900000005
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/targets.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 20.30350399999999
+      "durationMs": 22.821683000000007
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/verify.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 333.455529
+      "durationMs": 238.36087600000002
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/vite-plugin.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 108.580012
+      "durationMs": 70.74877699999999
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/vitest-collection.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 1230.5085
+      "durationMs": 1237.9263570000003
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/vitest-setup-boundary.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 161.54536400000003
+      "durationMs": 144.869397
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/worker-collection.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 863.9264230000001
+      "durationMs": 751.2670680000001
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/worker-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 52.395263
+      "durationMs": 81.17370700000002
     },
     {
       "id": "node:tools/coverage:unit:tools/coverage/tests/workerd-inspector.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 92.30356699999997
+      "durationMs": 95.400251
     },
     {
       "id": "node:tools/docs:unit:tools/docs/changes.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 2129.430618
+      "durationMs": 1642.964375
     },
     {
       "id": "node:tools/docs:unit:tools/docs/check-errors.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 207.302201
+      "durationMs": 196.732176
     },
     {
       "id": "node:tools/docs:unit:tools/docs/check-guard-cli.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 533.9781310000001
+      "durationMs": 510.83159200000006
     },
     {
       "id": "node:tools/docs:unit:tools/docs/check-guard.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 31.360392999999988
+      "durationMs": 35.463567
     },
     {
       "id": "node:tools/docs:unit:tools/docs/check-node.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 112.29794199999999
+      "durationMs": 105.626003
     },
     {
       "id": "node:tools/docs:unit:tools/docs/check.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 355.45045700000003
+      "durationMs": 339.985593
     },
     {
       "id": "node:tools/docs:unit:tools/docs/cli.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 4503.861674
+      "durationMs": 4335.600712
     },
     {
       "id": "node:tools/docs:unit:tools/docs/immutable.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 100.26219099999997
+      "durationMs": 150.200484
     },
     {
       "id": "node:tools/docs:unit:tools/docs/lint-policy.test.ts",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 2839.539675
+      "durationMs": 2421.9132409999997
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/location.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 22.022941000000017
+      "durationMs": 19.705963999999994
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/media.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 63.625210000000024
+      "durationMs": 84.57389400000001
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/provider.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 820.904541
+      "durationMs": 815.278545
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/regressions.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 208.260668
+      "durationMs": 93.63313500000001
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/runner.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 58.979152
+      "durationMs": 50.15022499999998
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/runtime.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 112.40583900000001
+      "durationMs": 88.81712899999998
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/selection.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 476.04684399999996
+      "durationMs": 457.052051
     },
     {
       "id": "node:tools/e2e:unit:tools/e2e/tests/steps.test.mjs",
       "identity": "node:linux:node26:workers2",
-      "durationMs": 506.00858899999986
+      "durationMs": 512.9811900000001
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/check-object-storage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 71.253092
+      "durationMs": 65.04277
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/consume-renewal.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 592.062689
+      "durationMs": 613.188679
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/database-audio-usage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 546.489088
+      "durationMs": 336.15451999999993
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/database-connection.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 23.41340199999999
+      "durationMs": 32.39209199999998
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/database-schema.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 543.7647089999998
+      "durationMs": 436.6487639999999
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/database-seed.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 504.7551049999999
+      "durationMs": 296.672703
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/diagnostic-consume-errors.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 316.81986499999994
+      "durationMs": 387.713628
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/dispatch-guards.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 40.490103999999974
+      "durationMs": 64.78130599999999
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/evaluation-usage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 771.016299
+      "durationMs": 442.929356
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/execution-control.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 114.23193
+      "durationMs": 71.78236499999998
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/interview-evaluation.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 220.124599
+      "durationMs": 218.88332699999998
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/local-worker-errors.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 730.529389
+      "durationMs": 518.3038359999999
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/recovery-errors.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 437.54831799999994
+      "durationMs": 517.293917
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/repository-confirmation.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 483.53355199999993
+      "durationMs": 439.42843600000003
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/retry-policy.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 27.703094999999962
+      "durationMs": 27.936589000000012
     },
     {
       "id": "worker:apps/evaluation:unit:apps/evaluation/tests/worker-delivery.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 767.1491579999999
+      "durationMs": 910.384766
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/audio-usage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 512.1860180000001
+      "durationMs": 316.101673
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/check-object-notification.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 507.17935600000004
+      "durationMs": 405.39531300000004
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-object.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 483.32621600000004
+      "durationMs": 736.473655
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-room-commands.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1015.1312230000001
+      "durationMs": 964.0411639999999
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-room.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 794.7580680000001
+      "durationMs": 536.896345
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-session.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 834.115938
+      "durationMs": 1034.9721059999997
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-state.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 52.639415
+      "durationMs": 31.054646000000012
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/interview-storage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 710.0208250000001
+      "durationMs": 398.768463
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/live-connection.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1470.565982
+      "durationMs": 1515.417657
     },
     {
       "id": "worker:apps/interview:unit:apps/interview/tests/live-session.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 62.191669999999974
+      "durationMs": 77.32814499999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/analysis-usage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 498.59726
+      "durationMs": 496.54814000000005
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/analyze-material.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 33.406465
+      "durationMs": 23.504929999999987
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/client.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 85.85162100000002
+      "durationMs": 69.97485599999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/configuration.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 42.005888
+      "durationMs": 24.891988999999995
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/create-interview-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 456.6733679999999
+      "durationMs": 348.98594499999996
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/date-time.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 54.847314999999966
+      "durationMs": 52.25552999999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/delete-interview.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 709.441452
+      "durationMs": 474.94650499999995
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics-client.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 127.28124399999999
+      "durationMs": 182.62933300000003
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics-errors.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 23.215129999999988
+      "durationMs": 13.687985999999995
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics-page-interactions.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1410.1892159999998
+      "durationMs": 1087.166819
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics-page.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 66.61302300000003
+      "durationMs": 65.444369
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics-storage.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 759.6775100000001
+      "durationMs": 540.919381
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/diagnostics.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 183.07464799999997
+      "durationMs": 106.04457999999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/error-contracts.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 404.66463100000004
+      "durationMs": 449.353438
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interview-detail.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 564.491892
+      "durationMs": 356.946773
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interview-history.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 562.571218
+      "durationMs": 455.3294199999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interview-live-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 45.79254400000001
+      "durationMs": 84.29431499999997
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interview-repository.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 517.8090000000001
+      "durationMs": 543.9898969999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interviews-page.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1075.7761
+      "durationMs": 637.3913329999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/interviews.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 94.52313099999999
+      "durationMs": 78.449729
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/json-body.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 66.35480000000001
+      "durationMs": 41.16965299999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/local-access.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 57.196023999999994
+      "durationMs": 43.96330299999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/local-session-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 48.932402999999994
+      "durationMs": 55.556804000000014
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/material-repository.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 525.089606
+      "durationMs": 520.4683619999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/materials-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 124.480371
+      "durationMs": 92.74128300000002
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/openai-material-analyzer.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 67.869071
+      "durationMs": 77.085282
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-api-routes.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 932.4393029999999
+      "durationMs": 573.759827
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-audio.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 95.244476
+      "durationMs": 144.26858299999998
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-client.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 73.30702199999999
+      "durationMs": 59.639759999999995
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-history.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1643.906105
+      "durationMs": 1102.923151
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-live.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1373.2658359999998
+      "durationMs": 1033.673738
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-preparation.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 791.9566310000001
+      "durationMs": 808.6972430000002
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-response.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 58.613970999999964
+      "durationMs": 46.58730100000001
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/practice-session.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 1126.9859170000002
+      "durationMs": 1230.4234410000001
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/retry-evaluation.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 464.52247399999993
+      "durationMs": 720.1210110000002
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/route-types.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 20.766258000000008
+      "durationMs": 12.765614999999997
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/router-shell.test.tsx",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 158.086856
+      "durationMs": 77.30591199999999
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/stored-materials-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 444.23374199999995
+      "durationMs": 354.97319699999997
     },
     {
       "id": "worker:apps/web:unit:apps/web/tests/verify-http.test.ts",
       "identity": "worker:linux:node26:workers2",
-      "durationMs": 681.7192110000001
+      "durationMs": 653.9702629999999
     }
   ]
 }

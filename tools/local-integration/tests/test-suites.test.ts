@@ -4,7 +4,17 @@ import { selectTestFiles } from '../src/test-suites.ts';
 test('PR結合から長時間だけを除き、全結合と排他的に対応させる', () => {
   const short = selectTestFiles('integration-pr');
   const long = selectTestFiles('realtime');
-  expect(short).toHaveLength(10);
+  expect(short).toHaveLength(14);
+  expect(short).not.toContain('tests/restart.test.ts');
+  for (const name of [
+    'response-loss',
+    'after-acceptance',
+    'after-do-save',
+    'after-queue-send',
+    'after-result-before-ack',
+  ]) {
+    expect(short).toContain(`tests/restart-${name}.test.ts`);
+  }
   expect(short).toContain('tests/voice-interview.test.ts');
   expect(short).toContain('tests/interview-evaluation-worker.test.ts');
   expect(long).toEqual(['tests/realtime-retries.test.ts']);

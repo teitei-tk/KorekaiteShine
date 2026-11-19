@@ -68,7 +68,11 @@ cp.spawn = (program,args) => {
         fileURLToPath(new URL('../src/run-test-suite.ts', import.meta.url)),
         ...args,
       ],
-      { encoding: 'utf8', timeout: 30_000 },
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        env: { ...process.env, KOREKAITE_BOUNDARY_BUNDLE: root },
+      },
     );
     return {
       ...result,

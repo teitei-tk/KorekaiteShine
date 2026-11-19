@@ -31,6 +31,8 @@ export type LocalRuntime = {
 };
 
 export type LocalRuntimeOptions = {
+  boundaryBuild?: boolean;
+  boundaryBundle?: string;
   profileStartup?: boolean;
   profileVite?: boolean;
   port?: number;
@@ -72,11 +74,12 @@ async function prepareRuntime(
 ): Promise<string> {
   signal?.throwIfAborted();
   if (
-    (options.materialAnalysisMock ||
+    (options.boundaryBuild ||
+      options.materialAnalysisMock ||
       options.interviewVoiceMock ||
       options.interviewEvaluationMock ||
-      options.manualDiagnostics ||
-      options.probeOnlyEvaluation ||
+      (options.manualDiagnostics && !options.boundaryBundle) ||
+      (options.probeOnlyEvaluation && !options.boundaryBundle) ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck) &&
@@ -91,6 +94,12 @@ async function prepareRuntime(
   timing?.mark('artifactMs');
   await runDatabaseCommand(config, ['migrate'], { signal });
   timing?.mark('databaseMs');
+  if (options.boundaryBundle) {
+    const { stageBoundaryBundle } = await import('./boundary-bundle.ts');
+    const project = await stageBoundaryBundle(options.boundaryBundle, config, options);
+    timing?.mark('filesAndConfigMs');
+    return project;
+  }
   const project = join(config.artifactDirectory, 'web');
   await mkdir(project, { recursive: true });
   await rm(join(project, 'src'), { recursive: true, force: true });
@@ -150,7 +159,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs')({
   server: { handlers: { POST: ({ request }) => acceptCheck(request, {
     db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
     actorId: 'local-developer', now: () => Temporal.Now.instant().epochMilliseconds, newId: () => crypto.randomUUID(),
-    scheduleInitialization: ${options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
+    scheduleInitialization: ${options.boundaryBuild ? `(env.BOUNDARY_MANUAL_DIAGNOSTICS === 'true' ? undefined : jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId })))))` : options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
   }) } },
 });\n`,
   );
@@ -208,7 +217,12 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     d1_databases: [{ binding: 'DB', database_name: config.d1.name, database_id: config.d1.id }],
     compatibility_date: '2026-10-19',
     compatibility_flags: ['nodejs_compat'],
-    vars: { APP_ENV: config.environment },
+    vars: {
+      APP_ENV: config.environment,
+      ...(options.boundaryBuild
+        ? { BOUNDARY_MANUAL_DIAGNOSTICS: 'false', BOUNDARY_PROBE_ONLY_EVALUATION: 'false' }
+        : {}),
+    },
   };
   const interviewEntry = join(project, 'interview.local.ts');
   await writeFile(
@@ -263,7 +277,7 @@ ${config.environment === 'test' ? `import { consumeFormalForTest } from ${JSON.s
 ${options.stopAfterResultBeforeAck ? `import { stopAfterResultBeforeAckForTest } from ${JSON.stringify(join(fixtures, 'ack-stop.ts'))};` : ''}
 export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export default {
-  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : `async (batch, env) => { await recordQueueDelivery(batch); ${options.holdEvaluationBeforeConsume ? 'await holdBeforeEvaluationForTest(env);' : ''} ${config.environment === 'test' ? 'if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) { await consumeFormalForTest(batch, env); return; }' : ''} ${options.stopAfterResultBeforeAck ? 'await stopAfterResultBeforeAckForTest(batch, env, controlled => application.queue(controlled, env));' : 'await application.queue(batch, env);'} }`},
+  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : `async (batch, env) => { ${options.boundaryBuild ? `if (env.BOUNDARY_PROBE_ONLY_EVALUATION === 'true') { await probe.queue(batch, env); return; }` : ''} await recordQueueDelivery(batch); ${options.holdEvaluationBeforeConsume ? 'await holdBeforeEvaluationForTest(env);' : ''} ${config.environment === 'test' ? 'if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) { await consumeFormalForTest(batch, env); return; }' : ''} ${options.stopAfterResultBeforeAck ? 'await stopAfterResultBeforeAckForTest(batch, env, controlled => application.queue(controlled, env));' : 'await application.queue(batch, env);'} }`},
   async scheduled(controller, env) { await application.scheduled(controller, env); await probe.scheduled(controller); },
 };\n`,
   );
@@ -383,8 +397,12 @@ function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, st
   };
 }
 
-async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
-  const project = await prepareRuntime(config);
+async function buildUnlockedRuntime(
+  config: RuntimeConfig,
+  options: Pick<LocalRuntimeOptions, 'boundaryBuild'> = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  const project = await prepareRuntime(config, options, signal);
   await runNodeCommand({
     args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
     cwd: project,
@@ -392,6 +410,7 @@ async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
     logPath: join(config.artifactDirectory, 'build.log'),
     label: 'ローカルビルド',
     timeoutMs: 120_000,
+    signal,
   });
 }
 
@@ -525,10 +544,15 @@ async function startUnlockedRuntime(
   }
 }
 
-export async function buildRuntime(config: RuntimeConfig): Promise<void> {
+export async function buildRuntime(
+  config: RuntimeConfig,
+  options: Pick<LocalRuntimeOptions, 'boundaryBuild'> = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  signal?.throwIfAborted();
   const release = await lockEnvironment(config);
   try {
-    await buildUnlockedRuntime(config);
+    await buildUnlockedRuntime(config, options, signal);
   } finally {
     release();
   }
@@ -547,14 +571,30 @@ export async function startRuntimeInProcess(
   if (options.profileVite && mode !== 'dev') {
     throw new Error('Vite詳細計測はdev起動だけで利用できます。');
   }
+  if (
+    options.boundaryBundle &&
+    (config.environment !== 'test' ||
+      mode !== 'preview' ||
+      options.profileVite ||
+      options.boundaryBuild ||
+      options.materialAnalysisMock ||
+      options.interviewVoiceMock ||
+      options.interviewEvaluationMock ||
+      options.checkObjectProbe ||
+      options.holdEvaluationBeforeConsume ||
+      options.stopAfterResultBeforeAck ||
+      options.testAiBindings)
+  ) {
+    throw new Error('事前ビルドの起動設定が不正です。');
+  }
   const timing = options.profileStartup ? createStartupTiming() : undefined;
   if (
     mode === 'preview' &&
     (options.materialAnalysisMock ||
       options.interviewVoiceMock ||
       options.interviewEvaluationMock ||
-      options.manualDiagnostics ||
-      options.probeOnlyEvaluation ||
+      (options.manualDiagnostics && !options.boundaryBundle) ||
+      (options.probeOnlyEvaluation && !options.boundaryBundle) ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck)

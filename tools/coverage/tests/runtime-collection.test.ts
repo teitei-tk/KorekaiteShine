@@ -5,11 +5,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assert, expect, test, vi } from 'vitest';
 import { resolveRuntime } from '../../../packages/runtime-config/src/resources.ts';
+import { createBoundaryBundle } from '../../local-integration/src/boundary-bundle.ts';
 import { startRuntime } from '../../local-integration/src/runtime.ts';
 import { prepareRun } from '../src/prepare.ts';
 import { readCaptures } from '../src/capture.ts';
 
-test.each(['stop', 'kill-vite'] as const)(
+test.each(['stop', 'kill-vite', 'prebuilt'] as const)(
   '実際の3 WorkersでWeb原本を計測し%sでも回収する',
   async (mode) => {
     const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -23,6 +24,7 @@ test.each(['stop', 'kill-vite'] as const)(
     vi.stubEnv('KOREKAITE_COVERAGE_SUITE', 'fixture');
     const runtimeState = {
       runtime: undefined as Awaited<ReturnType<typeof startRuntime>> | undefined,
+      bundle: undefined as Awaited<ReturnType<typeof createBoundaryBundle>> | undefined,
     };
     try {
       const config = resolveRuntime({
@@ -31,7 +33,14 @@ test.each(['stop', 'kill-vite'] as const)(
         runId: 'coverage',
         parallelIndex: 0,
       });
-      runtimeState.runtime = await startRuntime(config);
+      if (mode === 'prebuilt') {
+        runtimeState.bundle = await createBoundaryBundle();
+      }
+      runtimeState.runtime = await startRuntime(
+        config,
+        mode === 'prebuilt' ? 'preview' : 'dev',
+        runtimeState.bundle ? { boundaryBundle: runtimeState.bundle.directory } : {},
+      );
       expect((await fetch(`${runtimeState.runtime.baseUrl}/api/interviews`)).status).toBe(200);
       if (mode === 'kill-vite') {
         const rows = execFileSync('ps', ['-eo', 'pid=,ppid=,pgid='], { encoding: 'utf8' })
@@ -81,6 +90,7 @@ test.each(['stop', 'kill-vite'] as const)(
       expect(records.every((record) => record.status === 'complete')).toBe(true);
     } finally {
       await runtimeState.runtime?.stop();
+      await runtimeState.bundle?.dispose();
       vi.unstubAllEnvs();
       rmSync(workspace, { recursive: true, force: true });
     }

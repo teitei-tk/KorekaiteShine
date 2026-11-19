@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { validateCheckAccepted } from '@korekaite/api-contracts/http/diagnostics-validators';
-import { startRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/built-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 

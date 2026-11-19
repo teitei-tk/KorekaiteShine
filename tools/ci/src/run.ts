@@ -1,3 +1,7 @@
+import {
+  boundaryTestFile,
+  createBoundaryBundle,
+} from '../../local-integration/src/boundary-bundle.ts';
 import { isScenarioLocation } from '../../e2e/location.ts';
 import path from 'node:path';
 
@@ -96,7 +100,12 @@ export async function runShard(root: string, plan: Plan, shard: Shard): Promise<
         continue;
       }
       const prepareStarted = performance.now();
+      const bundle =
+        project === 'tools/local-integration' && group.some((test) => boundaryTestFile(test.file))
+          ? await createBoundaryBundle()
+          : undefined;
       const ctx = await createVitest({
+        ...(bundle ? { env: { KOREKAITE_BOUNDARY_BUNDLE: bundle.directory } } : {}),
         root: path.resolve(root, project),
         watch: false,
         maxWorkers: 2,
@@ -108,6 +117,9 @@ export async function runShard(root: string, plan: Plan, shard: Shard): Promise<
             },
           },
         ],
+      }).catch(async (error: Error) => {
+        await bundle?.dispose();
+        throw error;
       });
       result.timings.prepareMs += performance.now() - prepareStarted;
       try {
@@ -158,7 +170,11 @@ export async function runShard(root: string, plan: Plan, shard: Shard): Promise<
         }
       } finally {
         const teardownStarted = performance.now();
-        await ctx.close();
+        try {
+          await ctx.close();
+        } finally {
+          await bundle?.dispose();
+        }
         result.timings.teardownMs += performance.now() - teardownStarted;
       }
     }

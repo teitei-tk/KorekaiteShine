@@ -1,3 +1,4 @@
+import { boundaryTestFile, createBoundaryBundle } from './boundary-bundle.ts';
 import { spawn } from 'node:child_process';
 import { constants } from 'node:os';
 import { realpathSync } from 'node:fs';
@@ -7,8 +8,17 @@ import { fileURLToPath } from 'node:url';
 import { selectTestFiles, validateTestFiles } from './test-suites.ts';
 import { stopProcessGroup } from './process.ts';
 
-export async function runTestProcess(args: readonly string[], cwd: string): Promise<number> {
-  const child = spawn(process.execPath, [...args], { cwd, stdio: 'inherit', detached: true });
+export async function runTestProcess(
+  args: readonly string[],
+  cwd: string,
+  environment: NodeJS.ProcessEnv = {},
+): Promise<number> {
+  const child = spawn(process.execPath, [...args], {
+    cwd,
+    env: { ...process.env, ...environment },
+    stdio: 'inherit',
+    detached: true,
+  });
   const interruptedState = { interrupted: undefined as NodeJS.Signals | undefined };
   const interrupt = (signal: NodeJS.Signals) => {
     interruptedState.interrupted = signal;
@@ -61,7 +71,21 @@ async function main() {
     extra.splice(list, 1);
   }
   const vitest = fileURLToPath(new URL('../node_modules/vitest/vitest.mjs', import.meta.url));
-  return runTestProcess([vitest, list === -1 ? 'run' : 'list', ...files, ...extra], cwd);
+  const bundle =
+    list === -1 &&
+    files.some((file) => boundaryTestFile(file)) &&
+    !process.env.KOREKAITE_BOUNDARY_BUNDLE
+      ? await createBoundaryBundle()
+      : undefined;
+  try {
+    return await runTestProcess(
+      [vitest, list === -1 ? 'run' : 'list', ...files, ...extra],
+      cwd,
+      bundle ? { KOREKAITE_BOUNDARY_BUNDLE: bundle.directory } : {},
+    );
+  } finally {
+    await bundle?.dispose();
+  }
 }
 
 if (import.meta.main) {

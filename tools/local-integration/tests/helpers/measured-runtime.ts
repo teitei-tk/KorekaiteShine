@@ -24,7 +24,7 @@ export async function startRuntime(...args: Parameters<typeof runtime.startRunti
         parseJson(await readFile(join(config.artifactDirectory, 'startup-timing.json'), 'utf8')),
       );
       recordStartupTiming(timing, outerMs);
-      if (mode === 'dev') {
+      if (mode === 'dev' && !options?.boundaryBundle) {
         const profile = parseJson(
           await readFile(join(config.artifactDirectory, 'vite-profile.json'), 'utf8'),
         );

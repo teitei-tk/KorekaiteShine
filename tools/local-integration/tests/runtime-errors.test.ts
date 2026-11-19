@@ -1,3 +1,4 @@
+import { runDatabaseCommand } from '../src/database.ts';
 import type * as LintTypeModule0 from 'node:child_process';
 import type * as LintTypeModule1 from 'node:fs/promises';
 import { SystemError } from '../../testing/system-error.mts';
@@ -338,4 +339,24 @@ test('Vite詳細計測をdevelopmentとpreviewでは開始しない', async () =
     startRuntimeInProcess(preview.config, 'preview', { profileVite: true }),
   ).rejects.toThrow('dev起動');
   expect(spawn).not.toHaveBeenCalled();
+});
+
+test('共有ビルドはtest previewと対応する障害注入だけに限定する', async () => {
+  const fixture = await runtimeFixture();
+  for (const options of [
+    { boundaryBundle: '/bundle', checkObjectProbe: 'normal' as const },
+    { boundaryBundle: '/bundle', profileVite: true },
+    { boundaryBundle: '/bundle', holdEvaluationBeforeConsume: true },
+  ]) {
+    await expect(startRuntimeInProcess(fixture.config, 'preview', options)).rejects.toThrow();
+  }
+  await expect(
+    startRuntimeInProcess(fixture.config, 'dev', { boundaryBundle: '/bundle' }),
+  ).rejects.toThrow();
+  const development = await runtimeFixture('development');
+  await expect(
+    startRuntimeInProcess(development.config, 'preview', { boundaryBundle: '/bundle' }),
+  ).rejects.toThrow();
+  expect(spawn).not.toHaveBeenCalled();
+  expect(runDatabaseCommand).not.toHaveBeenCalled();
 });

@@ -86,6 +86,7 @@ export type IntegrationReport = {
   startedAt: string;
   finishedAt: string | null;
   durationMs: number | null;
+  timings: { startupMs: number; restartMs: number; checksMs: number; cleanupMs: number };
   expected: Outcome & { retryDelaysMs: number[]; acceptanceCounts?: AcceptanceCounts };
   attempts: { attemptNumber: number; startedAt: number; finishedAt: number }[];
   scheduled: {
@@ -310,6 +311,7 @@ export async function runDiagnosticScenario(input: {
     startedAt: Temporal.Now.instant().toString({ fractionalSecondDigits: 3 }),
     finishedAt: null,
     durationMs: null,
+    timings: { startupMs: 0, restartMs: 0, checksMs: 0, cleanupMs: 0 },
     expected: {
       ...(input.fault === 'response_loss' ? { acceptanceCounts: { jobs: 1, requests: 1 } } : {}),
       status: input.scenario === 'exhaust_retries' ? 'failed' : 'completed',
@@ -342,6 +344,17 @@ export async function runDiagnosticScenario(input: {
     scheduledPending: undefined as Promise<void> | undefined,
     scheduledFailed: false,
   };
+  const measure = async <T>(
+    phase: 'startupMs' | 'restartMs' | 'cleanupMs',
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    const started = performance.now();
+    try {
+      return await operation();
+    } finally {
+      report.timings[phase] += performance.now() - started;
+    }
+  };
   const hasScheduledFailed = () => runtimeContext.scheduledFailed;
   function startScheduled(activeRuntime: LocalRuntime): void {
     runtimeContext.stopScheduled = startScheduledInterval((elapsedMs) => {
@@ -372,11 +385,13 @@ export async function runDiagnosticScenario(input: {
     }, report.scheduled.intervalMs);
   }
   try {
-    report.versions = await runtimeVersions();
-    runtimeContext.runtime = await startRuntime(config, 'dev', {
-      manualDiagnostics: restarts,
-      holdEvaluationBeforeConsume: input.fault === 'after_queue_send',
-      stopAfterResultBeforeAck: input.fault === 'after_result_before_ack',
+    runtimeContext.runtime = await measure('startupMs', async () => {
+      report.versions = await runtimeVersions();
+      return startRuntime(config, 'dev', {
+        manualDiagnostics: restarts,
+        holdEvaluationBeforeConsume: input.fault === 'after_queue_send',
+        stopAfterResultBeforeAck: input.fault === 'after_result_before_ack',
+      });
     });
     if (!restarts) {
       startScheduled(runtimeContext.runtime);
@@ -510,17 +525,19 @@ export async function runDiagnosticScenario(input: {
       }
       report.actual.beforeRestartStatus = before.status;
       report.actual.beforeRestartChecks = before.checks;
-      await runtimeContext.runtime.stop();
-      runtimeContext.runtime = undefined;
-      const stoppedAt = Temporal.Now.instant().epochMilliseconds;
-      if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
-        await runDatabaseCommand(config, [
-          'execute',
-          'DROP TRIGGER reject_integration_notification;',
-        ]);
-      }
-      runtimeContext.runtime = await startRuntime(config);
-      report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
+      await measure('restartMs', async () => {
+        await requireValue(runtimeContext.runtime).stop();
+        runtimeContext.runtime = undefined;
+        const stoppedAt = Temporal.Now.instant().epochMilliseconds;
+        if (input.fault === 'after_do_save' || input.fault === 'after_queue_send') {
+          await runDatabaseCommand(config, [
+            'execute',
+            'DROP TRIGGER reject_integration_notification;',
+          ]);
+        }
+        runtimeContext.runtime = await startRuntime(config);
+        report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
+      });
       report.actual.restartCount = 1;
       startScheduled(runtimeContext.runtime);
     }
@@ -585,11 +602,13 @@ export async function runDiagnosticScenario(input: {
       if (hasScheduledFailed()) {
         throw new IntegrationFailureError('SCHEDULED_FAILED');
       }
-      await runtimeContext.runtime.stop();
-      runtimeContext.runtime = undefined;
-      const stoppedAt = Temporal.Now.instant().epochMilliseconds;
-      runtimeContext.runtime = await startRuntime(config);
-      report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
+      await measure('restartMs', async () => {
+        await requireValue(runtimeContext.runtime).stop();
+        runtimeContext.runtime = undefined;
+        const stoppedAt = Temporal.Now.instant().epochMilliseconds;
+        runtimeContext.runtime = await startRuntime(config);
+        report.restart = { stoppedAt, restartedAt: Temporal.Now.instant().epochMilliseconds };
+      });
       report.actual.restartCount = 1;
       const afterResponse = await fetch(
         `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
@@ -727,28 +746,37 @@ export async function runDiagnosticScenario(input: {
     report.exitCode = 1;
     report.failureCode = error instanceof IntegrationFailureError ? error.code : 'UNEXPECTED_ERROR';
   } finally {
-    runtimeContext.stopScheduled?.();
-    await runtimeContext.scheduledPending;
-    if (hasScheduledFailed()) {
-      runtimeContext.failure = new IntegrationFailureError('SCHEDULED_FAILED');
-      report.exitCode = 1;
-      report.failureCode = 'SCHEDULED_FAILED';
-    }
-    try {
-      await runtimeContext.runtime?.stop();
-      if (report.exitCode === 0) {
-        // この関数はappEnv: 'test'で解決するため、ローカル状態の保存先が必ずある。
-        await rm(requireValue(config.stateDirectory), { recursive: true, force: true });
-        await rm(config.artifactDirectory, { recursive: true, force: true });
+    await measure('cleanupMs', async () => {
+      runtimeContext.stopScheduled?.();
+      await runtimeContext.scheduledPending;
+      if (hasScheduledFailed()) {
+        runtimeContext.failure = new IntegrationFailureError('SCHEDULED_FAILED');
+        report.exitCode = 1;
+        report.failureCode = 'SCHEDULED_FAILED';
       }
-    } catch (error) {
-      runtimeContext.failure =
-        error instanceof Error ? error : new Error('統合検証の停止・破棄に失敗しました。');
-      report.exitCode = 1;
-      report.failureCode = 'CLEANUP_FAILED';
-    }
+      try {
+        await runtimeContext.runtime?.stop();
+        if (report.exitCode === 0) {
+          // この関数はappEnv: 'test'で解決するため、ローカル状態の保存先が必ずある。
+          await rm(requireValue(config.stateDirectory), { recursive: true, force: true });
+          await rm(config.artifactDirectory, { recursive: true, force: true });
+        }
+      } catch (error) {
+        runtimeContext.failure =
+          error instanceof Error ? error : new Error('統合検証の停止・破棄に失敗しました。');
+        report.exitCode = 1;
+        report.failureCode = 'CLEANUP_FAILED';
+      }
+    });
     report.finishedAt = Temporal.Now.instant().toString({ fractionalSecondDigits: 3 });
-    report.durationMs = Math.round(performance.now() - started);
+    report.durationMs = performance.now() - started;
+    report.timings.checksMs = Math.max(
+      0,
+      report.durationMs -
+        report.timings.startupMs -
+        report.timings.restartMs -
+        report.timings.cleanupMs,
+    );
     // 応答全体、要求本文、冪等キー、例外メッセージは記録しない。
     await writeFile(resultPath, `${JSON.stringify(report, null, 2)}\n`);
   }

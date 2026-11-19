@@ -11,16 +11,14 @@ export type History = {
   createdAt: string;
   samples: Sample[];
 };
-function isHistory(value: unknown): value is History {
+type TimingData = Omit<History, 'event' | 'branch' | 'conclusion'>;
+function isTimingData(value: unknown): value is TimingData {
   return (
     isRecord(value) &&
     value.schema === 1 &&
     typeof value.id === 'string' &&
     typeof value.repository === 'string' &&
     typeof value.workflow === 'string' &&
-    value.event === 'push' &&
-    value.branch === 'main' &&
-    value.conclusion === 'success' &&
     typeof value.createdAt === 'string' &&
     Array.isArray(value.samples) &&
     value.samples.every(
@@ -35,13 +33,65 @@ function isHistory(value: unknown): value is History {
     )
   );
 }
+function isHistory(value: unknown): value is History {
+  return (
+    isTimingData(value) &&
+    'event' in value &&
+    value.event === 'push' &&
+    'branch' in value &&
+    value.branch === 'main' &&
+    'conclusion' in value &&
+    value.conclusion === 'success'
+  );
+}
 export function readHistory(
   input: unknown,
   context: { repository: string; workflow: string; now: number },
   identity: string,
 ): { id: string | null; durations: Record<string, number> } {
+  return readTimingData(isHistory(input) ? input : null, context, identity);
+}
+export function readWeights(
+  history: unknown,
+  seed: unknown,
+  context: { repository: string; workflow: string; now: number },
+  identity: string,
+): { id: string | null; durations: Record<string, number>; sources: string[] } {
+  const validSeed =
+    isRecord(seed) &&
+    isRecord(seed.source) &&
+    Number.isSafeInteger(seed.source.runId) &&
+    typeof seed.source.runId === 'number' &&
+    seed.source.runId > 0 &&
+    Number.isSafeInteger(seed.source.attempt) &&
+    typeof seed.source.attempt === 'number' &&
+    seed.source.attempt > 0 &&
+    typeof seed.source.headSha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(seed.source.headSha) &&
+    seed.source.conclusion === 'success' &&
+    seed.id === `reviewed-run:${seed.source.runId}:${seed.source.attempt}`;
+  const initial = readTimingData(validSeed ? seed : null, context, identity);
+  const main = readHistory(history, context, identity);
+  const sources = [
+    ...(initial.id &&
+    Object.keys(initial.durations).some((id) => !Object.hasOwn(main.durations, id))
+      ? [initial.id]
+      : []),
+    ...(main.id && Object.keys(main.durations).length > 0 ? [main.id] : []),
+  ];
+  return {
+    id: sources.at(-1) ?? null,
+    sources,
+    durations: { ...initial.durations, ...main.durations },
+  };
+}
+function readTimingData(
+  input: unknown,
+  context: { repository: string; workflow: string; now: number },
+  identity: string,
+): { id: string | null; durations: Record<string, number> } {
   const empty = { id: null, durations: {} };
-  if (!isHistory(input)) {
+  if (!isTimingData(input)) {
     return empty;
   }
   const h = input;
@@ -64,6 +114,17 @@ export function readHistory(
   }
   const groups = new Map<string, number[]>();
   for (const sample of h.samples) {
+    const sampledAt = (() => {
+      try {
+        return Temporal.Instant.from(sample.sampledAt ?? h.createdAt).epochMilliseconds;
+      } catch {
+        return Number.NaN;
+      }
+    })();
+    const sampleAge = context.now - sampledAt;
+    if (!Number.isFinite(sampleAge) || sampleAge < 0 || sampleAge > 30 * 86_400_000) {
+      continue;
+    }
     if (sample.identity === identity) {
       const values = groups.get(sample.id) ?? [];
       values.push(sample.durationMs);

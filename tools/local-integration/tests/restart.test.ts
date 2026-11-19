@@ -2,7 +2,19 @@ import { parseJson } from '@korekaite/api-contracts/json';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { assert, expect, test } from 'vitest';
-import { runDiagnosticScenario } from '../src/integration.ts';
+import { runDiagnosticScenario as runScenario } from '../src/integration.ts';
+
+async function runDiagnosticScenario(input: Parameters<typeof runScenario>[0]) {
+  const result = await runScenario(input);
+  process.stdout.write(
+    `restart-timing ${JSON.stringify({
+      case: result.report.case,
+      ...result.report.timings,
+      totalMs: result.report.durationMs,
+    })}\n`,
+  );
+  return result;
+}
 
 test('受付応答の本文を失った後も同じキーで再送し、ジョブと受付を一件のまま完了する', async () => {
   const { report, resultPath } = await runDiagnosticScenario({

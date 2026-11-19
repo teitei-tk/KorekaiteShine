@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir, readdir, appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assignTests } from './plan.ts';
-import { readHistory, mergeHistory } from './history.ts';
+import { readWeights, mergeHistory } from './history.ts';
 import type { History } from './history.ts';
 import { validateResults } from './results.ts';
 import { identity } from './types.ts';
@@ -89,6 +89,7 @@ async function makePlan(): Promise<Plan> {
   const historyInput: JsonValue = await json(
     process.env.CI_HISTORY_PATH ?? '.ci/history-input.json',
   ).catch(() => null);
+  const seedInput = await json('tools/ci/timing-seed.json').catch(() => null);
   const plan: Plan = {
     schema: 1,
     sha,
@@ -116,13 +117,15 @@ async function makePlan(): Promise<Plan> {
     const group = tests.filter(
       (test) => test.runnerClass === kind && selection.selected.includes(test.id),
     );
-    const history = readHistory(
+    const history = readWeights(
       historyInput,
+      seedInput,
       { repository, workflow, now: Temporal.Now.instant().epochMilliseconds },
       identity(kind),
     );
-    if (history.id) {
+    if (history.id && group.length > 0 && process.env.CI_TEST_WEIGHTS !== 'equal') {
       plan.historyId = history.id;
+      reasons.push(`${kind}の配分時間: ${history.sources.join(', ')}`);
     }
     const durations = process.env.CI_TEST_WEIGHTS === 'equal' ? {} : history.durations;
     for (const [index, ids] of assignTests(

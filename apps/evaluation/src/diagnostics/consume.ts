@@ -5,7 +5,8 @@ import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { diagnosticChecks } from '@korekaite/database';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { eq } from 'void/db';
-import { consumeJob, type DeliveryContext } from '../application/consume-job';
+import { consumeJob } from '../application/consume-job';
+import type { DeliveryContext } from '../application/consume-job';
 import { evaluateDiagnostic } from './evaluator';
 
 export async function consumeDiagnostic(
@@ -23,10 +24,9 @@ export async function consumeDiagnostic(
       if (signal.aborted) {
         throw new Error('評価は中止されました。');
       }
-      const [check] = await db
-        .select()
-        .from(diagnosticChecks)
-        .where(eq(diagnosticChecks.jobId, jobId));
+      const check = (
+        await db.select().from(diagnosticChecks).where(eq(diagnosticChecks.jobId, jobId))
+      ).at(0);
       if (!check) {
         throw new Error('診断条件がありません。');
       }

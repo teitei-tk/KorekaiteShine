@@ -1,3 +1,6 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { isObject } from './records.ts';
+import { requireValue } from './required.ts';
 import {
   coverageEnvironment,
   localProcessEnvironment,
@@ -20,7 +23,9 @@ async function within<T>(promise: Promise<T>, milliseconds: number, message: str
     return await Promise.race([
       promise,
       new Promise<never>((_resolve, reject) => {
-        timerState.timer = setTimeout(() => reject(new Error(message)), milliseconds);
+        timerState.timer = setTimeout(() => {
+          reject(new Error(message));
+        }, milliseconds);
       }),
     ]);
   } finally {
@@ -47,8 +52,13 @@ export function connectLocalRuntime(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cron: '* * * * *' }),
       });
-      const body = await response.json();
-      if (!response.ok || body.result?.outcome !== 'ok') {
+      const body = parseJson(await response.text());
+      if (
+        !response.ok ||
+        !isObject(body) ||
+        !isObject(body.result) ||
+        body.result.outcome !== 'ok'
+      ) {
         throw new Error(`scheduledイベント失敗: ${JSON.stringify(body)}`);
       }
     },
@@ -61,7 +71,7 @@ export async function startOwnedRuntime(
   mode: 'dev' | 'preview',
   options: LocalRuntimeOptions,
 ): Promise<LocalRuntime> {
-  const owner = fork(new URL('./runtime-owner-host.ts', import.meta.url), [], {
+  const owner = fork(new URL('runtime-owner-host.ts', import.meta.url), [], {
     execArgv: [],
     env: {
       ...localProcessEnvironment(),
@@ -70,28 +80,34 @@ export async function startOwnedRuntime(
     },
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
-  owner.stderr!.resume();
+  requireValue(owner.stderr).resume();
   const failureState = { failure: undefined as string | undefined };
-  const closed = new Promise<number | null>((resolve) =>
-    owner.once('close', (code) => resolve(code)),
-  );
+  const closed = new Promise<number | null>((resolve) => {
+    owner.once('close', (code) => {
+      resolve(code);
+    });
+  });
   const ready = new Promise<string>((resolve, reject) => {
-    owner.on('message', (message: RuntimeOwnerMessage) => {
-      if (message.type === 'ready') {
+    owner.on('message', (message: unknown) => {
+      if (isObject(message) && message.type === 'ready' && typeof message.baseUrl === 'string') {
         resolve(message.baseUrl);
-      } else if (message.type === 'error') {
+      } else if (
+        isObject(message) &&
+        message.type === 'error' &&
+        typeof message.message === 'string'
+      ) {
         failureState.failure = message.message;
         reject(new Error(message.message));
       }
     });
     owner.once('error', reject);
-    owner.once('close', (code) =>
+    owner.once('close', (code) => {
       reject(
         new Error(
           failureState.failure ?? `ランタイム管理プロセスが起動前に終了しました（${code}）。`,
         ),
-      ),
-    );
+      );
+    });
     const request: RuntimeOwnerRequest = { type: 'start', config, mode, options };
     owner.send(request, (error) => {
       if (error) {
@@ -104,7 +120,9 @@ export async function startOwnedRuntime(
     return (stoppingState.stopping ??= (async () => {
       if (owner.connected) {
         const request: RuntimeOwnerRequest = { type: 'stop' };
-        owner.send(request, () => {});
+        owner.send(request, () => {
+          /* この実装では追加の処理を行わない。 */
+        });
       }
       const code = await within(
         closed,
@@ -125,7 +143,9 @@ export async function startOwnedRuntime(
     }));
     return connectLocalRuntime(baseUrl, stop, config.workers.evaluation, completion);
   } catch (error) {
-    await stop().catch(() => {});
+    await stop().catch(() => {
+      /* この実装では追加の処理を行わない。 */
+    });
     throw error;
   }
 }

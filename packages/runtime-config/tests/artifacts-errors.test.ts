@@ -1,3 +1,4 @@
+import type * as LintTypeModule0 from 'node:fs/promises';
 import { SystemError } from '../../../tools/testing/system-error.mts';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,7 +8,7 @@ import { claimArtifactDirectory } from '../src/artifacts.ts';
 import { resolveRuntime } from '../src/resources.ts';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof LintTypeModule0>();
   return { ...actual, writeFile: vi.fn(actual.writeFile) };
 });
 

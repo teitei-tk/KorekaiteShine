@@ -13,13 +13,12 @@ export async function classifyDelivery(
   db: ReturnType<typeof createPrimaryDb>,
   notification: JobNotification,
 ): Promise<DeliveryClassification> {
-  const [deleted] = await db
-    .select()
-    .from(deletedJobs)
-    .where(eq(deletedJobs.jobId, notification.jobId));
+  const deleted = (
+    await db.select().from(deletedJobs).where(eq(deletedJobs.jobId, notification.jobId))
+  ).at(0);
   if (deleted) {
     return { kind: 'deleted' };
   }
-  const [job] = await db.select().from(jobs).where(eq(jobs.jobId, notification.jobId));
+  const job = (await db.select().from(jobs).where(eq(jobs.jobId, notification.jobId))).at(0);
   return job ? { kind: 'job', job } : { kind: 'missing' };
 }

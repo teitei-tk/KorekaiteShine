@@ -18,7 +18,7 @@ test('検証済み候補を本人と期限に結び付け、Markdown全文を保
     });
     expect(await findMaterialTheme(database.db, 'actor', 'analysis', 0, 100)).toEqual({
       theme,
-      materialHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      materialHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
     });
     expect(await findMaterialTheme(database.db, 'other', 'analysis', 0, 100)).toBeNull();
     expect(await findMaterialTheme(database.db, 'actor', 'analysis', 0, 200)).toBeNull();

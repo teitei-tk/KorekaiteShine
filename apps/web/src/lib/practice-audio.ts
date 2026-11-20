@@ -1,6 +1,6 @@
 import workletUrl from './microphone-worklet.js?url';
 
-const sampleRate = 24000;
+const sampleRate = 24_000;
 export function encodeMicrophoneFrame(generation: number, pcm: ArrayBuffer): ArrayBuffer {
   if (
     !Number.isSafeInteger(generation) ||
@@ -22,7 +22,7 @@ export function createPlayback(context: AudioContext) {
   const nextState = { next: 0 };
   return {
     play(bytes: ArrayBuffer, complete: () => void) {
-      if (!bytes.byteLength || bytes.byteLength % 2 || bytes.byteLength > 98304) {
+      if (!bytes.byteLength || bytes.byteLength % 2 || bytes.byteLength > 98_304) {
         throw new Error('受信音声の形式が不正です。');
       }
       const length = bytes.byteLength / 2;
@@ -34,7 +34,7 @@ export function createPlayback(context: AudioContext) {
       const samples = buffer.getChannelData(0);
       const view = new DataView(bytes);
       for (const i of samples.keys()) {
-        samples[i] = view.getInt16(i * 2, true) / 32768;
+        samples[i] = view.getInt16(i * 2, true) / 32_768;
       }
       const source = context.createBufferSource();
       source.buffer = buffer;
@@ -92,7 +92,9 @@ export async function openInterviewAudio(
       track.removeEventListener('ended', lost);
       track.stop();
     }
-    void context.close().catch(() => {});
+    void context.close().catch(() => {
+      /* 拒否は呼び出し元で処理済み。ここでは待機列だけを解放する。 */
+    });
   }
   signal.addEventListener('abort', close, { once: true });
   try {
@@ -132,7 +134,15 @@ export async function openInterviewAudio(
     }
     streamContext.input.connect(streamContext.node);
     streamContext.node.connect(context.destination);
-    return { play: playback.play, stopPlayback: playback.stop, close };
+    return {
+      play: (bytes: ArrayBuffer, complete: () => void) => {
+        playback.play(bytes, complete);
+      },
+      stopPlayback: () => {
+        playback.stop();
+      },
+      close,
+    };
   } catch (error) {
     close();
     throw error;

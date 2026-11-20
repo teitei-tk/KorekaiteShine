@@ -2,7 +2,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 
-const sampleRate = 24000;
+const sampleRate = 24_000;
 
 function tone(frequency) {
   const pcm = Buffer.alloc((sampleRate / 2) * 2);
@@ -18,10 +18,11 @@ function tone(frequency) {
 export async function startProvider() {
   const http = createServer((_request, response) => response.writeHead(404).end());
   const ws = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 });
-  const silent = new WeakSet();
-  const mutedReplies = new WeakSet();
+
   const provider = {
     refused: false,
+    silent: false,
+    muted: false,
     turn: 0,
     onHeldQuestion: undefined,
     openingMuted: false,
@@ -75,21 +76,23 @@ export async function startProvider() {
       // 実サービスと同じく音声deltaにはevent_idを付けない。
       send({
         type: 'session.output_audio.delta',
-        delta:
-          mutedReplies.has(peer) && frequency !== 330
-            ? Buffer.alloc(sampleRate).toString('base64')
-            : tone(frequency),
+        delta: provider.muted ? Buffer.alloc(sampleRate).toString('base64') : tone(frequency),
       });
     }
-    peer.on('error', () => {});
+    peer.on('error', () => {
+      /* この実装では追加の処理を行わない。 */
+    });
     peer.on('message', (raw) => {
-      if (silent.has(peer)) {
+      const event = JSON.parse(raw.toString());
+      if (provider.silent && event.type !== 'session.start') {
         return;
       }
-      const event = JSON.parse(raw.toString());
       if (event.type === 'session.start') {
         turnState.startedAt = Math.floor(performance.now());
         send({ type: 'session.started', event_id: crypto.randomUUID(), session: { id: session } });
+        if (provider.silent) {
+          return;
+        }
         const material = event.session?.input?.[0]?.content[0]?.text;
         const operation = material && JSON.parse(material).resume?.pendingQuestionOperation;
         if (operation) {
@@ -107,7 +110,9 @@ export async function startProvider() {
         }
         transcript('output', '取り組んだことを教えてください。');
         if (!provider.openingMuted) {
-          Array.from({ length: provider.openingChunks }).forEach(() => play(330));
+          for (const _ of Array.from({ length: provider.openingChunks })) {
+            play(330);
+          }
           provider.openingChunks = 1;
         }
         provider.openingMuted = false;
@@ -168,14 +173,14 @@ export async function startProvider() {
       provider.openingMuted = true;
     },
     muteReplies() {
-      for (const peer of ws.clients) {
-        mutedReplies.add(peer);
-      }
+      provider.muted = true;
     },
     silenceCurrentConnections() {
-      for (const peer of ws.clients) {
-        silent.add(peer);
-      }
+      provider.silent = true;
+    },
+    restoreResponses() {
+      provider.muted = false;
+      provider.silent = false;
     },
     rejectDials(value) {
       provider.refused = value;
@@ -185,9 +190,15 @@ export async function startProvider() {
         peer.terminate();
       }
       ws.close();
-      await new Promise((resolve, reject) =>
-        http.close((error) => (error ? reject(error) : resolve())),
-      );
+      await new Promise((resolve, reject) => {
+        http.close((error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+      });
     },
   };
 }

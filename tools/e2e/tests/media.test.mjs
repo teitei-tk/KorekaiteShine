@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import {
   installMediaProbe,
   fakeMediaArgs,
@@ -8,6 +8,17 @@ import {
   waitForOpening,
 } from '../media.mjs';
 
+beforeEach(() => {
+  vi.stubGlobal('voiceE2e', undefined);
+  vi.stubGlobal(
+    'WebSocket',
+    class {
+      close() {
+        return 'closed';
+      }
+    },
+  );
+});
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -19,7 +30,7 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   vi.stubGlobal('navigator', {});
   const context = { addInitScript: (fn) => fn() };
   await installMediaProbe(context);
-  expect(window.voiceE2e).toBeUndefined();
+  expect(globalThis.voiceE2e).toBeUndefined();
   const track = { enabled: true, readyState: 'live' };
   navigator.mediaDevices = { getUserMedia: async () => ({ getAudioTracks: () => [track] }) };
   const amplitudeState = { amplitude: 0 };
@@ -35,7 +46,12 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   vi.stubGlobal('AudioNode', FakeNode);
   vi.stubGlobal('AudioBufferSourceNode', class extends FakeNode {});
   await installMediaProbe(context);
-  expect(() => window.voiceE2e.speak()).toThrow('マイク');
+  globalThis.voiceE2e.traceSocket();
+  const socket = new WebSocket();
+  expect(socket.close()).toBe('closed');
+  expect(globalThis.voiceE2e.socketClosures).toHaveLength(1);
+  expect(globalThis.voiceE2e.socketClosures[0]).toContain('media.test.mjs');
+  expect(() => globalThis.voiceE2e.speak()).toThrow('マイク');
   await navigator.mediaDevices.getUserMedia({ audio: true });
   expect(track.enabled).toBe(false);
   const node = new FakeNode();
@@ -52,11 +68,11 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   vi.advanceTimersByTime(20);
   node.context.currentTime = 0.1;
   vi.advanceTimersByTime(20);
-  expect(window.voiceE2e.count).toBe(0);
+  expect(globalThis.voiceE2e.count).toBe(0);
   amplitudeState.amplitude = 0.1;
   node.context.currentTime = 0.2;
   vi.advanceTimersByTime(20);
-  expect(window.voiceE2e.count).toBe(1);
+  expect(globalThis.voiceE2e.count).toBe(1);
   const page = { evaluate: (fn) => fn(), waitForFunction: vi.fn(async (fn, arg) => fn(arg)) };
   expect(await playbackCount(page)).toBe(1);
   await speak(page);
@@ -68,14 +84,17 @@ test('マイクの発話区間とスピーカーに到達した非無音の再�
   expect(page.waitForFunction.mock.lastCall[0]()).toBe(true);
   expect(await waitForPlayback(page, 0)).toBe(1);
   track.readyState = 'ended';
-  expect(() => window.voiceE2e.speak()).toThrow('マイク');
+  expect(() => globalThis.voiceE2e.speak()).toThrow('マイク');
   expect(vi.getTimerCount()).toBe(0);
   expect(fakeMediaArgs.join(' ')).toContain('answer.wav');
 });
 
 test('初回質問の100msだけでは通さず、模擬質問500msの再生終了を確認する', async () => {
-  vi.stubGlobal('window', {
-    voiceE2e: { count: 8, audibleSeconds: 0.1, completedSeconds: 0.1, lastSound: -1000 },
+  vi.stubGlobal('voiceE2e', {
+    count: 8,
+    audibleSeconds: 0.1,
+    completedSeconds: 0.1,
+    lastSound: -1000,
   });
   const page = {
     evaluate: (fn) => fn(),
@@ -86,13 +105,13 @@ test('初回質問の100msだけでは通さず、模擬質問500msの再生終�
     },
   };
   await expect(waitForOpening(page, 0)).rejects.toThrow('再生が不足');
-  window.voiceE2e.audibleSeconds = 0.46;
-  window.voiceE2e.completedSeconds = 0.46;
+  globalThis.voiceE2e.audibleSeconds = 0.46;
+  globalThis.voiceE2e.completedSeconds = 0.46;
   await expect(waitForOpening(page, 0)).rejects.toThrow('再生が不足');
   vi.stubEnv('E2E_PROFILE', 'live');
   await expect(waitForOpening(page, 0)).resolves.toBeUndefined();
   vi.stubEnv('E2E_PROFILE', 'pr');
-  window.voiceE2e.completedSeconds = 0.5;
+  globalThis.voiceE2e.completedSeconds = 0.5;
   await expect(waitForOpening(page, 0)).resolves.toBeUndefined();
 });
 
@@ -117,23 +136,23 @@ test('再生予定のバッファのうち実際に再生済みの区間だけ�
   const source = new Source();
   const samples = new Float32Array(4800);
   for (const i of samples.subarray(0, 2400).keys()) {
-    samples[i] = Math.sin((2 * Math.PI * 440 * i) / 24000);
+    samples[i] = Math.sin((2 * Math.PI * 440 * i) / 24_000);
   }
-  source.buffer = { sampleRate: 24000, getChannelData: () => samples };
+  source.buffer = { sampleRate: 24_000, getChannelData: () => samples };
   source.context = { currentTime: 0, destination: {}, createAnalyser: () => ({ fftSize: 8 }) };
   source.connect(source.context.destination);
   source.start();
   source.context.currentTime = 0.05;
   source.ended();
-  expect(window.voiceE2e.playedFrequencies).toEqual([]);
+  expect(globalThis.voiceE2e.playedFrequencies).toEqual([]);
   source.start(1);
   source.ended();
-  expect(window.voiceE2e.completedSeconds).toBeCloseTo(0.05);
+  expect(globalThis.voiceE2e.completedSeconds).toBeCloseTo(0.05);
   source.start(1);
   source.context.currentTime = 1.2;
   source.ended();
-  expect(window.voiceE2e.playedFrequencies).toHaveLength(1);
-  expect(window.voiceE2e.playedFrequencies[0]).toBeCloseTo(220, 0);
-  expect(window.voiceE2e.completedSeconds).toBeCloseTo(0.25);
-  expect(window.voiceE2e.audibleSeconds).toBeCloseTo(0.15);
+  expect(globalThis.voiceE2e.playedFrequencies).toHaveLength(1);
+  expect(globalThis.voiceE2e.playedFrequencies[0]).toBeCloseTo(220, 0);
+  expect(globalThis.voiceE2e.completedSeconds).toBeCloseTo(0.25);
+  expect(globalThis.voiceE2e.audibleSeconds).toBeCloseTo(0.15);
 });

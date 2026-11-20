@@ -18,7 +18,9 @@ export async function lockEnvironment(config: RuntimeConfig): Promise<() => void
   } catch (error) {
     lockState.lock?.close();
     if (error instanceof Error && error.message.includes('database is locked')) {
-      throw new Error('環境は使用中です。ローカルランタイムと同じ環境の操作を停止してください。');
+      throw new Error('環境は使用中です。ローカルランタイムと同じ環境の操作を停止してください。', {
+        cause: error,
+      });
     }
     throw error;
   }

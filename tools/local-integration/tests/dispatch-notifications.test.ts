@@ -1,7 +1,9 @@
+import { readJson } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
-import { runDatabaseCommand, type LocalRuntime } from '../src/runtime.ts';
+import { runDatabaseCommand } from '../src/runtime.ts';
+import type { LocalRuntime } from '../src/runtime.ts';
 import { createNotificationRuntime } from './helpers/notification-runtime.ts';
 
 const suite = createNotificationRuntime();
@@ -35,7 +37,7 @@ async function dispatch(runtime: LocalRuntime, failJobId?: string) {
     method: 'POST',
   });
   expect(response.status).toBe(200);
-  return response.json();
+  return readJson(response);
 }
 async function assertSent(config: RuntimeConfig, jobId: string, sent: boolean) {
   await runDatabaseCommand(config, [
@@ -121,11 +123,11 @@ test(
   async ({ signal }) => {
     await suite.run(async ({ config, runtime, newJobId }) => {
       const jobId = newJobId();
-      await seedNotification(config, jobId, now + 86400000);
+      await seedNotification(config, jobId, now + 86_400_000);
       expect(await dispatch(runtime)).toEqual({
         outboxSent: 1,
         outboxDeferred: 0,
-        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 86400 }],
+        requests: [{ purpose: 'diagnostics', operation: 'notify', jobId, delaySeconds: 86_400 }],
       });
       await assertSent(config, jobId, true);
     }, signal);
@@ -151,7 +153,7 @@ test(
   async ({ signal }) => {
     await suite.run(async ({ config, runtime, newJobId }) => {
       const jobId = newJobId();
-      await seedNotification(config, jobId, now, now + 1_001);
+      await seedNotification(config, jobId, now, now + 1001);
       expect(await dispatch(runtime)).toEqual({
         outboxSent: 1,
         outboxDeferred: 0,

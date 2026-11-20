@@ -16,7 +16,7 @@ test('起動確認のHTTP本文が終わらない場合も期限内に失敗し�
   await once(server, 'listening');
   try {
     const address = server.address();
-    if (!address || typeof address === 'string') {
+    if (address === null || typeof address === 'string') {
       throw new Error('TCPポートがありません。');
     }
     const started = performance.now();
@@ -26,7 +26,13 @@ test('起動確認のHTTP本文が終わらない場合も期限内に失敗し�
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
+      server.close((error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 }, 5000);
@@ -40,7 +46,7 @@ test('起動確認のHTTP応答が失敗状態なら本文の完了後も準備�
   await once(server, 'listening');
   try {
     const address = server.address();
-    if (!address || typeof address === 'string') {
+    if (address === null || typeof address === 'string') {
       throw new Error('TCPポートがありません。');
     }
     await expect(confirmHttpReady(`http://127.0.0.1:${address.port}`, 1000)).rejects.toThrow(
@@ -49,7 +55,13 @@ test('起動確認のHTTP応答が失敗状態なら本文の完了後も準備�
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
+      server.close((error) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
     });
   }
 });

@@ -1,20 +1,21 @@
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseEnvironment, type AppEnvironment } from './environment.ts';
+import { parseEnvironment } from './environment.ts';
+import type { AppEnvironment } from './environment.ts';
 
-export interface RuntimeInput {
+export type RuntimeInput = {
   repositoryRoot: string;
   appEnv: string | undefined;
   runId?: string;
   parallelIndex?: number;
-}
+};
 
-export interface QueuePair {
+export type QueuePair = {
   queue: string;
   dlq: string;
-}
+};
 
-export interface RuntimeConfig {
+export type RuntimeConfig = {
   environment: AppEnvironment;
   workers: { web: string; interview: string; evaluation: string };
   d1: { name: string; id: string };
@@ -22,7 +23,7 @@ export interface RuntimeConfig {
   queues: { evaluation: QueuePair; diagnostics?: QueuePair };
   stateDirectory: string | null;
   artifactDirectory: string;
-}
+};
 
 function queuePair(name: string): QueuePair {
   return { queue: name, dlq: `${name}-dlq` };

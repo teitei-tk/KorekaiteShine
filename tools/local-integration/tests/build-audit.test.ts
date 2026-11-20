@@ -1,8 +1,11 @@
+import { readBuildAudit } from '../src/records.ts';
+import { objectAt, objectArray, stringValue, stringArray } from './helpers/config-json.ts';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, onTestFinished, test } from 'vitest';
-import { buildAudit, type BuildAudit } from '../src/build-audit.ts';
+import { buildAudit } from '../src/build-audit.ts';
+import { parseJson } from '@korekaite/api-contracts/json';
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'korekaite-build-audit-'));
@@ -10,7 +13,7 @@ async function fixture() {
   const directory = join(root, 'audit');
   const hook = buildAudit(directory).writeBundle;
   if (typeof hook !== 'function') {
-    throw new Error('ビルド監査のフックがありません。');
+    throw new TypeError('ビルド監査のフックがありません。');
   }
   const info = { importedIds: ['external'], dynamicallyImportedIds: ['lazy'], isEntry: true };
   const context = {
@@ -18,14 +21,12 @@ async function fixture() {
     getModuleIds: () => ['entry'],
     getModuleInfo: (): typeof info | null => info,
   };
-  const invoke = (options: { dir?: string }, bundle: object) =>
-    hook.call(
-      context as object as ThisParameterType<typeof hook>,
-      options as Parameters<typeof hook>[0],
-      bundle as Parameters<typeof hook>[1],
-    );
-  const report = async (): Promise<BuildAudit> =>
-    JSON.parse(await readFile(join(directory, 'client.json'), 'utf8'));
+  // Viteの全contextを装う型断定はせず、フックが読むAPIだけを備えたfixtureで呼び出す。
+  const invoke = async (options: { dir?: string }, bundle: object) => {
+    await Reflect.apply(hook, context, [options, bundle]);
+  };
+  const report = async () =>
+    readBuildAudit(parseJson(await readFile(join(directory, 'client.json'), 'utf8')));
   return { root, directory, context, invoke, report };
 }
 
@@ -83,4 +84,26 @@ test('読み込んだモジュールの情報が欠けていれば不完全な�
   context.getModuleInfo = () => null;
   await expect(invoke({}, {})).rejects.toThrow('モジュール情報がありません: entry');
   await expect(report()).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
+test('監査記録の構造が不正なら利用前に拒否する', () => {
+  for (const value of [
+    null,
+    {},
+    { environment: 'client', outputDirectory: 'dist', modules: [false], outputs: [] },
+  ]) {
+    expect(() => readBuildAudit(value)).toThrow();
+  }
+});
+
+test('検査用JSONのコンテナ・要素・文字列を実際に検証する', () => {
+  expect(objectAt({ nested: { name: 'worker' } }, 'nested')).toEqual({ name: 'worker' });
+  expect(objectArray([{ name: 'worker' }])).toEqual([{ name: 'worker' }]);
+  expect(stringArray(['a', 'b'])).toEqual(['a', 'b']);
+  expect(() => objectAt(null)).toThrow(TypeError);
+  expect(() => objectAt({}, 'missing')).toThrow(TypeError);
+  expect(() => objectArray({})).toThrow(TypeError);
+  expect(() => objectArray([false])).toThrow(TypeError);
+  expect(() => stringValue(1)).toThrow(TypeError);
+  expect(() => stringArray([1])).toThrow(TypeError);
 });

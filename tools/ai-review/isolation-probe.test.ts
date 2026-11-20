@@ -72,11 +72,15 @@ it('資格情報が空でも環境変数が継承されていれば拒否する'
 });
 
 it('通信先へ到達できる場合にネットワーク隔離成功と表示しない', async () => {
-  const server = createServer((socket) => socket.end());
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const server = createServer((socket) => {
+    socket.end();
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', resolve);
+  });
   try {
     const address = server.address();
-    if (!address || typeof address === 'string') {
+    if (address === null || typeof address === 'string') {
       throw new Error('listener not ready');
     }
     const report = await probeIsolation({
@@ -90,7 +94,11 @@ it('通信先へ到達できる場合にネットワーク隔離成功と表示�
     expect(report.checks).toContainEqual({ name: 'network', passed: false });
     expect(report.passed).toBe(false);
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
   }
 });
 
@@ -98,8 +106,12 @@ it('接続できるUnixソケットを隔離済みにせず、存在しないソ
   const directory = mkdtempSync(join(tmpdir(), 'socket-probe-'));
   directories.push(directory);
   const path = join(directory, 'service.sock');
-  const server = createServer((socket) => socket.end());
-  await new Promise<void>((resolve) => server.listen(path, resolve));
+  const server = createServer((socket) => {
+    socket.end();
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(path, resolve);
+  });
   try {
     const report = await probeIsolation({
       expectedUid: process.getuid?.() ?? 0,
@@ -109,7 +121,7 @@ it('接続できるUnixソケットを隔離済みにせず、存在しないソ
       port: 0,
       env: {},
       protectedSockets: [path, join(directory, 'missing.sock')],
-      protectedProcesses: [process.pid, 2147483647],
+      protectedProcesses: [process.pid, 2_147_483_647],
     });
     expect(report.checks).toEqual(
       expect.arrayContaining([
@@ -120,19 +132,25 @@ it('接続できるUnixソケットを隔離済みにせず、存在しないソ
       ]),
     );
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await new Promise<void>((resolve) => {
+      server.close(() => {
+        resolve();
+      });
+    });
   }
 });
 
 it('終了コード0でも検査結果の欠落・一部だけの成功を合格にしない', () => {
-  expect(() => requireIsolationReport('', ['uid', 'network'])).toThrow();
-  expect(() =>
+  expect(() => {
+    requireIsolationReport('', ['uid', 'network']);
+  }).toThrow();
+  expect(() => {
     requireIsolationReport(
       JSON.stringify({ stage: 'sandbox', passed: true, checks: [{ name: 'uid', passed: true }] }),
       ['uid', 'network'],
-    ),
-  ).toThrow();
-  expect(() =>
+    );
+  }).toThrow();
+  expect(() => {
     requireIsolationReport(
       JSON.stringify({
         stage: 'sandbox',
@@ -143,9 +161,9 @@ it('終了コード0でも検査結果の欠落・一部だけの成功を合格
         ],
       }),
       ['uid', 'network'],
-    ),
-  ).toThrow();
-  expect(() =>
+    );
+  }).toThrow();
+  expect(() => {
     requireIsolationReport(
       JSON.stringify({
         stage: 'sandbox',
@@ -156,9 +174,9 @@ it('終了コード0でも検査結果の欠落・一部だけの成功を合格
         ],
       }),
       ['uid', 'network'],
-    ),
-  ).toThrow();
-  expect(() =>
+    );
+  }).toThrow();
+  expect(() => {
     requireIsolationReport(
       JSON.stringify({
         stage: 'sandbox',
@@ -169,8 +187,8 @@ it('終了コード0でも検査結果の欠落・一部だけの成功を合格
         ],
       }),
       ['uid', 'network'],
-    ),
-  ).not.toThrow();
+    );
+  }).not.toThrow();
 });
 
 it('存在しない親PIDは合格にせず、秘密を含まない原因を報告する', async () => {
@@ -178,7 +196,7 @@ it('存在しない親PIDは合格にせず、秘密を含まない原因を報�
     expectedUid: process.getuid?.() ?? 0,
     protectedFiles: [],
     readOnlyDirectories: [],
-    parentPid: 2147483647,
+    parentPid: 2_147_483_647,
     port: 0,
     env: {},
   });

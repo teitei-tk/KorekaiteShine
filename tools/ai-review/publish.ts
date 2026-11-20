@@ -1,14 +1,13 @@
+import { requireValue } from './required.ts';
 import { appendFileSync } from 'node:fs';
-import {
-  operationMarker,
-  generationMarker,
-  readArtifact,
-  validateArtifact,
-  type ReviewArtifact,
-} from './artifact.ts';
-import { loadSnapshot, snapshotRevision, normalizeSnapshot, type Snapshot } from './snapshot.ts';
-import { githubApi, ownComment, type Api, type ReviewComment } from './github.ts';
-import { eligible, type PullRequest } from './policy.ts';
+import { operationMarker, generationMarker, readArtifact, validateArtifact } from './artifact.ts';
+import type { ReviewArtifact } from './artifact.ts';
+import { loadSnapshot, snapshotRevision, normalizeSnapshot } from './snapshot.ts';
+import type { Snapshot } from './snapshot.ts';
+import { githubApi, ownComment } from './github.ts';
+import type { Api } from './github.ts';
+import { eligible } from './policy.ts';
+import type { PullRequest } from './policy.ts';
 import { writeStatusReport } from './status-report.ts';
 
 export function recognizeOperations(artifact: ReviewArtifact, current: Snapshot): Set<string> {
@@ -17,28 +16,27 @@ export function recognizeOperations(artifact: ReviewArtifact, current: Snapshot)
     done = new Set<string>();
   for (const op of artifact.operations) {
     const found = [
-      ...current.issues.map((c) => ({ c, inline: false })),
-      ...current.inline.map((c) => ({ c, inline: true })),
+      ...current.issues.map((c) => ({ c, inline: false as const })),
+      ...current.inline.map((c) => ({ c, inline: true as const })),
     ].filter(({ c }) => c.body.includes(operationMarker(op.id)));
     if (found.length > 1) {
       throw new Error('同じ投稿操作が重複しています');
     }
-    if (!found.length) {
+    if (found.length === 0) {
       continue;
     }
-    const { c, inline } = found[0];
-    const line = c as ReviewComment;
+    const [{ c, inline }] = found;
     if (
       !ownComment(c) ||
       c.body !== op.body ||
       (op.kind === 'finding'
         ? !inline ||
-          !!line.in_reply_to_id ||
-          line.path !== op.path ||
-          line.original_line !== op.line ||
-          line.original_commit_id !== artifact.metadata.head
+          Boolean(c.in_reply_to_id) ||
+          c.path !== op.path ||
+          c.original_line !== op.line ||
+          c.original_commit_id !== artifact.metadata.head
         : op.replyTo
-          ? !inline || line.in_reply_to_id !== op.replyTo
+          ? !inline || c.in_reply_to_id !== op.replyTo
           : inline)
     ) {
       throw new Error('操作マーカーと投稿本文・対象が一致しません');
@@ -91,7 +89,7 @@ export async function publishArtifact(
     for (const c of [...current.issues, ...current.inline]) {
       if (
         ownComment(c) &&
-        /<!-- generation:v2:\d+:\d+:/.test(c.body) &&
+        /<!-- generation:v2:\d+:\d+:/u.test(c.body) &&
         c.body.includes(`:${m.head}:${m.base} -->`) &&
         !c.body.includes(generationMarker(m, artifact.origin))
       ) {
@@ -101,23 +99,21 @@ export async function publishArtifact(
     if (done.has(op.id)) {
       continue;
     }
-    if (op.kind === 'finding') {
-      await api(`pulls/${m.number}/comments`, 'POST', {
-        body: op.body,
-        commit_id: m.head,
-        path: op.path!,
-        line: op.line!,
-        side: 'RIGHT',
-      });
-    } else {
-      await api(
-        op.replyTo
-          ? `pulls/${m.number}/comments/${op.replyTo}/replies`
-          : `issues/${m.number}/comments`,
-        'POST',
-        { body: op.body },
-      );
-    }
+    await (op.kind === 'finding'
+      ? api(`pulls/${m.number}/comments`, 'POST', {
+          body: op.body,
+          commit_id: m.head,
+          path: requireValue(op.path),
+          line: requireValue(op.line),
+          side: 'RIGHT',
+        })
+      : api(
+          op.replyTo
+            ? `pulls/${m.number}/comments/${op.replyTo}/replies`
+            : `issues/${m.number}/comments`,
+          'POST',
+          { body: op.body },
+        ));
     wroteState.wrote = true;
   }
   return wroteState.wrote ? 'REVIEW_COMPLETE' : 'ALREADY_COMPLETE';
@@ -125,11 +121,11 @@ export async function publishArtifact(
 if (import.meta.main) {
   try {
     const origin = {
-      run: process.env.GITHUB_RUN_ID!,
-      attempt: process.env.GENERATION_ATTEMPT!,
-      sha: process.env.GITHUB_SHA!,
+      run: requireValue(process.env.GITHUB_RUN_ID),
+      attempt: requireValue(process.env.GENERATION_ATTEMPT),
+      sha: requireValue(process.env.GITHUB_SHA),
     };
-    const artifact = readArtifact(process.env.REVIEW_DIRECTORY!, origin),
+    const artifact = readArtifact(requireValue(process.env.REVIEW_DIRECTORY), origin),
       m = artifact.metadata;
     if (
       m.number !== Number(process.env.PR_NUMBER) ||

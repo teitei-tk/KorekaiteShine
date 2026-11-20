@@ -1,5 +1,6 @@
+import { readJson, readCheckAccepted, readCheckStatus } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { withDiagnosticRuntime } from './helpers/diagnostic-runtime.ts';
 import { runDatabaseCommand } from '../src/runtime.ts';
 
@@ -11,7 +12,7 @@ test('評価例外は試行・再試行通知を保存して実行権を解放�
       body: JSON.stringify({ scenario: 'success' }),
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const now = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const deliver = async (time: number, rejectEvaluation = false) => {
       const delivered = await fetch(
@@ -23,10 +24,12 @@ test('評価例外は試行・再試行通知を保存して実行権を解放�
         },
       );
       expect(delivered.status).toBe(200);
-      return delivered.json();
+      return readJson(delivered);
     };
     const status = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
+      readCheckStatus(
+        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+      );
     expect(await deliver(now, true)).toEqual({ action: 'ack' });
     const waiting = await status();
     expect(waiting).toMatchObject({
@@ -34,7 +37,10 @@ test('評価例外は試行・再試行通知を保存して実行権を解放�
       attemptCount: 1,
       lastErrorCode: 'AI_EXCEPTION',
     });
-    expect(Temporal.Instant.from(waiting.nextAttemptAt).epochMilliseconds).toBe(now + 30_000);
+    expect(
+      Temporal.Instant.from(waiting.nextAttemptAt ?? assert.fail('必要な日時がありません。'))
+        .epochMilliseconds,
+    ).toBe(now + 30_000);
     await runDatabaseCommand(config, [
       'execute',
       `

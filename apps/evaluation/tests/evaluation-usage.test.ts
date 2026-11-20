@@ -9,7 +9,7 @@ import { reserveEvaluation } from '../src/server/repositories/evaluation-usage';
 test('新規評価を一日10ジョブに制限し、日付をまたぐ自動再試行は元の枠を使う', async () => {
   const database = createTestDatabase();
   try {
-    const now = 1794063599000;
+    const now = 1_794_063_599_000;
     const reserve = (jobId: string, actorId = 'actor', at = now) =>
       reserveEvaluation(database.db, { jobId, actorId, now: at });
     const results = await Promise.all(
@@ -32,7 +32,7 @@ test('枠がない新規ジョブではAIを呼ばず、既存予約の再試行
   const database = createTestDatabase();
   const now = 1000;
   try {
-    for (const index of Array(10).keys()) {
+    for (const index of Array.from({ length: 10 }).keys()) {
       expect(
         await reserveEvaluation(database.db, { jobId: `job-${index}`, actorId: 'actor', now }),
       ).toBe(true);
@@ -109,7 +109,7 @@ test('枠がない新規ジョブではAIを呼ばず、既存予約の再試行
       throw new Error('モックAI');
     });
     const evaluate = createJobEvaluator(database.db, generate, () => now);
-    const signal = new AbortController().signal;
+    const { signal } = new AbortController();
     expect(await evaluate('new', 1, signal)).toEqual({
       ok: false,
       error: { code: 'EVALUATION_USAGE_LIMIT', retryable: false },

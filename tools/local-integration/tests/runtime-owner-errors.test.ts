@@ -1,15 +1,13 @@
+import type * as LintTypeModule0 from 'node:child_process';
 import { ChildProcess, fork } from 'node:child_process';
 import { PassThrough } from 'node:stream';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { afterEach, expect, test, vi } from 'vitest';
-import {
-  connectLocalRuntime,
-  startOwnedRuntime,
-  type RuntimeOwnerRequest,
-} from '../src/runtime-owner.ts';
+import { assert, afterEach, expect, test, vi } from 'vitest';
+import { connectLocalRuntime, startOwnedRuntime } from '../src/runtime-owner.ts';
+import type { RuntimeOwnerRequest } from '../src/runtime-owner.ts';
 
 vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:child_process')>()),
+  ...(await importOriginal<typeof LintTypeModule0>()),
   fork: vi.fn(),
 }));
 afterEach(() => {
@@ -67,7 +65,9 @@ test('IPC送信失敗を起動成功にせず管理プロセスを停止する',
       callback(new Error('send failed'));
     } else {
       callback(null);
-      queueMicrotask(() => fixture.child.emit('close', 0));
+      queueMicrotask(() => {
+        fixture.child.emit('close', 0);
+      });
     }
     return false;
   });
@@ -103,7 +103,9 @@ test('停止時の異常終了コードを成功扱いしない', async () => {
   const runtime = await fixture.start();
   fixture.send.mockImplementation((_request, callback) => {
     callback(null);
-    queueMicrotask(() => fixture.child.emit('close', 8));
+    queueMicrotask(() => {
+      fixture.child.emit('close', 8);
+    });
     return true;
   });
   await expect(runtime.stop()).rejects.toThrow('異常終了しました（8）');
@@ -130,7 +132,9 @@ test('readyが来なければ120秒で起動を中断し停止を確認する', 
   fixture.send.mockImplementation((request, callback) => {
     callback(null);
     if (request.type === 'stop') {
-      queueMicrotask(() => fixture.child.emit('close', 0));
+      queueMicrotask(() => {
+        fixture.child.emit('close', 0);
+      });
     }
     return true;
   });
@@ -147,7 +151,9 @@ test('scheduled応答がHTTP成功でも結果がok以外なら失敗する', as
   );
   const runtime = connectLocalRuntime(
     'http://owner.invalid',
-    async () => {},
+    async () => {
+      /* この実装では追加の処理を行わない。 */
+    },
     'evaluation',
     Promise.resolve({ exitCode: 0 }),
   );
@@ -155,18 +161,22 @@ test('scheduled応答がHTTP成功でも結果がok以外なら失敗する', as
 });
 
 test('scheduledの成功応答を受理し対象Workerとcronを送る', async () => {
-  const fetcher = vi.fn().mockResolvedValue(Response.json({ result: { outcome: 'ok' } }));
+  const fetcher = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(Response.json({ result: { outcome: 'ok' } }));
   vi.stubGlobal('fetch', fetcher);
   const runtime = connectLocalRuntime(
     'http://owner.invalid',
-    async () => {},
+    async () => {
+      /* この実装では追加の処理を行わない。 */
+    },
     'evaluation',
     Promise.resolve({ exitCode: 0 }),
   );
   await runtime.runScheduled();
-  const [url, options] = fetcher.mock.calls[0]!;
-  expect(String(url)).toContain('worker=evaluation');
-  expect(options.body).toBe(JSON.stringify({ cron: '* * * * *' }));
+  const [url, options] = fetcher.mock.calls[0] ?? assert.fail('必須のテスト値がありません。');
+  expect(url instanceof Request ? url.url : String(url)).toContain('worker=evaluation');
+  expect(options?.body).toBe(JSON.stringify({ cron: '* * * * *' }));
 });
 
 test('ready以外の未知のIPCメッセージを起動成功として扱わない', async () => {

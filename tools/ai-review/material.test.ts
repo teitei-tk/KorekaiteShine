@@ -1,3 +1,4 @@
+import { readJsonObject } from './tests/helpers/json-object.ts';
 import { expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -9,17 +10,18 @@ it('diffヘッダーやhunk外の行を投稿可能な変更行として数え�
     changedLines('diff --git a/a.ts b/a.ts\n--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-old\n+new'),
   ).toEqual([1]);
 });
-it('追加行だけを投稿候補にする', () =>
-  expect(changedLines('@@ -1,2 +1,3 @@\n same\n+new\n-old\n+newer')).toEqual([2, 3]));
+it('追加行だけを投稿候補にする', () => {
+  expect(changedLines('@@ -1,2 +1,3 @@\n same\n+new\n-old\n+newer')).toEqual([2, 3]);
+});
 it('原文への参照と全差分行を準備し独自分割を作らない', () => {
   const dir = mkdtempSync(join(tmpdir(), 'codex-material-'));
   const pr = {
     number: 1,
-    user: { id: 1324680, type: 'User' },
+    user: { id: 1_324_680, type: 'User' },
     state: 'open',
     draft: false,
-    head: { sha: 'a'.repeat(40), repo: { id: 1426899426 } },
-    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1426899426 } },
+    head: { sha: 'a'.repeat(40), repo: { id: 1_426_899_426 } },
+    base: { sha: 'b'.repeat(40), ref: 'main', repo: { id: 1_426_899_426 } },
   };
   const git = (...args: string[]) =>
     args[0] === 'merge-base'
@@ -33,7 +35,7 @@ it('原文への参照と全差分行を準備し独自分割を作らない', (
     const result = collectFromGit(pr, dir, git, { issues: [], inline: [], threads: [] }, '4');
     expect(result.version).toBe(2);
     expect(result.lines['a.rs']).toEqual([1]);
-    expect(JSON.parse(readFileSync(join(dir, 'request.json'), 'utf8')).head).toBe(pr.head.sha);
+    expect(readJsonObject(readFileSync(join(dir, 'request.json'), 'utf8')).head).toBe(pr.head.sha);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

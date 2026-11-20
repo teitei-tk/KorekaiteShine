@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { expect, test, vi } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import { analyzeStoredMaterialRequest } from '../src/server/stored-materials';
@@ -36,10 +37,10 @@ test('分析枠を確保してからAIへ送り、保存した候補を返し、
       (await analyzeStoredMaterialRequest(request(), { ...deps, actor: () => '' })).status,
     ).toBe(503);
     expect(await database.db.select().from(usageReservations)).toHaveLength(0);
-    for (const _ of Array(10).keys()) {
+    for (const _ of Array.from({ length: 10 }).keys()) {
       const response = await analyzeStoredMaterialRequest(request(), deps);
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
+      expect(parseJson(await response.text())).toMatchObject({
         themes: [{ excerpt: '架空の経験' }],
         analysisId: expect.any(String),
       });

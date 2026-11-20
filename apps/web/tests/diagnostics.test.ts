@@ -1,10 +1,12 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { parseJson } from '@korekaite/api-contracts/json';
+import { assert, afterEach, expect, test, vi } from 'vitest';
 import {
   validateCheckInternalError,
   validateCheckValidationError,
   validateCheckAccepted,
 } from '@korekaite/api-contracts/http/diagnostics-validators';
-import { acceptCheck, type CheckDependencies } from '../src/diagnostics/accept';
+import { acceptCheck } from '../src/diagnostics/accept';
+import type { CheckDependencies } from '../src/diagnostics/accept';
 import { getCheck } from '../src/diagnostics/get';
 
 const repository = vi.hoisted(() => ({ acceptDiagnosticJob: vi.fn(), findDiagnosticJob: vi.fn() }));
@@ -17,13 +19,15 @@ afterEach(() => {
 test('予期しない内部例外は詳細を公開せず500と追跡ログを返す', async () => {
   repository.acceptDiagnosticJob.mockRejectedValue(new TypeError('private_internal_failure'));
   repository.findDiagnosticJob.mockRejectedValue(new TypeError('private_internal_failure'));
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const deps: CheckDependencies = {
     // repositoryを置き換えるこの例外境界テストではDBを呼ばない。ローカルD1障害は統合テストで検証する。
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',
-    now: () => 1793577600000,
+    now: () => 1_793_577_600_000,
     newId: () => crypto.randomUUID(),
   };
   const start = new Request('http://localhost/api/diagnostics/check-jobs', {
@@ -38,33 +42,38 @@ test('予期しない内部例外は詳細を公開せず500と追跡ログを�
   for (const response of responses) {
     expect(response.status).toBe(500);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const body = await response.json();
-    expect(validateCheckInternalError(body)).toBe(true);
+    const body = parseJson(await response.text());
+    assert.ok(validateCheckInternalError(body));
     expect(JSON.stringify(body)).not.toContain('private_internal_failure');
     expect(JSON.stringify(log.mock.calls)).toContain(body.error.requestId);
   }
   expect(JSON.stringify(log.mock.calls)).not.toContain('private_internal_failure');
 });
 
-test('本文を読み取れない要求は保存せず400と追跡情報を返す', async () => {
+test.each(['読取失敗', '不正JSON'])('本文が%sの要求は保存せず400と追跡情報を返す', async (kind) => {
   const requestId = crypto.randomUUID();
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const deps: CheckDependencies = {
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',
-    now: () => 1793577600000,
+    now: () => 1_793_577_600_000,
     newId: () => requestId,
   };
   const init: RequestInit & { duplex: 'half' } = {
     method: 'POST',
     duplex: 'half',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
-    body: new ReadableStream<Uint8Array>({
-      pull(controller) {
-        controller.error(new Error('private_body_read_failure'));
-      },
-    }),
+    body:
+      kind === '不正JSON'
+        ? '{'
+        : new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.error(new Error('private_body_read_failure'));
+            },
+          }),
   };
   const response = await acceptCheck(
     new Request('http://localhost/api/diagnostics/check-jobs', init),
@@ -72,8 +81,8 @@ test('本文を読み取れない要求は保存せず400と追跡情報を返�
   );
   expect(response.status).toBe(400);
   expect(response.headers.get('Cache-Control')).toBe('no-store');
-  const body = await response.json();
-  expect(validateCheckValidationError(body)).toBe(true);
+  const body = parseJson(await response.text());
+  assert.ok(validateCheckValidationError(body));
   expect(body.error).toMatchObject({
     code: 'VALIDATION_ERROR',
     requestId,
@@ -96,12 +105,14 @@ test('永続化後の初期化開始に失敗しても202と元の受付を保�
   const scheduleInitialization = vi.fn(() => {
     throw new Error('private_initialization_failure');
   });
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const deps: CheckDependencies = {
     db: {} as CheckDependencies['db'],
     environment: 'test',
     actorId: 'local-developer',
-    now: () => 1793577600000,
+    now: () => 1_793_577_600_000,
     newId: () => requestId,
     scheduleInitialization,
   };
@@ -115,8 +126,8 @@ test('永続化後の初期化開始に失敗しても202と元の受付を保�
   expect(response.status).toBe(202);
   expect(response.headers.get('Cache-Control')).toBe('no-store');
   expect(response.headers.get('Location')).toBe(`/api/diagnostics/check-jobs/${accepted.jobId}`);
-  const body = await response.json();
-  expect(validateCheckAccepted(body)).toBe(true);
+  const body = parseJson(await response.text());
+  assert.ok(validateCheckAccepted(body));
   expect(body).toEqual(accepted);
   expect(repository.acceptDiagnosticJob).toHaveBeenCalledExactlyOnceWith(deps, key, {
     scenario: 'success',

@@ -1,3 +1,4 @@
+import { jsonObject, parseObject } from './helpers/json';
 import { expect, test } from 'vitest';
 import { interviews, transcriptFragments, evaluationInputs } from '@korekaite/database/interviews';
 import { jobs, jobAttempts } from '@korekaite/database/jobs';
@@ -89,8 +90,8 @@ test('本人の原文と評価を返し、内部設定・別人の記録・壊�
     const response = await interviewDetailRequest(request, 'one', deps);
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
-    const body = await response.json();
-    expect(body.audioRemainingMs).toBe(3600000);
+    const body = parseObject(await response.text());
+    expect(body.audioRemainingMs).toBe(3_600_000);
     expect(body.transcripts).toEqual([
       {
         fragmentId: 'f1',
@@ -103,8 +104,8 @@ test('本人の原文と評価を返し、内部設定・別人の記録・壊�
         receivedAt: 500,
       },
     ]);
-    expect(body.evaluation.result).toEqual(result);
-    expect(JSON.stringify(body)).not.toMatch(/private-|materialHash|actorId/);
+    expect(jsonObject(body.evaluation).result).toEqual(result);
+    expect(JSON.stringify(body)).not.toMatch(/private-|materialHash|actorId/u);
     expect(
       (await interviewDetailRequest(request, 'one', { ...deps, actor: () => 'other' })).status,
     ).toBe(404);

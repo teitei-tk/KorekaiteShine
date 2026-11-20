@@ -1,3 +1,4 @@
+import { readJson } from './helpers/json.ts';
 import { access } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { expect, test } from 'vitest';
@@ -38,7 +39,7 @@ test('共有環境は未送信・送信失敗の通知をケース間で除去�
         { method: 'POST' },
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ outboxSent: 0, outboxDeferred: 1 });
+      expect(await readJson(response)).toMatchObject({ outboxSent: 0, outboxDeferred: 1 });
     }, signal);
     await suite.run(async ({ config, runtime }) => {
       expect(runtime.baseUrl).toBe(previousUrlContext.previousUrl);
@@ -47,7 +48,7 @@ test('共有環境は未送信・送信失敗の通知をケース間で除去�
         { method: 'POST' },
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ outboxSent: 0, outboxDeferred: 0, requests: [] });
+      expect(await readJson(response)).toEqual({ outboxSent: 0, outboxDeferred: 0, requests: [] });
       await runDatabaseCommand(config, [
         'execute',
         `

@@ -1,17 +1,16 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { DiagnosticDatabaseError } from '../server/repositories/database-error';
 import { bodyValidationDetails, errorResponse, validationResponse } from './errors';
 import {
   validateCheckIdempotencyKey,
   validateCheckStart,
 } from '@korekaite/api-contracts/http/diagnostics-validators';
-import {
-  acceptDiagnosticJob,
-  type AcceptanceContext,
-} from '../server/repositories/diagnostic-jobs';
+import { acceptDiagnosticJob } from '../server/repositories/diagnostic-jobs';
+import type { AcceptanceContext } from '../server/repositories/diagnostic-jobs';
 
-export interface CheckDependencies extends AcceptanceContext {
-  scheduleInitialization?(jobId: string): void;
-}
+export type CheckDependencies = {
+  scheduleInitialization?: (jobId: string) => void;
+} & AcceptanceContext;
 
 export async function acceptCheck(request: Request, deps: CheckDependencies): Promise<Response> {
   const requestId = deps.newId();
@@ -36,7 +35,7 @@ export async function acceptCheck(request: Request, deps: CheckDependencies): Pr
   }
   const input = (() => {
     try {
-      return body === null ? undefined : JSON.parse(body);
+      return body === null ? undefined : parseJson(body);
     } catch {
       return undefined;
     }

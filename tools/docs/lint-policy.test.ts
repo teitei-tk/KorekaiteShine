@@ -93,3 +93,67 @@ it('immutableルールで変数宣言・引数の書き換え・Object.assignを
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it('inline抑制の再導入を追跡ソース検査で拒否する', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lint-directive-'));
+  const check = (files: string[]) =>
+    spawnSync(process.execPath, ['tools/lint/check-inline-directives.mjs', ...files], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+  try {
+    const valid = join(dir, 'valid.tsx');
+    writeFileSync(
+      valid,
+      [
+        "export const text = ' // oxlint-disable-line no-console';",
+        'export const label = <div>// oxlint-disable</div>;',
+        `export const template = \`value \${1}// oxlint-disable\`;`,
+      ].join('\n'),
+    );
+    expect(check([valid]).status).toBe(0);
+    const files = [
+      '// oxlint-disable-next-line no-console\nconsole.log(1);',
+      '/* eslint-disable no-console */\nconsole.log(1);',
+      'console.log(1); // oxlint-disable-line no-console',
+      'console.log(1);// oxlint-disable-line no-console',
+      '/** oxlint-disable no-console */\nconsole.log(1);',
+      '/* 説明\n eslint-disable no-console\n*/\nconsole.log(1);',
+      'export const value = <div>{/* oxlint-disable no-console */}</div>;',
+      'export function f() { /* eslint-disable no-console */ }',
+      'if (true) {/* oxlint-disable no-console */}',
+      '// @ts-ignore\nexport const value = 1;',
+      '// biome-ignore lint/suspicious/noConsole: fixture\nconsole.log(1);',
+    ].map((source, index) => {
+      const file = join(dir, `invalid-${index}.tsx`);
+      writeFileSync(file, source);
+      return file;
+    });
+    const result = check(files);
+    expect(result.status).toBe(1);
+    for (const file of files) {
+      expect(result.stderr).toContain(`${file}:`);
+    }
+    expect(result.stderr).toContain('inline検査抑制は禁止');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it('inline検査は引数なしでGit管理対象を列挙し、普通のコメントを許可する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'lint-tracked-'));
+  try {
+    writeFileSync(join(directory, 'normal.ts'), '// 普通のコメント\nexport const value = 1;');
+    expect(spawnSync('git', ['init', '--quiet'], { cwd: directory }).status).toBe(0);
+    expect(spawnSync('git', ['add', 'normal.ts'], { cwd: directory }).status).toBe(0);
+    const result = spawnSync(
+      process.execPath,
+      [join(root, 'tools/lint/check-inline-directives.mjs')],
+      { cwd: directory, encoding: 'utf8' },
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('inline検査抑制: 0件');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

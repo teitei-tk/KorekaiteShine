@@ -1,3 +1,6 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { readObject } from './records.ts';
+import { requireValue } from './required.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -9,7 +12,8 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { runWithEvidence } from './evidence.ts';
 import { runtimeVersions } from './versions.ts';
-import { startRuntime, runDatabaseCommand, type LocalRuntime } from './runtime.ts';
+import { startRuntime, runDatabaseCommand } from './runtime.ts';
+import type { LocalRuntime } from './runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -19,18 +23,18 @@ async function json(runtime: LocalRuntime, path: string, init: RequestInit = {},
     signal: AbortSignal.timeout(10_000),
   });
   assert.equal(response.status, status);
-  return response.json();
+  return parseJson(await response.text());
 }
 
 async function waitForCompleted(runtime: LocalRuntime, jobId: string) {
   const deadline = performance.now() + 30_000;
   for (;;) {
-    const job = await json(runtime, `/api/formal-queue-test?jobId=${jobId}`);
+    const job = readObject(await json(runtime, `/api/formal-queue-test?jobId=${jobId}`));
     assert.equal(job.jobId, jobId);
     assert.equal(job.purpose, 'evaluation');
     if (job.status === 'completed') {
       assert.equal(job.attemptCount, 1);
-      return { status: String(job.status), attemptCount: Number(job.attemptCount) };
+      return { status: job.status, attemptCount: job.attemptCount };
     }
     assert.notEqual(job.status, 'failed');
     assert.ok(performance.now() < deadline, '隔離検証のジョブが完了しませんでした。');
@@ -80,7 +84,7 @@ export async function runIsolationIntegration(): Promise<string> {
           return;
         }
         for (const config of configs) {
-          await rm(config.stateDirectory!, { recursive: true, force: true });
+          await rm(requireValue(config.stateDirectory), { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         }
       });
@@ -107,13 +111,13 @@ export async function runIsolationIntegration(): Promise<string> {
       });
       const markers = [randomUUID(), randomUUID()];
       const writeMarker = (slot: number) =>
-        json(runtimes[slot]!, '/api/isolation-test', {
+        json(runtimes[slot], '/api/isolation-test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ marker: markers[slot] }),
         });
       await writeMarker(0);
-      const secondDoBeforeWrite = await json(runtimes[1]!, '/api/isolation-test');
+      const secondDoBeforeWrite = await json(runtimes[1], '/api/isolation-test');
       evidence.observe({ secondDoBeforeWrite });
       assert.equal(secondDoBeforeWrite, null);
       await writeMarker(1);
@@ -128,7 +132,7 @@ export async function runIsolationIntegration(): Promise<string> {
       );
       assert.equal(new Set([devOutput, ...outputPaths]).size, 3);
       await Promise.all(
-        outputPaths.map((path, slot) => writeFile(path, markers[slot]!, { flag: 'wx' })),
+        outputPaths.map(async (path, slot) => writeFile(path, markers[slot], { flag: 'wx' })),
       );
       const outputs = await Promise.all(outputPaths.map((path) => readFile(path, 'utf8')));
       const outputMarkersIsolated =
@@ -159,13 +163,13 @@ export async function runIsolationIntegration(): Promise<string> {
       evidence.observe({ testEnvironments });
       for (const slot of [0, 1]) {
         if (slot === 1) {
-          const job = await json(runtimes[1]!, `/api/formal-queue-test?jobId=${jobId}`);
+          const job = readObject(await json(runtimes[1], `/api/formal-queue-test?jobId=${jobId}`));
           const secondJobBeforeSend = {
             status: String(job.status),
             attemptCount: Number(job.attemptCount),
           };
           const secondQueueBeforeSend = await json(
-            runtimes[1]!,
+            runtimes[1],
             `/api/check-object-test?jobId=${jobId}`,
           );
           evidence.observe({ secondJobBeforeSend, secondQueueBeforeSend });
@@ -173,7 +177,7 @@ export async function runIsolationIntegration(): Promise<string> {
           assert.equal(secondQueueBeforeSend, null);
         }
         await json(
-          runtimes[slot]!,
+          runtimes[slot],
           `/api/formal-queue-test?source=${slot === 0 ? 'web' : 'interview'}`,
           {
             method: 'POST',
@@ -182,9 +186,11 @@ export async function runIsolationIntegration(): Promise<string> {
           },
           202,
         );
-        const completed = await waitForCompleted(runtimes[slot]!, jobId);
-        const receipt = await json(runtimes[slot]!, `/api/check-object-test?jobId=${jobId}`);
-        const queueMatches = receipt.queue === configs[slot]!.queues.evaluation.queue;
+        const completed = await waitForCompleted(runtimes[slot], jobId);
+        const receipt = readObject(
+          await json(runtimes[slot], `/api/check-object-test?jobId=${jobId}`),
+        );
+        const queueMatches = receipt.queue === configs[slot].queues.evaluation.queue;
         testEnvironments.push({ slot, ...completed, queue: String(receipt.queue), queueMatches });
         assert.equal(queueMatches, true);
         assert.deepEqual(receipt.message, { schemaVersion: 1, jobId });

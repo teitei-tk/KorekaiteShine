@@ -2,7 +2,11 @@ import { expect, test, vi } from 'vitest';
 import { runDiagnosticIntegration } from '../src/integration-run.ts';
 import { runDiagnosticScenario } from '../src/integration.ts';
 
-vi.mock('../src/integration.ts', () => ({ runDiagnosticScenario: vi.fn(async () => {}) }));
+vi.mock('../src/integration.ts', () => ({
+  runDiagnosticScenario: vi.fn(async () => {
+    /* この実装では追加の処理を行わない。 */
+  }),
+}));
 
 test('一つのケースが失敗しても残りを独立した番号で実行し、全体を失敗終了にする', async () => {
   const calls: { runId: string; parallelIndex: number; scenario: string }[] = [];
@@ -13,7 +17,7 @@ test('一つのケースが失敗しても残りを独立した番号で実行�
     }
   });
   expect(result.exitCode).toBe(1);
-  expect(result.runId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(result.runId).toMatch(/^[0-9a-f-]{36}$/u);
   expect(calls.map((input) => input.scenario)).toEqual([
     'success',
     'retry_then_success',

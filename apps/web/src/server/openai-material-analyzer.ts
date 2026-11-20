@@ -1,27 +1,13 @@
+import type { JsonValue } from '@korekaite/api-contracts/json';
+import { parseJson } from '@korekaite/api-contracts/json';
 import schema from '@korekaite/api-contracts/http/material-analysis-schema';
 import type { MaterialAnalysisCandidate } from '../application/analyze-material';
 
-interface ResponseContentInput {
-  type?: string;
-  text?: string;
-}
-interface ResponseMessageInput {
-  type?: string;
-  role?: string;
-  status?: string;
-  content?: (ResponseContentInput | null)[];
-}
-interface ResponseInput {
-  status?: string;
-  error?: { message?: string } | null;
-  output?: (ResponseMessageInput | null)[];
-}
-
-interface MaterialAnalyzerOptions {
+type MaterialAnalyzerOptions = {
   apiKey: string;
   model: string;
   fetcher?: typeof fetch;
-}
+};
 
 export const materialPromptVersion = '2026-11-07-v1';
 
@@ -64,31 +50,32 @@ export function createMaterialAnalyzer(options: MaterialAnalyzerOptions) {
       if (!response.ok) {
         throw new Error('AI応答が失敗しました。');
       }
-      return readStructuredOutput(await response.json());
+      return readStructuredOutput(parseJson(await response.text()));
     } catch {
       throw new Error('材料分析AIを利用できません。');
     }
   };
 }
 
-function readStructuredOutput(body: ResponseInput | null): MaterialAnalysisCandidate | null {
+function readStructuredOutput(body: JsonValue): MaterialAnalysisCandidate | null {
   if (
     body === null ||
     typeof body !== 'object' ||
     Array.isArray(body) ||
     body.status !== 'completed' ||
-    body.error != null ||
+    (body.error !== null && body.error !== undefined) ||
     !Array.isArray(body.output)
   ) {
     throw new Error('未完了の応答です。');
   }
   const messages = body.output.filter(
-    (item) => item !== null && typeof item === 'object' && item.type === 'message',
+    (item) =>
+      item !== null && typeof item === 'object' && !Array.isArray(item) && item.type === 'message',
   );
   if (messages.length !== 1) {
     throw new Error('応答を特定できません。');
   }
-  const message = messages[0];
+  const [message] = messages;
   if (
     !message ||
     typeof message !== 'object' ||
@@ -100,7 +87,7 @@ function readStructuredOutput(body: ResponseInput | null): MaterialAnalysisCandi
   ) {
     throw new Error('応答メッセージが不正です。');
   }
-  const content = message.content[0];
+  const [content] = message.content;
   if (
     !content ||
     typeof content !== 'object' ||
@@ -110,5 +97,5 @@ function readStructuredOutput(body: ResponseInput | null): MaterialAnalysisCandi
   ) {
     throw new Error('構造化された応答がありません。');
   }
-  return JSON.parse(content.text);
+  return parseJson(content.text);
 }

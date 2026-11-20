@@ -96,11 +96,11 @@ function fixture(workflow = '.github/workflows/docs.yml') {
   };
   const pr = {
     number: 7,
-    user: { id: 1324680, type: 'User' },
+    user: { id: 1_324_680, type: 'User' },
     state: 'open',
     draft: false,
-    head: { sha: revision.head, repo: { id: 1426899426 } },
-    base: { sha: revision.base, ref: 'main', repo: { id: 1426899426 } },
+    head: { sha: revision.head, repo: { id: 1_426_899_426 } },
+    base: { sha: revision.base, ref: 'main', repo: { id: 1_426_899_426 } },
   };
   const source = {
     created_at: '2026-10-25T06:00:01Z',
@@ -111,8 +111,8 @@ function fixture(workflow = '.github/workflows/docs.yml') {
     status: 'completed',
     conclusion: 'success',
     head_sha: revision.head,
-    repository: { id: 1426899426 },
-    head_repository: { id: 1426899426 },
+    repository: { id: 1_426_899_426 },
+    head_repository: { id: 1_426_899_426 },
     pull_requests: [{ number: 7, head: { sha: revision.head }, base: { sha: revision.base } }],
   };
   const review = {
@@ -123,8 +123,8 @@ function fixture(workflow = '.github/workflows/docs.yml') {
     status: 'completed',
     conclusion: 'success',
     display_title: 'AI review / source run 10 attempt 2 / review',
-    repository: { id: 1426899426 },
-    head_repository: { id: 1426899426 },
+    repository: { id: 1_426_899_426 },
+    head_repository: { id: 1_426_899_426 },
   };
   const reviews = [review];
   const sources = [source];

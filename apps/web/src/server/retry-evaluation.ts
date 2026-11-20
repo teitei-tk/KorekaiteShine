@@ -15,9 +15,9 @@ export async function retryEvaluationRequest(
   interviewId: string,
   deps: {
     db: ReturnType<typeof createPrimaryDb>;
-    actor(request: Request): string | null;
-    now(): number;
-    newId(): string;
+    actor: (request: Request) => string | null;
+    now: () => number;
+    newId: () => string;
   },
 ) {
   const actor = deps.actor(request);
@@ -35,20 +35,22 @@ export async function retryEvaluationRequest(
   const parent = parsed.value.failedJobId;
   const { db } = deps;
   try {
-    const [source] = await db
-      .select({ status: jobs.status, interviewStatus: interviews.status })
-      .from(evaluationInputs)
-      .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
-      .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
-      .where(
-        and(
-          eq(interviews.actorId, actor),
-          eq(jobs.actorId, actor),
-          eq(jobs.purpose, 'evaluation'),
-          eq(interviews.interviewId, interviewId),
-          eq(jobs.jobId, parent),
-        ),
-      );
+    const source = (
+      await db
+        .select({ status: jobs.status, interviewStatus: interviews.status })
+        .from(evaluationInputs)
+        .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
+        .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
+        .where(
+          and(
+            eq(interviews.actorId, actor),
+            eq(jobs.actorId, actor),
+            eq(jobs.purpose, 'evaluation'),
+            eq(interviews.interviewId, interviewId),
+            eq(jobs.jobId, parent),
+          ),
+        )
+    ).at(0);
     if (!source) {
       return applicationFailure('NOT_FOUND');
     }
@@ -114,7 +116,7 @@ export async function retryEvaluationRequest(
       db.insert(jobOutbox).select(
         db
           .select({
-            id: sql<string>`${id + ':notify:0'}`.as('id'),
+            id: sql<string>`${`${id}:notify:0`}`.as('id'),
             jobId: evaluationInputs.jobId,
             purpose: sql<'evaluation'>`'evaluation'`.as('purpose'),
             operation: sql<'notify'>`'notify'`.as('operation'),
@@ -126,17 +128,19 @@ export async function retryEvaluationRequest(
           .where(and(eq(evaluationInputs.jobId, id), sql`changes()=1`)),
       ),
     ]);
-    const [accepted] = await db
-      .select({ jobId: evaluationInputs.jobId })
-      .from(evaluationInputs)
-      .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
-      .where(
-        and(
-          eq(interviews.actorId, actor),
-          eq(interviews.interviewId, interviewId),
-          eq(evaluationInputs.retryOf, parent),
-        ),
-      );
+    const accepted = (
+      await db
+        .select({ jobId: evaluationInputs.jobId })
+        .from(evaluationInputs)
+        .innerJoin(interviews, eq(interviews.interviewId, evaluationInputs.interviewId))
+        .where(
+          and(
+            eq(interviews.actorId, actor),
+            eq(interviews.interviewId, interviewId),
+            eq(evaluationInputs.retryOf, parent),
+          ),
+        )
+    ).at(0);
     if (!accepted) {
       return applicationFailure('CONFLICT');
     }

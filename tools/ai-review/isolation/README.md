@@ -84,7 +84,7 @@ PR #42のマージ後、[mainでの再実行](https://github.com/teitei-tk/Korek
 
 2026年10月28日、macOS上のDocker Linux/aarch64で、Node 26.12.1・公式Actionの固定コミット・Codex 0.164.0を用いて成功しました。Dockerの既定seccompではuser namespaceを作れなかったため、資格情報・ホストソケットを持たない一時コンテナに限り`--security-opt seccomp=unconfined`を指定しました。これはGitHub-hosted runnerでの実証ではありません。
 
-リポジトリの既存TypeScriptコンパイラで、検査コードを一時ディレクトリへ出力します。`tsconfig.isolation.json`は通常の`tsconfig.json`を継承し、Temporalを含む型設定を共有します。JavaScript出力と相対importの拡張子変換だけを隔離用に設定し、型エラー時は出力しません。
+リポジトリの固定版tsrsで、検査コードを一時ディレクトリへ出力します。`tsconfig.isolation.json`は通常の`tsconfig.json`を継承し、Temporalを含む型設定を共有します。JavaScript出力と相対importの拡張子変換だけを隔離用に設定し、型エラー時は出力しません。
 
 ```sh
 pnpm --dir tools/ai-review build:isolation --outDir /tmp/ai-review-isolation-compiled

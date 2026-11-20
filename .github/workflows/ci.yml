@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify-lockfile:
     name: Verify Actions lockfile
@@ -76,12 +80,25 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - name: Verify Guard registry
         if: steps.changes.outputs.required == 'true'
         run: node tools/docs/check-guard.ts --registry-only
       - name: Install documentation check dependencies
         if: steps.changes.outputs.required == 'true'
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: node tools/ci/src/install-dependencies.ts
       - name: Check Node.js configuration
         if: steps.changes.outputs.required == 'true'
         run: pnpm check:node
@@ -91,11 +108,12 @@ jobs:
   lint-format:
     name: Repository lint and format
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
       - uses: pnpm/action-setup@v6.1.1
         with:
@@ -104,160 +122,34 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Lint repository with oxlint
-        run: pnpm lint
-      - name: Check repository formatting with oxfmt
-        run: pnpm format:check
-  apps:
-    name: Apps checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
-      - uses: pnpm/action-setup@v6.1.1
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts --registry-only
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Generate shared contracts
-        run: pnpm --filter @korekaite/api-contracts generate
-      - name: Build and typecheck apps
-        run: pnpm --filter './apps/*' --workspace-concurrency=1 run typecheck
-      - name: Test apps
-        run: pnpm --filter './apps/*' --workspace-concurrency=1 run test
-  packages:
-    name: Packages checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
-      - uses: pnpm/action-setup@v6.1.1
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts --registry-only
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Generate shared contracts
-        run: pnpm --filter @korekaite/api-contracts generate
-      - name: Build and typecheck packages
-        run: pnpm --filter './packages/*' --workspace-concurrency=1 run typecheck
-      - name: Test packages
-        run: pnpm --filter './packages/*' --workspace-concurrency=1 run test
-  tools:
-    name: Tools checks
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
-      - uses: pnpm/action-setup@v6.1.1
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts --registry-only
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Generate shared contracts
-        run: pnpm --filter @korekaite/api-contracts generate
-      - name: Build and typecheck tools
-        run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run typecheck
-      - name: Test tools
-        run: pnpm --filter './tools/*' --filter '!@korekaite/local-integration' --workspace-concurrency=1 run test
-  local-boundaries:
-    name: Local Worker boundaries (${{ matrix.shard }}/4)
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
-      - uses: pnpm/action-setup@v6.1.1
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts --registry-only
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Generate shared contracts
-        run: pnpm --filter @korekaite/api-contracts generate
-      - name: Typecheck local integration tooling
-        run: pnpm --filter @korekaite/local-integration typecheck
-      - name: Test Worker and D1 boundaries
-        run: pnpm --filter @korekaite/local-integration test ${{ matrix.shard }} --maxWorkers=2
-  local-integration:
-    name: Local Worker integration (${{ matrix.shard }}/3)
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
-      - uses: pnpm/action-setup@v6.1.1
-        with:
-          package_json_file: package.json
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - name: Verify Guard registry
-        run: node tools/docs/check-guard.ts --registry-only
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Generate shared contracts
-        run: pnpm --filter @korekaite/api-contracts generate
-      - name: Prepare development retention sentinel
-        run: pnpm prepare:integration
-      - name: Test real-time Queue delivery and recovery
-        run: pnpm --filter @korekaite/local-integration test:integration:pr ${{ matrix.shard }} --maxWorkers=2
-  voice-e2e:
-    name: Voice interview browser E2E
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+      - run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - run: node tools/docs/check-guard.ts
+      - run: pnpm lint
+      - run: pnpm format:check
+  typecheck:
+    name: Typecheck all workspaces
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
       - uses: pnpm/action-setup@v6.1.1
         with:
@@ -266,8 +158,248 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
       - run: node tools/docs/check-guard.ts --registry-only
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm --filter @korekaite/api-contracts generate
-      - run: pnpm --filter @korekaite/e2e exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - run: pnpm typecheck
+  build:
+    name: Build application and isolation tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+      - run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - name: Generate contracts and route types
+        run: pnpm prepare:checks
+      - run: pnpm --filter korekaite-shine-web build:app
+      - run: pnpm --filter korekaite-shine-ai-review build:isolation --outDir ../../.ci/isolation-build
+  test-plan:
+    name: Select and balance tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_tests: ${{ steps.plan.outputs.has_tests }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+      - run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - name: Generate contracts and route types
+        run: pnpm prepare:checks
+      - name: Read timing history from a successful main push
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          mkdir -p .ci
+          # History is only an optimization. Missing history never removes tests.
+          if run=$(gh run list --workflow ci.yml --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId') && [[ "$run" =~ ^[0-9]+$ ]]; then
+            if gh run download "$run" --name "ci-history-$run" --dir .ci/prior; then
+              cp .ci/prior/history.json .ci/history-input.json
+            fi
+          fi
+      - name: Create test plan
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node tools/ci/src/cli.ts plan
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: ci-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .ci/plan.json
+            .ci/history-input.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+  tests:
+    name: Tests (${{ matrix.id }})
+    needs: test-plan
+    if: needs.test-plan.outputs.has_tests == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.test-plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container:
+      image: ${{ matrix.runnerClass == 'e2e' && 'mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579' || '' }}
+      options: --init --shm-size=1g
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+      - run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - name: Generate contracts and route types
+        run: pnpm prepare:checks
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: ci-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci
+      - name: Prepare integration sentinel
+        if: matrix.runnerClass == 'integration'
+        run: pnpm prepare:integration
+      - name: Verify preinstalled browser
+        if: matrix.runnerClass == 'e2e'
+        working-directory: tools/e2e
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          import { chromium } from 'playwright';
+          const require = createRequire(import.meta.url);
+          const image = JSON.parse(readFileSync('/ms-playwright/.docker-info', 'utf8'));
+          assert.equal(image.driverVersion, require('playwright/package.json').version);
+          const browser = await chromium.launch();
+          console.log(`Preinstalled Chromium ${browser.version()}`);
+          await browser.close();
+          JS
+      - name: Run selected tests
+        env:
+          SHARD_ID: ${{ matrix.id }}
+        run: node tools/ci/src/cli.ts run "$SHARD_ID"
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: ci-result-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.id }}
+          path: .ci/results/*.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+  ci-result:
+    name: CI result
+    if: always()
+    needs: [verify-lockfile, docs, lint-format, typecheck, build, test-plan, tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Verify required job states
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: node tools/ci/src/job-result.ts
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: ci-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci
+      - uses: actions/download-artifact@v8.0.2
+        if: needs.test-plan.outputs.has_tests == 'true'
+        with:
+          pattern: ci-result-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: .ci/results
+          merge-multiple: true
+      - name: Verify complete test results
+        run: node tools/ci/src/cli.ts result
+      - uses: actions/upload-artifact@v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: ci-history-${{ github.run_id }}
+          path: .ci/history.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 30

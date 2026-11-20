@@ -1,7 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { SystemError } from '../../testing/system-error.mts';
+import { readMeasurement } from '../src/schema.ts';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createCounterJournal } from '../src/journal.ts';
 import { startCapture, readCaptures } from '../src/capture.ts';
 import { createMergeFixture } from './fixtures/measurement.ts';
@@ -11,13 +13,13 @@ test('開始時の未完了記録を、正常終了時のカウンター付き�
   try {
     const { run, records, path } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'process-1');
-    expect(JSON.parse(readFileSync(capture.path, 'utf8'))).toMatchObject({
+    expect(readMeasurement(readFileSync(capture.path, 'utf8'))).toMatchObject({
       captureId: 'process-1',
       status: 'incomplete',
       files: [],
     });
     capture.finish({ [path]: records[0].files[0].coverage }, 'complete');
-    const result = JSON.parse(readFileSync(capture.path, 'utf8'));
+    const result = readMeasurement(readFileSync(capture.path, 'utf8'));
     expect(result).toEqual({ ...records[0], captureId: 'process-1' });
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -29,10 +31,10 @@ test('未知のファイルを黙って捨てず未完了の記録を残す', ()
   try {
     const { run, records } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'process-2');
-    expect(() => capture.finish({ unknown: records[0].files[0].coverage }, 'complete')).toThrow(
-      '台帳にない計測対象: unknown',
-    );
-    expect(JSON.parse(readFileSync(capture.path, 'utf8')).status).toBe('incomplete');
+    expect(() => {
+      capture.finish({ unknown: records[0].files[0].coverage }, 'complete');
+    }).toThrow('台帳にない計測対象: unknown');
+    expect(readMeasurement(readFileSync(capture.path, 'utf8')).status).toBe('incomplete');
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -75,6 +77,35 @@ test('収集失敗の理由を計測片に残す', () => {
       failure: 'Inspectorに接続できません',
     });
   } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('開始台帳に文字列以外のIDがあれば収集を拒否する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'coverage-capture-'));
+  try {
+    writeFileSync(join(directory, 'starts.jsonl'), '123\n');
+    expect(() => readCaptures(directory)).toThrow('計測開始IDが不正');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('終了済みプロセスの未完了記録だけを同期journalから復元する', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'coverage-capture-'));
+  try {
+    const { run, path, target } = createMergeFixture();
+    const capture = startCapture(run, 'unit', directory, 'terminated');
+    const journal = createCounterJournal(`${capture.path}.events`, run.targets);
+    journal[path] = target.coverage;
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new SystemError('gone', 'ESRCH');
+    });
+    const [recovered] = readCaptures(directory);
+    expect(recovered.status).toBe('complete');
+    expect(recovered.files).toEqual([target]);
+  } finally {
+    vi.restoreAllMocks();
     rmSync(directory, { recursive: true, force: true });
   }
 });

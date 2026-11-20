@@ -1,3 +1,4 @@
+import { required } from './schema.ts';
 import { createHash } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -24,20 +25,20 @@ export function coveragePlugin(
     transform(source: string, id: string) {
       const [file, query] = id.split('?');
       if (new URLSearchParams(query).has('url')) {
-        return;
+        return undefined;
       }
-      const alias = physicalAliases.find(({ from }) => file.startsWith(from + '/'));
+      const alias = physicalAliases.find(({ from }) => file.startsWith(`${from}/`));
       const path = relative(
         physicalRoot,
         alias ? resolve(alias.to, relative(alias.from, file)) : file,
       );
       const target = targets.get(path);
       if (!target) {
-        return;
+        return undefined;
       }
       const hash = (text: string) => createHash('sha256').update(text).digest('hex');
       if (alias && hash(source) !== target.sourceHash) {
-        return;
+        return undefined;
       }
       const result = instrumentSource(path, source);
       if (hash(source) !== target.sourceHash || hash(result.code) !== target.instrumentationHash) {
@@ -45,7 +46,12 @@ export function coveragePlugin(
       }
       return {
         code: result.code,
-        map: { ...result.map, sources: result.map.sources.map((source) => resolve(root, source!)) },
+        map: {
+          ...result.map,
+          sources: result.map.sources.map((source) =>
+            resolve(root, required(source ?? undefined, 'source map source')),
+          ),
+        },
       };
     },
   };

@@ -1,11 +1,10 @@
-import evaluation, { type EvaluationEnvironment } from './worker';
+import evaluation from './worker';
+import type { EvaluationEnvironment } from './worker';
 import { Temporal } from '@js-temporal/polyfill';
 import { createPrimaryDb } from '@korekaite/database/connection';
 import { isQuarantinedDelivery } from './server/repositories/delivery-anomalies';
-import {
-  dispatchNotifications,
-  type NotificationDependencies,
-} from './application/dispatch-notifications';
+import { dispatchNotifications } from './application/dispatch-notifications';
+import type { NotificationDependencies } from './application/dispatch-notifications';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
 import type { JobNotification } from '@korekaite/api-contracts/messages';
 import { consumeDiagnostic } from './diagnostics/consume';
@@ -17,7 +16,7 @@ import type {
 } from '@cloudflare/workers-types';
 import { recoverJobs } from './application/recover-jobs';
 
-interface RecoveryEnvironment extends EvaluationEnvironment {
+type RecoveryEnvironment = EvaluationEnvironment & {
   DB: D1Database;
   APP_ENV: string;
   DIAGNOSTIC_QUEUE_NAME: string;
@@ -27,13 +26,16 @@ interface RecoveryEnvironment extends EvaluationEnvironment {
   EVALUATION_QUEUE: Queue<JobNotification>;
   EVALUATION_DLQ: Queue<JobNotification>;
   CHECK_OBJECT: {
-    getByName(name: string): {
-      initializeCheck(jobId: string): Promise<{ jobId: string; firstReceivedAt: string }>;
+    getByName: (name: string) => {
+      initializeCheck: (jobId: string) => Promise<{
+        jobId: string;
+        firstReceivedAt: string;
+      }>;
     };
   };
-}
+};
 
-export default {
+const worker = {
   async queue(batch: MessageBatch<JobNotification>, env: RecoveryEnvironment): Promise<void> {
     if (env.APP_ENV !== 'development' && env.APP_ENV !== 'test') {
       throw new Error('診断評価を利用できない環境です。');
@@ -120,3 +122,5 @@ function notificationDependencies(env: RecoveryEnvironment): NotificationDepende
     },
   };
 }
+
+export default worker;

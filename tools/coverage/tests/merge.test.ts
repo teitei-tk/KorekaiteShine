@@ -26,7 +26,9 @@ test('非負の安全な整数でない実行回数を拒否する', () => {
   ]) {
     for (const kind of ['s', 'f', 'b'] as const) {
       const { run, records } = createMergeFixture();
-      const coverage = records[0].files[0].coverage;
+      const [firstRecord] = records;
+      const [firstFile] = firstRecord.files;
+      const { coverage } = firstFile;
       if (kind === 'b') {
         coverage.b['0'][0] = value;
       } else {
@@ -40,7 +42,9 @@ test('非負の安全な整数でない実行回数を拒否する', () => {
 test('文・関数・分岐の計測位置が台帳と異なる記録を拒否する', () => {
   for (const kind of ['statement', 'function', 'branch'] as const) {
     const { run, records } = createMergeFixture();
-    const coverage = records[0].files[0].coverage;
+    const [firstRecord] = records;
+    const [firstFile] = firstRecord.files;
+    const { coverage } = firstFile;
     if (kind === 'statement') {
       coverage.statementMap['0'].start.line += 1;
     } else if (kind === 'function') {
@@ -98,7 +102,7 @@ test('別の実行・リビジョン・形式・suiteの計測片を混入させ
     { suite: 'unknown' },
   ]) {
     const { run, records } = createMergeFixture();
-    const invalid = [{ ...records[0], ...patch }, ...records.slice(1)] as typeof records;
+    const invalid = [{ ...records[0], ...patch }, ...records.slice(1)];
     expect(() => mergeMeasurements(run, invalid)).toThrow(
       '計測片の識別情報が一致しません: capture-0',
     );
@@ -107,7 +111,18 @@ test('別の実行・リビジョン・形式・suiteの計測片を混入させ
 
 test('台帳のファイルがどの収集結果にもない場合は欠落を報告する', () => {
   const { run, records } = createMergeFixture();
-  const emptyRecords = records.map((record) => ({ ...record, files: [] }));
+  const emptyRecords = records.map(
+    ({ formatVersion, captureId, runId, revision, suite, status, failure }) => ({
+      formatVersion,
+      captureId,
+      runId,
+      revision,
+      suite,
+      status,
+      failure,
+      files: [],
+    }),
+  );
   expect(() => mergeMeasurements(run, emptyRecords)).toThrow(
     'ファイルの計測記録が欠落しています: src/choose.ts',
   );
@@ -117,12 +132,14 @@ test('欠落または余分なカウンターと分岐数の不一致を拒否�
   for (const kind of ['s', 'f', 'b'] as const) {
     for (const extra of [false, true]) {
       const { run, records } = createMergeFixture();
-      const coverage = records[0].files[0].coverage;
+      const [firstRecord] = records;
+      const [firstFile] = firstRecord.files;
+      const { coverage } = firstFile;
       if (extra) {
         if (kind === 'b') {
-          coverage.b['unexpected'] = [0];
+          coverage.b.unexpected = [0];
         } else {
-          coverage[kind]['unexpected'] = 0;
+          coverage[kind].unexpected = 0;
         }
       } else {
         delete coverage[kind]['0'];

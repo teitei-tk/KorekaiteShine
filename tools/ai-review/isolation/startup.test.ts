@@ -1,36 +1,35 @@
-import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import type * as LintTypeModule0 from 'node:child_process';
+import type * as LintTypeModule1 from 'node:fs';
+import type * as LintTypeModule2 from 'node:os';
+import { assert, beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import {
-  createServer,
-  type RequestListener,
-  type IncomingMessage,
-  type ServerResponse,
-  type Server,
-} from 'node:http';
+import { createServer } from 'node:http';
+import type { RequestListener, IncomingMessage, ServerResponse, Server } from 'node:http';
 import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 
 vi.mock('node:http', () => ({ createServer: vi.fn() }));
 vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof import('node:child_process')>()),
+  ...(await original<typeof LintTypeModule0>()),
   spawn: vi.fn(),
 }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule1>()),
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   rmSync: vi.fn(),
 }));
 vi.mock('node:os', async (original) => ({
-  ...(await original<typeof import('node:os')>()),
+  ...(await original<typeof LintTypeModule2>()),
   networkInterfaces: vi.fn(),
 }));
 
 function receiver(): Server {
-  return vi.mocked(createServer).mock.results[0]!.value;
+  return (vi.mocked(createServer).mock.results[0] ?? assert.fail('必須のテスト値がありません。'))
+    .value;
 }
 it('PIDがないまま期限を迎えても別プロセスを停止しない', async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -38,7 +37,9 @@ it('PIDがないまま期限を迎えても別プロセスを停止しない', a
   countContext.childPid = undefined;
   const pending = import('./startup.ts');
   const rejected = expect(pending).rejects.toThrow('offline startup timed out');
-  await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce());
+  await vi.waitFor(() => {
+    expect(spawn).toHaveBeenCalledOnce();
+  });
   await vi.advanceTimersByTimeAsync(30_000);
   await rejected;
   expect(process.kill).not.toHaveBeenCalled();
@@ -47,7 +48,9 @@ it('子プロセスのerrorイベントでタイマーを解放し設定を復�
   vi.mocked(spawn).mockImplementationOnce(() => {
     const child = new ChildProcess();
     Object.defineProperty(child, 'stderr', { value: new PassThrough() });
-    queueMicrotask(() => child.emit('error', new Error('fixture spawn')));
+    queueMicrotask(() => {
+      child.emit('error', new Error('fixture spawn'));
+    });
     return child;
   });
   await expect(import('./startup.ts')).rejects.toThrow('fixture spawn');
@@ -67,10 +70,12 @@ it('起動期限を超えたプロセス群を停止して設定を復元する'
   countContext.timedOut = true;
   const pending = import('./startup.ts');
   const rejected = expect(pending).rejects.toThrow('offline startup timed out');
-  await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce());
+  await vi.waitFor(() => {
+    expect(spawn).toHaveBeenCalledOnce();
+  });
   await vi.advanceTimersByTimeAsync(30_000);
   await rejected;
-  expect(process.kill).toHaveBeenCalledWith(-12345, 'SIGKILL');
+  expect(process.kill).toHaveBeenCalledWith(-12_345, 'SIGKILL');
   expect(receiver().close).toHaveBeenCalled();
 });
 it('外部インターフェイスがある環境では起動検証を実行しない', async () => {
@@ -131,13 +136,17 @@ beforeEach(() => {
   countContext.canaries = false;
   countContext.noRequest = false;
   countContext.timedOut = false;
-  address.mockReturnValue({ port: 43210 });
-  countContext.childPid = 12345;
+  address.mockReturnValue({ port: 43_210 });
+  countContext.childPid = 12_345;
   countContext.requestUrl = '/safe/responses';
   vi.spyOn(process, 'getuid').mockReturnValue(0);
   vi.spyOn(process, 'kill').mockReturnValue(true);
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.stubGlobal('process', {
     ...process,
     platform: 'linux',
@@ -183,15 +192,25 @@ beforeEach(() => {
         return;
       }
       if (!countContext.noRequest) {
-        const handler = vi.mocked(createServer).mock.lastCall![0] as RequestListener;
+        const handler = (
+          vi.mocked(createServer).mock.lastCall ?? assert.fail('必須のテスト値がありません。')
+        )[0] as RequestListener;
         handler.call(
           server,
-          { url: countContext.requestUrl, resume() {} } as IncomingMessage,
+          {
+            url: countContext.requestUrl,
+            resume() {
+              /* この実装では追加の処理を行わない。 */
+            },
+          } as IncomingMessage,
           { writeHead: vi.fn(), end: vi.fn() } as object as ServerResponse,
         );
       }
       countContext.canaries = trusted;
-      child.stderr!.emit('data', Buffer.from('fixture diagnostic'));
+      (child.stderr ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('fixture diagnostic'),
+      );
       child.emit('close', 1);
     });
     return child;

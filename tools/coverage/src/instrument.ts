@@ -1,3 +1,4 @@
+import { readSourceMap } from './schema.ts';
 import { createInstrumenter } from '@vitest/istanbul-lib-instrument';
 import { transformSync } from 'rolldown/utils';
 
@@ -14,7 +15,11 @@ export function instrumentSource(path: string, source: string) {
     coverageGlobalScopeFunc: false,
   });
   // rolldownのSource Map v3はversionをnumber型で公開している。
-  const inputMap = transformed.map as Parameters<typeof instrumenter.instrumentSync>[2];
+  const inputMap = readSourceMap(transformed.map);
   const code = instrumenter.instrumentSync(transformed.code, path, inputMap);
-  return { code, coverage: instrumenter.lastFileCoverage()!, map: instrumenter.lastSourceMap()! };
+  return {
+    code,
+    coverage: instrumenter.lastFileCoverage(),
+    map: readSourceMap(instrumenter.lastSourceMap()),
+  };
 }

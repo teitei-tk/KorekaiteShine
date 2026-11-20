@@ -10,15 +10,15 @@ import {
   markCheckNotificationSent,
 } from '../server/repositories/check-outbox';
 
-interface CheckBindings {
+type CheckBindings = {
   DB: D1Database;
   APP_ENV: string;
   DIAGNOSTIC_QUEUE: Queue<JobNotification>;
-}
-export interface CheckInitialized {
+};
+export type CheckInitialized = {
   jobId: string;
   firstReceivedAt: string;
-}
+};
 
 export class CheckObject extends DurableObject<CheckBindings> {
   async initializeCheck(jobId: string): Promise<CheckInitialized> {

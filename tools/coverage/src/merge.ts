@@ -1,22 +1,23 @@
+import { parse } from './schema.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { createCoverageMap } from '@vitest/istanbul-lib-coverage';
 import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
 
-export interface CoverageTarget {
+export type CoverageTarget = {
   path: string;
   sourceHash: string;
   instrumentationHash: string;
   coverage: SourceCoverageData;
-}
+};
 
-export interface CoverageRun {
+export type CoverageRun = {
   runId: string;
   revision: string;
   requiredSuites: readonly string[];
   targets: readonly CoverageTarget[];
-}
+};
 
-export interface Measurement {
+export type Measurement = {
   formatVersion: 1;
   captureId: string;
   runId: string;
@@ -25,7 +26,7 @@ export interface Measurement {
   status: 'complete' | 'failed' | 'incomplete';
   failure?: string;
   files: readonly CoverageTarget[];
-}
+};
 
 function validateCounts(file: CoverageTarget): void {
   const { s, f, b, statementMap, fnMap, branchMap } = file.coverage;
@@ -50,7 +51,7 @@ function validateCounts(file: CoverageTarget): void {
 
 function definition(coverage: SourceCoverageData) {
   // JSON保存で省略されるundefinedを、実行前の位置定義と同じ形へ揃える。
-  return JSON.parse(
+  return parse(
     JSON.stringify({
       path: coverage.path,
       statementMap: coverage.statementMap,
@@ -62,7 +63,10 @@ function definition(coverage: SourceCoverageData) {
 }
 
 /** 共通の計測位置を持つ記録を統合する。入力は次の実行へ流用できるよう保持する。 */
-export function mergeMeasurements(run: CoverageRun, records: readonly Measurement[]) {
+export function mergeMeasurements(
+  run: CoverageRun,
+  records: readonly (Omit<Measurement, 'formatVersion'> & { formatVersion: number })[],
+) {
   const targets = new Map(run.targets.map((target) => [target.path, target]));
   const combined = createCoverageMap({});
   for (const target of run.targets) {

@@ -1,5 +1,5 @@
 import { PracticeLive } from './practice-live';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { components } from '@korekaite/api-contracts/http';
 import {
   readDetail,
@@ -36,29 +36,30 @@ const failureReasons: Readonly<Record<string, string>> = {
   INVALID_AI_RESULT: '評価結果の形式または引用の根拠を確認できませんでした。',
   EVALUATION_INPUT_UNAVAILABLE: '固定した評価入力を読み込めませんでした。',
 };
-const axes = {
-  problem: '課題・制約',
-  alternatives: '選択肢とトレードオフ',
-  reasoning: '判断の根拠',
-  action: '本人の行動・合意形成',
-  learning: '結果・学び',
-} as const;
-const observations = {
-  strengths: '強み',
-  gaps: '改善点',
-  unconfirmed: '確認できなかった点',
-  practiceQuestions: '次に練習する質問',
-} as const;
+const axes = [
+  ['problem', '課題・制約'],
+  ['alternatives', '選択肢とトレードオフ'],
+  ['reasoning', '判断の根拠'],
+  ['action', '本人の行動・合意形成'],
+  ['learning', '結果・学び'],
+] as const;
+const observations = [
+  ['strengths', '強み'],
+  ['gaps', '改善点'],
+  ['unconfirmed', '確認できなかった点'],
+  ['practiceQuestions', '次に練習する質問'],
+] as const;
 function timestamp(ms: number) {
   return Temporal.Instant.fromEpochMilliseconds(ms)
     .toZonedDateTimeISO('Asia/Tokyo')
     .toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
 }
-export function PracticeHistory({ onOpen }: { onOpen(id: string): void }) {
+export function PracticeHistory({ onOpen }: { onOpen: (id: string) => void }) {
   const [cursor, setCursor] = useState<Schema['InterviewCursor'] | null>(null);
   const [page, setPage] = useState<Schema['InterviewHistory'] | null>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+
   useEffect(() => {
     const controller = new AbortController();
     setPage(null);
@@ -69,37 +70,74 @@ export function PracticeHistory({ onOpen }: { onOpen(id: string): void }) {
           setPage(value);
         }
       },
-      (cause) => {
+      (error_) => {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : '履歴を取得できませんでした。');
+          setError(error_ instanceof Error ? error_.message : '履歴を取得できませんでした。');
         }
       },
     );
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [cursor, revision]);
   return (
     <section>
       <h2>面接履歴</h2>
       {error ? (
         <p role="alert">
-          {error} <button onClick={() => setRevision(revision + 1)}>再取得</button>
+          {error}{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setRevision(revision + 1);
+            }}
+          >
+            再取得
+          </button>
         </p>
-      ) : !page ? (
-        <p role="status">履歴を読み込み中…</p>
-      ) : page.items.length ? (
-        <ul>
-          {page.items.map((item) => (
-            <li key={item.interviewId}>
-              <button onClick={() => onOpen(item.interviewId)}>{item.theme}</button>{' '}
-              {timestamp(item.createdAt)} · {statusLabels[item.status]}
-            </li>
-          ))}
-        </ul>
+      ) : page ? (
+        page.items.length > 0 ? (
+          <ul>
+            {page.items.map((item) => (
+              <li key={item.interviewId}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpen(item.interviewId);
+                  }}
+                >
+                  {item.theme}
+                </button>{' '}
+                {timestamp(item.createdAt)} · {statusLabels[item.status]}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>保存された面接はありません。</p>
+        )
       ) : (
-        <p>保存された面接はありません。</p>
+        <output style={{ display: 'block', marginBlock: '1em' }}>履歴を読み込み中…</output>
       )}
-      {page?.next && <button onClick={() => setCursor(page.next)}>以前の面接を見る</button>}
-      {cursor && <button onClick={() => setCursor(null)}>最新の履歴へ</button>}
+      {page?.next && (
+        <button
+          type="button"
+          onClick={() => {
+            setCursor(page.next);
+          }}
+        >
+          以前の面接を見る
+        </button>
+      )}
+      {cursor && (
+        <button
+          type="button"
+          onClick={() => {
+            setCursor(null);
+          }}
+        >
+          最新の履歴へ
+        </button>
+      )}
     </section>
   );
 }
@@ -121,7 +159,7 @@ function Report({
             const sequence = sequences.get(id);
             return (
               sequence && (
-                <a key={id} href={'#transcript-' + sequence}>
+                <a key={id} href={`#transcript-${sequence}`}>
                   発言{sequence}{' '}
                 </a>
               )
@@ -135,8 +173,8 @@ function Report({
     <section>
       <h2>評価結果</h2>
       <p>{report.summary}</p>
-      {Object.entries(axes).map(([key, title]) => {
-        const axis = report.axes[key as keyof typeof axes];
+      {axes.map(([key, title]) => {
+        const axis = report.axes[key];
         return (
           <section key={key}>
             <h3>{title}</h3>
@@ -152,8 +190,8 @@ function Report({
           </section>
         );
       })}
-      {Object.entries(observations).map(([key, title]) => {
-        const items = report[key as keyof typeof observations];
+      {observations.map(([key, title]) => {
+        const items = report[key];
         return (
           items.length > 0 && (
             <section key={key}>
@@ -183,13 +221,16 @@ function Report({
     </section>
   );
 }
-export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): void }) {
+export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted: () => void }) {
   const [detail, setDetail] = useState<Schema['InterviewDetail'] | null>(null);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [revision, setRevision] = useState(0);
+  const refreshRevision = useCallback(() => {
+    setRevision((value) => value + 1);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     const timerState = { timer: undefined as ReturnType<typeof setTimeout> | undefined };
@@ -205,11 +246,13 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
           value.evaluation &&
           ['pending', 'running', 'retry_wait'].includes(value.evaluation.status)
         ) {
-          timerState.timer = setTimeout(refresh, 3000);
+          timerState.timer = setTimeout(() => {
+            void refresh();
+          }, 3000);
         }
-      } catch (cause) {
+      } catch (error_) {
         if (!controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : '面接の記録を取得できませんでした。');
+          setError(error_ instanceof Error ? error_.message : '面接の記録を取得できませんでした。');
         }
       }
     }
@@ -223,37 +266,35 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
   return (
     <article>
       {error && <p role="alert">{error}</p>}
-      {!detail && !error && <p role="status">面接の記録を読み込み中…</p>}
+      {!detail && !error && (
+        <output style={{ display: 'block', marginBlock: '1em' }}>面接の記録を読み込み中…</output>
+      )}
       {detail && (
         <>
           <h2>{detail.session.theme}</h2>
           {detail.session.status !== 'ended' && (
-            <PracticeLive
-              id={id}
-              onDeleted={onDeleted}
-              onEnded={() => setRevision((value) => value + 1)}
-            />
+            <PracticeLive id={id} onDeleted={onDeleted} onEnded={refreshRevision} />
           )}
           {detail.session.status === 'ended' && (
             <p>
               {statusLabels[detail.session.status]} · 面接時間{' '}
-              {Math.floor(detail.session.activeMs / 60000)}分
+              {Math.floor(detail.session.activeMs / 60_000)}分
               {Math.floor(detail.session.activeMs / 1000) % 60}秒
             </p>
           )}
           {detail.audioRemainingMs !== undefined && (
             <p>
               今日のアプリ内面接時間の残り（記録取得時点）{' '}
-              {Math.floor(detail.audioRemainingMs / 60000)}分
+              {Math.floor(detail.audioRemainingMs / 60_000)}分
               {Math.floor(detail.audioRemainingMs / 1000) % 60}秒
             </p>
           )}
           {detail.evaluation && (
-            <p role="status">
+            <output style={{ display: 'block', marginBlock: '1em' }}>
               {evaluationLabels[detail.evaluation.status]}
               {detail.evaluation.nextAttemptAt !== null &&
                 ` · 次の試行 ${timestamp(detail.evaluation.nextAttemptAt)}`}
-            </p>
+            </output>
           )}
           {evaluation?.status === 'failed' && (
             <section>
@@ -262,20 +303,25 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
                   '評価を完了できませんでした。時間をおいて再評価してください。'}
               </p>
               <button
+                type="button"
                 disabled={retrying}
-                onClick={async () => {
-                  setRetrying(true);
-                  setError('');
-                  try {
-                    await requestEvaluationRetry(id, evaluation.jobId);
-                    setRevision((value) => value + 1);
-                  } catch (cause) {
-                    setError(
-                      cause instanceof Error ? cause.message : '再評価を受け付けられませんでした。',
-                    );
-                  } finally {
-                    setRetrying(false);
-                  }
+                onClick={() => {
+                  void (async () => {
+                    setRetrying(true);
+                    setError('');
+                    try {
+                      await requestEvaluationRetry(id, evaluation.jobId);
+                      setRevision((value) => value + 1);
+                    } catch (error_) {
+                      setError(
+                        error_ instanceof Error
+                          ? error_.message
+                          : '再評価を受け付けられませんでした。',
+                      );
+                    } finally {
+                      setRetrying(false);
+                    }
+                  })();
                 }}
               >
                 同じ条件で再評価する
@@ -306,7 +352,7 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
             {detail.transcriptIncomplete && <p>文字起こしが一部欠けている可能性があります。</p>}
             <ol>
               {detail.transcripts.map((item) => (
-                <li key={item.fragmentId} id={'transcript-' + item.sequence}>
+                <li key={item.fragmentId} id={`transcript-${item.sequence}`}>
                   <strong>{item.speaker === 'user' ? 'あなた' : '面接官'}</strong> {item.content}
                 </li>
               ))}
@@ -323,32 +369,55 @@ export function PracticeRecord({ id, onDeleted }: { id: string; onDeleted(): voi
                 」の会話、材料の抜粋、評価を削除します。元に戻すことはできません。
               </p>
               <button
+                type="button"
                 disabled={deleting}
-                onClick={async () => {
-                  setDeleting(true);
-                  setError('');
-                  try {
-                    await deleteSavedInterview(id);
-                    onDeleted();
-                  } catch {
-                    setError('削除の完了を確認できませんでした。もう一度お試しください。');
-                  } finally {
-                    setDeleting(false);
-                  }
+                onClick={() => {
+                  void (async () => {
+                    setDeleting(true);
+                    setError('');
+                    try {
+                      await deleteSavedInterview(id);
+                      onDeleted();
+                    } catch {
+                      setError('削除の完了を確認できませんでした。もう一度お試しください。');
+                    } finally {
+                      setDeleting(false);
+                    }
+                  })();
                 }}
               >
                 この面接を削除する
               </button>
-              <button disabled={deleting} onClick={() => setConfirmDelete(false)}>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => {
+                  setConfirmDelete(false);
+                }}
+              >
                 キャンセル
               </button>
             </>
           ) : (
-            <button onClick={() => setConfirmDelete(true)}>記録の削除</button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmDelete(true);
+              }}
+            >
+              記録の削除
+            </button>
           )}
         </section>
       )}
-      <button onClick={() => setRevision(revision + 1)}>記録を更新</button>
+      <button
+        type="button"
+        onClick={() => {
+          setRevision(revision + 1);
+        }}
+      >
+        記録を更新
+      </button>
     </article>
   );
 }

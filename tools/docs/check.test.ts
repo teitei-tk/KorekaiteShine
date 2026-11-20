@@ -83,8 +83,8 @@ test('ファイル欠落と見出し欠落を別々に報告する', async () =>
   });
   const errors = await checkLinks(root, ['README.md']);
   expect(errors).toHaveLength(2);
-  expect(errors[0]).toMatch(/ファイルが存在しない/);
-  expect(errors[1]).toMatch(/見出しが存在しない/);
+  expect(errors[0]).toMatch(/ファイルが存在しない/u);
+  expect(errors[1]).toMatch(/見出しが存在しない/u);
 });
 
 test('コード例と外部URLはリンク検査の対象外', async () => {
@@ -99,7 +99,7 @@ test('リポジトリ外への相対パスを拒否する', async () => {
   const root = await fixture({ 'README.md': '# 案内\n\n[外](../outside.md)\n' });
   const errors = await checkLinks(root, ['README.md']);
   expect(errors).toHaveLength(1);
-  expect(errors[0]).toMatch(/リポジトリ外/);
+  expect(errors[0]).toMatch(/リポジトリ外/u);
 });
 
 test('リポジトリ内のリンク名でも外部ファイルを指すシンボリックリンクは拒否する', async () => {
@@ -117,7 +117,7 @@ test('表内のリンクを検査し、欠落箇所の行を報告する', async
   });
   const errors = await checkLinks(root, ['README.md']);
   expect(errors).toHaveLength(1);
-  expect(errors[0]).toMatch(/README.md:6: ファイルが存在しない/);
+  expect(errors[0]).toMatch(/README.md:6: ファイルが存在しない/u);
 });
 
 test('ルート・子パッケージの省略形とrun形式を照合し、引数を実行しない', async () => {
@@ -137,8 +137,8 @@ test('削除されたスクリプトと誤ったパッケージの行を報告�
   });
   const errors = await checkCommands(root, ['README.md']);
   expect(errors).toHaveLength(2);
-  expect(errors[0]).toMatch(/README.md:3:.*スクリプト/);
-  expect(errors[1]).toMatch(/README.md:6:.*package.json/);
+  expect(errors[0]).toMatch(/README.md:3:.*スクリプト/u);
+  expect(errors[1]).toMatch(/README.md:6:.*package.json/u);
 });
 
 test('組み込みコマンド、通常の文章、非シェルのコード例は対象外', async () => {
@@ -161,7 +161,7 @@ test('表内のコマンド欠落を報告し、Objectの継承プロパティ�
 
 test('リポジトリ外のパッケージ参照を拒否する', async () => {
   const root = await fixture({ 'README.md': '`pnpm --dir ../outside test`' });
-  expect((await checkCommands(root, ['README.md']))[0]).toMatch(/リポジトリ外/);
+  expect((await checkCommands(root, ['README.md']))[0]).toMatch(/リポジトリ外/u);
 });
 
 test('外部package.jsonへのシンボリックリンクをコマンドの根拠として使わない', async () => {
@@ -212,7 +212,7 @@ test('ドットを含む名前を省略形・run形式・子パッケージで�
     'tools/example/package.json': JSON.stringify({
       scripts: { 'check.present': 'exit 99', missing: 'exit 99' },
     }),
-    'README.md': '```sh\n' + commands.join('\n') + '\n```\n',
+    'README.md': `\`\`\`sh\n${commands.join('\n')}\n\`\`\`\n`,
   });
   const errors = await checkCommands(root, ['README.md']);
   expect(errors).toEqual([
@@ -227,7 +227,7 @@ test('removeの別名は組み込み操作として除外し、runで明示し�
   const aliases = ['rm', 'uninstall', 'un', 'uni'];
   const root = await fixture({
     'package.json': JSON.stringify({ scripts: {} }),
-    'README.md': '```sh\n' + aliases.map((alias) => `pnpm ${alias} example`).join('\n') + '\n```\n',
+    'README.md': `\`\`\`sh\n${aliases.map((alias) => `pnpm ${alias} example`).join('\n')}\n\`\`\`\n`,
   });
   expect(await checkCommands(root, ['README.md'])).toEqual([]);
   await writeFile(path.join(root, 'README.md'), '`pnpm run uninstall`\n');
@@ -255,7 +255,7 @@ test('設定・依存管理・公開などの組み込み操作と別名をス�
     'pm tasks',
   ];
   const root = await fixture({
-    'README.md': '```sh\n' + commands.map((command) => `pnpm ${command}`).join('\n') + '\n```\n',
+    'README.md': `\`\`\`sh\n${commands.map((command) => `pnpm ${command}`).join('\n')}\n\`\`\`\n`,
   });
   expect(await checkCommands(root, ['README.md'])).toEqual([]);
   await writeFile(path.join(root, 'package.json'), JSON.stringify({ scripts: {} }));
@@ -274,5 +274,12 @@ test('runとtestの別名はスクリプト呼び出しとして照合する', a
   await writeFile(path.join(root, 'README.md'), '`pnpm run-script config`\n');
   expect(await checkCommands(root, ['README.md'])).toEqual([
     'README.md:1: スクリプトが存在しない: config (package.json)',
+  ]);
+});
+
+test('scripts項目自体がないmanifestは未定義スクリプトとして報告する', async () => {
+  const root = await fixture({ 'README.md': '`pnpm missing`', 'package.json': '{}' });
+  expect(await checkCommands(root, ['README.md'])).toEqual([
+    'README.md:1: スクリプトが存在しない: missing (package.json)',
   ]);
 });

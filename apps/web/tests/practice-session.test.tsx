@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-// @vitest-environment-options {"url":"https://localhost/"}
 import './helpers/dom';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { PracticePage } from '../src/routes/practice';
+
+// @vitest-environment-options {"url":"https://localhost/"}
 
 test('準備した面接へ移動し、HTTPSで接続して終了通知から記録を読み直す', async () => {
   const user = userEvent.setup();
@@ -12,7 +13,9 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
   class Peer {
     onmessage!: (event: MessageEvent) => void;
     close = vi.fn();
-    constructor(readonly url: URL) {
+    readonly url: URL;
+    constructor(url: URL) {
+      this.url = url;
       peers.push(this);
     }
   }
@@ -24,15 +27,19 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
     'fetch',
     vi.fn(async (url) => {
       switch (url) {
-        case '/api/local-session':
+        case '/api/local-session': {
           return Response.json({ operationToken: 'a'.repeat(64) });
-        case '/api/materials/analyze':
+        }
+        case '/api/materials/analyze': {
           return Response.json({ analysisId: 'saved', themes: [theme] });
-        case '/api/interview-history':
+        }
+        case '/api/interview-history': {
           return Response.json({ items: [], next: null });
-        case '/api/interviews':
+        }
+        case '/api/interviews': {
           return Response.json(session);
-        case '/api/interviews/one':
+        }
+        case '/api/interviews/one': {
           return Response.json({
             session: { ...session, status: endedState.ended ? 'ended' : 'ready' },
             material: theme,
@@ -53,8 +60,10 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
             playback: [],
             evaluation: null,
           });
-        default:
+        }
+        default: {
           throw new Error(String(url));
+        }
       }
     }),
   );
@@ -65,11 +74,13 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
   await user.click(await screen.findByRole('radio', { name: '選択' }));
   await user.click(screen.getByRole('button', { name: '面接を準備する' }));
   expect(await screen.findByRole('heading', { name: '音声面接' })).toBeTruthy();
-  await waitFor(() => expect(peers).toHaveLength(1));
+  await waitFor(() => {
+    expect(peers).toHaveLength(1);
+  });
   const [socket] = peers;
   expect(socket.url.protocol).toBe('wss:');
   endedState.ended = true;
-  await act(async () =>
+  await act(async () => {
     socket.onmessage(
       new MessageEvent('message', {
         data: JSON.stringify({
@@ -86,8 +97,8 @@ test('準備した面接へ移動し、HTTPSで接続して終了通知から記
           evaluationJobId: null,
         }),
       }),
-    ),
-  );
-  expect(await screen.findByText(/終了 · 面接時間/)).toBeTruthy();
+    );
+  });
+  expect(await screen.findByText(/終了 · 面接時間/u)).toBeTruthy();
   expect(screen.getByText('面接官')).toBeTruthy();
 });

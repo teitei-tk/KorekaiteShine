@@ -1,8 +1,9 @@
+import { readJson, readJob, readCheckStatus } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 import type { LocalRuntime } from '../src/runtime.ts';
@@ -17,7 +18,8 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
     runId,
     parallelIndex: 0,
   });
-  const diagnosticQueue = config.queues.diagnostics!.dlq;
+  const diagnosticQueue = (config.queues.diagnostics ?? assert.fail('必須のテスト値がありません。'))
+    .dlq;
   const formalQueue = config.queues.evaluation.dlq;
   await runWithEvidence(
     {
@@ -42,7 +44,10 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
         if (!passed) {
           return;
         }
-        await rm(config.stateDirectory!, { recursive: true, force: true });
+        await rm(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+          recursive: true,
+          force: true,
+        });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
       const runtimeState = { runtime: undefined as LocalRuntime | undefined };
@@ -59,7 +64,7 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
         body: JSON.stringify({ scenario: 'exhaust_retries' }),
       });
       expect(accepted.status).toBe(202);
-      const { jobId } = await accepted.json();
+      const { jobId } = await readJob(accepted);
       const formalId = randomUUID();
       const now = Temporal.Now.instant().epochMilliseconds;
       const oldSentAt = now - 60_000;
@@ -98,9 +103,11 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
           async () =>
             Promise.all(
               [jobId, formalId].map(async (id) =>
-                (
-                  await fetch(`${runtimeState.runtime!.baseUrl}/api/check-object-test?jobId=${id}`)
-                ).json(),
+                readJson(
+                  await fetch(
+                    `${(runtimeState.runtime ?? assert.fail('必須のテスト値がありません。')).baseUrl}/api/check-object-test?jobId=${id}`,
+                  ),
+                ),
               ),
             ),
           { timeout: 20_000, interval: 250 },
@@ -128,15 +135,19 @@ test('DLQ送信済み・受信保存前の停止から同じ用途へ回復し�
       await expect
         .poll(
           async () => {
-            await runtimeState.runtime!.runScheduled(AbortSignal.timeout(10_000));
-            const diagnostic = await (
-              await fetch(`${runtimeState.runtime!.baseUrl}/api/diagnostics/check-jobs/${jobId}`)
-            ).json();
-            const formal = await (
+            await (
+              runtimeState.runtime ?? assert.fail('必須のテスト値がありません。')
+            ).runScheduled(AbortSignal.timeout(10_000));
+            const diagnostic = await readCheckStatus(
               await fetch(
-                `${runtimeState.runtime!.baseUrl}/api/formal-queue-test?jobId=${formalId}&view=dlq`,
-              )
-            ).json();
+                `${(runtimeState.runtime ?? assert.fail('必須のテスト値がありません。')).baseUrl}/api/diagnostics/check-jobs/${jobId}`,
+              ),
+            );
+            const formal = await readJson(
+              await fetch(
+                `${(runtimeState.runtime ?? assert.fail('必須のテスト値がありません。')).baseUrl}/api/formal-queue-test?jobId=${formalId}&view=dlq`,
+              ),
+            );
             evidence.observe({
               afterRestart: {
                 status: diagnostic.status,

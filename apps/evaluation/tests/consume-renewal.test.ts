@@ -1,5 +1,6 @@
-import { afterEach, expect, test, vi } from 'vitest';
-import { consumeJob, type EvaluationDependencies } from '../src/application/consume-job';
+import { assert, afterEach, expect, test, vi } from 'vitest';
+import { consumeJob } from '../src/application/consume-job';
+import type { EvaluationDependencies } from '../src/application/consume-job';
 import {
   acquireExecution,
   completeExecution,
@@ -51,7 +52,14 @@ test('評価待機中の実行権更新をD1へ委譲し、保存後にackして
       expectedPurpose: 'evaluation',
       kind: 'normal',
     },
-    { db, now: () => vi.getMockedSystemTime()!.getTime(), newId: () => 'owner', evaluate, effects },
+    {
+      db,
+      now: () =>
+        (vi.getMockedSystemTime() ?? assert.fail('必須のテスト値がありません。')).getTime(),
+      newId: () => 'owner',
+      evaluate,
+      effects,
+    },
   );
   await vi.advanceTimersByTimeAsync(30_000);
   expect(renewExecution).toHaveBeenCalledExactlyOnceWith(db, lease, 30_000);

@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, symlink, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -12,10 +12,27 @@ export async function startVoiceRuntime({ profile }) {
   const source = resolve(process.env.E2E_APP_ROOT);
   const root = await mkdtemp(join(tmpdir(), 'voice-e2e-'));
   const local = join(root, 'tools/local-integration');
-  const providerContext = { provider: undefined, runtime: undefined };
-  async function stop() {
+  const providerContext = { provider: undefined, runtime: undefined, log: undefined };
+  async function stop({ diagnostics = false } = {}) {
     try {
       await providerContext.runtime?.stop();
+      if (diagnostics && profile === 'pr' && providerContext.log) {
+        const log = await readFile(providerContext.log, 'utf8');
+        console.log(
+          'PR用ランタイムの診断:',
+          Object.fromEntries(
+            [
+              'interview_input_backpressure',
+              'optimized dependencies changed',
+              'new dependencies optimized',
+              'server restarted',
+              'page reload',
+              'Error',
+              'error',
+            ].map((marker) => [marker, log.split(marker).length - 1]),
+          ),
+        );
+      }
     } finally {
       try {
         await providerContext.provider?.stop();
@@ -40,6 +57,7 @@ export async function startVoiceRuntime({ profile }) {
       'dir',
     );
     await cp(join(source, 'tools/local-integration/package.json'), join(local, 'package.json'));
+    await cp(join(source, 'tools/local-integration/tsconfig.json'), join(local, 'tsconfig.json'));
     const runtimePath = join(local, 'src/runtime.ts');
     const optionsState = { options: {} };
     if (profile === 'pr') {
@@ -77,6 +95,7 @@ export class MockInterviewObject extends InterviewObject {
       runId: crypto.randomUUID(),
       parallelIndex: 0,
     });
+    providerContext.log = config.artifactDirectory && join(config.artifactDirectory, 'runtime.log');
     providerContext.runtime = await startRuntime(config, 'dev', optionsState.options);
     const url = providerContext.runtime.baseUrl;
     return {
@@ -95,6 +114,9 @@ export class MockInterviewObject extends InterviewObject {
       },
       silenceCurrentConnections() {
         providerContext.provider.silenceCurrentConnections();
+      },
+      restoreResponses() {
+        providerContext.provider.restoreResponses();
       },
       async rejectDials(value) {
         if (!providerContext.provider) {

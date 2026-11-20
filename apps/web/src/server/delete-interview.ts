@@ -26,9 +26,9 @@ export async function deleteInterviewRequest(
   id: string,
   deps: {
     db: ReturnType<typeof createPrimaryDb>;
-    actor(request: Request): string | null;
-    now(): number;
-    discard(actor: string, id: string): Promise<void>;
+    actor: (request: Request) => string | null;
+    now: () => number;
+    discard: (actor: string, id: string) => Promise<void>;
   },
 ) {
   const actor = deps.actor(request);
@@ -38,7 +38,7 @@ export async function deleteInterviewRequest(
   if (!validateInterviewId(id)) {
     return applicationFailure('INVALID_REQUEST');
   }
-  const db = deps.db;
+  const { db } = deps;
   const owner = and(eq(interviews.interviewId, id), eq(interviews.actorId, actor));
   const marked = db
     .select()
@@ -124,7 +124,7 @@ export async function deleteInterviewRequest(
       ),
       db.delete(interviews).where(owner),
     ]);
-    if (!(await marked).length) {
+    if ((await marked).length === 0) {
       return applicationFailure('NOT_FOUND');
     }
     await deps.discard(actor, id);

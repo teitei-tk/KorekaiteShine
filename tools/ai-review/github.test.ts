@@ -3,6 +3,9 @@ import { target } from './github.ts';
 import type { Api } from './github.ts';
 import { MARKER, revisionMarker } from './policy.ts';
 
+const head = 'a'.repeat(40),
+  base = 'b'.repeat(40);
+
 it('同じbaseとheadの完了マーカーがあれば再レビューしない', async () => {
   const fixture = setup();
   fixture.prior.push({
@@ -33,25 +36,23 @@ it('CIが不正なPR番号を指す場合はPR資料を取得しない', async (
   expect(fixture.requests).toEqual(['actions/runs/1']);
 });
 
-const head = 'a'.repeat(40),
-  base = 'b'.repeat(40);
 function setup(kind = 'owner') {
   const requests: string[] = [];
   const pr = {
     number: 7,
-    user: { id: kind === 'other' ? 1 : 1324680, type: 'User' },
+    user: { id: kind === 'other' ? 1 : 1_324_680, type: 'User' },
     state: 'open',
     draft: false,
-    head: { sha: head, repo: { id: 1426899426 } },
-    base: { sha: base, ref: 'main', repo: { id: 1426899426 } },
+    head: { sha: head, repo: { id: 1_426_899_426 } },
+    base: { sha: base, ref: 'main', repo: { id: 1_426_899_426 } },
   };
   const run = {
     event: 'pull_request',
     conclusion: 'success',
     path: '.github/workflows/docs.yml',
     head_sha: kind === 'stale' ? 'c'.repeat(40) : head,
-    repository: { id: 1426899426 },
-    head_repository: { id: kind === 'fork' ? 1 : 1426899426 },
+    repository: { id: 1_426_899_426 },
+    head_repository: { id: kind === 'fork' ? 1 : 1_426_899_426 },
     pull_requests: [
       {
         number: 7,
@@ -96,10 +97,12 @@ it('forkはPR取得前に拒否する', async () => {
   expect(await target(api, 1)).toEqual({ status: 'excluded' });
   expect(requests).toEqual(['actions/runs/1']);
 });
-it('CI後にheadが変わっていたら実行しない', async () =>
-  expect(await target(setup('stale').api, 1)).toEqual({ status: 'excluded' }));
-it('本人の最新headを返す', async () =>
-  expect(await target(setup().api, 1)).toMatchObject({ status: 'ready', pr: { number: 7 } }));
+it('CI後にheadが変わっていたら実行しない', async () => {
+  expect(await target(setup('stale').api, 1)).toEqual({ status: 'excluded' });
+});
+it('本人の最新headを返す', async () => {
+  expect(await target(setup().api, 1)).toMatchObject({ status: 'ready', pr: { number: 7 } });
+});
 it('API取得失敗を許可として扱わない', async () => {
   const api: Api = async () => {
     throw new Error('API failed');
@@ -107,8 +110,9 @@ it('API取得失敗を許可として扱わない', async () => {
   await expect(target(api, 1)).rejects.toThrow();
 });
 
-it('CI後にbaseだけ進んだ場合も認証前に拒否する', async () =>
-  expect(await target(setup('stale-base').api, 1)).toEqual({ status: 'excluded' }));
+it('CI後にbaseだけ進んだ場合も認証前に拒否する', async () => {
+  expect(await target(setup('stale-base').api, 1)).toEqual({ status: 'excluded' });
+});
 
 it('レビューコメントも100件を超えたら次ページまで取得する', async () => {
   const { reviewComments } = await import('./github.ts');

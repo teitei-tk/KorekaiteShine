@@ -7,13 +7,14 @@ import { createPrimaryDb } from '@korekaite/database/connection';
 import { createInterviewSession } from '../application/interview-session';
 import { createInterviewRoom } from '../application/interview-room';
 import { evaluationConfiguration } from '../application/evaluation-configuration';
-import { createLiveConnection, type LiveHandlers } from './live-connection';
+import { createLiveConnection } from './live-connection';
+import type { LiveHandlers } from './live-connection';
 import { loadInterview } from './repositories/interviews';
 
 // 接続を失ったときに稼働確認前の時間を計上しないため、面接中のみ5秒ごとに記録する。
 const audioCheckpointMs = 5000;
 
-interface Bindings {
+type Bindings = {
   DB: D1Database;
   APP_ENV: string;
   INTERVIEW_SESSION: DurableObjectNamespace;
@@ -21,11 +22,11 @@ interface Bindings {
   RESPONSES_MODEL?: string;
   EVALUATION_MODEL?: string;
   LIVE_VOICE?: string;
-}
-interface Identity {
+};
+type Identity = {
   actorId: string;
   interviewId: string;
-}
+};
 
 export class InterviewObject extends DurableObject<Bindings> {
   private room?: ReturnType<typeof createInterviewRoom>;
@@ -33,15 +34,18 @@ export class InterviewObject extends DurableObject<Bindings> {
 
   protected settings() {
     const voice = this.env.LIVE_VOICE ?? 'marin';
-    if (!['marin', 'harema', 'shida'].includes(voice) || !this.env.RESPONSES_MODEL?.trim()) {
+    if (
+      (voice !== 'marin' && voice !== 'harema' && voice !== 'shida') ||
+      !this.env.RESPONSES_MODEL?.trim()
+    ) {
       throw new Error('面接モデルの設定が必要です。');
     }
     return {
       apiKey: this.env.OPENAI_API_KEY ?? '',
       responsesModel: this.env.RESPONSES_MODEL,
-      voice: voice as 'marin' | 'harema' | 'shida',
+      voice,
       evaluation: evaluationConfiguration(this.env.EVALUATION_MODEL ?? ''),
-    };
+    } as const;
   }
   protected connectLive(
     options: Parameters<typeof createLiveConnection>[0],
@@ -50,7 +54,7 @@ export class InterviewObject extends DurableObject<Bindings> {
     return createLiveConnection(options, handlers);
   }
   private async getRoom(identity: Identity) {
-    await this.ctx.blockConcurrencyWhile(async () => {
+    return this.ctx.blockConcurrencyWhile(async () => {
       const saved = this.identity ?? (await this.ctx.storage.get<Identity>('identity'));
       if (
         saved &&
@@ -59,7 +63,7 @@ export class InterviewObject extends DurableObject<Bindings> {
         throw new Error('面接の対応が一致しません。');
       }
       if (this.room) {
-        return;
+        return this.room;
       }
       const db = createPrimaryDb(this.env.DB);
       if (!(await loadInterview(db, identity.actorId, identity.interviewId))) {
@@ -87,7 +91,7 @@ export class InterviewObject extends DurableObject<Bindings> {
             .orderBy(asc(transcriptFragments.sequence)),
         schedule: async (state) => {
           const now = Temporal.Now.instant().epochMilliseconds;
-          const deadline = state.deadline ?? (state.status === 'ending' ? now + 30000 : null);
+          const deadline = state.deadline ?? (state.status === 'ending' ? now + 30_000 : null);
           if (deadline === null) {
             await this.ctx.storage.deleteAlarm();
           } else {
@@ -99,8 +103,8 @@ export class InterviewObject extends DurableObject<Bindings> {
           }
         },
       });
+      return this.room;
     });
-    return this.room!;
   }
   async fetch(request: Request): Promise<Response> {
     // Web Workerが本人確認後にこの内部bindingへ転送し、本人ヘッダーを上書きする。
@@ -118,15 +122,17 @@ export class InterviewObject extends DurableObject<Bindings> {
       return new Response(null, { status: 404 });
     }
     if (request.method === 'DELETE') {
-      const [marked] = await createPrimaryDb(this.env.DB)
-        .select({ id: deletedInterviews.interviewId })
-        .from(deletedInterviews)
-        .where(
-          and(
-            eq(deletedInterviews.interviewId, interviewId),
-            eq(deletedInterviews.actorId, actorId),
-          ),
-        );
+      const marked = (
+        await createPrimaryDb(this.env.DB)
+          .select({ id: deletedInterviews.interviewId })
+          .from(deletedInterviews)
+          .where(
+            and(
+              eq(deletedInterviews.interviewId, interviewId),
+              eq(deletedInterviews.actorId, actorId),
+            ),
+          )
+      ).at(0);
       if (!marked) {
         return new Response(null, { status: 404 });
       }
@@ -157,7 +163,9 @@ export class InterviewObject extends DurableObject<Bindings> {
         this.ctx.waitUntil(room.receive(id, message.data));
       }
     });
-    const detach = () => this.ctx.waitUntil(room.detach(id));
+    const detach = () => {
+      this.ctx.waitUntil(room.detach(id));
+    };
     server.addEventListener('close', detach);
     server.addEventListener('error', detach);
     server.binaryType = 'arraybuffer';
@@ -165,8 +173,12 @@ export class InterviewObject extends DurableObject<Bindings> {
     try {
       await room.attach(id, {
         questionBoundaries: new URL(request.url).searchParams.has('questionBoundaries'),
-        send: (data) => server.send(data),
-        close: () => server.close(1000),
+        send: (data) => {
+          server.send(data);
+        },
+        close: () => {
+          server.close(1000);
+        },
       });
     } catch {
       server.close(1011);

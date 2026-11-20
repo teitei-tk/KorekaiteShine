@@ -1,19 +1,17 @@
-import { expect, test, vi } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test, vi } from 'vitest';
 import * as validators from '@korekaite/api-contracts/events/validators';
 import type { LiveTranscriptEvent } from '@korekaite/api-contracts/events/live';
 import type { LiveStartEvent } from '@korekaite/api-contracts/events/live-start';
-import {
-  createLiveConnection,
-  dialLiveSocket,
-  type LiveSocket,
-} from '../src/server/live-connection.ts';
+import { createLiveConnection, dialLiveSocket } from '../src/server/live-connection.ts';
+import type { LiveSocket } from '../src/server/live-connection.ts';
 
 const session: LiveStartEvent['session'] = {
   model: 'gpt-live-1',
   store: false,
   instructions: '日本語で面接する。',
   input: [],
-  audio: { format: { type: 'audio/pcm', rate: 24000 }, output: { voice: 'harema' } },
+  audio: { format: { type: 'audio/pcm', rate: 24_000 }, output: { voice: 'harema' } },
   delegation: {
     type: 'responses',
     responses: {
@@ -38,7 +36,9 @@ test('上流の終了確認と通信欠落の理由を別に返す', async () =>
     },
   );
   try {
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalledTimes(1);
+    });
     fake.message({ type: 'session.started', event_id: 's', session: { id: 's' } });
     await connection.ready;
     fake.message({
@@ -57,13 +57,13 @@ test('上流の終了確認と通信欠落の理由を別に返す', async () =>
 });
 function fakeSocket() {
   const events = new EventTarget();
-  const send = vi.fn();
+  const send = vi.fn<(data: string) => void>();
   const socketState = { readyState: 1 as 0 | 1 | 2 | 3 };
   const socket: LiveSocket = {
     get readyState() {
       return socketState.readyState;
     },
-    accept: vi.fn(),
+    accept: vi.fn<() => void>(),
     send,
     close: vi.fn(() => {
       socketState.readyState = 3;
@@ -87,7 +87,7 @@ test('開始確認まで音声を送らず、終了要求後の最後の原文�
   const transcript = vi.fn(async (_event: LiveTranscriptEvent) => {
     await saved;
   });
-  const audio = vi.fn();
+  const audio = vi.fn<(data: Uint8Array, offset: number) => void>();
   const connection = createLiveConnection(
     { apiKey: 'fixture-key', session },
     {
@@ -100,17 +100,25 @@ test('開始確認まで音声を送らず、終了要求後の最後の原文�
   );
   try {
     expect(connection.sendAudio(new Uint8Array([0, 0]))).toBe(false);
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
-    expect(JSON.parse(fake.send.mock.calls[0]![0])).toEqual({
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalledTimes(1);
+    });
+    expect(
+      parseObject((fake.send.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).toEqual({
       type: 'session.start',
       event_id: 'start',
       session,
     });
-    expect(fake.send.mock.calls[0]![0]).not.toContain('fixture-key');
+    expect(
+      (fake.send.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0],
+    ).not.toContain('fixture-key');
     fake.message({ type: 'session.started', event_id: 'started', session: { id: 'live-1' } });
     await connection.ready;
     expect(connection.sendAudio(new Uint8Array([1, 2]))).toBe(true);
-    expect(JSON.parse(fake.send.mock.lastCall![0])).toMatchObject({
+    expect(
+      parseObject((fake.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).toMatchObject({
       type: 'session.input_audio.append',
       audio: 'AQI=',
     });
@@ -132,13 +140,18 @@ test('開始確認まで音声を送らず、終了要求後の最後の原文�
     const completeState = { complete: false };
     void closing.then(() => {
       completeState.complete = true;
+      return null;
     });
-    await vi.waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(transcript).toHaveBeenCalledTimes(1);
+    });
     expect(completeState.complete).toBe(false);
     save();
     expect(await closing).toMatchObject({ complete: true, usageSeconds: 3 });
     expect(fake.socket.close).toHaveBeenCalledTimes(1);
-    expect(transcript.mock.calls[0]![0]).toMatchObject({ delta: ' 最後の回答。' });
+    expect(
+      (transcript.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0],
+    ).toMatchObject({ delta: ' 最後の回答。' });
   } finally {
     save();
     connection.abort();
@@ -161,7 +174,7 @@ test('開始期限後に接続が遅れて返っても、上流セッション�
         onUsage: async () => undefined,
       },
     );
-    await vi.advanceTimersByTimeAsync(30000);
+    await vi.advanceTimersByTimeAsync(30_000);
     expect(await connection.closed).toMatchObject({ complete: false, reason: 'START_TIMEOUT' });
     resolve(fake.socket);
     await vi.advanceTimersByTimeAsync(0);
@@ -191,7 +204,9 @@ test('不正な上流イベントと保存失敗で停止し、外部のエラ�
       },
     );
     try {
-      await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => {
+        expect(fake.send).toHaveBeenCalledTimes(1);
+      });
       fake.message({ type: 'session.started', event_id: 's', session: { id: 's' } });
       await connection.ready;
       fake.message(
@@ -246,7 +261,9 @@ test('保存待ちの受信が上限を超えたら接続を止め、受付済�
     },
   );
   try {
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalledTimes(1);
+    });
     fake.message({ type: 'session.started', event_id: 's', session: { id: 's' } });
     await connection.ready;
     fake.message({
@@ -256,8 +273,10 @@ test('保存待ちの受信が上限を超えたら接続を止め、受付済�
       start_ms: 0,
       end_ms: 1,
     });
-    await vi.waitFor(() => expect(transcript).toHaveBeenCalledTimes(1));
-    for (const _ of Array(257).keys()) {
+    await vi.waitFor(() => {
+      expect(transcript).toHaveBeenCalledTimes(1);
+    });
+    for (const _ of Array.from({ length: 257 }).keys()) {
       fake.message({ type: 'response.event' });
     }
     expect(fake.socket.close).toHaveBeenCalledTimes(1);
@@ -271,7 +290,7 @@ test('保存待ちの受信が上限を超えたら接続を止め、受付済�
 
 test('PCMを順序付きで再生側へ渡し、利用時間は累計を足し合わせない', async () => {
   const fake = fakeSocket();
-  const audio = vi.fn();
+  const audio = vi.fn<(data: Uint8Array, offset: number) => void>();
   const usage = vi.fn(async (_seconds: number, _final: boolean) => undefined);
   const connection = createLiveConnection(
     { apiKey: 'fixture-key', session },
@@ -284,12 +303,14 @@ test('PCMを順序付きで再生側へ渡し、利用時間は累計を足し�
     },
   );
   try {
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalledTimes(1);
+    });
     fake.message({ type: 'session.started', event_id: 's', session: { id: 's' } });
     await connection.ready;
     expect(connection.sendAudio(new Uint8Array(1))).toBe(false);
     expect(connection.sendAudio(new Uint8Array(9602))).toBe(false);
-    for (const i of Array(2).keys()) {
+    for (const i of Array.from({ length: 2 }).keys()) {
       fake.message({
         type: 'session.output_audio.delta',
         // 音声deltaには上流からevent_idが付かない場合がある。
@@ -301,9 +322,13 @@ test('PCMを順序付きで再生側へ渡し、利用時間は累計を足し�
         usage: { seconds: 10 + i },
       });
     }
-    await vi.waitFor(() => expect(audio).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => {
+      expect(audio).toHaveBeenCalledTimes(2);
+    });
     expect(audio.mock.calls.map((call) => call[1])).toEqual([20, 40]);
-    expect(audio.mock.calls[0]![0]).toEqual(new Uint8Array(960));
+    expect((audio.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0]).toEqual(
+      new Uint8Array(960),
+    );
     const closing = connection.close();
     fake.message({
       type: 'session.closed',
@@ -327,7 +352,7 @@ test('終了コマンドの送信失敗でもタイマーと接続を残さな�
   try {
     const fake = fakeSocket();
     fake.send.mockImplementation((message: string) => {
-      if (JSON.parse(message).type === 'session.close') {
+      if (parseObject(message).type === 'session.close') {
         throw new Error('fixture-secret');
       }
     });
@@ -355,7 +380,7 @@ test('終了コマンドの送信失敗でもタイマーと接続を残さな�
 test('接続は固定URLへサーバーの認証ヘッダーで行い、転送や失敗本文を公開しない', async () => {
   const fake = fakeSocket();
   const fetcher = vi.fn(async () => ({ status: 101, webSocket: fake.socket }));
-  const signal = new AbortController().signal;
+  const { signal } = new AbortController();
   expect(await dialLiveSocket('fixture-key', signal, fetcher)).toBe(fake.socket);
   expect(fetcher).toHaveBeenCalledWith('https://api.openai.com/v1/live/sessions', {
     headers: { Upgrade: 'websocket', Authorization: 'Bearer fixture-key' },
@@ -421,11 +446,15 @@ test('言い換えと見送りは接続確認後に固定の指示として送�
   );
   try {
     expect(connection.request('rephrase')).toBe(false);
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalledTimes(1);
+    });
     fake.message({ type: 'session.started', event_id: 's', session: { id: 's' } });
     await connection.ready;
     expect(connection.request('rephrase')).toBe(true);
-    expect(JSON.parse(fake.send.mock.lastCall![0])).toMatchObject({
+    expect(
+      parseObject((fake.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).toMatchObject({
       type: 'session.instructions.append',
       delegation_id: null,
       content: '現在の質問を、意図を変えずに分かりやすい日本語で言い換えてください。',
@@ -449,10 +478,16 @@ test('文字起こし保存の応答が止まっても終了要求から15秒で
       { apiKey: 'fixture-key', session },
       {
         dial: async () => fake.socket,
-        onReady: async () => {},
+        onReady: async () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
         onTranscript: () => saving,
-        onUsage: async () => {},
-        onAudio: () => {},
+        onUsage: async () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
+        onAudio: () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
       },
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -467,7 +502,7 @@ test('文字起こし保存の応答が止まっても終了要求から15秒で
     });
     const result = vi.fn();
     void connection.close().then(result);
-    await vi.advanceTimersByTimeAsync(14999);
+    await vi.advanceTimersByTimeAsync(14_999);
     expect(result).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(result).toHaveBeenCalledWith(
@@ -494,10 +529,16 @@ function openFixture() {
   const fake = fakeSocket();
   const handlers = {
     dial: async () => fake.socket,
-    onReady: vi.fn(async (_id: string) => {}),
-    onTranscript: vi.fn(async () => {}),
+    onReady: vi.fn(async (_id: string) => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    }),
+    onTranscript: vi.fn(async () => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    }),
     onAudio: vi.fn(),
-    onUsage: vi.fn(async () => {}),
+    onUsage: vi.fn(async () => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    }),
   };
   const connection = createLiveConnection({ apiKey: 'fixture', session }, handlers);
   return { fake, handlers, connection };
@@ -509,20 +550,24 @@ test.each([
   ['種別欠落', '{}', 'INVALID_EVENT'],
   ['契約違反', '{"type":"session.started"}', 'INVALID_EVENT'],
   ['バイナリ', new ArrayBuffer(2), 'INVALID_EVENT'],
-  ['文字数上限', 'a'.repeat(262145), 'BUFFER_LIMIT'],
-  ['バイト数上限', 'あ'.repeat(100000), 'BUFFER_LIMIT'],
+  ['文字数上限', 'a'.repeat(262_145), 'BUFFER_LIMIT'],
+  ['バイト数上限', 'あ'.repeat(100_000), 'BUFFER_LIMIT'],
   ['開始前音声', JSON.stringify(audioEvent), 'INVALID_EVENT'],
   ['開始前終了', JSON.stringify(closedEvent), 'INVALID_EVENT'],
 ] as const)('%s の受信で接続を解放する', async (_name, data, reason) => {
   const { fake, connection } = openFixture();
-  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  await vi.waitFor(() => {
+    expect(fake.send).toHaveBeenCalled();
+  });
   fake.dispatch(new MessageEvent('message', { data }));
   await expect(connection.closed).resolves.toMatchObject({ complete: false, reason });
 });
 
 test('重複した開始と内部イベントを無視し、音声位置と使用量を通知する', async () => {
   const { fake, handlers, connection } = openFixture();
-  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  await vi.waitFor(() => {
+    expect(fake.send).toHaveBeenCalled();
+  });
   fake.message({ type: 'responses.internal' });
   fake.message(started);
   await connection.ready;
@@ -531,7 +576,9 @@ test('重複した開始と内部イベントを無視し、音声位置と使�
   for (const n of [9, 3]) {
     fake.message({ type: 'session.usage.updated', event_id: 'usage', usage: { seconds: n } });
   }
-  await vi.waitFor(() => expect(handlers.onUsage).toHaveBeenCalledTimes(2));
+  await vi.waitFor(() => {
+    expect(handlers.onUsage).toHaveBeenCalledTimes(2);
+  });
   expect(handlers.onReady).toHaveBeenCalledTimes(1);
   expect(handlers.onAudio).toHaveBeenCalledWith(new Uint8Array(2), 0);
   for (const length of [0, 1, 9602]) {
@@ -583,7 +630,9 @@ test('接続の事前条件と接続開始失敗を区別する', async () => {
 test('通信切断と送信失敗を検出し、残っている通知も安全に破棄する', async () => {
   for (const kind of ['error', 'send'] as const) {
     const { fake, connection } = openFixture();
-    await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+    await vi.waitFor(() => {
+      expect(fake.send).toHaveBeenCalled();
+    });
     fake.message(started);
     await connection.ready;
     if (kind === 'error') {
@@ -610,7 +659,7 @@ test('開始の保存中に切断した場合は遅れて完了してもreadyを
     fake.dispatch(new Event('close'));
     fake.message(audioEvent);
     fake.dispatch(new Event('error'));
-    await vi.advanceTimersByTimeAsync(15000);
+    await vi.advanceTimersByTimeAsync(15_000);
     await expect(connection.closed).resolves.toMatchObject({ reason: 'TRANSPORT_CLOSED' });
     release();
     await vi.advanceTimersByTimeAsync(0);
@@ -622,7 +671,9 @@ test('開始の保存中に切断した場合は遅れて完了してもreadyを
 
 test('送信契約の検証失敗と切断済みソケットには送信しない', async () => {
   const { fake, connection } = openFixture();
-  await vi.waitFor(() => expect(fake.send).toHaveBeenCalled());
+  await vi.waitFor(() => {
+    expect(fake.send).toHaveBeenCalled();
+  });
   fake.message(started);
   await connection.ready;
   const validator = vi.spyOn(validators, 'validateLiveClientEvent').mockReturnValueOnce(false);
@@ -655,7 +706,7 @@ test('終了期限を過ぎて保存が失敗しても、確定した終了理�
       end_ms: 2,
     });
     const closing = connection.close();
-    await vi.advanceTimersByTimeAsync(15000);
+    await vi.advanceTimersByTimeAsync(15_000);
     fail(new Error('保存失敗'));
     await vi.advanceTimersByTimeAsync(0);
     expect(await closing).toMatchObject({ reason: 'CLOSE_TIMEOUT' });

@@ -22,7 +22,7 @@ test('音声上流の文字起こしを補正せず検証し、開始設定で�
       store: false,
       instructions: '日本語で面接する。',
       input: [],
-      audio: { format: { type: 'audio/pcm', rate: 24000 }, output: { voice: 'harema' } },
+      audio: { format: { type: 'audio/pcm', rate: 24_000 }, output: { voice: 'harema' } },
       delegation: {
         type: 'responses',
         responses: {

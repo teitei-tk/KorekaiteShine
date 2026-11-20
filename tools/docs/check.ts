@@ -1,21 +1,22 @@
 import { execFileSync } from 'node:child_process';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import MarkdownIt from 'markdown-it';
 import GithubSlugger from 'github-slugger';
-import { lint } from 'markdownlint/promise';
+import { lint, readConfig } from 'markdownlint/promise';
+import { inputRecord } from './input.ts';
+import type { DocumentInput } from './input.ts';
 
 const markdown = new MarkdownIt();
 type Token = ReturnType<typeof markdown.parse>[number];
-const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const repository = path.resolve(import.meta.dirname, '../..');
 
 // 固定版MarkdownItはinlineとimageにchildren配列を生成する（空の場合も[]）。
 function plainText(tokens: Token[]): string {
   return tokens
     .map((token) => {
       if (token.type === 'image') {
-        return plainText(token.children!);
+        return plainText(token.children ?? []);
       }
       if (token.type === 'text' || token.type === 'code_inline') {
         return token.content;
@@ -40,10 +41,10 @@ function parse(source: string) {
       lineState.line = token.map[0] + 1;
     }
     if (token.type === 'heading_open') {
-      anchors.add(slugger.slug(plainText(tokens[index + 1]!.children!)));
+      anchors.add(slugger.slug(plainText(tokens[index + 1]?.children ?? [])));
     }
     if (token.type === 'inline') {
-      for (const child of token.children!) {
+      for (const child of token.children ?? []) {
         const url =
           child.type === 'link_open'
             ? child.attrGet('href')
@@ -80,21 +81,21 @@ export async function checkLinks(directory: string, files: string[]) {
   for (const file of files) {
     const source = path.resolve(root, file);
     for (const { url, line } of (await document(source)).links) {
-      if (/^(?:https?:|mailto:|tel:|\/\/)/i.test(url)) {
+      if (/^(?:https?:|mailto:|tel:|\/\/)/iu.test(url)) {
         continue;
       }
       try {
-        if (/^[a-z][a-z\d+.-]*:/i.test(url)) {
+        if (/^[a-z][a-z\d+.-]*:/iu.test(url)) {
           throw new Error('未対応のリンク形式');
         }
         const hash = url.indexOf('#');
-        const location = hash < 0 ? url : url.slice(0, hash);
-        const fragment = hash < 0 ? '' : decodeURIComponent(url.slice(hash + 1));
+        const location = hash === -1 ? url : url.slice(0, hash);
+        const fragment = hash === -1 ? '' : decodeURIComponent(url.slice(hash + 1));
         const filename = decodeURIComponent(location.split('?')[0]);
         const target = filename
           ? path.resolve(
               filename.startsWith('/') ? root : path.dirname(source),
-              filename.replace(/^\//, ''),
+              filename.replace(/^\//u, ''),
             )
           : source;
         if (!within(root, target)) {
@@ -112,7 +113,7 @@ export async function checkLinks(directory: string, files: string[]) {
           continue;
         }
         if (fragment) {
-          if (!/\.md$/i.test(resolved)) {
+          if (!/\.md$/iu.test(resolved)) {
             throw new Error('Markdown以外の見出しリンクは未対応');
           }
           if (!(await document(resolved)).anchors.has(fragment)) {
@@ -275,25 +276,25 @@ export async function checkCommands(directory: string, files: string[]) {
         lineState.line = token.map[0] + 1;
       }
       if (token.type === 'inline') {
-        for (const child of token.children!) {
+        for (const child of token.children ?? []) {
           if (child.type === 'code_inline') {
             commands.push({ text: child.content, line: lineState.line });
           }
         }
       }
-      if (token.type === 'fence' && /^(sh|shell|bash|zsh)$/.test(token.info.trim())) {
-        token.content.split('\n').forEach((text, index) => {
+      if (token.type === 'fence' && /^(?:sh|shell|bash|zsh)$/u.test(token.info.trim())) {
+        for (const [index, text] of token.content.split('\n').entries()) {
           commands.push({ text, line: lineState.line + index + 1 });
-        });
+        }
       }
     }
     for (const { text, line } of commands) {
-      const words = text.trim().split(/\s+/);
+      const words = text.trim().split(/\s+/u);
       if (words.shift() !== 'pnpm') {
         continue;
       }
       const directory = words[0] === '--dir' ? words.splice(0, 2)[1] : '.';
-      if (!directory || !/^[\w./-]+$/.test(directory) || directory.startsWith('-')) {
+      if (!directory || !/^[\w./-]+$/u.test(directory) || directory.startsWith('-')) {
         continue;
       }
       const explicitRun = words[0] === 'run' || words[0] === 'run-script';
@@ -303,7 +304,7 @@ export async function checkCommands(directory: string, files: string[]) {
       const command = words.shift();
       const script = !explicitRun && (command === 't' || command === 'tst') ? 'test' : command;
       // 未対応オプション・シェル構文・説明用プレースホルダーは照合しない。
-      if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/.test(script)) {
+      if (!script || script.startsWith('-') || /["'`$\\;&|<>(){}*?!#[\]]/u.test(script)) {
         continue;
       }
       if (!explicitRun && builtins.has(script)) {
@@ -318,12 +319,11 @@ export async function checkCommands(directory: string, files: string[]) {
         if (!within(root, resolved)) {
           throw new Error('リポジトリ外のpackage.json');
         }
-        const data = JSON.parse(await readFile(resolved, 'utf8'));
-        if (
-          !data?.scripts ||
-          !Object.hasOwn(data.scripts, script) ||
-          typeof data.scripts[script] !== 'string'
-        ) {
+        const input: DocumentInput = JSON.parse(await readFile(resolved, 'utf8'));
+        const data = inputRecord(input, manifest);
+        const scripts =
+          data.scripts === undefined ? {} : inputRecord(data.scripts, `${manifest}: scripts`);
+        if (!Object.hasOwn(scripts, script) || typeof scripts[script] !== 'string') {
           throw new Error(`スクリプトが存在しない: ${script} (${path.relative(root, manifest)})`);
         }
       } catch (error) {
@@ -351,9 +351,9 @@ export async function main(root = repository) {
         encoding: 'utf8',
       })
         .split('\0')
-        .filter((file) => /\.md$/i.test(file)),
+        .filter((file) => /\.md$/iu.test(file)),
     ),
-  ].sort();
+  ].toSorted();
   const existing = [];
   for (const file of files) {
     try {
@@ -365,7 +365,7 @@ export async function main(root = repository) {
       }
     }
   }
-  const config = JSON.parse(await readFile(path.join(root, '.markdownlint.json'), 'utf8'));
+  const config = await readConfig(path.join(root, '.markdownlint.json'));
   const result = await lint({ files: existing.map((file) => path.join(root, file)), config });
   const formatting = Object.entries(result)
     .flatMap(([file, errors]) =>
@@ -380,13 +380,13 @@ export async function main(root = repository) {
   if (formatting) {
     console.error(formatting);
   }
-  if (links.length) {
+  if (links.length > 0) {
     console.error(links.join('\n'));
   }
-  if (commands.length) {
+  if (commands.length > 0) {
     console.error(commands.join('\n'));
   }
-  if (formatting || links.length || commands.length) {
+  if (formatting || links.length > 0 || commands.length > 0) {
     process.exitCode = 1;
   } else {
     console.log(
@@ -395,9 +395,11 @@ export async function main(root = repository) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(`文書検査失敗: ${error.message}`);
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`文書検査失敗: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
-  });
+  }
 }

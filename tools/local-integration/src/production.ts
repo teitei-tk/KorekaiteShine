@@ -1,3 +1,6 @@
+import { requireValue } from './required.ts';
+import { readBuildAudit, readWorkerConfig } from './records.ts';
+import { parseJson } from '@korekaite/api-contracts/json';
 import { localProcessEnvironment } from './local-environment.ts';
 import { confirmHttpReady } from './readiness.ts';
 import { stopProcessGroup, runNodeCommand } from './process.ts';
@@ -7,7 +10,6 @@ import { cp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from '
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import type { BuildAudit } from './build-audit.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const production = resolveRuntime({ repositoryRoot, appEnv: 'production' });
@@ -126,7 +128,7 @@ export async function runProductionBuild(project: string): Promise<void> {
 
 export async function startProductionPreview(
   project: string,
-): Promise<{ baseUrl: string; stop(): Promise<void> }> {
+): Promise<{ baseUrl: string; stop: () => Promise<void> }> {
   await verifyProductionArtifacts(project);
   const child = spawn(
     process.execPath,
@@ -158,13 +160,12 @@ export async function startProductionPreview(
   }
   try {
     const baseUrl = await new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error('本番プレビューが45秒以内に起動しませんでした。')),
-        45_000,
-      );
+      const timeout = setTimeout(() => {
+        reject(new Error('本番プレビューが45秒以内に起動しませんでした。'));
+      }, 45_000);
       const collect = (chunk: Buffer) => {
         outputState.output += chunk.toString();
-        const match = outputState.output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+        const match = /http:\/\/127\.0\.0\.1:\d+/u.exec(outputState.output);
         if (match) {
           clearTimeout(timeout);
           resolve(match[0]);
@@ -189,24 +190,6 @@ export async function startProductionPreview(
   }
 }
 
-interface WorkerConfig {
-  name: string;
-  workersDev: boolean;
-  previewUrls: boolean;
-  env: Record<
-    string,
-    {
-      type: string;
-      name?: string;
-      id?: string;
-      value?: string;
-      worker?: string;
-      exportName?: string;
-    }
-  >;
-  triggers?: { type: string; name: string; deadLetterQueue?: string }[];
-}
-
 function workerOutputDirectory(
   project: string,
   environment: 'client' | 'ssr' | 'interview' | 'evaluation',
@@ -229,16 +212,16 @@ export async function verifyProductionArtifacts(
   const project = await realpath(directory);
   const environments = ['client', 'ssr', 'interview', 'evaluation'] as const;
   for (const environment of environments) {
-    const audit: BuildAudit = JSON.parse(
-      await readFile(join(project, 'build-audit', `${environment}.json`), 'utf8'),
+    const audit = readBuildAudit(
+      parseJson(await readFile(join(project, 'build-audit', `${environment}.json`), 'utf8')),
     );
     const workerDirectory = workerOutputDirectory(project, environment);
     const outputDirectory = join(workerDirectory, environment === 'client' ? 'assets' : 'bundle');
     if (
       audit.environment !== environment ||
       audit.outputDirectory !== outputDirectory ||
-      !audit.modules.length ||
-      !audit.outputs.length
+      audit.modules.length === 0 ||
+      audit.outputs.length === 0
     ) {
       throw new Error(`ビルド監査情報が不足しています: ${environment}`);
     }
@@ -283,20 +266,22 @@ export async function verifyProductionArtifacts(
     }
     if (environment !== 'client') {
       const worker = environment === 'ssr' ? 'web' : environment;
-      const config: WorkerConfig = JSON.parse(
-        await readFile(join(workerDirectory, 'worker.config.json'), 'utf8'),
+      const config = readWorkerConfig(
+        parseJson(await readFile(join(workerDirectory, 'worker.config.json'), 'utf8')),
       );
       if (
         config.name !== production.workers[worker] ||
         config.env.APP_ENV?.type !== 'text' ||
         config.env.APP_ENV.value !== 'production' ||
-        config.workersDev !== false ||
-        config.previewUrls !== false ||
+        config.workersDev ||
+        config.previewUrls ||
         forbiddenContent.test(JSON.stringify(config))
       ) {
         throw new Error(`本番Worker設定に不整合があります: ${environment}`);
       }
-      const bindings = Object.entries(config.env);
+      const bindings = Object.entries(config.env).map(
+        ([name, binding]) => [name, requireValue(binding)] as const,
+      );
       const databases = bindings.filter(([, binding]) => binding.type === 'd1');
       if (
         databases.length !== 1 ||

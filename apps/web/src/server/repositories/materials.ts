@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { and, eq, gt } from 'void/db';
 import { materialAnalyses } from '@korekaite/database/materials';
 import type { createPrimaryDb } from '@korekaite/database/connection';
@@ -6,10 +7,10 @@ import { validateMaterialAnalysisResult } from '@korekaite/api-contracts/http/ma
 
 type Database = ReturnType<typeof createPrimaryDb>;
 type Analysis = typeof materialAnalyses.$inferInsert;
-interface SaveAnalysis extends Omit<Analysis, 'materialHash' | 'candidatesJson'> {
+type SaveAnalysis = {
   markdown: string;
   result: components['schemas']['MaterialAnalysisResult'];
-}
+} & Omit<Analysis, 'materialHash' | 'candidatesJson'>;
 
 export async function saveMaterialAnalysis(db: Database, input: SaveAnalysis): Promise<void> {
   if (!validateMaterialAnalysisResult(input.result)) {
@@ -41,20 +42,22 @@ export async function findMaterialTheme(
   if (!Number.isSafeInteger(themeIndex) || themeIndex < 0) {
     return null;
   }
-  const [row] = await db
-    .select()
-    .from(materialAnalyses)
-    .where(
-      and(
-        eq(materialAnalyses.analysisId, analysisId),
-        eq(materialAnalyses.actorId, actorId),
-        gt(materialAnalyses.expiresAt, now),
-      ),
-    );
+  const row = (
+    await db
+      .select()
+      .from(materialAnalyses)
+      .where(
+        and(
+          eq(materialAnalyses.analysisId, analysisId),
+          eq(materialAnalyses.actorId, actorId),
+          gt(materialAnalyses.expiresAt, now),
+        ),
+      )
+  ).at(0);
   if (!row) {
     return null;
   }
-  const candidates = JSON.parse(row.candidatesJson);
+  const candidates = parseJson(row.candidatesJson);
   if (!validateMaterialAnalysisResult(candidates)) {
     throw new Error('保存された分析候補が不正です。');
   }

@@ -1,10 +1,11 @@
+import type * as LintTypeModule0 from '../src/runtime.ts';
 import { EventEmitter } from 'node:events';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { afterEach, expect, test, vi } from 'vitest';
-import { PendingRuntimeCleanup, startRuntimeInProcess, type LocalRuntime } from '../src/runtime.ts';
+import { PendingRuntimeCleanup, startRuntimeInProcess } from '../src/runtime.ts';
 
 vi.mock('../src/runtime.ts', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../src/runtime.ts')>()),
+  ...(await importOriginal<typeof LintTypeModule0>()),
   startRuntimeInProcess: vi.fn(),
 }));
 afterEach(() => {
@@ -20,18 +21,26 @@ async function hostFixture() {
   const channel = {
     connected: true,
     exitCode: 0,
-    send: vi.fn((_message: object, callback: () => void) => callback()),
+    send: vi.fn((_message: object, callback: () => void) => {
+      callback();
+    }),
     disconnect: vi.fn(() => {
       channel.connected = false;
     }),
     on: events.on.bind(events),
     once: events.once.bind(events),
   };
-  const runtime: LocalRuntime = {
+  const runtime: LintTypeModule0.LocalRuntime = {
     baseUrl: 'http://host.invalid',
-    closed: new Promise(() => {}),
-    stop: vi.fn(async () => {}),
-    runScheduled: vi.fn(async () => {}),
+    closed: new Promise(() => {
+      /* この実装では追加の処理を行わない。 */
+    }),
+    stop: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
+    runScheduled: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
   };
   vi.mocked(startRuntimeInProcess).mockResolvedValue(runtime);
   vi.stubGlobal('process', channel);
@@ -63,7 +72,7 @@ test('起動前の停止後は遅れて届く開始要求を受け付けない',
 
 test('起動中に切断されたらreadyを送らず起動完了後に停止する', async () => {
   const fixture = await hostFixture();
-  const startup = Promise.withResolvers<LocalRuntime>();
+  const startup = Promise.withResolvers<LintTypeModule0.LocalRuntime>();
   vi.mocked(startRuntimeInProcess).mockReturnValue(startup.promise);
   fixture.start();
   fixture.channel.connected = false;
@@ -90,7 +99,9 @@ test('起動の非Error例外を定型文で通知して失敗終了にする', 
 
 test('起動失敗後の保留された後処理を確認してから切断する', async () => {
   const fixture = await hostFixture();
-  const cleanup = vi.fn(async () => {});
+  const cleanup = vi.fn(async () => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.mocked(startRuntimeInProcess).mockRejectedValue(new PendingRuntimeCleanup(cleanup));
   fixture.start();
   await fixture.settle();
@@ -179,4 +190,25 @@ test('管理ホストは起動を一度だけ受け付け停止を確認してIP
   await fixture.settle();
   expect(fixture.runtime.stop).toHaveBeenCalledTimes(1);
   expect(fixture.channel.disconnect).toHaveBeenCalledTimes(1);
+});
+
+test('終了確認Promiseの失敗を通知してランタイムを停止する', async () => {
+  for (const error of [new Error('closed failed'), 'private detail']) {
+    const fixture = await hostFixture();
+    const closed = Promise.withResolvers<{ exitCode: 0 | 1 }>();
+    fixture.runtime.closed = closed.promise;
+    fixture.start();
+    await fixture.settle();
+    closed.reject(error);
+    await fixture.settle();
+    expect(fixture.channel.send).toHaveBeenCalledWith(
+      {
+        type: 'error',
+        message: error instanceof Error ? 'closed failed' : 'ランタイムの終了確認に失敗しました。',
+      },
+      expect.any(Function),
+    );
+    expect(fixture.runtime.stop).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  }
 });

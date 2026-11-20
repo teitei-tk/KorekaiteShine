@@ -1,3 +1,5 @@
+import { parseJson, isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
 import { validDiagnostic } from './diagnostics.ts';
 import type { Diagnostic } from './diagnostics.ts';
 import { writeFileSync, readFileSync, statSync, existsSync } from 'node:fs';
@@ -21,7 +23,7 @@ const reasons = [
 ] as const;
 export type StatusReason = (typeof reasons)[number];
 export type ReportJob = 'gate' | 'generate' | 'publish';
-export interface StatusReport {
+export type StatusReport = {
   version: 1;
   run: string;
   attempt: string;
@@ -31,7 +33,7 @@ export interface StatusReport {
   reason: StatusReason;
   diagnostic?: Diagnostic;
   commentId?: number;
-}
+};
 // 外部入力を分類名へ流用しない。本番runtimeと読取側で同じ許可リストを使う。
 export const runtimeTargets = [
   'runtime/preflight',
@@ -58,45 +60,49 @@ export const runtimeTargets = [
   'finish/cleanup',
 ] as const;
 export type RuntimeTarget = (typeof runtimeTargets)[number];
-export function validTarget(value: string): boolean {
+export function validTarget(value: JsonInput): value is string {
   return (
     typeof value === 'string' &&
     (runtimeTargets.some((target) => target === value) ||
-      /^(gate|history|collect|preflight|artifact|publish|generate|workflow|invalid-task-id|(?:task|reconcile)-[1-9]\d{0,5})$/.test(
+      /^(?<capture1>gate|history|collect|preflight|artifact|publish|generate|workflow|invalid-task-id|(?:task|reconcile)-[1-9]\d{0,5})$/u.test(
         value,
       ))
   );
 }
-export function validReport(value: Partial<StatusReport> | null): value is StatusReport {
+export function validReport(value: JsonInput): value is StatusReport {
   return (
-    !!value &&
+    isJsonObject(value) &&
+    typeof value.reason === 'string' &&
+    typeof value.job === 'string' &&
+    typeof value.status === 'string' &&
     value.version === 1 &&
     (value.reason === 'BUDGET_NOTIFIED'
-      ? Number.isSafeInteger(value.commentId) &&
-        value.commentId! > 0 &&
+      ? typeof value.commentId === 'number' &&
+        Number.isSafeInteger(value.commentId) &&
+        value.commentId > 0 &&
         value.job === 'publish' &&
         value.status === 'success'
       : value.commentId === undefined) &&
     (value.diagnostic === undefined ||
       (value.status === 'failure' && validDiagnostic(value.diagnostic))) &&
     typeof value.run === 'string' &&
-    /^[1-9]\d{0,17}$/.test(value.run) &&
+    /^[1-9]\d{0,17}$/u.test(value.run) &&
     typeof value.attempt === 'string' &&
-    /^[1-9]\d{0,5}$/.test(value.attempt) &&
-    ['gate', 'generate', 'publish'].includes(value.job ?? '') &&
-    ['success', 'failure', 'neutral'].includes(value.status ?? '') &&
+    /^[1-9]\d{0,5}$/u.test(value.attempt) &&
+    ['gate', 'generate', 'publish'].includes(value.job) &&
+    ['success', 'failure', 'neutral'].includes(value.status) &&
     validTarget(value.target ?? '') &&
     reasons.some((reason) => reason === value.reason) &&
     // ここまでの許可リスト検査でjobとreasonの欠落は拒否される。
     (value.status !== 'success' ||
       (value.job === 'publish' &&
         value.target === 'publish' &&
-        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason!)) ||
-      (['gate', 'generate'].includes(value.job!) &&
+        ['REVIEW_COMPLETE', 'ALREADY_COMPLETE', 'BUDGET_NOTIFIED'].includes(value.reason)) ||
+      (['gate', 'generate'].includes(value.job) &&
         value.target === 'gate' &&
         value.reason === 'ALREADY_COMPLETE')) &&
     (value.status !== 'neutral' ||
-      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason!) ||
+      ['TARGET_CHANGED', 'SKIPPED'].includes(value.reason) ||
       (value.job === 'generate' && value.reason === 'COST_BUDGET_EXCEEDED')) &&
     (value.status !== 'failure' ||
       ![
@@ -106,7 +112,7 @@ export function validReport(value: Partial<StatusReport> | null): value is Statu
         'TARGET_CHANGED',
         'SKIPPED',
         'COST_BUDGET_EXCEEDED',
-      ].includes(value.reason!))
+      ].includes(value.reason))
   );
 }
 export function writeStatusReport(
@@ -132,9 +138,9 @@ export function writeStatusReport(
     target,
     reason,
     ...(diagnostic ? { diagnostic } : {}),
-    ...(commentId !== undefined ? { commentId } : {}),
+    ...(commentId === undefined ? {} : { commentId }),
   };
-  if (!validReport(value as Partial<StatusReport>)) {
+  if (!validReport(value)) {
     throw new Error('実行結果の形式が不正です');
   }
   const json = JSON.stringify(value);
@@ -154,7 +160,7 @@ export function readStatusReports(
     if (!stat.isFile()) {
       throw new Error('実行結果が大きすぎます');
     }
-    const value = JSON.parse(readFileSync(path, 'utf8')) as Partial<StatusReport> | null;
+    const value = parseJson(readFileSync(path, 'utf8'));
     if (
       !validReport(value) ||
       value.run !== String(run) ||
@@ -175,7 +181,7 @@ export function readStatusReports(
   // download-artifact v8は取得対象が1件なら指定先の直下へ展開する。
   const single = join(directory, 'status.json');
   if (existsSync(single)) {
-    if (reports.length) {
+    if (reports.length > 0) {
       throw new Error('単一・複数Artifactの展開結果が混在しています');
     }
     reports.push(readReport(single));
@@ -189,7 +195,7 @@ export function recordExecutionFailure(env: Record<string, string | undefined>):
     env.AI_REVIEW_REPORT ?? (env.RUNNER_TEMP ? join(env.RUNNER_TEMP, 'status.json') : undefined);
   if (path) {
     try {
-      const value: Partial<StatusReport> = JSON.parse(readFileSync(path, 'utf8'));
+      const value = parseJson(readFileSync(path, 'utf8'));
       if (
         validReport(value) &&
         value.run === env.GITHUB_RUN_ID &&

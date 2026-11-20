@@ -1,10 +1,11 @@
+import { parseObject, objectAt, objectArray, schemaMap, stringValue } from './schema-input.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { standaloneValidator } from './standalone-validator.ts';
 import { withReachableSchemas } from './reachable-schema.ts';
 
 const directory = new URL('../generated/http/', import.meta.url);
-const document = JSON.parse(await readFile(new URL('openapi.json', directory), 'utf8'));
+const document = parseObject(await readFile(new URL('openapi.json', directory), 'utf8'));
 const ajv = new Ajv2020({
   strict: false,
   coerceTypes: false,
@@ -12,7 +13,7 @@ const ajv = new Ajv2020({
   removeAdditional: false,
   code: { source: true, esm: true },
 });
-const exports: Record<string, string> = {};
+const validatorExports: Record<string, string> = {};
 const declarations: string[] = [];
 for (const model of [
   'LocalSession',
@@ -25,62 +26,64 @@ for (const model of [
   const name = `validate${model}`;
   ajv.addSchema({
     $id: name,
-    ...withReachableSchemas({ $ref: `#/components/schemas/${model}` }, document.components.schemas),
+    ...withReachableSchemas(
+      { $ref: `#/components/schemas/${model}` },
+      schemaMap(objectAt(document, 'components').schemas),
+    ),
   });
-  exports[name] = name;
+  validatorExports[name] = name;
   declarations.push(`export const ${name}: ValidateFunction<components['schemas']['${model}']>;`);
 }
-const parameters = document.paths['/api/interview-history'].get.parameters
-  .map((parameter: { $ref?: string; in?: string; name?: string; schema?: object }) => {
-    if (!parameter.$ref) {
+const parameters = objectArray(
+  objectAt(document, 'paths', '/api/interview-history', 'get').parameters,
+)
+  .map((parameter) => {
+    if (parameter.$ref === undefined) {
       return parameter;
     }
+    const reference = stringValue(parameter.$ref);
     const prefix = '#/components/parameters/';
-    if (!parameter.$ref.startsWith(prefix)) {
+    if (!reference.startsWith(prefix)) {
       throw new Error('未対応の引数参照です。');
     }
-    const name = parameter.$ref.slice(prefix.length).replaceAll('~1', '/').replaceAll('~0', '~');
-    const resolved = document.components.parameters[name];
-    if (!resolved) {
+    const name = reference.slice(prefix.length).replaceAll('~1', '/').replaceAll('~0', '~');
+    const resolved = objectAt(document, 'components', 'parameters')[name];
+    if (resolved === undefined) {
       throw new Error('引数の参照先がありません。');
     }
-    return resolved;
+    return objectAt(resolved);
   })
-  .filter((parameter: { in: string }) => parameter.in === 'query');
+  .filter((parameter) => parameter.in === 'query');
 const queryName = 'validateInterviewHistoryQuery';
 ajv.addSchema({
   $id: queryName,
   type: 'object',
   additionalProperties: false,
   properties: Object.fromEntries(
-    parameters.map((parameter: { name: string; schema: object }) => [
-      parameter.name,
-      parameter.schema,
-    ]),
+    parameters.map((parameter) => [stringValue(parameter.name), objectAt(parameter.schema)]),
   ),
   required: parameters
-    .filter((parameter: { required?: boolean }) => parameter.required)
-    .map((parameter: { name: string }) => parameter.name),
+    .filter((parameter) => parameter.required === true)
+    .map((parameter) => stringValue(parameter.name)),
 });
-exports[queryName] = queryName;
+validatorExports[queryName] = queryName;
 declarations.push(
   `export const ${queryName}: ValidateFunction<NonNullable<operations['getInterviewHistory']['parameters']['query']>>;`,
 );
-const idParameter = document.paths['/api/interviews/{interviewId}'].get.parameters.find(
-  (parameter: { in: string; name: string }) =>
-    parameter.in === 'path' && parameter.name === 'interviewId',
-);
-if (!idParameter?.schema) {
+const idParameter = objectArray(
+  objectAt(document, 'paths', '/api/interviews/{interviewId}', 'get').parameters,
+).find((parameter) => parameter.in === 'path' && parameter.name === 'interviewId');
+if (idParameter?.schema === undefined) {
   throw new Error('面接IDの契約がありません。');
 }
-ajv.addSchema({ $id: 'validateInterviewId', ...idParameter.schema });
-exports.validateInterviewId = 'validateInterviewId';
+ajv.addSchema({ $id: 'validateInterviewId', ...objectAt(idParameter.schema) });
+validatorExports.validateInterviewId = 'validateInterviewId';
 declarations.push(
   `export const validateInterviewId: ValidateFunction<operations['getInterviewDetail']['parameters']['path']['interviewId']>;`,
 );
 await writeFile(
   new URL('application-validators.mjs', directory),
-  standaloneValidator(ajv, exports),
+  standaloneValidator(ajv, validatorExports),
 );
 await writeFile(
   new URL('application-validators.d.mts', directory),

@@ -15,7 +15,7 @@ function isGlobalObjectConstructor(node, sourceCode) {
   );
 }
 
-export default {
+const immutablePlugin = {
   meta: { name: 'immutable' },
   rules: {
     'no-let': {
@@ -68,3 +68,5 @@ export default {
     },
   },
 };
+
+export default immutablePlugin;

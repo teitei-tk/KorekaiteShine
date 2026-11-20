@@ -1,14 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { assert, afterEach, describe, expect, it, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { authenticateProxy, type Launch } from './wif.ts';
+import { authenticateProxy } from './wif.ts';
+import type { Launch } from './wif.ts';
 
 const directories: string[] = [];
-afterEach(() =>
-  directories.splice(0).forEach((path) => rmSync(path, { recursive: true, force: true })),
-);
+afterEach(() => {
+  for (const path of directories.splice(0)) {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
 const env = {
   ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'test-request-secret',
   ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid/oidc',
@@ -48,7 +51,11 @@ function fixture(mode: 'ready' | 'failure' | 'wrong-pid' | 'no-shutdown') {
     `;
     return spawn(process.execPath, ['-e', source], options);
   });
-  return { info, launch, child: () => launch.mock.results[0]!.value };
+  return {
+    info,
+    launch,
+    child: () => (launch.mock.results[0] ?? assert.fail('必須のテスト値がありません。')).value,
+  };
 }
 describe('公式プロキシだけによる認証検証', () => {
   it('要求トークンをパイプだけで渡し、ready後に隔離検査し、GET shutdownで終了する', async () => {
@@ -69,7 +76,17 @@ describe('公式プロキシだけによる認証検証', () => {
   for (const mode of ['failure', 'wrong-pid', 'no-shutdown'] as const) {
     it(`${mode}を成功扱いせず、開始した子を停止する`, async () => {
       const f = fixture(mode);
-      await expect(authenticateProxy(env, f.info, () => {}, 300, f.launch)).rejects.toThrow();
+      await expect(
+        authenticateProxy(
+          env,
+          f.info,
+          () => {
+            /* この実装では追加の処理を行わない。 */
+          },
+          300,
+          f.launch,
+        ),
+      ).rejects.toThrow();
       expect(f.child().exitCode !== null || f.child().signalCode !== null).toBe(true);
     });
   }

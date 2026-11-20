@@ -22,9 +22,9 @@ test('音声送信を止めても上流終了まで文字起こしの受信世�
 
 test('接続確認後だけ時間を計測し、一時停止中は計測せず同じ面接を再開する', () => {
   const initial = createInterviewState('interview-a');
-  const connecting = transitionInterview(initial, { type: 'connect' }, 1_000);
+  const connecting = transitionInterview(initial, { type: 'connect' }, 1000);
   expect(connecting).toMatchObject({ status: 'connecting', generation: 1, activeMs: 0 });
-  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 3_000);
+  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 3000);
   const paused = transitionInterview(active, { type: 'pause' }, 13_000);
   expect(paused).toMatchObject({
     interviewId: 'interview-a',
@@ -50,11 +50,11 @@ test('停止5分・接続30秒の期限ちょうどで終了し、直前の再�
   expect(transitionInterview(connecting, { type: 'tick' }, 29_999).status).toBe('connecting');
   expect(transitionInterview(connecting, { type: 'tick' }, 30_000).status).toBe('ending');
   const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 0);
-  const paused = transitionInterview(active, { type: 'pause' }, 1_000);
+  const paused = transitionInterview(active, { type: 'pause' }, 1000);
   expect(transitionInterview(paused, { type: 'tick' }, 300_999).status).toBe('paused');
   expect(transitionInterview(paused, { type: 'tick' }, 301_000)).toMatchObject({
     status: 'ending',
-    activeMs: 1_000,
+    activeMs: 1000,
   });
   const retrying = transitionInterview(paused, { type: 'connect' }, 300_999);
   expect(retrying.deadline).toBe(301_000);
@@ -66,7 +66,7 @@ test('停止5分・接続30秒の期限ちょうどで終了し、直前の再�
 
 test('切断後は1分待ち、引き継ぎ前の世代から届くイベントで状態を変更しない', () => {
   const connecting = transitionInterview(createInterviewState('a'), { type: 'connect' }, 0);
-  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1_000);
+  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1000);
   const disconnected = transitionInterview(active, { type: 'disconnected', generation: 1 }, 11_000);
   expect(disconnected).toMatchObject({
     status: 'reconnecting',
@@ -94,16 +94,16 @@ test('切断後は1分待ち、引き継ぎ前の世代から届くイベント�
 
 test('20分の上限で計測を止め、終了保存の完了後は再開しない', () => {
   const connecting = transitionInterview(createInterviewState('a'), { type: 'connect' }, 0);
-  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1_000);
+  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1000);
   const ending = transitionInterview(active, { type: 'tick' }, 1_210_000);
   expect(ending).toMatchObject({ status: 'ending', activeMs: 1_200_000, activeSince: null });
-  expect(() => transitionInterview(active, { type: 'persisted' }, 2_000)).toThrow();
+  expect(() => transitionInterview(active, { type: 'persisted' }, 2000)).toThrow();
   const ended = transitionInterview(ending, { type: 'persisted' }, 1_211_000);
   expect(ended.status).toBe('ended');
   expect(transitionInterview(ended, { type: 'finish' }, 1_212_000)).toEqual(ended);
   expect(transitionInterview(ended, { type: 'tick' }, 1_212_000)).toEqual(ended);
   expect(() => transitionInterview(ended, { type: 'connect' }, 1_212_000)).toThrow();
-  for (const now of [-1, NaN, Infinity, 999]) {
+  for (const now of [-1, Number.NaN, Infinity, 999]) {
     expect(() => transitionInterview(active, { type: 'pause' }, now)).toThrow();
   }
 });
@@ -111,16 +111,16 @@ test('20分の上限で計測を止め、終了保存の完了後は再開しな
 test('音声は接続確認済みの現世代だけが期限内に送信できる', () => {
   const connecting = transitionInterview(createInterviewState('a'), { type: 'connect' }, 0);
   expect(canSendAudio(connecting, 1, 100)).toBe(false);
-  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1_000);
-  expect(canSendAudio(active, 1, 1_000)).toBe(true);
-  expect(canSendAudio(active, 0, 1_000)).toBe(false);
+  const active = transitionInterview(connecting, { type: 'ready', generation: 1 }, 1000);
+  expect(canSendAudio(active, 1, 1000)).toBe(true);
+  expect(canSendAudio(active, 0, 1000)).toBe(false);
   expect(canSendAudio(active, 1, 1_201_000)).toBe(false);
-  expect(canSendAudio(active, 1, NaN)).toBe(false);
+  expect(canSendAudio(active, 1, Number.NaN)).toBe(false);
   expect(canSendAudio(active, 1, 999)).toBe(false);
-  const paused = transitionInterview(active, { type: 'pause' }, 2_000);
-  expect(canSendAudio(paused, paused.generation, 2_000)).toBe(false);
-  const ending = transitionInterview(active, { type: 'finish' }, 2_000);
-  expect(canSendAudio(ending, ending.generation, 2_000)).toBe(false);
+  const paused = transitionInterview(active, { type: 'pause' }, 2000);
+  expect(canSendAudio(paused, paused.generation, 2000)).toBe(false);
+  const ending = transitionInterview(active, { type: 'finish' }, 2000);
+  expect(canSendAudio(ending, ending.generation, 2000)).toBe(false);
 });
 
 test('状態に合わない通知を無視し、開始前の制御操作を拒否する', () => {
@@ -136,7 +136,7 @@ test('状態に合わない通知を無視し、開始前の制御操作を拒�
     expect(() => transitionInterview(state, action, 1)).toThrow();
   }
   const connecting = transitionInterview(state, { type: 'connect' }, 0);
-  expect(transitionInterview(connecting, { type: 'takeover' }, 200).deadline).toBe(30000);
+  expect(transitionInterview(connecting, { type: 'takeover' }, 200).deadline).toBe(30_000);
   const ending = transitionInterview(connecting, { type: 'finish' }, 1);
   expect(transitionInterview(ending, { type: 'tick' }, 2)).toBe(ending);
   const ended = transitionInterview(ending, { type: 'persisted' }, 2);
@@ -146,7 +146,7 @@ test('状態に合わない通知を無視し、開始前の制御操作を拒�
 test('期限が未設定の保存状態でも再接続と引き継ぎに新しい期限を設定する', () => {
   const state = { ...createInterviewState('a'), status: 'connecting' as const, generation: 1 };
   expect(transitionInterview(state, { type: 'disconnected', generation: 1 }, 100).deadline).toBe(
-    60100,
+    60_100,
   );
-  expect(transitionInterview(state, { type: 'takeover' }, 100).deadline).toBe(30100);
+  expect(transitionInterview(state, { type: 'takeover' }, 100).deadline).toBe(30_100);
 });

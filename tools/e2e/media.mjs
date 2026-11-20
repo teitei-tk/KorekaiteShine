@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
-const answer = fileURLToPath(new URL('./fixtures/answer.wav', import.meta.url));
+const answer = fileURLToPath(new URL('fixtures/answer.wav', import.meta.url));
 export const fakeMediaArgs = [
   '--use-fake-ui-for-media-stream',
   '--use-fake-device-for-media-stream',
@@ -21,6 +21,15 @@ export async function installMediaProbe(context) {
       audibleSeconds: 0,
       completedSeconds: 0,
       playedFrequencies: [],
+      socketClosures: [],
+    };
+    // 失敗時だけ切断元の呼出位置を報告する。通信内容は記録しない。
+    meter.traceSocket = () => {
+      const closeSocket = WebSocket.prototype.close;
+      WebSocket.prototype.close = function (...args) {
+        meter.socketClosures.push(new Error('ブラウザ側の切断').stack);
+        return closeSocket.apply(this, args);
+      };
     };
     const tracks = new Set();
     const acquire = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -34,8 +43,8 @@ export async function installMediaProbe(context) {
     };
     meter.speak = () => {
       const live = [...tracks].filter((track) => track.readyState === 'live');
-      if (!live.length) {
-        throw Error('発話に使えるマイクがありません。');
+      if (live.length === 0) {
+        throw new Error('発話に使えるマイクがありません。');
       }
       meter.speaking = true;
       for (const track of live) {
@@ -50,17 +59,17 @@ export async function installMediaProbe(context) {
     };
     // スピーカーへ接続された実際のグラフを分岐し、再生時計が進む間の振幅を測る。
     const graphs = new WeakMap();
-    const connect = AudioNode.prototype.connect;
+    const { connect } = AudioNode.prototype;
     AudioNode.prototype.connect = function (destination, ...options) {
       const result = connect.call(this, destination, ...options);
       if (destination === this.context.destination) {
         if (this instanceof AudioBufferSourceNode && this.buffer) {
-          const buffer = this.buffer;
+          const { buffer } = this;
           const start = this.start.bind(this);
           const playback = { startedAt: undefined };
           this.start = (when = 0, ...args) => {
             playback.startedAt = Math.max(this.context.currentTime, when);
-            return start(when, ...args);
+            start(when, ...args);
           };
           this.addEventListener(
             'ended',
@@ -106,7 +115,8 @@ export async function installMediaProbe(context) {
           const previousState = { previous: ctx.currentTime };
           const timer = setInterval(() => {
             if (ctx.state === 'closed') {
-              return clearInterval(timer);
+              clearInterval(timer);
+              return;
             }
             analyserState.analyser.getFloatTimeDomainData(samples);
             if (
@@ -123,25 +133,27 @@ export async function installMediaProbe(context) {
       }
       return result;
     };
-    window.voiceE2e = meter;
+    globalThis.voiceE2e = meter;
   });
 }
 export function playbackCount(page) {
-  return page.evaluate(() => window.voiceE2e.count);
+  return page.evaluate(() => globalThis.voiceE2e.count);
 }
 export async function waitForQuiet(page) {
   await page.waitForFunction(
-    () => !window.voiceE2e.speaking && performance.now() - window.voiceE2e.lastSound > 800,
+    () => !globalThis.voiceE2e.speaking && performance.now() - globalThis.voiceE2e.lastSound > 800,
     undefined,
     { timeout: 45_000 },
   );
 }
 export async function speak(page) {
   await waitForQuiet(page);
-  await page.evaluate(() => window.voiceE2e.speak());
+  await page.evaluate(() => globalThis.voiceE2e.speak());
 }
 export async function waitForPlayback(page, previousCount) {
-  await page.waitForFunction((n) => window.voiceE2e.count > n, previousCount, { timeout: 40_000 });
+  await page.waitForFunction((n) => globalThis.voiceE2e.count > n, previousCount, {
+    timeout: 40_000,
+  });
   return playbackCount(page);
 }
 
@@ -151,7 +163,7 @@ export async function waitForOpening(page, previousCount) {
   const minimum = process.env.E2E_PROFILE === 'live' ? 0.4 : 0.5;
   await page.waitForFunction(
     (seconds) =>
-      window.voiceE2e.audibleSeconds >= 0.4 && window.voiceE2e.completedSeconds >= seconds,
+      globalThis.voiceE2e.audibleSeconds >= 0.4 && globalThis.voiceE2e.completedSeconds >= seconds,
     minimum,
     { timeout: 40_000 },
   );

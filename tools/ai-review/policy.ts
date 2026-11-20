@@ -1,12 +1,14 @@
+import { isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
 import { ReviewFailure } from './failure.ts';
 import { detail } from './diagnostics.ts';
 import type { PriorFinding } from './history.ts';
 export const REPOSITORY = 'teitei-tk/KorekaiteShine';
-export const REPOSITORY_ID = 1426899426;
-export const OWNER_ID = 1324680;
+export const REPOSITORY_ID = 1_426_899_426;
+export const OWNER_ID = 1_324_680;
 export const MARKER = '<!-- korekaite-ai-review -->';
 
-export interface PullRequest {
+export type PullRequest = {
   number: number;
   user: { id: number; type: string };
   state: string;
@@ -15,96 +17,106 @@ export interface PullRequest {
   base: { sha: string; ref: string; repo: { id: number } };
   title?: string;
   body?: string | null;
-}
-export function eligible(value: Partial<PullRequest> | null): value is PullRequest {
-  const pr = value as PullRequest | null;
+};
+export function eligible(value: JsonInput | undefined): value is PullRequest {
+  const pr = value;
   return (
-    !!pr &&
-    pr.user?.id === OWNER_ID &&
+    pr !== undefined &&
+    isJsonObject(pr) &&
+    isJsonObject(pr.user) &&
+    pr.user.id === OWNER_ID &&
     pr.user.type === 'User' &&
-    pr.head?.repo?.id === REPOSITORY_ID &&
-    pr.base?.repo?.id === REPOSITORY_ID &&
+    isJsonObject(pr.head) &&
+    isJsonObject(pr.head.repo) &&
+    pr.head.repo.id === REPOSITORY_ID &&
+    isJsonObject(pr.base) &&
+    isJsonObject(pr.base.repo) &&
+    pr.base.repo.id === REPOSITORY_ID &&
     pr.base.ref === 'main' &&
     pr.state === 'open' &&
-    pr.draft === false &&
+    !Boolean(pr.draft) &&
+    typeof pr.number === 'number' &&
     Number.isSafeInteger(pr.number) &&
     pr.number > 0 &&
-    /^[a-f0-9]{40}$/.test(pr.head.sha) &&
-    /^[a-f0-9]{40}$/.test(pr.base.sha)
+    typeof pr.head.sha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(pr.head.sha) &&
+    typeof pr.base.sha === 'string' &&
+    /^[a-f0-9]{40}$/u.test(pr.base.sha)
   );
 }
-export interface Finding {
+export type Finding = {
   priority: 'P1' | 'P2';
   path: string;
   line: number;
   condition: string;
   impact: string;
   fix: string;
-}
-export interface FixCheck {
+};
+export type FixCheck = {
   id: string;
   status: 'fixed' | 'unfixed' | 'unverified';
   evidence: string;
-}
-export interface Review {
+};
+export type Review = {
   status: 'complete' | 'incomplete';
   summary: string;
   uncertainties: string[];
   findings: Finding[];
   checks?: FixCheck[];
-}
-function shortText(value: string | null | undefined, max: number): value is string {
+};
+function shortText(value: JsonInput | undefined, max: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= max;
 }
-export interface FindingInput {
+export type FindingInput = {
   priority: string;
   path: string;
   line: number;
   condition: string;
   impact: string;
   fix: string;
-}
-export interface ReviewInput {
+};
+export type ReviewInput = {
   status: string;
   summary: string;
   uncertainties: string[];
   findings: FindingInput[];
   checks?: { id: string; status: string; evidence: string }[];
-}
+};
 // 投稿済みの履歴にも使う形式検証。新規投稿の重複判定は含めない。
-export function validFindings(value: FindingInput[] | null | undefined): Finding[] {
-  if (!Array.isArray(value) || value.length > 3) {
+export function validFindings(value: JsonInput | undefined): Finding[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 3 ||
+    !value.every(
+      (f): f is Finding =>
+        isJsonObject(f) &&
+        (f.priority === 'P1' || f.priority === 'P2') &&
+        shortText(f.path, 500) &&
+        typeof f.line === 'number' &&
+        Number.isSafeInteger(f.line) &&
+        f.line >= 1 &&
+        shortText(f.condition, 1000) &&
+        shortText(f.impact, 1000) &&
+        shortText(f.fix, 1000),
+    )
+  ) {
     throw new Error('指摘の形式が不正です');
   }
-  for (const f of value) {
-    if (
-      !f ||
-      !['P1', 'P2'].includes(f.priority) ||
-      !shortText(f.path, 500) ||
-      !Number.isSafeInteger(f.line) ||
-      f.line < 1 ||
-      !shortText(f.condition, 1000) ||
-      !shortText(f.impact, 1000) ||
-      !shortText(f.fix, 1000)
-    ) {
-      throw new Error('指摘の形式が不正です');
-    }
-  }
-  return value as Finding[];
+  return value;
 }
 export function validReview(
-  value: ReviewInput | null,
+  value: JsonInput,
   lines: Record<string, number[]>,
   prior: PriorFinding[] = [],
 ): Review {
-  const r = value as Review | null;
+  const r = value;
   if (
-    !r ||
-    !['complete', 'incomplete'].includes(r.status) ||
+    !isJsonObject(r) ||
+    (r.status !== 'complete' && r.status !== 'incomplete') ||
     !shortText(r.summary, 1500) ||
     !Array.isArray(r.uncertainties) ||
     r.uncertainties.length > 5 ||
-    !r.uncertainties.every((x) => shortText(x, 500))
+    !r.uncertainties.every((x): x is string => shortText(x, 500))
   ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
@@ -123,8 +135,8 @@ export function validReview(
     }
   }
   if (
-    r.findings.some((f, index) =>
-      [...prior, ...r.findings.slice(0, index)].some(
+    findings.some((f, index) =>
+      [...prior, ...findings.slice(0, index)].some(
         (p) => p.path === f.path && p.condition.trim() === f.condition.trim(),
       ),
     )
@@ -139,8 +151,11 @@ export function validReview(
   if (
     !Array.isArray(checks) ||
     checks.length !== prior.length ||
-    new Set(checks.map((c) => c?.id)).size !== checks.length ||
-    checks.some((c) => !c || !prior.some((f) => f.id === c.id))
+    !checks.every(
+      (c): c is { id: string; status?: JsonInput; evidence?: JsonInput } =>
+        isJsonObject(c) && typeof c.id === 'string' && prior.some((f) => f.id === c.id),
+    ) ||
+    new Set(checks.map((c) => c.id)).size !== checks.length
   ) {
     throw new ReviewFailure(
       'OUTPUT_INVALID',
@@ -149,8 +164,10 @@ export function validReview(
     );
   }
   if (
-    checks.some(
-      (c) => !['fixed', 'unfixed', 'unverified'].includes(c.status) || !shortText(c.evidence, 500),
+    !checks.every(
+      (c): c is FixCheck =>
+        (c.status === 'fixed' || c.status === 'unfixed' || c.status === 'unverified') &&
+        shortText(c.evidence, 500),
     )
   ) {
     throw new ReviewFailure(
@@ -159,7 +176,14 @@ export function validReview(
       detail('CHECK_RESULT_INVALID'),
     );
   }
-  return r;
+  return {
+    ...r,
+    status: r.status,
+    summary: r.summary,
+    uncertainties: r.uncertainties,
+    findings,
+    ...(r.checks === undefined ? {} : { checks }),
+  };
 }
 // MarkdownをHTML化して挿入させず、@による通知も発生させない。
 export function safe(value: string): string {
@@ -167,8 +191,8 @@ export function safe(value: string): string {
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
-    .replaceAll('@', '@\u200b')
-    .replace(/[\\`*_[\]#!|]/g, '\\$&');
+    .replaceAll('@', '@\u200B')
+    .replaceAll(/[\\`*_[\]#!|]/gu, String.raw`\$&`);
 }
 export function revisionMarker(head: string, base: string): string {
   return `<!-- revision:${head}:${base} -->`;
@@ -187,8 +211,8 @@ export function renderReview(r: Review, head: string, base: string): string {
       `**${f.priority} — ${safe(f.path)}:${f.line}**\n\n発生条件: ${safe(f.condition)}\n\n影響: ${safe(f.impact)}\n\n修正方針: ${safe(f.fix)}`,
     );
   }
-  if (r.uncertainties.length) {
-    parts.push('未確認事項:\n' + r.uncertainties.map((x) => `- ${safe(x)}`).join('\n'));
+  if (r.uncertainties.length > 0) {
+    parts.push(`未確認事項:\n${r.uncertainties.map((x) => `- ${safe(x)}`).join('\n')}`);
   }
   parts.push('指摘がない場合も、不具合がないことを保証しません。');
   return parts.join('\n\n');

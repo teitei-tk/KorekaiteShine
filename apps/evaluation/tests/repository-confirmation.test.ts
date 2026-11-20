@@ -1,7 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { afterEach, expect, test, vi } from 'vitest';
 import { createPrimaryDb } from '@korekaite/database/connection';
-import { acquireExecution } from '../src/server/repositories/job-execution';
+import { acquireExecution, completeExecution } from '../src/server/repositories/job-execution';
 import {
   requireDiagnosticInitialization,
   confirmDiagnosticInitialization,
@@ -19,11 +19,14 @@ function database() {
     limit = vi.fn();
     insert = vi.fn();
     update = vi.fn();
+    delete = vi.fn();
     set = vi.fn();
     onConflictDoNothing = vi.fn();
     returning = vi.fn();
     batch = vi.fn(async () => [[], [], [{ attemptNumber: 1 }]]);
-  })((resolve) => resolve([]));
+  })((resolve) => {
+    resolve([]);
+  });
   for (const method of [
     query.select,
     query.from,
@@ -32,6 +35,7 @@ function database() {
     query.limit,
     query.insert,
     query.update,
+    query.delete,
     query.set,
     query.onConflictDoNothing,
     query.returning,
@@ -72,4 +76,17 @@ test('D1の初期化更新後に観測結果がなければ確定済みとして
     'DO保存の観測結果を確定できません。',
   );
   expect(db.batch).toHaveBeenCalledTimes(1);
+});
+
+test('完了更新のD1結果が欠落した場合は完了として扱わない', async () => {
+  const db = database();
+  db.batch.mockResolvedValueOnce([]);
+  await expect(
+    completeExecution(
+      db as object as Parameters<typeof completeExecution>[0],
+      { jobId: 'job', ownerToken: 'owner', generation: 1, attemptNumber: 1, deadline: 100 },
+      { summary: '評価済み' },
+      0,
+    ),
+  ).rejects.toThrow('D1更新結果が配列ではありません。');
 });

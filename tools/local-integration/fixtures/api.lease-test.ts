@@ -10,20 +10,25 @@ export const Route = createFileRoute('/api/lease-test')({
           return new Response(null, { status: 400 });
         }
         switch (body.operation) {
-          case 'acquire':
+          case 'acquire': {
             return Response.json(
               await env.EVALUATION_PROBE.acquireForTest(body.notification, body.now),
             );
-          case 'recover':
+          }
+          case 'recover': {
             return Response.json(
               await env.EVALUATION_PROBE.recoverForTest(body.notification, body.now),
             );
-          case 'renew':
+          }
+          case 'renew': {
             return Response.json(await env.EVALUATION_PROBE.renewForTest(body.lease, body.now));
-          case 'complete':
+          }
+          case 'complete': {
             return Response.json(await env.EVALUATION_PROBE.completeForTest(body.lease, body.now));
-          default:
+          }
+          default: {
             return new Response(null, { status: 400 });
+          }
         }
       },
     },

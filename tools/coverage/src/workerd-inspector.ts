@@ -1,12 +1,13 @@
+import { readEndpoints } from './schema.ts';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, readlinkSync } from 'node:fs';
 import { platform } from 'node:os';
 import { basename } from 'node:path';
 
-interface InspectorEndpoint {
+type InspectorEndpoint = {
   id: string;
   webSocketDebuggerUrl: string;
-}
+};
 
 /** 自分の子workerdが所有するソケットだけから直接Inspectorを探す。 */
 export async function findWorkerdInspector(
@@ -49,7 +50,7 @@ export async function findWorkerdInspector(
       if (!response.ok) {
         continue;
       }
-      const endpoints: InspectorEndpoint[] = await response.json();
+      const endpoints = readEndpoints(await response.json());
       if (
         Array.isArray(endpoints) &&
         names.every((name) => endpoints.some((endpoint) => endpoint.id === `core:user:${name}`))
@@ -72,7 +73,7 @@ function darwinPorts(pids: readonly number[]): number[] {
   return [
     ...new Set(
       output.split('\n').flatMap((line) => {
-        const match = line.match(/^n.+:(\d+)$/u);
+        const match = /^n.+:(?<port>\d+)$/u.exec(line);
         return match ? [Number(match[1])] : [];
       }),
     ),
@@ -84,7 +85,7 @@ function linuxPorts(pids: readonly number[]): number[] {
   for (const pid of pids) {
     for (const fd of readdirSync(`/proc/${pid}/fd`)) {
       try {
-        const socket = readlinkSync(`/proc/${pid}/fd/${fd}`).match(/^socket:\[(\d+)\]$/u);
+        const socket = /^socket:\[(?<inode>\d+)\]$/u.exec(readlinkSync(`/proc/${pid}/fd/${fd}`));
         if (socket) {
           inodes.add(socket[1]);
         }

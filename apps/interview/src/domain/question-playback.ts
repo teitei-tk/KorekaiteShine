@@ -10,7 +10,7 @@ export function questionPlayback() {
       const samples = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
       const block = { offset: 0 };
       while (block.offset < bytes.byteLength) {
-        const offset = block.offset;
+        const { offset } = block;
         const end = Math.min(offset + 960, bytes.byteLength);
         const window = { power: 0, index: offset };
         while (window.index < end) {

@@ -1,21 +1,25 @@
+import type * as LintTypeModule0 from 'node:net';
+import type * as LintTypeModule1 from 'node:child_process';
+import type * as LintTypeModule2 from 'node:fs';
+import type * as LintTypeModule3 from '../isolation-probe.ts';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { createConnection, createServer, Socket, type Server } from 'node:net';
+import { createConnection, createServer, Socket } from 'node:net';
 import { readdirSync, readFileSync, readlinkSync, writeFileSync } from 'node:fs';
-import { probeIsolation, type IsolationReport } from '../isolation-probe.ts';
+import { probeIsolation } from '../isolation-probe.ts';
 
 vi.mock('node:net', async (original) => ({
-  ...(await original<typeof import('node:net')>()),
+  ...(await original<typeof LintTypeModule0>()),
   createConnection: vi.fn(),
   createServer: vi.fn(),
 }));
 vi.mock('node:child_process', async (original) => ({
-  ...(await original<typeof import('node:child_process')>()),
+  ...(await original<typeof LintTypeModule1>()),
   spawn: vi.fn(),
 }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule2>()),
   chmodSync: vi.fn(),
   readdirSync: vi.fn(),
   readFileSync: vi.fn(),
@@ -25,7 +29,7 @@ vi.mock('node:fs', async (original) => ({
   statSync: () => ({ isSocket: () => true }),
 }));
 vi.mock('../isolation-probe.ts', async (original) => ({
-  ...(await original<typeof import('../isolation-probe.ts')>()),
+  ...(await original<typeof LintTypeModule3>()),
   probeIsolation: vi.fn(),
 }));
 
@@ -37,7 +41,9 @@ function closedAllServers() {
 it('検査後に受信器へ接続できなければ隔離成功としない', async () => {
   vi.mocked(createConnection).mockImplementationOnce(() => {
     const socket = new Socket();
-    queueMicrotask(() => socket.emit('error', new Error('fixture connection')));
+    queueMicrotask(() => {
+      socket.emit('error', new Error('fixture connection'));
+    });
     return socket;
   });
   await expect(import('./run.ts')).rejects.toThrow('fixture connection');
@@ -95,7 +101,7 @@ it('受信器のアドレス不明時は両受信器を閉じて失敗する', a
   expect(closedAllServers()).toBe(true);
 });
 const address = vi.fn<() => { port: number } | null>();
-function fixtureReport(): IsolationReport {
+function fixtureReport(): LintTypeModule3.IsolationReport {
   return {
     passed: false,
     pidNamespace: 'pid:[100]',
@@ -118,7 +124,7 @@ const statusContext = { status: 0, changed: false, statReads: 0 };
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
-  address.mockReturnValue({ port: 43210 });
+  address.mockReturnValue({ port: 43_210 });
   statusContext.status = 0;
   statusContext.changed = false;
   statusContext.statReads = 0;
@@ -128,7 +134,9 @@ beforeEach(() => {
     platform: 'linux',
     argv: ['node', 'fixture', '/fixture/action.js', 'github'],
   });
-  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.mocked(readdirSync).mockReturnValue(['101', '102', 'self'] as object as ReturnType<
     typeof readdirSync
   >);
@@ -137,14 +145,11 @@ beforeEach(() => {
       return 'Runner.Worker\n';
     }
     if (String(path).endsWith('/101/stat')) {
-      return (
-        '101 (fixture) ' +
-        [
-          'S',
-          ...Array(18).fill('0'),
-          statusContext.changed && ++statusContext.statReads > 1 ? '100' : '99',
-        ].join(' ')
-      );
+      return `101 (fixture) ${[
+        'S',
+        ...Array.from({ length: 18 }, () => '0'),
+        statusContext.changed && ++statusContext.statReads > 1 ? '100' : '99',
+      ].join(' ')}`;
     }
     throw new Error('fixture proc disappeared');
   });
@@ -166,17 +171,21 @@ beforeEach(() => {
         callback();
         return server;
       });
-    })() as object as Server;
+    })() as object as LintTypeModule0.Server;
     return server;
   });
   vi.mocked(createConnection).mockImplementation(() => {
     const socket = new Socket();
-    queueMicrotask(() => socket.emit('connect'));
+    queueMicrotask(() => {
+      socket.emit('connect');
+    });
     return socket;
   });
   vi.mocked(spawn).mockImplementation(() => {
     const child = new ChildProcess();
-    queueMicrotask(() => child.emit('exit', statusContext.status));
+    queueMicrotask(() => {
+      child.emit('exit', statusContext.status);
+    });
     return child;
   });
 });

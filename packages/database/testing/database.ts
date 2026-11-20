@@ -1,3 +1,4 @@
+import { parseJournal } from './journal.ts';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +12,9 @@ export async function prepareMigrationFixture(directory: string, through?: strin
   if (!path || path.startsWith('..')) {
     throw new Error('独立テスト環境内だけに履歴を準備できます。');
   }
-  const journal = JSON.parse(await readFile(join(source, 'migrations/meta/_journal.json'), 'utf8'));
+  const journal = parseJournal(
+    await readFile(join(source, 'migrations/meta/_journal.json'), 'utf8'),
+  );
   const entries: { tag: string }[] = journal.entries;
   const index =
     through === undefined

@@ -1,3 +1,5 @@
+import type * as LintTypeModule0 from '@korekaite/runtime-config';
+import type * as LintTypeModule1 from 'node:fs/promises';
 import { SystemError } from '../../testing/system-error.mts';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,7 +10,7 @@ import { runDatabaseCommand } from '../src/database.ts';
 
 const location = vi.hoisted(() => ({ root: '' }));
 vi.mock('@korekaite/runtime-config', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@korekaite/runtime-config')>();
+  const original = await importOriginal<typeof LintTypeModule0>();
   return {
     ...original,
     resolveRuntime: (input: Parameters<typeof original.resolveRuntime>[0]) =>
@@ -16,7 +18,7 @@ vi.mock('@korekaite/runtime-config', async (importOriginal) => {
   };
 });
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs/promises')>();
+  const original = await importOriginal<typeof LintTypeModule1>();
   return { ...original, writeFile: vi.fn(original.writeFile) };
 });
 vi.mock('../src/lock.ts', () => ({ lockEnvironment: vi.fn() }));
@@ -30,23 +32,29 @@ afterEach(() => {
 
 async function preparationFixture() {
   location.root = await mkdtemp(join(tmpdir(), 'prepare-boundary-'));
-  const root = location.root;
+  const { root } = location;
   onTestFinished(() => rm(root, { recursive: true, force: true }));
   const directory = join(root, '.local/development/artifacts');
   await mkdir(directory, { recursive: true });
   const output = join(directory, 'isolation-output.txt');
-  const release = vi.fn();
+  const release = vi.fn<() => void>(() => {
+    /* 解放呼出しを記録する。 */
+  });
   vi.mocked(lockEnvironment).mockResolvedValue(release);
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   const run = async (args: string[] = []) => {
     vi.resetModules();
     const channel = { argv: ['node', 'prepare-integration.ts', ...args], exitCode: 0 };
     vi.stubGlobal('process', channel);
     await import('../src/prepare-integration.ts');
-    await vi.waitFor(() =>
-      expect(log.mock.calls.length + error.mock.calls.length).toBeGreaterThan(0),
-    );
+    await vi.waitFor(() => {
+      expect(log.mock.calls.length + error.mock.calls.length).toBeGreaterThan(0);
+    });
     return channel;
   };
   return { output, release, log, error, run };
@@ -82,4 +90,12 @@ test('統合準備コマンドの追加引数はDB操作前に拒否する', asy
   const fixture = await preparationFixture();
   expect((await fixture.run(['--reset'])).exitCode).toBe(1);
   expect(runDatabaseCommand).not.toHaveBeenCalled();
+});
+
+test('準備処理の非Error例外を表示しロックを解放する', async () => {
+  const fixture = await preparationFixture();
+  vi.mocked(runDatabaseCommand).mockRejectedValue('database rejected');
+  expect((await fixture.run()).exitCode).toBe(1);
+  expect(fixture.error).toHaveBeenCalledWith('database rejected');
+  expect(fixture.release).toHaveBeenCalledTimes(1);
 });

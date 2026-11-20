@@ -1,3 +1,5 @@
+import { parseJson, isJsonObject } from './json.ts';
+import { requireValue } from './required.ts';
 // 公式Actionの準備・プロキシの起動/終了・成果物検証だけを担当する。モデル実行はActionに任せる。
 import {
   cpSync,
@@ -19,22 +21,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { authenticate } from './wif.ts';
 import { wifProxyArgs } from './isolation/wif.ts';
 import { start, readInfo, identity, alive } from './isolation/lifecycle.ts';
-import {
-  requireIsolationReport,
-  type IsolationInput,
-  type IsolationReport,
-} from './isolation-probe.ts';
-import {
-  createArtifact,
-  saveArtifact,
-  validateMetadata,
-  type Metadata,
-  type GenerationOrigin,
-} from './artifact.ts';
+import { requireIsolationReport, parseIsolationObservation } from './isolation-probe.ts';
+import type { IsolationInput } from './isolation-probe.ts';
+import { createArtifact, saveArtifact, validateMetadata, validOrigin } from './artifact.ts';
+import type { Metadata, GenerationOrigin } from './artifact.ts';
 import { digest } from './snapshot.ts';
-import { writeStatusReport, type RuntimeTarget } from './status-report.ts';
+import { writeStatusReport } from './status-report.ts';
+import type { RuntimeTarget } from './status-report.ts';
 type Mark = (target: RuntimeTarget) => RuntimeTarget;
-import type { ReviewInput } from './policy.ts';
 const root = '/opt/ai-review',
   worktree = `${root}/pr`,
   context = `${root}/context`,
@@ -47,6 +41,30 @@ type State = {
   metadataHash: string;
   origin: GenerationOrigin;
 };
+function parseRuntimeState(text: string): State {
+  const value = parseJson(text);
+  if (
+    !isJsonObject(value) ||
+    !isJsonObject(value.proxy) ||
+    typeof value.proxy.pid !== 'number' ||
+    !Number.isSafeInteger(value.proxy.pid) ||
+    typeof value.proxy.start !== 'string' ||
+    typeof value.infoPath !== 'string' ||
+    typeof value.configHash !== 'string' ||
+    typeof value.metadataHash !== 'string' ||
+    !validOrigin(value.origin)
+  ) {
+    throw new Error('実行状態が不正です');
+  }
+  return {
+    proxy: { pid: value.proxy.pid, start: value.proxy.start },
+    infoPath: value.infoPath,
+    configHash: value.configHash,
+    metadataHash: value.metadataHash,
+    origin: value.origin,
+  };
+}
+
 export function protectTree(path: string): void {
   const stat = lstatSync(path);
   if (stat.isSymbolicLink()) {
@@ -66,7 +84,7 @@ export function protectTree(path: string): void {
 function setup(directory: string, workspace: string, mark: Mark): void {
   mark('setup/metadata');
   const metadata: Metadata = validateMetadata(
-    JSON.parse(readFileSync(join(directory, 'metadata.json'), 'utf8')),
+    parseJson(readFileSync(join(directory, 'metadata.json'), 'utf8')),
   );
   mark('setup/directories');
   mkdirSync(context, { recursive: true, mode: 0o755 });
@@ -105,16 +123,18 @@ async function verify(state: State): Promise<void> {
     throw new Error('プロキシPID不一致');
   }
   const processes = readdirSync('/proc')
-    .filter((n) => /^\d+$/.test(n))
+    .filter((n) => /^\d+$/u.test(n))
     .map(Number)
     .filter((pid) => {
       try {
-        return /^Runner\.(Worker|Listener)$/.test(readFileSync(`/proc/${pid}/comm`, 'utf8').trim());
+        return /^Runner\.(?<capture1>Worker|Listener)$/u.test(
+          readFileSync(`/proc/${pid}/comm`, 'utf8').trim(),
+        );
       } catch {
         return false;
       }
     });
-  if (!processes.length) {
+  if (processes.length === 0) {
     throw new Error('実runnerを確認できません');
   }
   const input: IsolationInput = {
@@ -123,8 +143,8 @@ async function verify(state: State): Promise<void> {
     parentPidNamespace: readlinkSync('/proc/self/ns/pid'),
     protectedProcesses: [process.pid, ...processes],
     protectedFiles: [`${privateDir}/metadata.json`],
-    protectedSockets: ['/var/run/docker.sock', '/run/containerd/containerd.sock'].filter(
-      existsSync,
+    protectedSockets: ['/var/run/docker.sock', '/run/containerd/containerd.sock'].filter((path) =>
+      existsSync(path),
     ),
     readOnlyDirectories: [worktree, context, home, '/tmp', `${home}/tmp`],
     readOnlyFiles: [
@@ -142,12 +162,12 @@ async function verify(state: State): Promise<void> {
   const probeArgs = ['/usr/local/bin/node', '--input-type=module', '-e', script];
   const outside = spawnSync('/usr/bin/sudo', ['-u', 'ai-review', '--', ...probeArgs], {
     encoding: 'utf8',
-    timeout: 15000,
+    timeout: 15_000,
   });
   if (outside.error || outside.status === null) {
     throw new Error('UID隔離検査が失敗しました');
   }
-  const report: IsolationReport = JSON.parse(outside.stdout);
+  const report = parseIsolationObservation(outside.stdout);
   if (
     report.pidNamespace !== input.parentPidNamespace ||
     report.checks.some(
@@ -174,7 +194,7 @@ async function verify(state: State): Promise<void> {
       '--',
       ...probeArgs,
     ],
-    { encoding: 'utf8', timeout: 15000 },
+    { encoding: 'utf8', timeout: 15_000 },
   );
   if (inside.error || inside.status !== 0) {
     throw new Error('読み取り専用隔離を確認できません');
@@ -195,10 +215,10 @@ async function begin(mark: Mark): Promise<void> {
   mark('start/claims');
   await authenticate(process.env, 'claims');
   mark('start/origin');
-  const run = process.env.GITHUB_RUN_ID!,
-    attempt = process.env.GITHUB_RUN_ATTEMPT!,
-    sha = process.env.GITHUB_SHA!;
-  if (!/^[1-9]\d*$/.test(run) || !/^[1-9]\d*$/.test(attempt) || !/^[a-f0-9]{40}$/.test(sha)) {
+  const run = requireValue(process.env.GITHUB_RUN_ID),
+    attempt = requireValue(process.env.GITHUB_RUN_ATTEMPT),
+    sha = requireValue(process.env.GITHUB_SHA);
+  if (!/^[1-9]\d*$/u.test(run) || !/^[1-9]\d*$/u.test(attempt) || !/^[a-f0-9]{40}$/u.test(sha)) {
     throw new Error('生成元が不正です');
   }
   mark('start/proxy');
@@ -211,7 +231,7 @@ async function begin(mark: Mark): Promise<void> {
   );
   const proxy = identity(pid);
   try {
-    const info = await readInfo(infoPath, 60000);
+    const info = await readInfo(infoPath, 60_000);
     if (info.pid !== pid) {
       throw new Error('初期交換失敗');
     }
@@ -252,7 +272,7 @@ async function shutdown(state: State): Promise<boolean> {
     redirect: 'error',
     signal: AbortSignal.timeout(3000),
   });
-  for (const _ of Array(60)) {
+  for (const _ of Array.from({ length: 60 })) {
     if (!alive(state.proxy)) {
       break;
     }
@@ -264,7 +284,7 @@ async function shutdown(state: State): Promise<boolean> {
 }
 async function finish(directory: string, outcome: string, mark: Mark): Promise<void> {
   mark('finish/state');
-  const state: State = JSON.parse(readFileSync(`${privateDir}/state.json`, 'utf8'));
+  const state = parseRuntimeState(readFileSync(`${privateDir}/state.json`, 'utf8'));
   const stoppedState = { stopped: false };
   try {
     try {
@@ -279,13 +299,13 @@ async function finish(directory: string, outcome: string, mark: Mark): Promise<v
       if (!lstatSync(file).isFile()) {
         throw new Error('結果ファイル不正');
       }
-      const review: ReviewInput = JSON.parse(readFileSync(file, 'utf8'));
-      const metadata: Metadata = JSON.parse(readFileSync(`${privateDir}/metadata.json`, 'utf8'));
+      const review = parseJson(readFileSync(file, 'utf8'));
+      const metadata = parseJson(readFileSync(`${privateDir}/metadata.json`, 'utf8'));
       mark('finish/artifact');
       const artifact = createArtifact(metadata, review, state.origin, null);
       saveArtifact(directory, artifact);
       appendFileSync(
-        process.env.GITHUB_OUTPUT!,
+        requireValue(process.env.GITHUB_OUTPUT),
         `artifact=ai-review-v2-${state.origin.run}-${state.origin.attempt}\nattempt=${state.origin.attempt}\n`,
       );
       console.log(
@@ -342,7 +362,7 @@ export async function executeRuntime(
     try {
       writeStatusReport(env, 'failure', targetState.target, 'EXECUTION_FAILED');
       if (env.GITHUB_STEP_SUMMARY) {
-        appendFileSync(env.GITHUB_STEP_SUMMARY, message + '\n');
+        appendFileSync(env.GITHUB_STEP_SUMMARY, `${message}\n`);
       }
     } catch {
       console.error('固定診断の保存に失敗しました。');

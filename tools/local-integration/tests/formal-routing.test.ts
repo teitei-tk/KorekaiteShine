@@ -1,8 +1,9 @@
+import { readJsonObject, readJsonArray, jsonObject } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 import { runWithEvidence } from '../src/evidence.ts';
@@ -39,7 +40,10 @@ test.each(['web', 'interview'] as const)(
           if (!passed) {
             return;
           }
-          await rm(config.stateDirectory!, { recursive: true, force: true });
+          await rm(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+            recursive: true,
+            force: true,
+          });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
         const runtime = await startRuntime(config);
@@ -65,7 +69,7 @@ test.each(['web', 'interview'] as const)(
             async () => {
               const result = await fetch(`${runtime.baseUrl}/api/formal-queue-test?jobId=${jobId}`);
               expect(result.status).toBe(200);
-              const job = await result.json();
+              const job = await readJsonObject(result);
               evidence.observe({
                 job: {
                   jobId: job.jobId,
@@ -85,10 +89,10 @@ test.each(['web', 'interview'] as const)(
             attemptCount: 1,
           });
         const receipt = await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`);
-        const observedReceipt = await receipt.json();
+        const observedReceipt = await readJsonObject(receipt);
         evidence.observe({
           queue: observedReceipt.queue,
-          deliveredJobId: observedReceipt.message?.jobId,
+          deliveredJobId: jsonObject(observedReceipt.message).jobId,
         });
         expect(observedReceipt).toEqual({
           queue: config.queues.evaluation.queue,
@@ -138,7 +142,10 @@ test('正式DLQの受信をD1へ記録し、失敗済みの架空ジョブを再
         if (!passed) {
           return;
         }
-        await rm(config.stateDirectory!, { recursive: true, force: true });
+        await rm(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+          recursive: true,
+          force: true,
+        });
         await rm(config.artifactDirectory, { recursive: true, force: true });
       });
       const runtime = await startRuntime(config);
@@ -169,21 +176,14 @@ test('正式DLQの受信をD1へ記録し、失敗済みの架空ジョブを再
               `${runtime.baseUrl}/api/formal-queue-test?jobId=${jobId}&view=dlq`,
             );
             expect(result.status).toBe(200);
-            const receipts = await result.json();
+            const receipts = (await readJsonArray(result)).map((value) => jsonObject(value));
             evidence.observe({
-              receipts: receipts.map(
-                (receipt: {
-                  jobId: string;
-                  purpose: string;
-                  queueName: string;
-                  observedStatus: string;
-                }) => ({
-                  jobId: receipt.jobId,
-                  purpose: receipt.purpose,
-                  queueName: receipt.queueName,
-                  observedStatus: receipt.observedStatus,
-                }),
-              ),
+              receipts: receipts.map((receipt) => ({
+                jobId: receipt.jobId,
+                purpose: receipt.purpose,
+                queueName: receipt.queueName,
+                observedStatus: receipt.observedStatus,
+              })),
             });
             return receipts;
           },
@@ -198,10 +198,10 @@ test('正式DLQの受信をD1へ記録し、失敗済みの架空ジョブを再
           },
         ]);
       const receipt = await fetch(`${runtime.baseUrl}/api/check-object-test?jobId=${jobId}`);
-      const observedReceipt = await receipt.json();
+      const observedReceipt = await readJsonObject(receipt);
       evidence.observe({
         queue: observedReceipt.queue,
-        deliveredJobId: observedReceipt.message?.jobId,
+        deliveredJobId: jsonObject(observedReceipt.message).jobId,
       });
       expect(observedReceipt).toEqual({
         queue: config.queues.evaluation.dlq,

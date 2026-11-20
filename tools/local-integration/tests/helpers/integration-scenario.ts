@@ -1,11 +1,15 @@
+import type * as LintTypeModule0 from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, expect, onTestFinished, vi } from 'vitest';
+import { assert, afterEach, expect, onTestFinished, vi } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { runDiagnosticScenario, type IntegrationReport } from '../../src/integration.ts';
-import { startRuntime, type LocalRuntime } from '../../src/runtime.ts';
+import { runDiagnosticScenario } from '../../src/integration.ts';
+import { parseObject, objectAt, objectArray } from './config-json.ts';
+import { parseJson } from '@korekaite/api-contracts/json';
+import { startRuntime } from '../../src/runtime.ts';
+import type { LocalRuntime } from '../../src/runtime.ts';
 import { runtimeVersions } from '../../src/versions.ts';
 
 type Input = Parameters<typeof runDiagnosticScenario>[0];
@@ -20,15 +24,17 @@ vi.mock('node:timers/promises', () => ({
   },
 }));
 vi.mock('node:http', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:http')>()),
+  ...(await importOriginal<typeof LintTypeModule0>()),
   request: (
     _url: string,
     _options: object,
-    callback: (response: { statusCode: number; destroy(): void }) => void,
+    callback: (response: { statusCode: number; destroy: () => void }) => void,
   ) => {
     const request = {
       on: () => request,
-      end: () => callback({ statusCode: clock.httpStatus, destroy: vi.fn() }),
+      end: () => {
+        callback({ statusCode: clock.httpStatus, destroy: vi.fn<() => void>() });
+      },
     };
     return request;
   },
@@ -67,8 +73,12 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
   const runtime: LocalRuntime = {
     baseUrl: 'http://integration.invalid',
     closed: Promise.resolve({ exitCode: 0 }),
-    stop: vi.fn(async () => {}),
-    runScheduled: vi.fn(async () => {}),
+    stop: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
+    runScheduled: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
   };
   vi.mocked(startRuntime).mockResolvedValue(runtime);
   vi.mocked(runtimeVersions).mockResolvedValue({ node: process.version });
@@ -105,7 +115,8 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
   const attemptStartState = { attemptStart: base + (restarts ? 60_000 : 0) };
   const attempts = Array.from({ length: count }, (_, index) => {
     if (index > 0) {
-      attemptStartState.attemptStart += [30_000, 120_000, 300_000][index - 1]! + 1;
+      attemptStartState.attemptStart +=
+        ([30_000, 120_000, 300_000][index - 1] ?? assert.fail('必須のテスト値がありません。')) + 1;
     }
     return {
       attemptNumber: index + 1,
@@ -116,15 +127,15 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
   const receipt = {
     queue:
       scenario === 'exhaust_retries'
-        ? config.queues.diagnostics!.dlq
-        : config.queues.diagnostics!.queue,
+        ? (config.queues.diagnostics ?? assert.fail('必須のテスト値がありません。')).dlq
+        : (config.queues.diagnostics ?? assert.fail('必須のテスト値がありません。')).queue,
     message: { schemaVersion: 1, jobId },
   };
   const nativeRetry = {
     stop: {
       kind: 'exception',
       messageId: 'delivery',
-      queue: config.queues.diagnostics!.queue,
+      queue: (config.queues.diagnostics ?? assert.fail('必須のテスト値がありません。')).queue,
       occurredAt: base + 1000,
     },
     acknowledgedMessageId: 'delivery',
@@ -177,7 +188,7 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
     initialize: () => new Response('injected failure', { status: 500 }),
   };
   const fetcher = vi.fn<typeof fetch>(async (request, options) => {
-    const url = new URL(String(request));
+    const url = new URL(request instanceof Request ? request.url : request.toString());
     if (url.pathname === '/api/diagnostics/check-jobs') {
       return replies.accept();
     }
@@ -209,13 +220,19 @@ export function scenarioFixture(scenario: Input['scenario'] = 'success', fault?:
     return replies.receipt();
   });
   vi.stubGlobal('fetch', fetcher);
-  const readReport = async (): Promise<IntegrationReport> =>
-    JSON.parse(await readFile(resultPath, 'utf8'));
+  const readReport = async () => {
+    const report = parseObject(await readFile(resultPath, 'utf8'));
+    const scheduled = objectAt(report.scheduled);
+    return {
+      ...report,
+      scheduled: { ...scheduled, invocations: objectArray(scheduled.invocations) },
+    };
+  };
   const fails = async (code: string, message: string = code) => {
     await expect(runDiagnosticScenario(input)).rejects.toThrow(message);
     const serialized = await readFile(resultPath, 'utf8');
     expect(serialized).not.toContain('private details');
-    expect(JSON.parse(serialized)).toMatchObject({ exitCode: 1, failureCode: code });
+    expect(parseJson(serialized)).toMatchObject({ exitCode: 1, failureCode: code });
     expect(vi.getTimerCount()).toBe(0);
     return readReport();
   };

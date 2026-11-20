@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { expect, test } from 'vitest';
 import { createLocalAccess } from '../src/server/local-access';
 import { localSessionRequest } from '../src/server/local-session';
@@ -14,7 +15,7 @@ test('ローカル画面に操作トークンとHttpOnly Cookieを返し、外�
   expect(response.headers.get('Set-Cookie')).toBe(
     `korekaite-local-session=${token}; Path=/; HttpOnly; SameSite=Strict`,
   );
-  expect(await response.json()).toEqual({ operationToken: token });
+  expect(parseJson(await response.text())).toEqual({ operationToken: token });
   for (const request of [
     new Request('http://localhost:4327/api/local-session', {
       headers: { Origin: 'https://external.example' },

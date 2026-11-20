@@ -1,8 +1,9 @@
+import { readJson, readCheckAccepted, readCheckStatus } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -24,17 +25,17 @@ test('成功評価は実行権を取得し、試行1回の結果と完了を一�
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const response = await fetch(`${runtime.baseUrl}/api/evaluation-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ schemaVersion: 1, jobId: accepted.jobId }),
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ action: 'ack' });
-    const status = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
+    expect(await readJson(response)).toEqual({ action: 'ack' });
+    const status = await readCheckStatus(
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
     expect(status).toMatchObject({
       status: 'completed',
       attemptCount: 1,
@@ -74,21 +75,21 @@ test('完了後の再配送は評価を再実行せずackする', async () => {
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const deliver = () =>
       fetch(`${runtime.baseUrl}/api/evaluation-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schemaVersion: 1, jobId: accepted.jobId }),
       });
-    expect(await (await deliver()).json()).toEqual({ action: 'ack' });
-    const before = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
-    expect(await (await deliver()).json()).toEqual({ action: 'ack' });
-    const after = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
+    expect(await readJson(await deliver())).toEqual({ action: 'ack' });
+    const before = await readCheckStatus(
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
+    expect(await readJson(await deliver())).toEqual({ action: 'ack' });
+    const after = await readCheckStatus(
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
     expect(after).toEqual(before);
     await runDatabaseCommand(config, [
       'execute',
@@ -120,7 +121,7 @@ test('同じジョブの同時配送は一つだけが評価し、有効な実�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const deliver = (hold = false) =>
       fetch(`${runtime.baseUrl}/api/evaluation-test?hold=${hold}`, {
         method: 'POST',
@@ -133,22 +134,22 @@ test('同じジョブの同時配送は一つだけが評価し、有効な実�
         .poll(
           async () =>
             (
-              await (
-                await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-              ).json()
+              await readCheckStatus(
+                await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+              )
             ).status,
-          { timeout: 5_000, interval: 50 },
+          { timeout: 5000, interval: 50 },
         )
         .toBe('running');
       const duplicate = await deliver();
       expect(duplicate.status).toBe(200);
-      expect(await duplicate.json()).toEqual({ action: 'ack' });
+      expect(await readJson(duplicate)).toEqual({ action: 'ack' });
     } finally {
       await runDatabaseCommand(config, [
         'execute',
         `INSERT INTO connection_checks (writer, value) VALUES ('release:${accepted.jobId}', 'yes');`,
       ]);
-      expect(await (await first).json()).toEqual({ action: 'ack' });
+      expect(await readJson(await first)).toEqual({ action: 'ack' });
     }
     await runDatabaseCommand(config, [
       'execute',
@@ -183,7 +184,7 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
         body: '{"scenario":"success"}',
       });
       expect(response.status).toBe(202);
-      return response.json();
+      return readCheckAccepted(response);
     };
     const firstJob = await accept();
     const waitingJob = await accept();
@@ -199,23 +200,24 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
         .poll(
           async () =>
             (
-              await (
-                await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${firstJob.jobId}`)
-              ).json()
+              await readCheckStatus(
+                await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${firstJob.jobId}`),
+              )
             ).status,
-          { timeout: 5_000, interval: 50 },
+          { timeout: 5000, interval: 50 },
         )
         .toBe('running');
       const before = Temporal.Now.instant().epochMilliseconds;
-      expect(await (await deliver(waitingJob.jobId)).json()).toEqual({ action: 'ack' });
-      const waiting = await (
-        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${waitingJob.jobId}`)
-      ).json();
-      expect(waiting).toMatchObject({ status: 'pending', attemptCount: 0 });
-      expect(Temporal.Instant.from(waiting.nextAttemptAt).epochMilliseconds).toBeGreaterThanOrEqual(
-        before + 30_000,
+      expect(await readJson(await deliver(waitingJob.jobId))).toEqual({ action: 'ack' });
+      const waiting = await readCheckStatus(
+        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${waitingJob.jobId}`),
       );
-      expect(await (await deliver(waitingJob.jobId)).json()).toEqual({ action: 'ack' });
+      expect(waiting).toMatchObject({ status: 'pending', attemptCount: 0 });
+      expect(
+        Temporal.Instant.from(waiting.nextAttemptAt ?? assert.fail('必要な日時がありません。'))
+          .epochMilliseconds,
+      ).toBeGreaterThanOrEqual(before + 30_000);
+      expect(await readJson(await deliver(waitingJob.jobId))).toEqual({ action: 'ack' });
       await runDatabaseCommand(config, [
         'execute',
         `
@@ -231,7 +233,7 @@ test('別ジョブが本人枠を使用中なら試行せず次回通知を保�
         'execute',
         `INSERT INTO connection_checks (writer, value) VALUES ('release:${firstJob.jobId}', 'yes');`,
       ]);
-      expect(await (await first).json()).toEqual({ action: 'ack' });
+      expect(await readJson(await first)).toEqual({ action: 'ack' });
     }
   } finally {
     await runtime.stop();
@@ -256,7 +258,7 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
       body: '{"scenario":"retry_then_success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const now = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const deliver = async (time: number) => {
       const delivered = await fetch(`${runtime.baseUrl}/api/evaluation-test?now=${time}`, {
@@ -265,10 +267,12 @@ test('一時失敗は次回通知を保存し、期限前には試行せず、2�
         body: JSON.stringify({ schemaVersion: 1, jobId: accepted.jobId }),
       });
       expect(delivered.status).toBe(200);
-      return delivered.json();
+      return readJson(delivered);
     };
     const getStatus = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
+      readCheckStatus(
+        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+      );
     expect(await deliver(now)).toEqual({ action: 'ack' });
     const waiting = await getStatus();
     expect(waiting).toMatchObject({
@@ -331,7 +335,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
       body: '{"scenario":"exhaust_retries"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const nowState = { now: Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds };
     const delays = [30_000, 120_000, 300_000];
     const deliver = async () => {
@@ -341,10 +345,12 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
         body: JSON.stringify({ schemaVersion: 1, jobId: accepted.jobId }),
       });
       expect(delivered.status).toBe(200);
-      expect(await delivered.json()).toEqual({ action: 'ack' });
+      expect(await readJson(delivered)).toEqual({ action: 'ack' });
     };
     const getStatus = async () =>
-      (await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)).json();
+      readCheckStatus(
+        await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+      );
     for (const attempt of [1, 2, 3, 4]) {
       await deliver();
       const status = await getStatus();
@@ -375,7 +381,7 @@ test('全4回失敗した評価は30・120・300秒後に再試行し、失敗�
             fractionalSecondDigits: 3,
           }),
         });
-        nowState.now += 1_000;
+        nowState.now += 1000;
         await deliver();
         expect(await getStatus()).toEqual(status);
       }
@@ -417,14 +423,14 @@ test('Web受付からDO・ローカルQueue・評価Consumerを経てD1の成功
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     await expect
       .poll(
         async () =>
-          await (
-            await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-          ).json(),
-        { timeout: 8_000, interval: 100 },
+          readCheckStatus(
+            await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+          ),
+        { timeout: 8000, interval: 100 },
       )
       .toMatchObject({
         status: 'completed',

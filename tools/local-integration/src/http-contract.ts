@@ -1,3 +1,6 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { isObject } from './records.ts';
+import { requireValue } from './required.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -48,7 +51,7 @@ export async function runHttpContractIntegration(): Promise<
           if (!passed) {
             return;
           }
-          await rm(config.stateDirectory!, { recursive: true, force: true });
+          await rm(requireValue(config.stateDirectory), { recursive: true, force: true });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
         if (mode === 'preview') {
@@ -74,8 +77,8 @@ export async function runHttpContractIntegration(): Promise<
             contractValid: false,
           };
           cases.push(observation);
-          const body = await response.clone().json();
-          if (Array.isArray(body.items)) {
+          const body = parseJson(await response.clone().text());
+          if (isObject(body) && Array.isArray(body.items)) {
             observation.itemCount = body.items.length;
           }
           await assertInterviewResponse(response, example);

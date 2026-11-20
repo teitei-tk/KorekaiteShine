@@ -1,12 +1,16 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
+import { readJson, readJob } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/built-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('delivery-anomalies');
 
 test('存在しないジョブの通知は配送異常を保存してackし、ジョブや評価を作らない', async () => {
   const config = resolveRuntime({
@@ -25,7 +29,7 @@ test('存在しないジョブの通知は配送異常を保存してackし、�
       body: JSON.stringify({ schemaVersion: 1, jobId }),
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ action: 'ack' });
+    expect(await readJson(response)).toEqual({ action: 'ack' });
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -63,7 +67,7 @@ test('隔離記録を保存できない場合はackせずretryし、復旧後に
         body: JSON.stringify({ schemaVersion: 1, jobId }),
       });
       expect(response.status).toBe(200);
-      return response.json();
+      return readJson(response);
     };
     await runDatabaseCommand(config, [
       'execute',
@@ -119,7 +123,7 @@ test('用途不一致の通知は隔離してackし、元ジョブと正常な�
       body: JSON.stringify({ schemaVersion: 1, jobId }),
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ action: 'ack' });
+    expect(await readJson(response)).toEqual({ action: 'ack' });
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -161,7 +165,7 @@ test('削除済みジョブの遅延通知は記録してackし、ジョブを�
       body: JSON.stringify({ schemaVersion: 1, jobId }),
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ action: 'ack' });
+    expect(await readJson(response)).toEqual({ action: 'ack' });
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -214,7 +218,7 @@ test('不正形式と未対応版は本文IDで照会せず、区別して隔離
         body: JSON.stringify(body),
       });
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ action: 'ack' });
+      expect(await readJson(response)).toEqual({ action: 'ack' });
     }
     await runDatabaseCommand(config, [
       'execute',
@@ -256,7 +260,7 @@ test('D1照会失敗を不在と判定せずretryし、隔離記録を作らな�
       body: JSON.stringify({ schemaVersion: 1, jobId }),
     });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ action: 'retry', delaySeconds: 30 });
+    expect(await readJson(response)).toEqual({ action: 'retry', delaySeconds: 30 });
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -297,7 +301,7 @@ test('保存後ack前の再配送は同じ記録を更新し、別メッセー�
         },
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ action: 'ack' });
+      expect(await readJson(response)).toEqual({ action: 'ack' });
     };
     await deliver(messageId, 1000);
     // ack判断が配送基盤へ反映されず、保存済み通知が再受信された状態。
@@ -343,7 +347,7 @@ test('隔離済み配送は用途が後から一致しても評価を自動実�
       body: JSON.stringify({ scenario: 'success' }),
     });
     expect(acceptedResponse.status).toBe(202);
-    const { jobId } = await acceptedResponse.json();
+    const { jobId } = await readJob(acceptedResponse);
     const messageId = randomUUID();
     const deliver = async () => {
       const response = await fetch(
@@ -355,7 +359,7 @@ test('隔離済み配送は用途が後から一致しても評価を自動実�
         },
       );
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ action: 'ack' });
+      expect(await readJson(response)).toEqual({ action: 'ack' });
     };
     await runDatabaseCommand(config, [
       'execute',
@@ -424,7 +428,7 @@ test('実ローカルQueueとDLQは同じ異常分類で隔離し、元ジョブ
           },
         );
         expect(response.status).toBe(202);
-        expect(await response.json()).toEqual({ enqueued: true });
+        expect(await readJson(response)).toEqual({ enqueued: true });
       }
     }
     await expect

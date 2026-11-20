@@ -1,20 +1,24 @@
 // @vitest-environment jsdom
+import type * as AudioModule from '../src/lib/practice-audio';
+import { parseObject } from './helpers/json';
 import './helpers/dom';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { PracticeLive } from '../src/components/practice-live';
 import { sessionToken } from '../src/lib/practice';
-vi.mock('../src/lib/practice', () => ({ sessionToken: vi.fn().mockResolvedValue('token') }));
 import { openInterviewAudio } from '../src/lib/practice-audio';
+
+vi.mock('../src/lib/practice', () => ({ sessionToken: vi.fn().mockResolvedValue('token') }));
+
 vi.mock('../src/lib/practice-audio', async (original) => ({
-  ...(await original<typeof import('../src/lib/practice-audio')>()),
+  ...(await original<typeof AudioModule>()),
   openInterviewAudio: vi.fn(),
 }));
 
 test('開始操作でマイクを準備し、面接中だけ音声を送り、一時停止で解放する', async () => {
   const user = userEvent.setup();
-  const send = vi.fn();
+  const send = vi.fn<(data: string | ArrayBuffer) => void>();
   const peers: FakeSocket[] = [];
   class FakeSocket {
     readyState = 1;
@@ -27,13 +31,17 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
     }
   }
   vi.stubGlobal('WebSocket', FakeSocket);
-  const close = vi.fn();
-  vi.mocked(openInterviewAudio).mockResolvedValue({ play: vi.fn(), stopPlayback: vi.fn(), close });
-  const done = vi.fn();
+  const close = vi.fn<() => void>();
+  vi.mocked(openInterviewAudio).mockResolvedValue({
+    play: vi.fn<(buffer: ArrayBuffer, complete: () => void) => void>(),
+    stopPlayback: vi.fn<() => void>(),
+    close,
+  });
+  const done = vi.fn<() => void>();
   render(<PracticeLive id="one" onEnded={done} />);
-  const state = (status: string, generation: number, canControl: boolean) =>
+  const state = (status: string, generation: number, canControl: boolean) => {
     act(() =>
-      peers[0].onmessage!(
+      (peers[0].onmessage ?? assert.fail('必須のテスト値がありません。'))(
         new MessageEvent('message', {
           data: JSON.stringify({
             type: 'state',
@@ -51,19 +59,29 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
         }),
       ),
     );
+  };
   state('ready', 0, false);
   expect(openInterviewAudio).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: 'マイクを許可して開始' }));
-  expect(JSON.parse(send.mock.lastCall![0])).toMatchObject({ type: 'start', generation: 0 });
-  const capture = vi.mocked(openInterviewAudio).mock.lastCall![1];
+  expect(
+    parseObject((send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'start', generation: 0 });
+  const [, capture] =
+    vi.mocked(openInterviewAudio).mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   capture(new ArrayBuffer(2));
   expect(send).toHaveBeenCalledTimes(1);
   state('active', 1, true);
   capture(new ArrayBuffer(2));
-  expect(new DataView(send.mock.lastCall![0]).getFloat64(0)).toBe(1);
+  expect(
+    new DataView(
+      audioBuffer((send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).getFloat64(0),
+  ).toBe(1);
   await user.click(screen.getByRole('button', { name: '一時停止' }));
   expect(close).toHaveBeenCalled();
-  expect(JSON.parse(send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 1 });
+  expect(
+    parseObject((send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'pause', generation: 1 });
   state('paused', 2, true);
   await user.click(screen.getByRole('button', { name: 'マイクを許可して再開' }));
   close.mockClear();
@@ -71,9 +89,14 @@ test('開始操作でマイクを準備し、面接中だけ音声を送り、�
   state('paused', 2, true);
   expect(close).not.toHaveBeenCalled();
   state('active', 3, true);
-  const resumedCapture = vi.mocked(openInterviewAudio).mock.lastCall![1];
+  const [, resumedCapture] =
+    vi.mocked(openInterviewAudio).mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   resumedCapture(new ArrayBuffer(2));
-  expect(new DataView(send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+  expect(
+    new DataView(
+      audioBuffer((send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).getFloat64(0),
+  ).toBe(3);
   state('ended', 4, false);
   expect(done).toHaveBeenCalledTimes(1);
 });
@@ -85,28 +108,36 @@ test('切断後に同じ面接へ自動接続し、失敗が続いたら1分で�
     class Peer {
       onclose: (() => void) | null = null;
       close = vi.fn();
-      constructor(readonly url: URL) {
+      readonly url: URL;
+      constructor(url: URL) {
+        this.url = url;
         peers.push(this);
       }
     }
     vi.stubGlobal('WebSocket', Peer);
-    render(<PracticeLive id="same" onEnded={() => {}} />);
-    act(() => peers[0].onclose!());
+    render(<PracticeLive id="same" onEnded={vi.fn<() => void>()} />);
+    act(() => {
+      (peers[0].onclose ?? assert.fail('必須のテスト値がありません。'))();
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);
     });
     expect(peers).toHaveLength(2);
     expect(peers[1].url.pathname).toBe('/api/interviews/same/live');
-    act(() => peers[1].onclose!());
+    act(() => {
+      (peers[1].onclose ?? assert.fail('必須のテスト値がありません。'))();
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(peers).toHaveLength(3);
     // 最後の接続が期限直前まで応答しなかった場合、次の試行は期限を超える。
     vi.spyOn(performance, 'now').mockReturnValue(59_999);
-    act(() => peers[2].onclose!());
+    act(() => {
+      (peers[2].onclose ?? assert.fail('必須のテスト値がありません。'))();
+    });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60000);
+      await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(peers).toHaveLength(3);
   } finally {
@@ -126,17 +157,19 @@ test.each([true, false, 'manual'] as const)(
         onclose: (() => void) | null = null;
         onmessage: ((event: MessageEvent) => void) | null = null;
         close = vi.fn();
-        send = vi.fn();
+        send = vi.fn<(data: string | ArrayBuffer) => void>();
         constructor() {
           peers.push(this);
         }
       }
       vi.stubGlobal('WebSocket', Peer);
-      const stop = vi.fn();
-      vi.mocked(openInterviewAudio)
-        .mockClear()
-        .mockResolvedValue({ play: vi.fn(), stopPlayback: vi.fn(), close: stop });
-      render(<PracticeLive id="same" onEnded={() => {}} />);
+      const stop = vi.fn<() => void>();
+      vi.mocked(openInterviewAudio).mockClear().mockResolvedValue({
+        play: vi.fn<(buffer: ArrayBuffer, complete: () => void) => void>(),
+        stopPlayback: vi.fn<() => void>(),
+        close: stop,
+      });
+      render(<PracticeLive id="same" onEnded={vi.fn<() => void>()} />);
       const receive = async (status: string, generation: number, canControl: boolean) => {
         await act(async () =>
           peers.at(-1)?.onmessage?.(
@@ -159,35 +192,41 @@ test.each([true, false, 'manual'] as const)(
         );
       };
       await receive('ready', 0, false);
-      if (owner) {
+      if (owner !== false) {
         await act(async () => {
           screen.getByRole('button', { name: 'マイクを許可して開始' }).click();
         });
       }
       await receive('active', 1, Boolean(owner));
-      act(() => peers[0].onclose!());
-      if (owner) {
+      act(() => {
+        (peers[0].onclose ?? assert.fail('必須のテスト値がありません。'))();
+      });
+      if (owner !== false) {
         expect(stop).toHaveBeenCalled();
       }
       vi.mocked(sessionToken).mockClear();
-      if (owner === 'manual') {
-        await act(async () => screen.getByRole('button', { name: '再接続' }).click());
-      } else {
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(1000);
-        });
-      }
+      await (owner === 'manual'
+        ? act(async () => {
+            screen.getByRole('button', { name: '再接続' }).click();
+          })
+        : act(async () => {
+            await vi.advanceTimersByTimeAsync(1000);
+          }));
       expect(sessionToken).toHaveBeenCalledTimes(1);
       await receive('reconnecting', 2, false);
-      if (owner) {
-        expect(JSON.parse(peers[1].send.mock.lastCall![0])).toMatchObject({
+      if (owner === false) {
+        expect(peers[1].send).not.toHaveBeenCalled();
+        expect(openInterviewAudio).not.toHaveBeenCalled();
+      } else {
+        expect(
+          parseObject(
+            (peers[1].send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0],
+          ),
+        ).toMatchObject({
           type: 'resume',
           generation: 2,
         });
         expect(openInterviewAudio).toHaveBeenCalledTimes(2);
-      } else {
-        expect(peers[1].send).not.toHaveBeenCalled();
-        expect(openInterviewAudio).not.toHaveBeenCalled();
       }
     } finally {
       vi.useRealTimers();
@@ -203,13 +242,13 @@ test('マイクを拒否した場合は開始せず、許可待ちで画面を�
     bufferedAmount = 0;
     onmessage: ((event: MessageEvent) => void) | null = null;
     close = vi.fn();
-    send = vi.fn();
+    send = vi.fn<(data: string | ArrayBuffer) => void>();
     constructor() {
       peers.push(this);
     }
   }
   vi.stubGlobal('WebSocket', Peer);
-  const ready = () =>
+  const ready = () => {
     act(() =>
       peers[0].onmessage?.(
         new MessageEvent('message', {
@@ -229,6 +268,7 @@ test('マイクを拒否した場合は開始せず、許可待ちで画面を�
         }),
       ),
     );
+  };
   const permission = Promise.withResolvers<Awaited<ReturnType<typeof openInterviewAudio>>>();
   const signalState = { signal: undefined as AbortSignal | undefined };
   vi.mocked(openInterviewAudio)
@@ -237,16 +277,22 @@ test('マイクを拒否した場合は開始せず、許可待ちで画面を�
       signalState.signal = request;
       return permission.promise;
     });
-  const page = render(<PracticeLive id="mic" onEnded={() => {}} />);
+  const page = render(<PracticeLive id="mic" onEnded={vi.fn<() => void>()} />);
   ready();
   await user.click(screen.getByRole('button', { name: 'マイクを許可して開始' }));
-  expect(screen.getByRole('alert').textContent).toMatch(/使用許可/);
+  expect(screen.getByRole('alert').textContent).toMatch(/使用許可/u);
   expect(peers[0].send).not.toHaveBeenCalled();
   await user.click(screen.getByRole('button', { name: 'マイクを許可して開始' }));
   page.unmount();
   expect(signalState.signal?.aborted).toBe(true);
-  const close = vi.fn();
-  await act(async () => permission.resolve({ play: vi.fn(), stopPlayback: vi.fn(), close }));
+  const close = vi.fn<() => void>();
+  await act(async () => {
+    permission.resolve({
+      play: vi.fn<(buffer: ArrayBuffer, complete: () => void) => void>(),
+      stopPlayback: vi.fn<() => void>(),
+      close,
+    });
+  });
   expect(close).toHaveBeenCalledTimes(1);
   expect(peers[0].send).not.toHaveBeenCalled();
 });
@@ -257,7 +303,7 @@ function mountLive() {
     readyState = 1;
     bufferedAmount = 0;
     close = vi.fn();
-    send = vi.fn();
+    send = vi.fn<(data: string | ArrayBuffer) => void>();
     onmessage!: (event: MessageEvent) => void;
     onerror!: () => void;
     onclose!: () => void;
@@ -266,15 +312,22 @@ function mountLive() {
     }
   }
   vi.stubGlobal('WebSocket', Peer);
-  const audio = { play: vi.fn(), close: vi.fn(), stopPlayback: vi.fn() };
+  const audio = {
+    play: vi.fn<(buffer: ArrayBuffer, complete: () => void) => void>(),
+    close: vi.fn<() => void>(),
+    stopPlayback: vi.fn<() => void>(),
+  };
   vi.mocked(openInterviewAudio).mockReset().mockResolvedValue(audio);
-  const deleted = vi.fn();
-  const page = render(<PracticeLive id="live" onEnded={vi.fn()} onDeleted={deleted} />);
-  const peer = peers[0];
-  const raw = (data: string | ArrayBuffer | Blob) =>
+  const deleted = vi.fn<() => void>();
+  const page = render(<PracticeLive id="live" onEnded={vi.fn<() => void>()} onDeleted={deleted} />);
+  const [peer] = peers;
+  const raw = (data: string | ArrayBuffer | Blob) => {
     act(() => peer.onmessage(new MessageEvent('message', { data })));
-  const receive = (event: object) => raw(JSON.stringify(event));
-  const state = (extra: object = {}) =>
+  };
+  const receive = (event: object) => {
+    raw(JSON.stringify(event));
+  };
+  const state = (extra: object = {}) => {
     receive({
       type: 'state',
       interviewId: 'live',
@@ -289,7 +342,11 @@ function mountLive() {
       evaluationJobId: null,
       ...extra,
     });
-  const click = (name: string) => act(async () => screen.getByRole('button', { name }).click());
+  };
+  const click = (name: string) =>
+    act(async () => {
+      screen.getByRole('button', { name }).click();
+    });
   return { peers, peer, audio, page, deleted, raw, receive, state, click };
 }
 
@@ -297,7 +354,8 @@ test('通話中の引き継ぎは旧接続の再開待ちを経ても、新担�
   const { state, click, audio, peer } = mountLive();
   state({ canControl: false });
   await click('このタブで引き継ぐ');
-  const [, capture] = vi.mocked(openInterviewAudio).mock.lastCall!;
+  const [, capture] =
+    vi.mocked(openInterviewAudio).mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   state({ status: 'reconnecting', generation: 2, canControl: false });
   capture(new ArrayBuffer(2));
   expect(peer.send).toHaveBeenCalledTimes(1);
@@ -305,7 +363,11 @@ test('通話中の引き継ぎは旧接続の再開待ちを経ても、新担�
   state({ status: 'active', generation: 3 });
   expect(audio.close).not.toHaveBeenCalled();
   capture(new ArrayBuffer(2));
-  expect(new DataView(peer.send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+  expect(
+    new DataView(
+      audioBuffer((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).getFloat64(0),
+  ).toBe(3);
 });
 
 test('非担当タブで一時停止中に選べる音声操作は引き継ぎだけ', async () => {
@@ -313,17 +375,19 @@ test('非担当タブで一時停止中に選べる音声操作は引き継ぎ�
   state({ status: 'paused', canControl: false });
   expect(screen.queryByRole('button', { name: 'マイクを許可して再開' })).toBeNull();
   await click('このタブで引き継ぐ');
-  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('takeover');
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]).type,
+  ).toBe('takeover');
 });
 
 test('質問と発言を順番にまとめ、言い換え・スキップ・終了を送る', async () => {
   vi.useFakeTimers();
   const { receive, state, click, peer } = mountLive();
-  state({ activeSince: 1, activeMs: 900000 });
+  state({ activeSince: 1, activeMs: 900_000 });
   await act(async () => {
     await vi.advanceTimersByTimeAsync(500);
   });
-  expect(screen.getByText(/15分が経過/)).toBeTruthy();
+  expect(screen.getByText(/15分が経過/u)).toBeTruthy();
   state({ activeSince: 1, deadline: 5 });
   for (const [sequence, speaker, content, generation] of [
     [2, 'assistant', 'ですか', 1],
@@ -333,7 +397,7 @@ test('質問と発言を順番にまとめ、言い換え・スキップ・終�
   ] as const) {
     receive({
       type: 'transcript',
-      fragmentId: 'id' + sequence,
+      fragmentId: `id${sequence}`,
       sequence,
       generation,
       speaker,
@@ -345,17 +409,25 @@ test('質問と発言を順番にまとめ、言い換え・スキップ・終�
   expect(screen.getByText('現在の質問').nextElementSibling?.textContent).toBe('なぜですか');
   expect(screen.getAllByRole('listitem')).toHaveLength(3);
   await click('言い換えを依頼');
-  const rephrase = JSON.parse(peer.send.mock.lastCall![0]);
+  const rephrase = parseObject(
+    (peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0],
+  );
   expect(rephrase).toMatchObject({ type: 'rephrase', generation: 1 });
   await click('質問を見送る');
-  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('rephrase');
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]).type,
+  ).toBe('rephrase');
   receive({ type: 'error', commandId: rephrase.commandId, code: 'STALE_STATE' });
   await click('質問を見送る');
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'skip', generation: 1 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'skip', generation: 1 });
   await click('終了して評価する');
   state({ generation: 2, status: 'reconnecting' });
   state({ generation: 3, status: 'connecting' });
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'finish', generation: 3 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'finish', generation: 3 });
   receive({ type: 'ack', commandId: 'ack' });
   expect(screen.queryByRole('alert')).toBeNull();
 });
@@ -370,18 +442,24 @@ test('同じ操作中に連打しても質問切替は一度だけ送信する',
     rephrase.click();
   });
   expect(peer.send).toHaveBeenCalledTimes(1);
-  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('rephrase');
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]).type,
+  ).toBe('rephrase');
 });
 
 test('質問切替の拒否後も、依頼済みの一時停止は現在の世代で送る', async () => {
   const { state, click, peer, receive } = mountLive();
   state();
   await click('言い換えを依頼');
-  const { commandId } = JSON.parse(peer.send.mock.lastCall![0]);
+  const { commandId } = parseObject(
+    (peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0],
+  );
   await click('一時停止');
   receive({ type: 'error', commandId, code: 'STALE_STATE' });
   expect(peer.send).toHaveBeenCalledTimes(2);
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 1 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'pause', generation: 1 });
 });
 
 test('最初の音声を20秒待っても再生されなければ再接続の案内を出す', async () => {
@@ -389,7 +467,7 @@ test('最初の音声を20秒待っても再生されなければ再接続の案
   const { state } = mountLive();
   state();
   await act(async () => vi.advanceTimersByTimeAsync(20_500));
-  expect(screen.getByText(/面接官の音声を待っています/)).toBeTruthy();
+  expect(screen.getByText(/面接官の音声を待っています/u)).toBeTruthy();
 });
 
 test('質問の切替前の音声を止め、新世代の質問の文字と再生完了までマイク送信を止める', async () => {
@@ -397,7 +475,8 @@ test('質問の切替前の音声を止め、新世代の質問の文字と再�
   state({ status: 'ready' });
   await click('マイクを許可して開始');
   state();
-  const [, capture] = vi.mocked(openInterviewAudio).mock.lastCall!;
+  const [, capture] =
+    vi.mocked(openInterviewAudio).mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   await click('言い換えを依頼');
   expect(audio.stopPlayback).toHaveBeenCalledOnce();
   peer.send.mockClear();
@@ -414,7 +493,7 @@ test('質問の切替前の音声を止め、新世代の質問の文字と再�
   const question = new Int16Array(6000).fill(512).buffer;
   receive({ ...audioHeader, generation: 3, byteLength: question.byteLength });
   raw(question);
-  act(() => audio.play.mock.lastCall![1]());
+  act(() => (audio.play.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[1]());
   peer.send.mockClear();
   capture(new ArrayBuffer(2));
   expect(peer.send).not.toHaveBeenCalled();
@@ -429,7 +508,11 @@ test('質問の切替前の音声を止め、新世代の質問の文字と再�
     sourceEndMs: null,
   });
   capture(new ArrayBuffer(2));
-  expect(new DataView(peer.send.mock.lastCall![0]).getFloat64(0)).toBe(3);
+  expect(
+    new DataView(
+      audioBuffer((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+    ).getFloat64(0),
+  ).toBe(3);
 });
 
 test('質問切替中の一時停止はすぐマイクを解放し、新世代の面接中に一度だけ停止を送る', async () => {
@@ -447,7 +530,9 @@ test('質問切替中の一時停止はすぐマイクを解放し、新世代�
   state({ generation: 3 });
   state({ generation: 3 });
   expect(peer.send).toHaveBeenCalledTimes(1);
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 3 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'pause', generation: 3 });
 });
 
 test('質問切替中に一時停止を押して新接続に失敗しても、再開待ちの世代を一時停止する', async () => {
@@ -465,7 +550,9 @@ test('質問切替中に一時停止を押して新接続に失敗しても、�
   state({ status: 'reconnecting', generation: 4 });
   state({ status: 'reconnecting', generation: 4 });
   expect(peer.send).toHaveBeenCalledTimes(1);
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 4 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'pause', generation: 4 });
   state({ status: 'paused', generation: 5 });
   expect(screen.getByRole('button', { name: 'マイクを許可して再開' })).toBeTruthy();
   expect(audio.close).toHaveBeenCalledOnce();
@@ -479,7 +566,9 @@ test('新世代で言い換えの返答が届く前でも質問を見送れる',
   state({ status: 'connecting', generation: 3 });
   state({ generation: 3 });
   await click('質問を見送る');
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'skip', generation: 3 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'skip', generation: 3 });
 });
 
 test('切替先で音声だけが届いても、20秒後に文字待ちと復帰操作を表示する', async () => {
@@ -495,17 +584,21 @@ test('切替先で音声だけが届いても、20秒後に文字待ちと復帰
   const question = new Int16Array(6000).fill(512).buffer;
   receive({ ...audioHeader, generation: 3, byteLength: question.byteLength });
   raw(question);
-  act(() => audio.play.mock.lastCall![1]());
-  await act(async () => vi.advanceTimersByTimeAsync(20500));
-  expect(screen.getByText(/質問の文字がまだ届いていません/)).toBeTruthy();
+  act(() => (audio.play.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[1]());
+  await act(async () => vi.advanceTimersByTimeAsync(20_500));
+  expect(screen.getByText(/質問の文字がまだ届いていません/u)).toBeTruthy();
   await click('音声をつなぎ直す');
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({ type: 'pause', generation: 3 });
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({ type: 'pause', generation: 3 });
 });
 test('担当タブで再生した音声だけを受領し、再生中の世代や担当変更を検知する', async () => {
   const { peer, audio, receive, state, raw, click } = mountLive();
   state({ canControl: false });
   await click('このタブで引き継ぐ');
-  expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('takeover');
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]).type,
+  ).toBe('takeover');
   state();
   function frame(generation: number) {
     receive({ ...audioHeader, generation });
@@ -514,9 +607,11 @@ test('担当タブで再生した音声だけを受領し、再生中の世代�
   frame(2);
   expect(audio.play).not.toHaveBeenCalled();
   frame(1);
-  const complete = audio.play.mock.lastCall![1];
+  const [, complete] = audio.play.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   complete();
-  expect(JSON.parse(peer.send.mock.lastCall![0])).toMatchObject({
+  expect(
+    parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]),
+  ).toMatchObject({
     type: 'playback',
     audioOffsetMs: 20,
   });
@@ -547,41 +642,50 @@ test.each([
 ])('不正なイベント（%s）では再接続を促す', (kind) => {
   const { peer, raw, receive, state } = mountLive();
   switch (kind) {
-    case 'ヘッダーなし':
+    case 'ヘッダーなし': {
       raw(new ArrayBuffer(2));
       break;
-    case '別形式':
+    }
+    case '別形式': {
       receive(audioHeader);
       raw(new Blob());
       break;
-    case '長さ違い':
+    }
+    case '長さ違い': {
       receive(audioHeader);
       raw(new ArrayBuffer(4));
       break;
-    case 'ヘッダー重複':
+    }
+    case 'ヘッダー重複': {
       receive(audioHeader);
       receive(audioHeader);
       break;
-    case '不明イベント':
+    }
+    case '不明イベント': {
       receive({ type: 'unknown' });
       break;
-    case '別の面接':
+    }
+    case '別の面接': {
       state({ interviewId: 'other' });
       break;
-    default:
+    }
+    default: {
       receive({ type: 'deleted', interviewId: 'other' });
+    }
   }
   expect(peer.close).toHaveBeenCalledOnce();
-  expect(screen.getByRole('alert').textContent).toMatch(/再開/);
+  expect(screen.getByRole('alert').textContent).toMatch(/再開/u);
 });
 
 test('削除通知を受けて再接続を止める', async () => {
   vi.useFakeTimers();
   const { deleted, receive, peer, peers } = mountLive();
   receive({ type: 'deleted', interviewId: 'live' });
-  act(() => peer.onclose());
+  act(() => {
+    peer.onclose();
+  });
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(60000);
+    await vi.advanceTimersByTimeAsync(60_000);
   });
   expect(deleted).toHaveBeenCalledOnce();
   expect(peers).toHaveLength(1);
@@ -607,17 +711,22 @@ test.each(['切断', '送信遅延'])('マイクの%sで送信を停止する', 
   state({ status: 'ready' });
   await click('マイクを許可して開始');
   state();
-  const [, capture, lost] = vi.mocked(openInterviewAudio).mock.lastCall!;
+  const [, capture, lost] =
+    vi.mocked(openInterviewAudio).mock.lastCall ?? assert.fail('必須のテスト値がありません。');
   if (kind === '切断') {
     act(lost);
-    expect(JSON.parse(peer.send.mock.lastCall![0]).type).toBe('pause');
+    expect(
+      parseObject((peer.send.mock.lastCall ?? assert.fail('必須のテスト値がありません。'))[0]).type,
+    ).toBe('pause');
   } else {
-    peer.bufferedAmount = 300000;
-    act(() => capture(new ArrayBuffer(2)));
+    peer.bufferedAmount = 300_000;
+    act(() => {
+      capture(new ArrayBuffer(2));
+    });
     expect(peer.close).toHaveBeenCalledOnce();
   }
   expect(audio.close).toHaveBeenCalledOnce();
-  expect(screen.getByRole('alert').textContent).toMatch(/マイクが切断|送信が追いつかず/);
+  expect(screen.getByRole('alert').textContent).toMatch(/マイクが切断|送信が追いつかず/u);
   const count = peer.send.mock.calls.length;
   capture(new ArrayBuffer(2));
   expect(peer.send).toHaveBeenCalledTimes(count);
@@ -633,14 +742,18 @@ test.each(['世代変更', 'ソケット終了', 'ユーザー中断'])(
     await click('マイクを許可して開始');
     if (kind === 'ユーザー中断') {
       page.unmount();
-      await act(async () => permission.reject());
+      await act(async () => {
+        permission.reject();
+      });
     } else {
       if (kind === '世代変更') {
         state({ generation: 2 });
       } else {
         peer.readyState = 3;
       }
-      await act(async () => permission.resolve(audio));
+      await act(async () => {
+        permission.resolve(audio);
+      });
       expect(audio.close).toHaveBeenCalledOnce();
     }
     expect(peer.send).not.toHaveBeenCalled();
@@ -650,18 +763,22 @@ test.each(['世代変更', 'ソケット終了', 'ユーザー中断'])(
 test('応答待ちを打ち切り、セッション再取得失敗を表示する', async () => {
   vi.useFakeTimers();
   const { peer } = mountLive();
-  act(() => peer.onerror());
-  expect(screen.getByRole('alert').textContent).toMatch(/接続が切れ/);
+  act(() => {
+    peer.onerror();
+  });
+  expect(screen.getByRole('alert').textContent).toMatch(/接続が切れ/u);
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(10000);
+    await vi.advanceTimersByTimeAsync(10_000);
   });
   expect(peer.close).toHaveBeenCalledOnce();
   vi.mocked(sessionToken).mockRejectedValueOnce(new Error('unreachable'));
-  act(() => peer.onclose());
+  act(() => {
+    peer.onclose();
+  });
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
   });
-  expect(screen.getByRole('alert').textContent).toMatch(/起動時のURL/);
+  expect(screen.getByRole('alert').textContent).toMatch(/起動時のURL/u);
 });
 
 test('開始を送った直後の再クリックでマイクを重複取得しない', async () => {
@@ -675,8 +792,10 @@ test('開始を送った直後の再クリックでマイクを重複取得し�
 test('復帰期限を過ぎて実行されたタイマーでは接続しない', async () => {
   vi.useFakeTimers();
   const { peers, peer } = mountLive();
-  act(() => peer.onclose());
-  vi.spyOn(performance, 'now').mockReturnValue(70000);
+  act(() => {
+    peer.onclose();
+  });
+  vi.spyOn(performance, 'now').mockReturnValue(70_000);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
   });
@@ -688,7 +807,9 @@ test.each([true, false])('再認証待ちに画面を閉じたら結果を破棄
   const { peers, peer, page } = mountLive();
   const token = Promise.withResolvers<string>();
   vi.mocked(sessionToken).mockReturnValueOnce(token.promise);
-  act(() => peer.onclose());
+  act(() => {
+    peer.onclose();
+  });
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
   });
@@ -707,13 +828,18 @@ test('前の許可結果が届いても、新しいマイク準備が終わる�
   const { state, audio, click, peer, peers } = mountLive();
   const waits: ((value: typeof audio) => void)[] = [];
   vi.mocked(openInterviewAudio).mockImplementation(
-    () => new Promise((resolve) => waits.push(resolve)),
+    () =>
+      new Promise((resolve) => {
+        waits.push(resolve);
+      }),
   );
   state({ status: 'ready' });
   await click('マイクを許可して開始');
-  act(() => peer.onclose());
+  act(() => {
+    peer.onclose();
+  });
   await click('再接続');
-  act(() =>
+  act(() => {
     peers[1].onmessage(
       new MessageEvent('message', {
         data: JSON.stringify({
@@ -730,13 +856,24 @@ test('前の許可結果が届いても、新しいマイク準備が終わる�
           evaluationJobId: null,
         }),
       }),
-    ),
-  );
+    );
+  });
   await click('マイクを許可して開始');
-  await act(async () => waits[0](audio));
+  await act(async () => {
+    waits[0](audio);
+  });
   expect(
     screen.getByRole('button', { name: 'マイクを許可して開始' }).closest('fieldset')?.disabled,
   ).toBe(true);
-  await act(async () => waits[1](audio));
+  await act(async () => {
+    waits[1](audio);
+  });
   expect(peers[1].send).toHaveBeenCalledOnce();
 });
+
+function audioBuffer(value: string | ArrayBuffer): ArrayBuffer {
+  if (!(value instanceof ArrayBuffer)) {
+    throw new TypeError('音声はArrayBufferである必要があります。');
+  }
+  return value;
+}

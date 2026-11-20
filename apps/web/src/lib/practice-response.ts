@@ -1,5 +1,5 @@
 // マイクと再生PCMは24 kHz・16 bit。内容は保存せず、音量とサンプル数だけを使う。
-const sampleRate = 24000;
+const sampleRate = 24_000;
 
 function meanSquare(samples: Int16Array) {
   return samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length;
@@ -29,7 +29,7 @@ export function createResponseMonitor() {
     },
     capture(bytes: ArrayBuffer, now: number) {
       const samples = new Int16Array(bytes);
-      const power = samples.length ? meanSquare(samples) : 0;
+      const power = samples.length > 0 ? meanSquare(samples) : 0;
       if (power < 4 ** 2) {
         state.inputPower = 0;
         state.inputSamples = 0;
@@ -48,9 +48,9 @@ export function createResponseMonitor() {
       }
     },
     playbackVersion: () => state.version,
-    played(bytes: ArrayBuffer, receivedVersion = state.version) {
+    played(bytes: ArrayBuffer, receivedVersion = state.version): boolean | undefined {
       if (state.waitingSince === null || receivedVersion !== state.version) {
-        return;
+        return undefined;
       }
       const samples = new Int16Array(bytes);
       const position = { offset: 0 };

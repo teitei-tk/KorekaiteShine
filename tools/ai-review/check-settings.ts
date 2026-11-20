@@ -1,14 +1,19 @@
+import { parseJson, isJsonObject } from './json.ts';
 import { execFileSync } from 'node:child_process';
 import { REPOSITORY } from './policy.ts';
 
 const checks = {
   OPENAI_WIF_AUDIENCE: (value: string) => value === 'https://api.openai.com/v1',
-  OPENAI_IDENTITY_PROVIDER_ID: (value: string) => /^idp_[A-Za-z0-9]+$/.test(value),
-  OPENAI_SERVICE_ACCOUNT_ID: (value: string) => /^user-[A-Za-z0-9]+$/.test(value),
+  OPENAI_IDENTITY_PROVIDER_ID: (value: string) => /^idp_[A-Za-z0-9]+$/u.test(value),
+  OPENAI_SERVICE_ACCOUNT_ID: (value: string) => /^user-[A-Za-z0-9]+$/u.test(value),
   AI_REVIEW_MODE: (value: string) => ['claims', 'review', 'off'].includes(value),
 };
 type Name = keyof typeof checks;
 type Expected = Partial<Record<Name, string>>;
+
+function isName(value: string): value is Name {
+  return Object.hasOwn(checks, value);
+}
 
 function readVariables(): string {
   return execFileSync('gh', ['variable', 'list', '--repo', REPOSITORY, '--json', 'name,value'], {
@@ -26,27 +31,32 @@ export function checkSettings(
   expected: Expected = {},
 ): { ok: boolean; output: string } {
   try {
-    const data: { name: string; value: string }[] = JSON.parse(read());
+    const data = parseJson(read());
     if (
       !Array.isArray(data) ||
-      !data.every((row) => row && typeof row.name === 'string' && typeof row.value === 'string')
+      !data.every(
+        (row): row is { name: string; value: string } =>
+          isJsonObject(row) && typeof row.name === 'string' && typeof row.value === 'string',
+      )
     ) {
       throw new Error('Invalid response');
     }
-    const rows = (Object.keys(checks) as Name[]).map((name) => {
-      const matches = data.filter((row) => row.name === name);
-      if (!matches.length || (matches.length === 1 && !matches[0].value)) {
-        return { ok: false, line: `${name}: 未設定` };
-      }
-      if (matches.length !== 1 || !checks[name](matches[0].value)) {
-        return { ok: false, line: `${name}: 形式不正` };
-      }
-      if (expected[name] === undefined) {
-        return { ok: true, line: `${name}: 形式OK・期待値未指定` };
-      }
-      const ok = matches[0].value === expected[name];
-      return { ok, line: `${name}: ${ok ? '一致' : '不一致'}` };
-    });
+    const rows = Object.keys(checks)
+      .filter((name): name is Name => isName(name))
+      .map((name) => {
+        const matches = data.filter((row) => row.name === name);
+        if (matches.length === 0 || (matches.length === 1 && !matches[0].value)) {
+          return { ok: false, line: `${name}: 未設定` };
+        }
+        if (matches.length !== 1 || !checks[name](matches[0].value)) {
+          return { ok: false, line: `${name}: 形式不正` };
+        }
+        if (expected[name] === undefined) {
+          return { ok: true, line: `${name}: 形式OK・期待値未指定` };
+        }
+        const ok = matches[0].value === expected[name];
+        return { ok, line: `${name}: ${ok ? '一致' : '不一致'}` };
+      });
     return { ok: rows.every((row) => row.ok), output: rows.map((row) => row.line).join('\n') };
   } catch {
     return {
@@ -58,7 +68,7 @@ export function checkSettings(
 
 if (import.meta.main) {
   const expected: Expected = {};
-  for (const name of Object.keys(checks) as Name[]) {
+  for (const name of Object.keys(checks).filter((name): name is Name => isName(name))) {
     const value = process.env[`EXPECTED_${name}`];
     if (value !== undefined) {
       expected[name] = value;

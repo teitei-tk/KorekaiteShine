@@ -7,13 +7,13 @@ import type { operations } from '@korekaite/api-contracts/http';
 
 type Start = operations['startCheckJob']['requestBody']['content']['application/json'];
 type Accepted = operations['startCheckJob']['responses'][202]['content']['application/json'];
-export interface AcceptanceContext {
+export type AcceptanceContext = {
   db: ReturnType<typeof createPrimaryDb>;
   environment: 'development' | 'test';
   actorId: string;
-  now(): number;
-  newId(): string;
-}
+  now: () => number;
+  newId: () => string;
+};
 
 export async function acceptDiagnosticJob(
   context: AcceptanceContext,
@@ -70,9 +70,9 @@ export async function acceptDiagnosticJob(
     );
   } catch (error) {
     // batchの失敗時は全体がrollbackされる。競合した確定済み受付だけを読み直す。
-    const [existing] = await databaseOperation(async () =>
-      db.select().from(diagnosticRequests).where(scope),
-    );
+    const existing = (
+      await databaseOperation(async () => db.select().from(diagnosticRequests).where(scope))
+    ).at(0);
     if (!existing) {
       throw error;
     }
@@ -102,19 +102,21 @@ export async function findDiagnosticJob(
   context: AcceptanceContext,
   jobId: string,
 ): Promise<CheckStatus | null> {
-  const [row] = await databaseOperation(async () =>
-    context.db
-      .select({ job: jobs, check: diagnosticChecks })
-      .from(jobs)
-      .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
-      .where(
-        and(
-          eq(jobs.jobId, jobId),
-          eq(jobs.actorId, context.actorId),
-          eq(jobs.purpose, 'diagnostics'),
+  const row = (
+    await databaseOperation(async () =>
+      context.db
+        .select({ job: jobs, check: diagnosticChecks })
+        .from(jobs)
+        .innerJoin(diagnosticChecks, eq(jobs.jobId, diagnosticChecks.jobId))
+        .where(
+          and(
+            eq(jobs.jobId, jobId),
+            eq(jobs.actorId, context.actorId),
+            eq(jobs.purpose, 'diagnostics'),
+          ),
         ),
-      ),
-  );
+    )
+  ).at(0);
   if (!row) {
     return null;
   }

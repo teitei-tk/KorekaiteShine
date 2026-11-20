@@ -4,20 +4,19 @@ import {
   transcriptFragments,
   playbackReceipts,
   evaluationInputs,
-  type EvaluationConfiguration,
-  type EvaluationSnapshot,
 } from '@korekaite/database/interviews';
+import type { EvaluationConfiguration, EvaluationSnapshot } from '@korekaite/database/interviews';
 import { jobs, jobOutbox } from '@korekaite/database/jobs';
 import type { createPrimaryDb } from '@korekaite/database/connection';
 import { validateJobNotification } from '@korekaite/api-contracts/messages/validators';
 import { loadInterview } from './interviews';
 
 type Database = ReturnType<typeof createPrimaryDb>;
-interface FinishOptions {
+type FinishOptions = {
   jobId: string;
   evaluation: EvaluationConfiguration;
   transcriptIncomplete: boolean;
-}
+};
 
 export async function finishInterview(
   db: Database,
@@ -41,10 +40,9 @@ export async function finishInterview(
     eq(evaluationInputs.interviewId, interviewId),
     eq(evaluationInputs.kind, 'initial'),
   );
-  const [existing] = await db
-    .select({ jobId: evaluationInputs.jobId })
-    .from(evaluationInputs)
-    .where(initial);
+  const existing = (
+    await db.select({ jobId: evaluationInputs.jobId }).from(evaluationInputs).where(initial)
+  ).at(0);
   if (existing) {
     return existing.jobId;
   }
@@ -143,7 +141,7 @@ export async function finishInterview(
     db.insert(jobOutbox).select(
       db
         .select({
-          id: sql<string>`${options.jobId + ':notify:0'}`.as('id'),
+          id: sql<string>`${`${options.jobId}:notify:0`}`.as('id'),
           jobId: evaluationInputs.jobId,
           purpose: sql<'evaluation'>`'evaluation'`.as('purpose'),
           operation: sql<'notify'>`'notify'`.as('operation'),
@@ -167,9 +165,8 @@ export async function finishInterview(
       })
       .where(and(finishing, exists(db.select().from(evaluationInputs).where(createdInput)))),
   ]);
-  const [accepted] = await db
-    .select({ jobId: evaluationInputs.jobId })
-    .from(evaluationInputs)
-    .where(initial);
+  const accepted = (
+    await db.select({ jobId: evaluationInputs.jobId }).from(evaluationInputs).where(initial)
+  ).at(0);
   return accepted?.jobId ?? null;
 }

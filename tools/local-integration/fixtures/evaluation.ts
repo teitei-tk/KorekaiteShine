@@ -1,3 +1,5 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { readFixtureObject } from './json';
 import { confirmFixtureKey } from './ai-bindings';
 import { diagnosticTransactionEffects } from '../../../apps/evaluation/src/diagnostics/transaction-effects';
 import { Temporal } from '@js-temporal/polyfill';
@@ -25,8 +27,8 @@ import {
   completeExecution,
   renewExecution,
   recoverExpiredExecution,
-  type ExecutionLease,
 } from '../../../apps/evaluation/src/server/repositories/job-execution';
+import type { ExecutionLease } from '../../../apps/evaluation/src/server/repositories/job-execution';
 
 export class TopologyEvaluation extends WorkerEntrypoint<{
   DB: D1Database;
@@ -173,27 +175,30 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
             if (hold) {
               const deadline = Temporal.Now.instant().epochMilliseconds + 15_000;
               for (;;) {
-                const [released] = await primary
-                  .select()
-                  .from(connectionChecks)
-                  .where(eq(connectionChecks.writer, `release:${jobId}`));
+                const released = (
+                  await primary
+                    .select()
+                    .from(connectionChecks)
+                    .where(eq(connectionChecks.writer, `release:${jobId}`))
+                ).at(0);
                 if (released) {
                   break;
                 }
                 if (Temporal.Now.instant().epochMilliseconds >= deadline) {
                   throw new Error('テストの評価待機がタイムアウトしました。');
                 }
-                await new Promise((resolve) => setTimeout(resolve, 50));
+                await new Promise((resolve) => {
+                  setTimeout(resolve, 50);
+                });
               }
             }
-            const [check] = await primary
-              .select()
-              .from(diagnosticChecks)
-              .where(eq(diagnosticChecks.jobId, jobId));
+            const check = (
+              await primary.select().from(diagnosticChecks).where(eq(diagnosticChecks.jobId, jobId))
+            ).at(0);
             if (!check) {
               throw new Error('診断条件がありません。');
             }
-            return evaluateDiagnostic(check.scenario, attemptNumber);
+            return await evaluateDiagnostic(check.scenario, attemptNumber);
           } catch (error) {
             console.error(
               JSON.stringify({
@@ -212,26 +217,30 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     );
   }
   async readQueueReceipt(jobId: string) {
-    const [row] = await db
-      .select()
-      .from(connectionChecks)
-      .where(eq(connectionChecks.writer, `queue:${jobId}`));
-    return row ? JSON.parse(row.value) : null;
+    const row = (
+      await db
+        .select()
+        .from(connectionChecks)
+        .where(eq(connectionChecks.writer, `queue:${jobId}`))
+    ).at(0);
+    return row ? parseJson(row.value) : null;
   }
 
   async readFormalJob(jobId: string) {
     if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
     }
-    const [job] = await createPrimaryDb(this.env.DB)
-      .select({
-        jobId: jobs.jobId,
-        purpose: jobs.purpose,
-        status: jobs.status,
-        attemptCount: jobs.attemptCount,
-      })
-      .from(jobs)
-      .where(eq(jobs.jobId, jobId));
+    const job = (
+      await createPrimaryDb(this.env.DB)
+        .select({
+          jobId: jobs.jobId,
+          purpose: jobs.purpose,
+          status: jobs.status,
+          attemptCount: jobs.attemptCount,
+        })
+        .from(jobs)
+        .where(eq(jobs.jobId, jobId))
+    ).at(0);
     return job ?? null;
   }
 
@@ -249,8 +258,14 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     const receipts = await primary.select().from(connectionChecks);
     const deliveries = receipts
       .filter((row) => row.writer.startsWith('queue-message:'))
-      .map((row) => JSON.parse(row.value))
-      .filter((row) => row.message.jobId === jobId).length;
+      .map((row) => {
+        const value = readFixtureObject(row.value);
+        if (!validateJobNotification(value.message)) {
+          throw new Error('配送通知の形式が不正です。');
+        }
+        return value.message;
+      })
+      .filter((message) => message.jobId === jobId).length;
     return {
       notifications: notifications.length,
       unsent: notifications.filter((row) => row.sentAt === null).length,
@@ -262,10 +277,12 @@ export class TopologyEvaluation extends WorkerEntrypoint<{
     if (this.env.APP_ENV !== 'test' || !validateJobNotification({ schemaVersion: 1, jobId })) {
       throw new Error('テスト要求が不正です。');
     }
-    const [row] = await createPrimaryDb(this.env.DB)
-      .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
-      .from(diagnosticChecks)
-      .where(eq(diagnosticChecks.jobId, jobId));
+    const row = (
+      await createPrimaryDb(this.env.DB)
+        .select({ firstReceivedAt: diagnosticChecks.firstReceivedAt })
+        .from(diagnosticChecks)
+        .where(eq(diagnosticChecks.jobId, jobId))
+    ).at(0);
     return row ?? null;
   }
 
@@ -342,11 +359,11 @@ export async function recordQueueDelivery(batch: {
   }
 }
 
-export default {
+const queueFixture = {
   // 接続確認専用Consumer。受信を記録し、評価の業務状態は変更しない。
   async queue(batch: {
     queue: string;
-    messages: { id: string; body: JobNotification; ack(): void }[];
+    messages: { id: string; body: JobNotification; ack: () => void }[];
   }) {
     await recordQueueDelivery(batch);
     for (const message of batch.messages) {
@@ -366,6 +383,10 @@ export async function holdBeforeEvaluationForTest(env: { APP_ENV: string }): Pro
     throw new Error('評価前の停止はtest環境専用です。');
   }
   for (;;) {
-    await new Promise((resolve) => setTimeout(resolve, 60_000));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 60_000);
+    });
   }
 }
+
+export default queueFixture;

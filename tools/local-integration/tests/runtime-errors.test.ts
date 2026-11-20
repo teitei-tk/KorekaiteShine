@@ -1,11 +1,15 @@
+import { stageBoundaryBundle } from '../src/boundary-bundle.ts';
+import { runDatabaseCommand } from '../src/database.ts';
+import type * as LintTypeModule0 from 'node:child_process';
+import type * as LintTypeModule1 from 'node:fs/promises';
 import { SystemError } from '../../testing/system-error.mts';
 import { ChildProcess, spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
+import { assert, afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { PendingRuntimeCleanup, buildRuntime, startRuntimeInProcess } from '../src/runtime.ts';
 import { lockEnvironment } from '../src/lock.ts';
 import { stopProcessGroup, runNodeCommand } from '../src/process.ts';
@@ -13,13 +17,14 @@ import { confirmHttpReady } from '../src/readiness.ts';
 import { startRuntimeCapture } from '../../coverage/src/runtime-capture.ts';
 
 vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:child_process')>()),
+  ...(await importOriginal<typeof LintTypeModule0>()),
   spawn: vi.fn(),
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...original, symlink: vi.fn(original.symlink) };
+  const original = await importOriginal<typeof LintTypeModule1>();
+  return { ...original, symlink: vi.fn(original.symlink), writeFile: vi.fn(original.writeFile) };
 });
+vi.mock('../src/boundary-bundle.ts', () => ({ stageBoundaryBundle: vi.fn() }));
 vi.mock('../src/database.ts', () => ({ runDatabaseCommand: vi.fn() }));
 vi.mock('../src/lock.ts', () => ({ lockEnvironment: vi.fn() }));
 vi.mock('../src/process.ts', () => ({ stopProcessGroup: vi.fn(), runNodeCommand: vi.fn() }));
@@ -40,13 +45,21 @@ async function runtimeFixture(environment: 'development' | 'test' | 'production'
     appEnv: environment,
     ...(environment === 'test' ? { runId: 'runtime', parallelIndex: 0 } : {}),
   });
-  const release = vi.fn();
+  const release = vi.fn<() => void>(() => {
+    /* 解放呼出しを記録する。 */
+  });
   vi.mocked(lockEnvironment).mockResolvedValue(release);
   const child = new ChildProcess();
+  Object.defineProperty(child, 'pid', { value: 12_345 });
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
   vi.mocked(spawn).mockImplementation(() => {
-    queueMicrotask(() => child.stdout!.emit('data', Buffer.from('http://127.0.0.1:1234')));
+    queueMicrotask(() => {
+      (child.stdout ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('http://127.0.0.1:1234'),
+      );
+    });
     return child;
   });
   vi.mocked(stopProcessGroup).mockImplementation(async () => {
@@ -87,7 +100,9 @@ test('依存へのシンボリックリンク作成が拒否されたらロッ�
 test('起動時のerrorイベントで失敗し停止確認後にロックを解放する', async () => {
   const fixture = await runtimeFixture();
   vi.mocked(spawn).mockImplementation(() => {
-    queueMicrotask(() => fixture.child.emit('error', new Error('spawn failed')));
+    queueMicrotask(() => {
+      fixture.child.emit('error', new Error('spawn failed'));
+    });
     return fixture.child;
   });
   await expect(startRuntimeInProcess(fixture.config)).rejects.toThrow('spawn failed');
@@ -97,7 +112,9 @@ test('起動時のerrorイベントで失敗し停止確認後にロックを解
 test('URL出力前の終了を起動成功として扱わない', async () => {
   const fixture = await runtimeFixture();
   vi.mocked(spawn).mockImplementation(() => {
-    queueMicrotask(() => fixture.child.emit('exit', 2));
+    queueMicrotask(() => {
+      fixture.child.emit('exit', 2);
+    });
     return fixture.child;
   });
   await expect(startRuntimeInProcess(fixture.config)).rejects.toThrow('起動失敗（2）');
@@ -123,7 +140,10 @@ test('起動後処理が失敗したらロックを保持し後処理の再試�
   );
   expect(failure).toBeInstanceOf(PendingRuntimeCleanup);
   expect(fixture.release).not.toHaveBeenCalled();
-  await (failure as PendingRuntimeCleanup).cleanup();
+  if (!(failure instanceof PendingRuntimeCleanup)) {
+    throw new TypeError('後処理待ちの例外ではありません。');
+  }
+  await failure.cleanup();
   expect(fixture.release).toHaveBeenCalledTimes(1);
 });
 
@@ -145,7 +165,9 @@ test('起動ログが出なければ45秒で停止しロックを解放する', 
   vi.useFakeTimers();
   vi.mocked(spawn).mockReturnValue(fixture.child);
   const result = expect(startRuntimeInProcess(fixture.config)).rejects.toThrow('45秒以内');
-  await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+  await vi.waitFor(() => {
+    expect(spawn).toHaveBeenCalled();
+  });
   await vi.advanceTimersByTimeAsync(45_000);
   await result;
   expect(fixture.release).toHaveBeenCalledTimes(1);
@@ -207,8 +229,14 @@ test('URLがまだ含まれない起動ログを保持して続くURLでHTTPを�
   const fixture = await runtimeFixture();
   vi.mocked(spawn).mockImplementation(() => {
     queueMicrotask(() => {
-      fixture.child.stdout!.emit('data', Buffer.from('starting '));
-      fixture.child.stderr!.emit('data', Buffer.from('http://127.0.0.1:1234'));
+      (fixture.child.stdout ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('starting '),
+      );
+      (fixture.child.stderr ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('http://127.0.0.1:1234'),
+      );
     });
     return fixture.child;
   });
@@ -284,4 +312,110 @@ test('診断DOの環境拒否とQueueプローブを独立テストのWorker設�
   } finally {
     await runtime.stop();
   }
+});
+
+test('起動計測の保存中に中断された場合も起動成功を返さない', async () => {
+  const fixture = await runtimeFixture();
+  const controller = new AbortController();
+  const actual = await vi.importActual<typeof LintTypeModule1>('node:fs/promises');
+  vi.mocked(writeFile).mockImplementation(async (...args) => {
+    await actual.writeFile(...args);
+    if (typeof args[0] === 'string' && args[0].endsWith('/startup-timing.json')) {
+      controller.abort();
+    }
+  });
+  await expect(
+    startRuntimeInProcess(fixture.config, 'dev', { profileStartup: true }, controller.signal),
+  ).rejects.toThrow();
+  expect(stopProcessGroup).toHaveBeenCalledWith(fixture.child);
+  expect(fixture.release).toHaveBeenCalledTimes(1);
+});
+
+test('Vite詳細計測をdevelopmentとpreviewでは開始しない', async () => {
+  const development = await runtimeFixture('development');
+  await expect(
+    startRuntimeInProcess(development.config, 'dev', { profileVite: true }),
+  ).rejects.toThrow('独立test環境');
+  const preview = await runtimeFixture();
+  await expect(
+    startRuntimeInProcess(preview.config, 'preview', { profileVite: true }),
+  ).rejects.toThrow('dev起動');
+  expect(spawn).not.toHaveBeenCalled();
+});
+
+test('共有ビルドはtest previewと対応する障害注入だけに限定する', async () => {
+  const fixture = await runtimeFixture();
+  for (const options of [
+    { boundaryBundle: '/bundle', checkObjectProbe: 'normal' as const },
+    { boundaryBundle: '/bundle', profileVite: true },
+    { boundaryBundle: '/bundle', holdEvaluationBeforeConsume: true },
+  ]) {
+    await expect(startRuntimeInProcess(fixture.config, 'preview', options)).rejects.toThrow();
+  }
+  await expect(
+    startRuntimeInProcess(fixture.config, 'dev', { boundaryBundle: '/bundle' }),
+  ).rejects.toThrow();
+  const development = await runtimeFixture('development');
+  await expect(
+    startRuntimeInProcess(development.config, 'preview', { boundaryBundle: '/bundle' }),
+  ).rejects.toThrow();
+  expect(spawn).not.toHaveBeenCalled();
+  expect(runDatabaseCommand).not.toHaveBeenCalled();
+});
+
+test('Vite詳細計測のIPC完了を待って起動を返す', async () => {
+  const fixture = await runtimeFixture();
+  Object.defineProperty(fixture.child, 'connected', { value: true });
+  const send = vi.fn((_message: object, callback: (error: Error | null) => void) => {
+    callback(null);
+    queueMicrotask(() => {
+      fixture.child.emit('message', 'vite-startup-snapshot-saved');
+    });
+    return true;
+  });
+  Object.defineProperty(fixture.child, 'send', { value: send });
+  const runtime = await startRuntimeInProcess(fixture.config, 'dev', { profileVite: true });
+  expect(send).toHaveBeenCalled();
+  expect(
+    await readFile(join(fixture.config.artifactDirectory, 'web/vite.config.ts'), 'utf8'),
+  ).toContain('await profileVitePlugins(');
+  await runtime.stop();
+});
+
+test('共有ビルドと未対応の停止注入・AI秘密設定を併用しない', async () => {
+  const fixture = await runtimeFixture();
+  for (const options of [{ stopAfterResultBeforeAck: true }, { testAiBindings: {} }]) {
+    await expect(
+      startRuntimeInProcess(fixture.config, 'preview', { boundaryBundle: '/bundle', ...options }),
+    ).rejects.toThrow('事前ビルド');
+  }
+  for (const options of [{ manualDiagnostics: true }, { probeOnlyEvaluation: true }]) {
+    await expect(startRuntimeInProcess(fixture.config, 'preview', options)).rejects.toThrow(
+      '自動初期化',
+    );
+  }
+  expect(spawn).not.toHaveBeenCalled();
+});
+
+test('共有成果物を独立保存先へ配置してからpreviewを起動する', async () => {
+  const fixture = await runtimeFixture();
+  vi.mocked(stageBoundaryBundle).mockResolvedValue(join(fixture.config.artifactDirectory, 'web'));
+  const runtime = await startRuntimeInProcess(fixture.config, 'preview', {
+    boundaryBundle: '/fixture/bundle',
+    manualDiagnostics: true,
+    probeOnlyEvaluation: true,
+    profileStartup: true,
+  });
+  expect(stageBoundaryBundle).toHaveBeenCalledWith(
+    '/fixture/bundle',
+    fixture.config,
+    expect.objectContaining({ manualDiagnostics: true, probeOnlyEvaluation: true }),
+  );
+  expect(runDatabaseCommand).toHaveBeenCalledWith(fixture.config, ['migrate'], expect.any(Object));
+  expect(spawn).toHaveBeenCalledWith(
+    process.execPath,
+    expect.arrayContaining(['preview']),
+    expect.objectContaining({ cwd: join(fixture.config.artifactDirectory, 'web') }),
+  );
+  await runtime.stop();
 });

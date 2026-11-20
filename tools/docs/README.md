@@ -11,7 +11,7 @@ pnpmはルートの[package.json](../../package.json)の`packageManager`で固�
 
 `pnpm check`はNode.js設定の整合性・Lint・整形確認・型検査・Vitest・文書検査を順に実行し、失敗時に停止します。型検査とVitestはアプリ・共有パッケージ・ツールを依存順に直列検査します。固定版Vitestがロックファイル変更時に共有キャッシュを削除するため、パッケージ間の同時削除を避けます。AIレビューの設定は[専用手順](../../docs/runbooks/ai-review.md)を参照してください。個別には`pnpm check:node`、`pnpm typecheck`、`pnpm test`、`pnpm check:docs`を使えます。
 
-リポジトリ全体にoxlintとoxfmtを使用します。ルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。設定はルートの[.oxlintrc.json](../../.oxlintrc.json)と[.oxfmtrc.json](../../.oxfmtrc.json)、固定バージョンはルートの[package.json](../../package.json)で管理します。各ツールの対応ファイルを対象とし、依存・生成物などGitの除外対象は検査しません。自動生成の`pnpm-lock.yaml`と`.github/workflows/actions.lock`は整形対象から除外し、それぞれ専用ツールで管理します。oxlintはcorrectnessをエラーとして検査し、警告も終了コードを失敗にします。型検査は従来のTypeScriptを併用します。CIが呼ぶ`pnpm check`では整形の書き換えを行いません。
+リポジトリ全体にoxlintとoxfmtを使用します。ルートの`pnpm lint`でLint、`pnpm format:check`で整形確認、`pnpm format`で整形を実行できます。設定はルートの[.oxlintrc.json](../../.oxlintrc.json)と[.oxfmtrc.json](../../.oxfmtrc.json)、固定バージョンはルートの[package.json](../../package.json)で管理します。各ツールの対応ファイルを対象とし、依存・生成物などGitの除外対象は検査しません。自動生成の`pnpm-lock.yaml`と`.github/workflows/actions.lock`は整形対象から除外し、それぞれ専用ツールで管理します。oxlintは全カテゴリと適用可能なpluginを型情報付きで検査し、警告も終了コードを失敗にします。固定版ルールの分類漏れと理由付き例外をtools/lintの台帳で管理します。[局所例外台帳](../lint/scoped-exceptions.json)は具体的なファイル・規則・理由を設定と双方向照合します。inline抑制は別検査で禁止します。型検査はtsrsを使用し、Compiler API用TypeScriptは保持します。`pnpm lint`・`pnpm typecheck`・`pnpm test`は契約とrouteTreeを先に生成します。通常CIはlint・typecheck・build・テストを別runnerで並列実行します。詳細は[CI高速化の設計](../../docs/superpowers/specs/2026-11-17-ci-acceleration-design.md)を参照してください。検査では整形の書き換えを行いません。
 
 ネットワークとGitHub認証が必要なActions検証は`pnpm check:actions`に分けます。CIのActions検証ジョブはNode.js・pnpmの準備に依存しないよう、同じ`gh actions-lock --verify`を直接実行します。
 
@@ -77,7 +77,11 @@ node tools/docs/check-guard.ts --registry-only
 node tools/docs/check-guard.ts
 ```
 
-取得済み依存が現在のGuard判定を迂回しないよう、対象ジョブのpnpm storeキャッシュ復元とsetup-nodeの自動キャッシュを無効にしています。GitHub-hosted runnerの使い捨て環境を前提とし、pnpm Action自身のstoreキャッシュも既定の無効状態で使います。再実行では依存を再取得するため、通信量と所要時間が増えます。Guardの拒否・障害時は対象版と応答を確認し、必要に応じて復旧後に再実行してください。npm公式レジストリへの自動切替は行いません。
+通常CIは固定版setup-nodeの明示的な`cache: pnpm`でstoreを再利用します。`node_modules`、registryメタデータ、過去のlockfile検証結果はキャッシュしません。キーにはOS・architectureに加え、lockfile、workspace保護設定、各package.json、Node版、pnpm hook、インストール処理、Guard確認、workflowを含め、別キーへの部分一致復元は行いません。pnpm Action自身のstoreキャッシュとsetup-nodeの自動キャッシュは引き続き無効です。
+
+キャッシュ命中時も[依存準備](../ci/src/install-dependencies.ts)を省略しません。npm・pnpmのGuard registryを確認し、毎回空のmetadata/stateディレクトリで`pnpm install --frozen-lockfile --ignore-scripts --no-trust-lockfile --no-offline --no-prefer-offline`を実行します。store整合性検査も明示的に有効化します。公開後の待機時間・信頼ポリシー・依存ビルド保護はworkspace設定を維持します。metadataと検証結果の再利用は、現在のGuard拒否を迂回するため禁止します。Guardの拒否・障害時は失敗させ、offline実行やnpm公式レジストリへ自動切替しません。
+
+Worker実時間検査・AIレビュー・隔離受入検査は、今回のキャッシュ導入対象に含めず、従来どおり依存を再取得します。匿名モードでの全依存の再検証には引き続き通信が必要です。キャッシュの効果はダウンロード・展開の削減であり、検証時間を省略するものではありません。
 
 匿名モードには取得履歴と事後通知がありません。scope別registryや直接URLの依存は別途レビューし、GitHub Releases・apt・Actions本体の取得はGuardの保護範囲外として扱います。固定版の確認結果と未検証範囲は[検証記録](../../docs/research/takumi-guard.md)、将来のShisho CloudへのOIDC移行は[導入設計](../../docs/superpowers/specs/2026-11-07-takumi-guard-design.md#将来のshisho-cloud連携)を参照してください。
 
@@ -138,7 +142,7 @@ gh actions-lock --verify
 
 ## 型の禁止ルール
 
-`pnpm lint`はoxlintの`typescript/no-restricted-types`で、リポジトリ内の`unknown`型を拒否します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
+`pnpm lint`はoxlintの`typescript/no-restricted-types`で、通常の業務コードにある`unknown`型を拒否します。JSON・IPC・Inspector等の未検証入力を受ける境界だけは、実行時の構造検証が必要なため[局所例外台帳](../lint/scoped-exceptions.json)に限定して許可します。コメント・文字列は対象外です。既存のcommit・pushフックとCIでも同じLintを実行します。`lint-policy.test.ts`で、単独・オブジェクト内・型引数の禁止と、コメント・文字列の許可を確認します。
 
 外部入力には具体的な入力型を付け、実行時の形式検証を維持してください。型アサーションだけではJSONやAPI応答を検証したことになりません。
 
@@ -148,6 +152,14 @@ gh actions-lock --verify
 
 `pnpm check:coverage`は、現在のコミット・対象集合・元ソースと計測コードのハッシュが一致する保存結果だけを検査します。全体と各ファイルの4指標を実数で判定し、1件でも未網羅なら失敗します。必須suiteの欠落、失敗・未完了の収集、空のレポートも成功扱いしません。計測要素がない個別ファイルは理由を記録し、到達済みには数えません。
 
-通常CIの境界4分割・結合3分割と、各パッケージの型検査・テストは維持します。両コマンドは独立した`Worker real-time checks`で順に実行し、長時間の全体計測と100%判定を担当します。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
+通常CIの境界4分割・結合3分割と、各パッケージの型検査・テストは維持します。独立した`Worker real-time checks`は分割収集と統合時の100%判定を担当します。計測器や変換設定を更新した場合は、分母の変化を[調査記録](../../docs/research/test-coverage.md)と照合してください。
 
 通常CIは境界4分割と通常結合3分割を含みます。450秒の再試行待機1件と全体カバレッジ検査は `Worker real-time checks` に分離し、夜間・手動・関連変更のPRで実行します。通常CIの成功と長時間検査の結果は独立しています。全件のローカル検査は引き続き `pnpm check`、`pnpm prepare:integration`、`pnpm test:integration` です。
+
+## 長時間CIの分割計測
+
+`Worker real-time checks`は`pnpm test:coverage --shard=N/4`を4台で並行実行します。各台は生成・準備・buildを独立して行い、Vitestの全テストをファイル単位で4分割します。実時間30・120・300秒の再試行とDLQ検査を含み、待機時間は変更しません。各台の最大2ワーカーを維持します。
+
+`pnpm test:coverage --merge-shards`は`coverage/shards/1.json`から`4.json`を読み、現在のrevision・対象ソース・計測コード・必須suite・各収集片の完了を検証して統合します。欠落・重複・失敗・未完了は拒否し、統合後に各ファイルの行・文・関数・分岐100%を要求します。通常のローカル`pnpm test:coverage`と`pnpm check:coverage`も引き続き使用できます。
+
+各suiteの開始・終了・所要時間をActionsログへ出し、詳細ログは3日間のartifactへ保存します。Guard・固定lockfile・信頼ポリシーを維持する依存storeキャッシュを収集・統合ジョブで使います。キャッシュ命中でも現在のポリシー検証を省略しません。

@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { expect, test } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import { saveMaterialAnalysis } from '../src/server/repositories/materials.ts';
@@ -41,7 +42,7 @@ test('未認可・他人の候補・不正な本文を拒否し、面接を保�
         400,
         'INVALID_REQUEST',
       ],
-      ['actor', 'application/json', ' '.repeat(30001), 413, 'REQUEST_TOO_LARGE'],
+      ['actor', 'application/json', ' '.repeat(30_001), 413, 'REQUEST_TOO_LARGE'],
     ] as const) {
       const response = await createInterviewRequest(
         new Request('http://127.0.0.1/api/interviews', {
@@ -53,7 +54,7 @@ test('未認可・他人の候補・不正な本文を拒否し、面接を保�
       );
       expect(response.status).toBe(status);
       expect(response.headers.get('Cache-Control')).toBe('no-store');
-      expect(await response.json()).toMatchObject({ error: { code } });
+      expect(parseJson(await response.text())).toMatchObject({ error: { code } });
     }
     expect(database.sqlite.prepare('SELECT count(*) AS count FROM interviews').get()).toEqual({
       count: 0,
@@ -80,7 +81,7 @@ test('保存済みテーマで面接を開始し、分析候補の期限後も�
     const first = await createInterviewRequest(request(), deps);
     expect(first.status).toBe(200);
     expect(first.headers.get('Cache-Control')).toBe('no-store');
-    const accepted = await first.json();
+    const accepted = parseJson(await first.text());
     expect(accepted).toEqual({
       interviewId: 'interview-1',
       status: 'ready',
@@ -90,7 +91,7 @@ test('保存済みテーマで面接を開始し、分析候補の期限後も�
     });
     const replay = await createInterviewRequest(request(), { ...deps, now: () => 201 });
     expect(replay.status).toBe(200);
-    expect(await replay.json()).toEqual(accepted);
+    expect(parseJson(await replay.text())).toEqual(accepted);
     const changed = await createInterviewRequest(
       request({ ...input, background: '改変した補足' }),
       deps,

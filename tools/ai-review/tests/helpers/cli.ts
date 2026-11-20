@@ -1,9 +1,37 @@
+import { parseJson, isJsonObject } from '../../json.ts';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { onTestFinished } from 'vitest';
+
+type FixtureRequest =
+  | (string[] & { method?: never; url?: never; git?: never })
+  | { method: string; url: string; git?: never }
+  | { git: string[]; method?: never; url?: never };
+
+function readFixtureRequest(text: string): FixtureRequest {
+  const value = parseJson(text);
+  if (
+    Array.isArray(value) &&
+    value.every((argument): argument is string => typeof argument === 'string')
+  ) {
+    return value;
+  }
+  if (isJsonObject(value)) {
+    if (typeof value.method === 'string' && typeof value.url === 'string') {
+      return { method: value.method, url: value.url };
+    }
+    if (
+      Array.isArray(value.git) &&
+      value.git.every((argument): argument is string => typeof argument === 'string')
+    ) {
+      return { git: value.git };
+    }
+  }
+  throw new Error('CLI試験の要求記録が不正です。');
+}
 
 // CI・コンテナの実行UIDに依存せず、Linuxの非特権プロセスを再現する。
 export const unprivilegedLinux = `
@@ -14,7 +42,9 @@ process.getuid = () => 1000;
 /** ghとfetchの応答だけを制御し、元ソースのCLI入口を実Nodeで実行する。 */
 export function cliFixture() {
   const directory = mkdtempSync(join(tmpdir(), 'ai-review-cli-'));
-  onTestFinished(() => rmSync(directory, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(directory, { recursive: true, force: true });
+  });
   const responsePath = join(directory, 'responses.json');
   const requestsPath = join(directory, 'requests.jsonl');
   writeFileSync(requestsPath, '');
@@ -106,6 +136,6 @@ process.stdout.write(replies.git[key]);
         .trim()
         .split('\n')
         .filter(Boolean)
-        .map((line) => JSON.parse(line)),
+        .map((line) => readFixtureRequest(line)),
   };
 }

@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import { createInterview } from '../src/server/repositories/interviews.ts';
 
@@ -18,7 +18,8 @@ test('開始の同時要求を一件だけ受け付け、同じ要求の再送�
       createInterview(database.db, { ...input, interviewId: 'second' }, 0),
     ]);
     expect(results.filter((result) => result !== null)).toHaveLength(1);
-    const accepted = results.find((result) => result !== null)!;
+    const accepted =
+      results.find((result) => result !== null) ?? assert.fail('必須のテスト値がありません。');
     expect(
       await createInterview(database.db, { ...input, interviewId: accepted.interviewId }, 1),
     ).toEqual(accepted);

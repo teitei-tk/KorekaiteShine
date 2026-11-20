@@ -15,6 +15,10 @@ allowBuilds:
   lefthook: false
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
+# 2026-11-17利用者承認。公式oxc-project/tsrsのrelease provenanceを確認。
+# npm名の移管を伴うtsrsのこの固定版だけを例外にする。
+trustPolicyExclude:
+  - 'tsrs@0.25.0-ts7.1.0-beta'
 trustLockfile: false
 
 # ローカル連携検証: Babelの旧semverを、provenanceのある版へ置換する。

@@ -1,10 +1,11 @@
+import { readMeasurement } from '../src/schema.ts';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { readCaptures } from '../src/capture.ts';
 import { instrumentSource } from '../src/instrument.ts';
 
@@ -53,7 +54,7 @@ test.each([0, 1])('Node子プロセスの終了コード%dでも収集の完了�
     expect(child.status).toBe(exitCode);
     const files = readdirSync(directory).filter((name) => name.endsWith('.json'));
     expect(files).toHaveLength(1);
-    const record = JSON.parse(readFileSync(join(directory, files[0]), 'utf8'));
+    const record = readMeasurement(readFileSync(join(directory, files[0]), 'utf8'));
     expect(record).toMatchObject({ status: 'complete', suite: 'node', runId: 'node-run' });
     expect(record.files[0].coverage.statementMap).toEqual(result.coverage.statementMap);
     expect(record.files[0].coverage.f['0']).toBe(1);
@@ -108,11 +109,20 @@ test('SIGKILLされたNode子プロセスも同期journalから実行回数を�
       },
     );
     await new Promise<void>((resolve, reject) => {
-      childState.child!.stdout!.once('data', () => resolve());
-      childState.child!.once('error', reject);
-      childState.child!.once('exit', () => reject(new Error('準備前に終了しました')));
+      (
+        (childState.child ?? assert.fail('必須のテスト値がありません。')).stdout ??
+        assert.fail('必須のテスト値がありません。')
+      ).once('data', () => {
+        resolve();
+      });
+      (childState.child ?? assert.fail('必須のテスト値がありません。')).once('error', reject);
+      (childState.child ?? assert.fail('必須のテスト値がありません。')).once('exit', () => {
+        reject(new Error('準備前に終了しました'));
+      });
     });
-    const closed = new Promise((resolve) => childState.child!.once('close', resolve));
+    const closed = new Promise((resolve) => {
+      (childState.child ?? assert.fail('必須のテスト値がありません。')).once('close', resolve);
+    });
     childState.child.kill('SIGKILL');
     await closed;
     const records = readCaptures(directory);

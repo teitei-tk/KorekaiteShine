@@ -3,7 +3,7 @@ import type { Api as GitHubApi } from './github.ts';
 import { readStatusReports } from './status-report.ts';
 import type { StatusReason } from './status-report.ts';
 
-export interface ReviewRun {
+export type ReviewRun = {
   id: number;
   run_attempt: number;
   event: string;
@@ -13,14 +13,14 @@ export interface ReviewRun {
   conclusion: string | null;
   repository: { id: number };
   head_repository: { id: number };
-}
-interface Outcome {
+};
+type Outcome = {
   conclusion: 'success' | 'failure' | 'neutral' | 'cancelled' | 'timed_out';
   target: string;
   reason: StatusReason;
   diagnostic?: Diagnostic;
   commentId?: number;
-}
+};
 export async function completedOutcome(
   api: GitHubApi,
   run: ReviewRun,

@@ -12,7 +12,9 @@ const scenarioLabels: Record<Scenario, string> = {
 
 export function DiagnosticPage() {
   const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   const [scenario, setScenario] = useState<Scenario>('success');
   const [accepted, setAccepted] = useState<components['schemas']['CheckAccepted'] | null>(null);
   const [result, setResult] = useState<CheckStatus | null>(null);
@@ -22,7 +24,8 @@ export function DiagnosticPage() {
   // 再描画前の連続操作も同時実行させない。
   const inFlight = useRef(false);
 
-  async function submit(newRun: boolean) {
+  const previousRun = run.current;
+  async function submit(newRun: boolean, selectRun: () => ReturnType<typeof createDiagnosticRun>) {
     if (!ready || inFlight.current) {
       return;
     }
@@ -30,19 +33,19 @@ export function DiagnosticPage() {
     setBusy(true);
     setError('');
     try {
+      const current = selectRun();
+      run.current = current;
       if (newRun) {
-        run.current = createDiagnosticRun(scenario, { baseUrl: window.location.origin });
         setAccepted(null);
         setResult(null);
       }
-      // 新規作成の失敗はcatchへ進み、再送ボタンはrunがある場合だけ有効になる。
-      setAccepted(await run.current!.start());
-    } catch (cause) {
-      if (cause instanceof DiagnosticValidationError && cause.code === 'VALIDATION_ERROR') {
-        const locations = cause.details.map(
+      setAccepted(await current.start());
+    } catch (error_) {
+      if (error_ instanceof DiagnosticValidationError && error_.code === 'VALIDATION_ERROR') {
+        const locations = error_.details.map(
           (detail) => `${detail.location}${detail.path}: ${detail.code}`,
         );
-        setError(`入力エラー：${locations.join('、')}（要求ID：${cause.requestId}）`);
+        setError(`入力エラー：${locations.join('、')}（要求ID：${error_.requestId}）`);
       } else {
         setError('受付結果を確認できません。同じ実行を再送して確認してください。');
       }
@@ -61,7 +64,7 @@ export function DiagnosticPage() {
     setError('');
     setResult(null);
     try {
-      setResult(await getDiagnosticStatus(accepted.jobId, { baseUrl: window.location.origin }));
+      setResult(await getDiagnosticStatus(accepted.jobId, { baseUrl: globalThis.location.origin }));
     } catch {
       setError('状態を取得できませんでした。通信または応答形式を確認し、再取得してください。');
     } finally {
@@ -88,7 +91,7 @@ export function DiagnosticPage() {
         value={scenario}
         disabled={!ready || busy}
         onChange={(event) => {
-          const value = event.target.value;
+          const { value } = event.target;
           if (
             value === 'success' ||
             value === 'retry_then_success' ||
@@ -103,13 +106,21 @@ export function DiagnosticPage() {
         <option value="exhaust_retries">{scenarioLabels.exhaust_retries}</option>
       </select>
       <p>
-        <button type="button" disabled={!ready || busy} onClick={() => void submit(true)}>
+        <button
+          type="button"
+          disabled={!ready || busy}
+          onClick={() =>
+            void submit(true, () =>
+              createDiagnosticRun(scenario, { baseUrl: globalThis.location.origin }),
+            )
+          }
+        >
           新しい実行を開始
         </button>{' '}
         <button
           type="button"
           disabled={!ready || busy || !run.current || accepted !== null}
-          onClick={() => void submit(false)}
+          onClick={previousRun ? () => void submit(false, () => previousRun) : undefined}
         >
           同じ実行を再送
         </button>{' '}
@@ -118,7 +129,7 @@ export function DiagnosticPage() {
         </button>
       </p>
       <p>再送は元のシナリオと冪等キーを使います。新しい実行は別のジョブを作成します。</p>
-      {busy && <p role="status">通信中…</p>}
+      {busy && <output style={{ display: 'block', marginBlock: '1em' }}>通信中…</output>}
       {error && <p role="alert">{error}</p>}
       {accepted && (
         <section aria-label="受付結果">
@@ -148,7 +159,9 @@ export function DiagnosticResult({ result }: { result: CheckStatus }) {
   return (
     <section aria-label="診断結果">
       <h2>診断結果</h2>
-      <p role="status">{statusLabels[result.status]}</p>
+      <output style={{ display: 'block', marginBlock: '1em' }}>
+        {statusLabels[result.status]}
+      </output>
       <dl>
         <dt>ジョブID</dt>
         <dd>{result.jobId}</dd>

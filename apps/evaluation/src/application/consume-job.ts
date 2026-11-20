@@ -18,23 +18,27 @@ import {
   completeExecution,
   failExecution,
   renewExecution,
-  type JobPurpose,
 } from '../server/repositories/job-execution';
+import type { JobPurpose } from '../server/repositories/job-execution';
 
 export type DeliveryDecision = { action: 'ack' } | { action: 'retry'; delaySeconds: 30 };
-export interface DeliveryContext {
+export type DeliveryContext = {
   queueName: string;
   messageId: string;
   expectedPurpose: JobPurpose;
   kind: 'normal' | 'dlq';
-}
-export interface EvaluationDependencies {
+};
+export type EvaluationDependencies = {
   effects?: JobTransactionEffects;
   db: ReturnType<typeof createPrimaryDb>;
-  now(): number;
-  newId(): string;
-  evaluate(jobId: string, attemptNumber: number, signal: AbortSignal): Promise<EvaluationResult>;
-}
+  now: () => number;
+  newId: () => string;
+  evaluate: (
+    jobId: string,
+    attemptNumber: number,
+    signal: AbortSignal,
+  ) => Promise<EvaluationResult>;
+};
 export async function consumeJob(
   notification: JobNotification,
   context: DeliveryContext,

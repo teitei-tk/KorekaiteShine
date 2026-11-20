@@ -1,3 +1,4 @@
+import { parseObject, objectAt, objectArray } from './schema-input.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
@@ -5,10 +6,10 @@ import standaloneCode from 'ajv/dist/standalone/index.js';
 import { _ } from 'ajv/dist/compile/codegen/index.js';
 
 const directory = new URL('../generated/http/', import.meta.url);
-const document = JSON.parse(await readFile(new URL('openapi.json', directory), 'utf8'));
+const document = parseObject(await readFile(new URL('openapi.json', directory), 'utf8'));
 const operations = {
-  startCheckJob: document.paths['/api/diagnostics/check-jobs'].post,
-  getCheckJob: document.paths['/api/diagnostics/check-jobs/{jobId}'].get,
+  startCheckJob: objectAt(document, 'paths', '/api/diagnostics/check-jobs', 'post'),
+  getCheckJob: objectAt(document, 'paths', '/api/diagnostics/check-jobs/{jobId}', 'get'),
 };
 const ajv = new Ajv2020({
   strict: false,
@@ -18,16 +19,16 @@ const ajv = new Ajv2020({
   code: { source: true, esm: true, formats: _`formats.fullFormats` },
 });
 addFormats(ajv);
-const exports: Record<string, string> = {};
+const validatorExports: Record<string, string> = {};
 const declarations: string[] = [];
 function add(name: string, schema: object, type: string): void {
-  ajv.addSchema({ $id: name, components: document.components, ...schema });
-  exports[name] = name;
+  ajv.addSchema({ $id: name, components: objectAt(document, 'components'), ...schema });
+  validatorExports[name] = name;
   declarations.push(`export const ${name}: ValidateFunction<${type}>;`);
 }
 add(
   'validateCheckStart',
-  operations.startCheckJob.requestBody.content['application/json'].schema,
+  objectAt(operations.startCheckJob, 'requestBody', 'content', 'application/json', 'schema'),
   "operations['startCheckJob']['requestBody']['content']['application/json']",
 );
 for (const [name, operationId, status] of [
@@ -42,7 +43,14 @@ for (const [name, operationId, status] of [
 ] as const) {
   add(
     name,
-    operations[operationId].responses[status].content['application/json'].schema,
+    objectAt(
+      operations[operationId],
+      'responses',
+      String(status),
+      'content',
+      'application/json',
+      'schema',
+    ),
     `operations['${operationId}']['responses'][${status}]['content']['application/json']`,
   );
 }
@@ -50,22 +58,21 @@ for (const [name, operationId, location, parameter] of [
   ['validateCheckIdempotencyKey', 'startCheckJob', 'header', 'Idempotency-Key'],
   ['validateCheckJobId', 'getCheckJob', 'path', 'jobId'],
 ] as const) {
-  const entry = operations[operationId].parameters.find(
-    (candidate: { in: string; name: string }) =>
-      candidate.in === location && candidate.name === parameter,
+  const entry = objectArray(operations[operationId].parameters).find(
+    (candidate) => candidate.in === location && candidate.name === parameter,
   );
   if (!entry) {
     throw new Error(`契約に${parameter}がありません。`);
   }
   add(
     name,
-    entry.schema,
+    objectAt(entry.schema),
     `operations['${operationId}']['parameters']['${location}']['${parameter}']`,
   );
 }
 await writeFile(
   new URL('diagnostics-validators.mjs', directory),
-  `import formats from 'ajv-formats/dist/formats.js';\n${standaloneCode(ajv, exports)}`,
+  `import formats from 'ajv-formats/dist/formats.js';\n${standaloneCode(ajv, validatorExports)}`,
 );
 await writeFile(
   new URL('diagnostics-validators.d.mts', directory),

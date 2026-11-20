@@ -18,15 +18,15 @@ async function linkDirectory(source: string, target: string): Promise<void> {
       throw error;
     }
     if ((await readlink(target)) !== source) {
-      throw new Error('DB管理用の参照先が一致しません。');
+      throw new Error('DB管理用の参照先が一致しません。', { cause: error });
     }
   }
 }
 
-interface DatabaseOptions {
+type DatabaseOptions = {
   schemaDirectory?: string;
   signal?: AbortSignal;
-}
+};
 
 async function executeDatabaseCommand(
   config: RuntimeConfig,
@@ -37,13 +37,7 @@ async function executeDatabaseCommand(
   if (config.environment === 'production' || !config.stateDirectory) {
     throw new Error('ローカルDBだけを操作できます。');
   }
-  if (
-    !(
-      (args.length === 1 &&
-        (args[0] === 'generate' || args[0] === 'migrate' || args[0] === 'reset-seed')) ||
-      (args.length === 2 && args[0] === 'execute' && !args[1].startsWith('--'))
-    )
-  ) {
+  if (!validDatabaseCommand(args)) {
     throw new Error('未対応のDB操作です。');
   }
   if (options.schemaDirectory) {
@@ -132,4 +126,15 @@ export async function runDatabaseCommand(
   } finally {
     release();
   }
+}
+
+function validDatabaseCommand(value: readonly unknown[]): value is DatabaseCommand {
+  return (
+    (value.length === 1 &&
+      (value[0] === 'generate' || value[0] === 'migrate' || value[0] === 'reset-seed')) ||
+    (value.length === 2 &&
+      value[0] === 'execute' &&
+      typeof value[1] === 'string' &&
+      !value[1].startsWith('--'))
+  );
 }

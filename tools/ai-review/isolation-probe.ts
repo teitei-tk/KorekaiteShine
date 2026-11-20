@@ -1,3 +1,4 @@
+import { parseJson, isJsonObject } from './json.ts';
 // Linux受け入れ検査専用。本番のモデル起動・資格情報除去には使用しない。
 import { openSync, closeSync, writeFileSync, unlinkSync, readlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,8 +33,8 @@ export function parentAccessIsolated(
   return (
     ['EACCES', 'EPERM', 'EROFS'].includes(observation) ||
     (observation === 'ENOENT' &&
-      /^pid:\[\d+\]$/.test(parentNamespace ?? '') &&
-      /^pid:\[\d+\]$/.test(currentNamespace ?? '') &&
+      /^pid:\[\d+\]$/u.test(parentNamespace ?? '') &&
+      /^pid:\[\d+\]$/u.test(currentNamespace ?? '') &&
       parentNamespace !== currentNamespace)
   );
 }
@@ -53,7 +54,7 @@ function denied(action: () => void): boolean {
 }
 
 async function networkDenied(port: number): Promise<boolean> {
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
     return false;
   }
   return new Promise((resolve) => {
@@ -62,12 +63,16 @@ async function networkDenied(port: number): Promise<boolean> {
       socket.destroy();
       resolve(passed);
     };
-    socket.once('connect', () => finish(false));
-    socket.once('error', (error: NodeJS.ErrnoException) =>
-      finish(['EACCES', 'EPERM', 'ENETUNREACH', 'ECONNREFUSED'].includes(error.code ?? '')),
-    );
+    socket.once('connect', () => {
+      finish(false);
+    });
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      finish(['EACCES', 'EPERM', 'ENETUNREACH', 'ECONNREFUSED'].includes(error.code ?? ''));
+    });
     // タイムアウトだけでは拒否の証拠にしない。外側の検査器がlistenerの稼働を確認する。
-    socket.setTimeout(2000, () => finish(false));
+    socket.setTimeout(2000, () => {
+      finish(false);
+    });
   });
 }
 
@@ -78,12 +83,16 @@ async function socketDenied(path: string): Promise<boolean> {
       socket.destroy();
       resolve(passed);
     };
-    socket.once('connect', () => finish(false));
+    socket.once('connect', () => {
+      finish(false);
+    });
     // 消滅・listener停止・タイムアウトをアクセス拒否と混同しない。
-    socket.once('error', (error: NodeJS.ErrnoException) =>
-      finish(['EACCES', 'EPERM'].includes(error.code ?? '')),
-    );
-    socket.setTimeout(2000, () => finish(false));
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      finish(['EACCES', 'EPERM'].includes(error.code ?? ''));
+    });
+    socket.setTimeout(2000, () => {
+      finish(false);
+    });
   });
 }
 
@@ -91,7 +100,7 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   const pidNamespaceState = { pidNamespace: undefined as string | undefined };
   try {
     const value = readlinkSync('/proc/self/ns/pid');
-    if (/^pid:\[\d+\]$/.test(value)) {
+    if (/^pid:\[\d+\]$/u.test(value)) {
       pidNamespaceState.pidNamespace = value;
     }
   } catch {
@@ -120,7 +129,9 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   for (const [index, file] of input.protectedFiles.entries()) {
     checks.push({
       name: `protected-file-${index}`,
-      passed: denied(() => closeSync(openSync(file, 'r'))),
+      passed: denied(() => {
+        closeSync(openSync(file, 'r'));
+      }),
     });
   }
   for (const [index, directory] of input.readOnlyDirectories.entries()) {
@@ -136,7 +147,9 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   for (const [index, file] of (input.readOnlyFiles ?? []).entries()) {
     checks.push({
       name: `read-only-file-${index}`,
-      passed: denied(() => closeSync(openSync(file, 'r+'))),
+      passed: denied(() => {
+        closeSync(openSync(file, 'r+'));
+      }),
     });
   }
   const processes = [
@@ -175,8 +188,10 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
     checks.push({ name: `protected-socket-${index}`, passed: await socketDenied(path) });
   }
   const sudo = spawnSync('/usr/bin/sudo', ['-n', 'true'], { stdio: 'ignore', timeout: 2000 });
-  checks.push({ name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 });
-  checks.push({ name: 'network', passed: await networkDenied(input.port) });
+  checks.push(
+    { name: 'sudo', passed: !sudo.error && sudo.status !== null && sudo.status !== 0 },
+    { name: 'network', passed: await networkDenied(input.port) },
+  );
   return {
     passed: checks.every((check) => check.passed),
     checks,
@@ -184,19 +199,44 @@ export async function probeIsolation(input: IsolationInput): Promise<IsolationRe
   };
 }
 
-export function requireIsolationReport(text: string, names: string[]): void {
-  const report: Partial<IsolationReport> & { stage?: string } = JSON.parse(text);
+export function parseIsolationObservation(
+  text: string,
+): Omit<IsolationReport, 'passed'> & { passed?: boolean; stage?: string } {
+  const value = parseJson(text);
   if (
-    !report ||
+    !isJsonObject(value) ||
+    !Array.isArray(value.checks) ||
+    !value.checks.every(
+      (check): check is IsolationReport['checks'][number] =>
+        isJsonObject(check) &&
+        typeof check.name === 'string' &&
+        typeof check.passed === 'boolean' &&
+        (check.observation === undefined || typeof check.observation === 'string'),
+    ) ||
+    (value.passed !== undefined && typeof value.passed !== 'boolean') ||
+    (value.pidNamespace !== undefined && typeof value.pidNamespace !== 'string') ||
+    (value.stage !== undefined && typeof value.stage !== 'string')
+  ) {
+    throw new Error('missing or failed isolation checks');
+  }
+  return {
+    checks: value.checks,
+    ...(value.passed === undefined ? {} : { passed: value.passed }),
+    ...(value.pidNamespace === undefined ? {} : { pidNamespace: value.pidNamespace }),
+    ...(value.stage === undefined ? {} : { stage: value.stage }),
+  };
+}
+
+export function requireIsolationReport(text: string, names: string[]): void {
+  const report = parseIsolationObservation(text);
+  if (
     report.stage !== 'sandbox' ||
     report.passed !== true ||
     !Array.isArray(report.checks) ||
     report.checks.length !== names.length ||
-    report.checks.some(
-      (check) => !check || typeof check.name !== 'string' || check.passed !== true,
-    ) ||
+    report.checks.some((check) => !check.passed) ||
     new Set(report.checks.map((check) => check.name)).size !== names.length ||
-    names.some((name) => !report.checks?.some((check) => check.name === name))
+    names.some((name) => !report.checks.some((check) => check.name === name))
   ) {
     throw new Error('missing or failed isolation checks');
   }

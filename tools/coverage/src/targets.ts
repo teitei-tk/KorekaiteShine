@@ -13,15 +13,15 @@ const directoryReasons = new Map([
   ['testing', 'テスト専用コード'],
 ]);
 
-export interface TargetEntry {
+export type TargetEntry = {
   path: string;
   included: boolean;
   reason: string;
-}
+};
 
 function exclusionReason(path: string): string | undefined {
   const parts = path.split('/');
-  const name = parts.at(-1)!;
+  const name = path.slice(path.lastIndexOf('/') + 1);
   if (!/\.[cm]?[jt]sx?$/u.test(name)) {
     return '対象言語外';
   } else if (/\.d\.[cm]?ts$/u.test(name)) {
@@ -29,25 +29,21 @@ function exclusionReason(path: string): string | undefined {
   } else if (/\.gen\.[cm]?[jt]sx?$/u.test(name)) {
     return '生成物';
   } else if (
-    /\.(test|spec)\.[cm]?[jt]sx?$/u.test(name) ||
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(name) ||
     /^vitest(?:\..+)?\.config\.[cm]?[jt]s$/u.test(name)
   ) {
     return 'テスト専用コード';
-  } else {
-    const excludedPart = parts.find(
-      (part, index) =>
-        directoryReasons.has(part) ||
-        (part === 'coverage' && !(index === 1 && parts[0] === 'tools')),
-    );
-    return excludedPart === 'coverage'
-      ? '作業用ファイル'
-      : directoryReasons.get(excludedPart ?? '');
   }
+  const excludedPart = parts.find(
+    (part, index) =>
+      directoryReasons.has(part) || (part === 'coverage' && !(index === 1 && parts[0] === 'tools')),
+  );
+  return excludedPart === 'coverage' ? '作業用ファイル' : directoryReasons.get(excludedPart ?? '');
 }
 
 /** 対象外も理由付きで保存し、対象集合をレビュー可能にする。 */
 export function describeTargets(paths: readonly string[]): TargetEntry[] {
-  return [...new Set(paths)].sort().map((path) => {
+  return [...new Set(paths)].toSorted().map((path) => {
     const reason = exclusionReason(path);
     return {
       path,

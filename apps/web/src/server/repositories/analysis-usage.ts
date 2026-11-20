@@ -22,10 +22,12 @@ export async function reserveAnalysis(
     ) < ${usageLimits.analysesPerDay}
     ON CONFLICT DO NOTHING
   `);
-  const [saved] = await db
-    .select()
-    .from(usageReservations)
-    .where(eq(usageReservations.reservationId, input.reservationId));
+  const saved = (
+    await db
+      .select()
+      .from(usageReservations)
+      .where(eq(usageReservations.reservationId, input.reservationId))
+  ).at(0);
   return Boolean(
     saved &&
     saved.actorId === input.actorId &&

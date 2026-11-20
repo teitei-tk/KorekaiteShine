@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite';
 import { jobs } from '@korekaite/database';
 import { acceptCheck } from '../src/diagnostics/accept';
@@ -36,7 +37,8 @@ test('診断受付の冪等性・本人確認・入力不備とDB障害をHTTP�
     expect((await post('unknown')).status).toBe(400);
     const accepted = await post('success');
     expect(accepted.status).toBe(202);
-    const original = await accepted.json();
+    const original = parseObject(await accepted.text());
+    assert.ok(typeof original.jobId === 'string');
     expect(await (await post('success')).json()).toEqual(original);
     expect((await post('exhaust_retries')).status).toBe(409);
     expect((await post('exhaust_retries', crypto.randomUUID())).status).toBe(202);

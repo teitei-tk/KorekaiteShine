@@ -1,14 +1,19 @@
+import { measuredTests, measureSyncOperation } from './helpers/runtime-timing.ts';
+import { parseJson } from '@korekaite/api-contracts/json';
+import { parseObject, stringValue } from './helpers/config-json.ts';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, realpath, rm, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { expect, test } from 'vitest';
+import { assert, expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, buildRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, buildRuntime, runDatabaseCommand } from './helpers/measured-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('topology');
 
 test('Webから別WorkerのDOを呼び、DOの保存値を読み戻せる', async () => {
   const config = resolveRuntime({
@@ -110,7 +115,7 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
       if (result.status !== 'fulfilled') {
         throw new Error('起動に失敗しました。');
       }
-      await runDatabaseCommand(configs[index]!, [
+      await runDatabaseCommand(configs[index] ?? assert.fail('必須のテスト値がありません。'), [
         'execute',
         `INSERT INTO connection_checks (writer, value) VALUES ('isolated', '${index}')`,
       ]);
@@ -118,22 +123,35 @@ test('開発とテストを同時起動してもD1とViteキャッシュを共�
       expect(response.status).toBe(200);
       expect(await response.json()).toContainEqual({ writer: 'isolated', value: String(index) });
       expect(
-        (await stat(join(configs[index]!.artifactDirectory, 'vite-cache'))).isDirectory(),
+        (
+          await stat(
+            join(
+              (configs[index] ?? assert.fail('必須のテスト値がありません。')).artifactDirectory,
+              'vite-cache',
+            ),
+          )
+        ).isDirectory(),
       ).toBe(true);
       for (const project of ['web', 'database']) {
-        const projectRoot = join(configs[index]!.artifactDirectory, project);
-        const metadata = JSON.parse(
+        const projectRoot = join(
+          (configs[index] ?? assert.fail('必須のテスト値がありません。')).artifactDirectory,
+          project,
+        );
+        const metadata = parseObject(
           await readFile(join(projectRoot, '.void/local-d1.json'), 'utf8'),
         );
-        expect(await realpath(metadata.projectRoot)).toBe(await realpath(projectRoot));
-        expect(await realpath(metadata.persistRoot)).toBe(
-          await realpath(configs[index]!.stateDirectory!),
+        expect(await realpath(stringValue(metadata.projectRoot))).toBe(await realpath(projectRoot));
+        expect(await realpath(stringValue(metadata.persistRoot))).toBe(
+          await realpath(
+            (configs[index] ?? assert.fail('必須のテスト値がありません。')).stateDirectory ??
+              assert.fail('必須のテスト値がありません。'),
+          ),
         );
       }
     }
   } finally {
     await Promise.all(
-      started.map((result) => (result.status === 'fulfilled' ? result.value.stop() : undefined)),
+      started.flatMap((result) => (result.status === 'fulfilled' ? [result.value.stop()] : [])),
     );
   }
 
@@ -246,16 +264,18 @@ test('明示したreset-seedだけが既存データを消して固定データ�
       "INSERT INTO connection_checks (writer, value) VALUES ('temporary', 'remove-me')",
     ]);
     const before = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
-    const beforeRows = await before.json();
+    const beforeRows = parseJson(await before.text());
     expect(beforeRows).toContainEqual({ writer: 'temporary', value: 'remove-me' });
     expect(beforeRows).not.toContainEqual({ writer: 'fixture', value: 'local-only' });
     await runtimeContext.runtime.stop();
-    const seeded = spawnSync('pnpm', ['db:reset-seed'], {
-      cwd: repositoryRoot,
-      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
-      encoding: 'utf8',
-      timeout: 30_000,
-    });
+    const seeded = measureSyncOperation('database', () =>
+      spawnSync('pnpm', ['db:reset-seed'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+        encoding: 'utf8',
+        timeout: 30_000,
+      }),
+    );
     expect(seeded.status, seeded.stderr).toBe(0);
     runtimeContext.runtime = await startRuntime(config);
     const after = await fetch(`${runtimeContext.runtime.baseUrl}/api/database-topology`);
@@ -283,12 +303,14 @@ test('起動中の環境では別プロセスのreset-seedを拒否しデータ�
       'execute',
       "INSERT INTO connection_checks (writer, value) VALUES ('active', 'retained')",
     ]);
-    const attempted = spawnSync('pnpm', ['db:reset-seed'], {
-      cwd: repositoryRoot,
-      env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
-      encoding: 'utf8',
-      timeout: 30_000,
-    });
+    const attempted = measureSyncOperation('database', () =>
+      spawnSync('pnpm', ['db:reset-seed'], {
+        cwd: repositoryRoot,
+        env: { ...process.env, APP_ENV: 'test', LOCAL_TEST_RUN_ID: runId, LOCAL_TEST_SLOT: '0' },
+        encoding: 'utf8',
+        timeout: 30_000,
+      }),
+    );
     expect(attempted.status).toBe(1);
     expect(attempted.stderr).toContain('環境は使用中です');
     const response = await fetch(`${runtime.baseUrl}/api/database-topology`);

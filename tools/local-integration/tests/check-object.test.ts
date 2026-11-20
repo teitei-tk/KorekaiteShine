@@ -1,12 +1,22 @@
+import { measuredTests } from './helpers/runtime-timing.ts';
+import type { JsonValue } from '@korekaite/api-contracts/json';
+import {
+  readJson,
+  readInitializationObject,
+  readCheckAccepted,
+  readCheckStatus,
+} from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
-import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
+import { startRuntime, runDatabaseCommand } from './helpers/built-runtime.ts';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+const test = measuredTests('check-object');
 
 test('Webの非同期初期化が失敗しても受付を保持し、scheduledで回復する', async () => {
   const config = resolveRuntime({
@@ -29,7 +39,7 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     // 同じDOへ再度RPCし、障害中に初期化が完了できないことも確認する。
     const initialized = await fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
@@ -53,7 +63,7 @@ test('Webの非同期初期化が失敗しても受付を保持し、scheduled�
       `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
     );
     expect(status.status).toBe(200);
-    expect((await status.json()).checks.doPersistence).toBe('passed');
+    expect((await readCheckStatus(status)).checks.doPersistence).toBe('passed');
   } finally {
     await runtimeContext.runtime.stop();
   }
@@ -80,7 +90,7 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const initialize = () =>
       fetch(`${runtime.baseUrl}/api/check-object-test`, {
         method: 'POST',
@@ -89,14 +99,14 @@ test('同じ診断ジョブでDOを二回初期化しても初回保存日時を
       });
     const first = await initialize();
     expect(first.status).toBe(200);
-    const saved = await first.json();
+    const saved = await readJson(first);
     expect(saved).toEqual({
       jobId: accepted.jobId,
       firstReceivedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u),
     });
     const repeated = await initialize();
     expect(repeated.status).toBe(200);
-    expect(await repeated.json()).toEqual(saved);
+    expect(await readJson(repeated)).toEqual(saved);
   } finally {
     await runtime.stop();
   }
@@ -123,19 +133,19 @@ test('DO保存確認と通知outboxを一体保存し、再初期化でも各1�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
-    for (const _ of Array(2).keys()) {
+    const accepted = await readCheckAccepted(response);
+    for (const _ of Array.from({ length: 2 }).keys()) {
       const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: accepted.jobId }),
       });
       expect(initialized.status).toBe(200);
-      const stored = await initialized.json();
+      const stored = await readInitializationObject(initialized);
       const firstReceivedAt = Temporal.Instant.from(stored.firstReceivedAt).epochMilliseconds;
       expect(Number.isFinite(firstReceivedAt)).toBe(true);
       const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
-      expect((await status.json()).checks.doPersistence).toBe('passed');
+      expect((await readCheckStatus(status)).checks.doPersistence).toBe('passed');
       await runDatabaseCommand(config, [
         'execute',
         `
@@ -173,7 +183,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const initialize = () =>
       fetch(`${runtimeContext.runtime.baseUrl}/api/check-object-test`, {
         method: 'POST',
@@ -205,7 +215,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     });
     const recovered = await initialize();
     expect(recovered.status).toBe(200);
-    const saved = await recovered.json();
+    const saved = await readInitializationObject(recovered);
     expect(saved.jobId).toBe(accepted.jobId);
     expect(Temporal.Instant.from(saved.firstReceivedAt).epochMilliseconds).toBeLessThanOrEqual(
       failureObservedAt,
@@ -216,7 +226,7 @@ test('DO保存後にD1の通知記録が失敗しても、再起動後に初回�
     const status = await fetch(
       `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
     );
-    expect((await status.json()).checks.doPersistence).toBe('passed');
+    expect((await readCheckStatus(status)).checks.doPersistence).toBe('passed');
     await runDatabaseCommand(config, [
       'execute',
       `CREATE TEMP TABLE recovered_once (count INTEGER CHECK (count = 1)); INSERT INTO recovered_once SELECT COUNT(*) FROM job_outbox WHERE operation = 'notify';`,
@@ -247,25 +257,27 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     const initialized = await fetch(`${runtime.baseUrl}/api/check-object-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: accepted.jobId }),
     });
     expect(initialized.status).toBe(200);
-    const receiptState = { receipt: null };
-    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    const receiptState: { receipt: JsonValue } = { receipt: null };
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
-      receiptState.receipt = await observed.json();
+      receiptState.receipt = await readJson(observed);
       if (receiptState.receipt !== null) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100);
+      });
     }
     expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
@@ -277,7 +289,7 @@ test('DOから送った2項目の通知が診断Queueを経由してEvaluation�
     ]);
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
     // ここでは配送先の確認だけ。評価処理の完了を偽装しない。
-    expect((await status.json()).checks.consumerCompletion).toBe('pending');
+    expect((await readCheckStatus(status)).checks.consumerCompletion).toBe('pending');
   } finally {
     await runtime.stop();
   }
@@ -301,26 +313,28 @@ test('Webの受付だけでDO初期化と診断Queue配送を非同期に開始�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
-    const receiptState = { receipt: null };
-    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    const accepted = await readCheckAccepted(response);
+    const receiptState: { receipt: JsonValue } = { receipt: null };
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
       const observed = await fetch(
         `${runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
       );
       expect(observed.status).toBe(200);
-      receiptState.receipt = await observed.json();
+      receiptState.receipt = await readJson(observed);
       if (receiptState.receipt !== null) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100);
+      });
     }
     expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
       message: { schemaVersion: 1, jobId: accepted.jobId },
     });
     const status = await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`);
-    expect((await status.json()).checks.doPersistence).toBe('passed');
+    expect((await readCheckStatus(status)).checks.doPersistence).toBe('passed');
   } finally {
     await runtime.stop();
   }
@@ -348,22 +362,24 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     await runtimeContext.runtime.stop();
     runtimeContext.runtime = await startRuntime(config, 'dev', { probeOnlyEvaluation: true });
     await runtimeContext.runtime.runScheduled();
-    const receiptState = { receipt: null };
-    const deadline = Temporal.Now.instant().epochMilliseconds + 5_000;
+    const receiptState: { receipt: JsonValue } = { receipt: null };
+    const deadline = Temporal.Now.instant().epochMilliseconds + 5000;
     while (Temporal.Now.instant().epochMilliseconds < deadline) {
-      receiptState.receipt = await (
+      receiptState.receipt = await readJson(
         await fetch(
           `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
-        )
-      ).json();
+        ),
+      );
       if (receiptState.receipt !== null) {
         break;
       }
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 100);
+      });
     }
     expect(receiptState.receipt).toEqual({
       queue: config.queues.diagnostics?.queue,
@@ -373,7 +389,7 @@ test('受付直後に停止してもEvaluationのscheduledイベントが初期�
     const status = await fetch(
       `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
     );
-    expect((await status.json()).checks.doPersistence).toBe('passed');
+    expect((await readCheckStatus(status)).checks.doPersistence).toBe('passed');
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -431,7 +447,7 @@ test('Queue送信後に送信済み記録が失敗しても、再起動後に同
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     await runDatabaseCommand(config, [
       'execute',
       "CREATE TRIGGER reject_sent BEFORE UPDATE OF sent_at ON job_outbox WHEN OLD.operation = 'notify' BEGIN SELECT RAISE(FAIL, 'simulated_sent_failure'); END;",
@@ -493,7 +509,7 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       body: '{"scenario":"success"}',
     });
     expect(response.status).toBe(202);
-    const accepted = await response.json();
+    const accepted = await readCheckAccepted(response);
     await runDatabaseCommand(config, [
       'execute',
       `CREATE TRIGGER defer_notification AFTER INSERT ON job_outbox WHEN NEW.operation = 'notify' BEGIN UPDATE job_outbox SET scheduled_at = ${Temporal.Now.instant().epochMilliseconds + 172_800_000} WHERE id = NEW.id; END;`,
@@ -504,7 +520,7 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       body: JSON.stringify({ jobId: accepted.jobId }),
     });
     expect(initialized.status).toBe(200);
-    const saved = await initialized.json();
+    const saved = await readInitializationObject(initialized);
     await runtimeContext.runtime.runScheduled();
     await runDatabaseCommand(config, [
       'execute',
@@ -526,12 +542,12 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
     await expect
       .poll(
         async () =>
-          (
+          readJson(
             await fetch(
               `${runtimeContext.runtime.baseUrl}/api/check-object-test?jobId=${accepted.jobId}`,
-            )
-          ).json(),
-        { timeout: 5_000, interval: 100 },
+            ),
+          ),
+        { timeout: 5000, interval: 100 },
       )
       .toEqual({
         queue: config.queues.diagnostics?.queue,
@@ -543,7 +559,7 @@ test('遅延上限より先の通知は保留し、送信前の停止から期�
       body: JSON.stringify({ jobId: accepted.jobId }),
     });
     expect(repeated.status).toBe(200);
-    expect(await repeated.json()).toEqual(saved);
+    expect(await readJson(repeated)).toEqual(saved);
     await runDatabaseCommand(config, [
       'execute',
       `

@@ -41,7 +41,7 @@ export function localAiEnvironment(
   environment: string,
   mode: string,
   source: NodeJS.ProcessEnv = process.env,
-  fixture?: Record<string, string>,
+  fixture?: Partial<Record<string, string>>,
 ) {
   if (fixture) {
     if (

@@ -6,7 +6,7 @@ import type { CoverageRun } from './merge.ts';
 
 /** 起動前に必要なローダーだけを生成し、原本のマップで自己計測する。 */
 export function createNodePreload(root: string, run: CoverageRun, directory: string): string {
-  const original = new URL('./node-loader.ts', import.meta.url);
+  const original = new URL('node-loader.ts', import.meta.url);
   const path = relative(realpathSync(root), fileURLToPath(original));
   if (!run.targets.some((target) => target.path === path)) {
     return original.href;

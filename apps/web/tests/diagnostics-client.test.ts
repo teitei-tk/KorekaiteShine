@@ -1,3 +1,4 @@
+import { parseObject } from './helpers/json';
 import { expect, test, vi } from 'vitest';
 import { createDiagnosticRun, getDiagnosticStatus } from '../src/diagnostics/client';
 
@@ -40,11 +41,11 @@ test('202応答が失われても同じ冪等キーと入力で再送し、別�
   const bodies: object[] = [];
   const acceptedKeys = new Set<string>();
   const requestsState = { requests: 0 };
-  const fetcher: typeof fetch = vi.fn(async (input, init) => {
+  const fetcher: typeof fetch = vi.fn<typeof fetch>(async (input, init) => {
     const request = new Request(input, init);
     const idempotencyKey = request.headers.get('Idempotency-Key');
     keys.push(idempotencyKey);
-    bodies.push(await request.json());
+    bodies.push(parseObject(await request.text()));
     if (idempotencyKey) {
       acceptedKeys.add(idempotencyKey);
     }

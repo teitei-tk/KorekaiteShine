@@ -44,8 +44,8 @@ export async function createInterviewRequest(
   request: Request,
   deps: {
     db: ReturnType<typeof createPrimaryDb>;
-    actor(request: Request): string | null;
-    now(): number;
+    actor: (request: Request) => string | null;
+    now: () => number;
   },
 ): Promise<Response> {
   const actorId = deps.actor(request);

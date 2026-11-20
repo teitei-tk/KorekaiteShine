@@ -1,4 +1,5 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { parseJson } from '@korekaite/api-contracts/json';
+import { assert, afterEach, expect, test, vi } from 'vitest';
 import { interviews, deletedInterviews } from '@korekaite/database/interviews';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import type { createLiveConnection, LiveClosed, LiveHandlers } from '../src/server/live-connection';
@@ -6,17 +7,19 @@ import worker, { InterviewObject } from '../src/worker.local.ts';
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
-    constructor(
-      protected ctx: object,
-      protected env: object,
-    ) {}
+    protected ctx: object;
+    protected env: object;
+    constructor(ctx: object, env: object) {
+      this.ctx = ctx;
+      this.env = env;
+    }
   },
 }));
 
 afterEach(() => vi.unstubAllGlobals());
 
 class Socket extends EventTarget {
-  send = vi.fn();
+  send = vi.fn<(data: string) => void>();
   close = vi.fn();
   accept = vi.fn();
 }
@@ -65,7 +68,9 @@ function fixture(ObjectType = InterviewObject) {
     storage: {
       get: (key: string) => data.get(key),
       put: (key: string, value: { actorId: string; interviewId: string }) => data.set(key, value),
-      deleteAll: () => data.clear(),
+      deleteAll: () => {
+        data.clear();
+      },
       deleteAlarm,
       setAlarm,
     },
@@ -161,13 +166,13 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
     await f.seed();
     f.env.OPENAI_API_KEY = 'fixture';
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
-    for (const _ of Array(4).keys()) {
+    for (const _ of Array.from({ length: 4 }).keys()) {
       expect((await f.fetchObject()).status).toBe(101);
     }
     expect((await f.fetchObject()).status).toBe(503);
     expect(f.sockets[4].close).toHaveBeenCalledWith(1011);
     await f.object.alarm();
-    const socket = f.sockets[0];
+    const [socket] = f.sockets;
     socket.dispatchEvent(new MessageEvent('message', { data: {} }));
     socket.dispatchEvent(new MessageEvent('message', { data: new ArrayBuffer(1) }));
     socket.dispatchEvent(
@@ -177,18 +182,18 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
     );
     await Promise.all(f.pending.splice(0));
     expect(f.setAlarm).toHaveBeenCalled();
-    await vi.waitFor(() =>
-      expect(socket.send.mock.calls.map(([s]) => JSON.parse(s))).toContainEqual(
+    await vi.waitFor(() => {
+      expect(socket.send.mock.calls.map(([s]) => parseJson(s))).toContainEqual(
         expect.objectContaining({ code: 'AUDIO_CONNECT_FAILED' }),
-      ),
-    );
+      );
+    });
     socket.dispatchEvent(
       new MessageEvent('message', {
         data: JSON.stringify({ type: 'finish', generation: 2, commandId: 'end' }),
       }),
     );
     await Promise.all(f.pending.splice(0));
-    expect(socket.send.mock.calls.map(([s]) => JSON.parse(s))).toContainEqual(
+    expect(socket.send.mock.calls.map(([s]) => parseJson(s))).toContainEqual(
       expect.objectContaining({ status: 'ended' }),
     );
     socket.dispatchEvent(new Event('close'));
@@ -206,8 +211,10 @@ test('内部WebSocketを接続して操作と切断を配送し、削除で保�
 });
 
 test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが確認時刻を進める', async () => {
-  const stream = {} as { handlers: LiveHandlers };
-  const closed = new Promise<LiveClosed>(() => {});
+  const stream: { handlers?: LiveHandlers } = {};
+  const closed = new Promise<LiveClosed>(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   const f = fixture(
     class extends InterviewObject {
       protected override connectLive(
@@ -220,7 +227,9 @@ test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが�
           closed,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => closed,
         };
       }
@@ -235,7 +244,9 @@ test('面接中は無発話でも5秒後に稼働確認を予約し、alarmが�
       }),
     );
     await Promise.all(f.pending.splice(0));
-    await stream.handlers.onReady('stream');
+    await (stream.handlers ?? assert.fail('上流接続前にhandlerは利用できません。')).onReady(
+      'stream',
+    );
     const [active] = await f.database.db.select().from(interviews);
     expect(f.setAlarm).toHaveBeenLastCalledWith(active.updatedAt + 5000);
     const beforeMessages = f.sockets[0].send.mock.calls.length;

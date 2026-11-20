@@ -1,5 +1,8 @@
+import { readObject } from './input.ts';
+import { requireValue } from '../required.ts';
 // 実WIFの初期交換だけを検証する。認証プロトコル・更新は固定版の公式プロキシに任せる。
-import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { chmodSync, readFileSync, rmSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { authenticate } from '../wif.ts';
@@ -24,13 +27,13 @@ export function wifProxyArgs(env: NodeJS.ProcessEnv, infoPath: string): string[]
     '--server-info',
     infoPath,
     '--oidc-audience',
-    env.OPENAI_WIF_AUDIENCE!,
+    requireValue(env.OPENAI_WIF_AUDIENCE),
     '--identity-provider-id',
-    env.OPENAI_IDENTITY_PROVIDER_ID!,
+    requireValue(env.OPENAI_IDENTITY_PROVIDER_ID),
     '--service-account-id',
-    env.OPENAI_SERVICE_ACCOUNT_ID!,
+    requireValue(env.OPENAI_SERVICE_ACCOUNT_ID),
     '--github-oidc-request-url',
-    env.ACTIONS_ID_TOKEN_REQUEST_URL!,
+    requireValue(env.ACTIONS_ID_TOKEN_REQUEST_URL),
   ];
 }
 
@@ -38,7 +41,7 @@ export async function authenticateProxy(
   env: NodeJS.ProcessEnv,
   infoPath: string,
   inspect: (info: Info) => void,
-  timeoutMs = 60000,
+  timeoutMs = 60_000,
   launch: Launch = spawn,
 ): Promise<void> {
   // 過去のserver-infoを初期交換成功の証拠にしない。
@@ -52,33 +55,34 @@ export async function authenticateProxy(
   child.on('error', () => {
     failedState.failed = true;
   });
-  child.stdin!.on('error', () => {
+  requireValue(child.stdin).on('error', () => {
     failedState.failed = true;
   });
   const running = () => child.exitCode === null && child.signalCode === null && !failedState.failed;
   const infoContext = { info: undefined as Info | undefined, stopped: false };
   try {
-    child.stdin!.end(`${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}\n`);
+    requireValue(child.stdin).end(`${env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}\n`);
     const deadline = Temporal.Now.instant().epochMilliseconds + timeoutMs;
     while (running() && Temporal.Now.instant().epochMilliseconds < deadline) {
-      const candidateState = { candidate: undefined as Partial<Info> | undefined };
+      const candidateState = { candidate: undefined as ReturnType<typeof readObject> | undefined };
       try {
-        candidateState.candidate = JSON.parse(readFileSync(infoPath, 'utf8'));
+        candidateState.candidate = readObject(readFileSync(infoPath, 'utf8'));
       } catch {
         /* 作成・書込み待ち */
       }
       if (
         candidateState.candidate &&
+        typeof candidateState.candidate.port === 'number' &&
         Number.isInteger(candidateState.candidate.port) &&
-        candidateState.candidate.port! > 0 &&
-        candidateState.candidate.port! < 65536
+        requireValue(candidateState.candidate.port) > 0 &&
+        requireValue(candidateState.candidate.port) < 65_536
       ) {
         if (candidateState.candidate.pid !== child.pid) {
           throw new Error('proxy identity mismatch');
         }
         infoContext.info = {
-          pid: candidateState.candidate.pid!,
-          port: candidateState.candidate.port!,
+          pid: requireValue(child.pid),
+          port: requireValue(candidateState.candidate.port),
         };
         break;
       }
@@ -110,7 +114,11 @@ export async function authenticateProxy(
     } finally {
       if (child.exitCode === null && child.signalCode === null) {
         child.kill('SIGKILL');
-        await new Promise<void>((resolve) => child.once('close', () => resolve()));
+        await new Promise<void>((resolve) => {
+          child.once('close', () => {
+            resolve();
+          });
+        });
       }
       rmSync(infoPath, { force: true });
     }

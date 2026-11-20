@@ -47,6 +47,7 @@ test('評価枠・試行履歴・配送異常・削除記録を保存し、各�
       `INSERT INTO delivery_anomalies (queue_name, message_id, code, expected_purpose, first_detected_at, last_detected_at, status) VALUES ('check-dlq', 'message-a', 'JOB_NOT_FOUND', 'diagnostics', 1, 1, 'unresolved');`,
     ]);
   } finally {
+    /* この実装では追加の処理を行わない。 */
   }
 
   await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
@@ -90,6 +91,7 @@ test('ジョブの試行回数と履歴番号は規定範囲の整数だけを�
       "UPDATE jobs SET attempt_count = 4; INSERT INTO job_attempts (job_id, attempt_number, started_at) VALUES ('bounded-job', 1, 0), ('bounded-job', 4, 0)",
     ]);
   } finally {
+    /* この実装では追加の処理を行わない。 */
   }
 
   await rm(dirname(config.artifactDirectory), { recursive: true, force: true });
@@ -137,6 +139,7 @@ test('CHECK制約を加えるテーブル置換SQLは既存ジョブと関連行
     `,
     ]);
   } finally {
+    /* この実装では追加の処理を行わない。 */
   }
 
   await rm(dirname(config.artifactDirectory), { recursive: true, force: true });

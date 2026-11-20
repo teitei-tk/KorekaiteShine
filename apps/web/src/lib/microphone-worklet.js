@@ -10,7 +10,7 @@ class InterviewMicrophone extends AudioWorkletProcessor {
     if (mono) {
       for (const sample of mono) {
         const value = Math.max(-1, Math.min(1, sample));
-        this.frame.setInt16(this.offset, Math.round(value * (value < 0 ? 32768 : 32767)), true);
+        this.frame.setInt16(this.offset, Math.round(value * (value < 0 ? 32_768 : 32_767)), true);
         this.offset += 2;
         if (this.offset === this.frame.byteLength) {
           const bytes = this.frame.buffer;

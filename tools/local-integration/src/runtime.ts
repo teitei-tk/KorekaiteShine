@@ -1,3 +1,6 @@
+import { requestViteSnapshot, monotonicMilliseconds } from './vite-profile-host.ts';
+import { createStartupTiming } from './startup-timing.ts';
+import { requireValue } from './required.ts';
 import {
   coverageEnvironment,
   localProcessEnvironment,
@@ -9,7 +12,6 @@ import { startOwnedRuntime, connectLocalRuntime } from './runtime-owner.ts';
 import { stopProcessGroup, runNodeCommand } from './process.ts';
 import { lockEnvironment } from './lock.ts';
 import { runDatabaseCommand } from './database.ts';
-export { runDatabaseCommand } from './database.ts';
 import { spawn } from 'node:child_process';
 import { cp, mkdir, readlink, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -17,16 +19,22 @@ import { fileURLToPath } from 'node:url';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { claimArtifactDirectory } from '@korekaite/runtime-config/artifacts';
 
+export { runDatabaseCommand } from './database.ts';
+
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-export interface LocalRuntime {
+export type LocalRuntime = {
   baseUrl: string;
   closed: Promise<{ exitCode: 0 | 1 }>;
-  stop(): Promise<void>;
-  runScheduled(signal?: AbortSignal): Promise<void>;
-}
+  stop: () => Promise<void>;
+  runScheduled: (signal?: AbortSignal) => Promise<void>;
+};
 
-export interface LocalRuntimeOptions {
+export type LocalRuntimeOptions = {
+  boundaryBuild?: boolean;
+  boundaryBundle?: string;
+  profileStartup?: boolean;
+  profileVite?: boolean;
   port?: number;
   /** 面接DOの上流音声だけを独立test環境で代替する。 */
   interviewVoiceMock?: boolean;
@@ -44,29 +52,34 @@ export interface LocalRuntimeOptions {
   holdEvaluationBeforeConsume?: boolean;
   /** 保存後ack前のConsumer例外終了をtest環境で一度だけ起こす。 */
   stopAfterResultBeforeAck?: boolean;
-}
+};
 
-export class PendingRuntimeCleanup extends Error {
+class PendingRuntimeCleanupError extends Error {
   cleanup: () => Promise<void>;
   constructor(cleanup: () => Promise<void>) {
     super('起動失敗後のランタイム停止を確認できません。管理プロセスで後処理を継続します。');
+    this.name = 'PendingRuntimeCleanupError';
     this.cleanup = cleanup;
   }
 }
 
+export { PendingRuntimeCleanupError as PendingRuntimeCleanup };
+
 async function prepareRuntime(
   config: RuntimeConfig,
-  options: LocalRuntimeOptions = {},
+  options: LocalRuntimeOptions,
   signal?: AbortSignal,
   aiBindings: Record<string, string> = {},
+  timing?: ReturnType<typeof createStartupTiming>,
 ): Promise<string> {
   signal?.throwIfAborted();
   if (
-    (options.materialAnalysisMock ||
+    (options.boundaryBuild ||
+      options.materialAnalysisMock ||
       options.interviewVoiceMock ||
       options.interviewEvaluationMock ||
-      options.manualDiagnostics ||
-      options.probeOnlyEvaluation ||
+      (options.manualDiagnostics && !options.boundaryBundle) ||
+      (options.probeOnlyEvaluation && !options.boundaryBundle) ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck) &&
@@ -78,7 +91,15 @@ async function prepareRuntime(
     throw new Error('ローカル環境だけを起動できます。');
   }
   await claimArtifactDirectory(config);
+  timing?.mark('artifactMs');
   await runDatabaseCommand(config, ['migrate'], { signal });
+  timing?.mark('databaseMs');
+  if (options.boundaryBundle) {
+    const { stageBoundaryBundle } = await import('./boundary-bundle.ts');
+    const project = await stageBoundaryBundle(options.boundaryBundle, config, options);
+    timing?.mark('filesAndConfigMs');
+    return project;
+  }
   const project = join(config.artifactDirectory, 'web');
   await mkdir(project, { recursive: true });
   await rm(join(project, 'src'), { recursive: true, force: true });
@@ -97,7 +118,7 @@ async function prepareRuntime(
       throw error;
     }
     if ((await readlink(modulesTarget)) !== modulesSource) {
-      throw new Error('Web依存の参照先が一致しません。');
+      throw new Error('Web依存の参照先が一致しません。', { cause: error });
     }
   }
   const fixtures = join(repositoryRoot, 'tools/local-integration/fixtures');
@@ -138,7 +159,7 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs')({
   server: { handlers: { POST: ({ request }) => acceptCheck(request, {
     db: createPrimaryDb(env.DB), environment: ${JSON.stringify(config.environment)},
     actorId: 'local-developer', now: () => Temporal.Now.instant().epochMilliseconds, newId: () => crypto.randomUUID(),
-    scheduleInitialization: ${options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
+    scheduleInitialization: ${options.boundaryBuild ? `(env.BOUNDARY_MANUAL_DIAGNOSTICS === 'true' ? undefined : jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId })))))` : options.manualDiagnostics ? 'undefined' : `jobId => waitUntil(env.CHECK_OBJECT.getByName(env.APP_ENV + ':diagnostics:' + jobId).initializeCheck(jobId).catch(() => console.info(JSON.stringify({ event: 'diagnostic_initialization_deferred', jobId }))))`},
   }) } },
 });\n`,
   );
@@ -196,14 +217,19 @@ export const Route = createFileRoute('/api/diagnostics/check-jobs/$jobId')({
     d1_databases: [{ binding: 'DB', database_name: config.d1.name, database_id: config.d1.id }],
     compatibility_date: '2026-10-19',
     compatibility_flags: ['nodejs_compat'],
-    vars: { APP_ENV: config.environment },
+    vars: {
+      APP_ENV: config.environment,
+      ...(options.boundaryBuild
+        ? { BOUNDARY_MANUAL_DIAGNOSTICS: 'false', BOUNDARY_PROBE_ONLY_EVALUATION: 'false' }
+        : {}),
+    },
   };
   const interviewEntry = join(project, 'interview.local.ts');
   await writeFile(
     interviewEntry,
     `export { ${options.interviewVoiceMock ? 'MockInterviewObject as InterviewObject' : 'InterviewObject'} } from ${JSON.stringify(options.interviewVoiceMock ? join(fixtures, 'voice-interview.ts') : join(repositoryRoot, 'apps/interview/src/worker.ts'))};\nexport { default${options.checkObjectProbe ? '' : ', CheckObject'} } from ${JSON.stringify(join(repositoryRoot, 'apps/interview/src/worker.local.ts'))};\nexport { TopologyObject${options.checkObjectProbe ? ', InspectableCheckObject as CheckObject' : ''} } from ${JSON.stringify(join(fixtures, 'interview.ts'))};\n`,
   );
-  const diagnostics = config.queues.diagnostics;
+  const { diagnostics } = config.queues;
   if (!diagnostics) {
     throw new Error('ローカル診断Queueが未設定です。');
   }
@@ -251,7 +277,7 @@ ${config.environment === 'test' ? `import { consumeFormalForTest } from ${JSON.s
 ${options.stopAfterResultBeforeAck ? `import { stopAfterResultBeforeAckForTest } from ${JSON.stringify(join(fixtures, 'ack-stop.ts'))};` : ''}
 export { TopologyEvaluation } from ${JSON.stringify(join(fixtures, 'evaluation.ts'))};
 export default {
-  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : `async (batch, env) => { await recordQueueDelivery(batch); ${options.holdEvaluationBeforeConsume ? 'await holdBeforeEvaluationForTest(env);' : ''} ${config.environment === 'test' ? 'if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) { await consumeFormalForTest(batch, env); return; }' : ''} ${options.stopAfterResultBeforeAck ? 'await stopAfterResultBeforeAckForTest(batch, env, controlled => application.queue(controlled, env));' : 'await application.queue(batch, env);'} }`},
+  queue: ${options.probeOnlyEvaluation ? 'probe.queue' : `async (batch, env) => { ${options.boundaryBuild ? `if (env.BOUNDARY_PROBE_ONLY_EVALUATION === 'true') { await probe.queue(batch, env); return; }` : ''} await recordQueueDelivery(batch); ${options.holdEvaluationBeforeConsume ? 'await holdBeforeEvaluationForTest(env);' : ''} ${config.environment === 'test' ? 'if (batch.queue === env.EVALUATION_QUEUE_NAME || batch.queue === env.EVALUATION_DLQ_NAME) { await consumeFormalForTest(batch, env); return; }' : ''} ${options.stopAfterResultBeforeAck ? 'await stopAfterResultBeforeAckForTest(batch, env, controlled => application.queue(controlled, env));' : 'await application.queue(batch, env);'} }`},
   async scheduled(controller, env) { await application.scheduled(controller, env); await probe.scheduled(controller); },
 };\n`,
   );
@@ -343,16 +369,18 @@ import { defineConfig } from 'vite';
 import { voidPlugin } from 'void';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import react from '@vitejs/plugin-react';
+${options.profileVite ? `import { profileVitePlugins } from ${JSON.stringify(join(repositoryRoot, 'tools/local-integration/src/vite-profile.mjs'))};` : ''}
 ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `import { runtimeCoveragePlugin } from ${JSON.stringify(join(repositoryRoot, 'tools/coverage/src/runtime-plugin.ts'))};` : ''}
-export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: [
+export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: ${options.profileVite ? 'await profileVitePlugins(' : ''}[
   ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `runtimeCoveragePlugin(${JSON.stringify(project)}),` : ''}
   voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: [
     { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
     { config: ${JSON.stringify(evaluation)}, viteEnvironment: { name: 'evaluation' } },
   ] }), tanstackStart(), react(),
-] });
+]${options.profileVite ? `, ${JSON.stringify(join(config.artifactDirectory, 'vite-profile.json'))})` : ''} });
 `,
   );
+  timing?.mark('filesAndConfigMs');
   return project;
 }
 
@@ -369,8 +397,12 @@ function runtimeEnvironment(config: RuntimeConfig, aiBindings: Record<string, st
   };
 }
 
-async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
-  const project = await prepareRuntime(config);
+async function buildUnlockedRuntime(
+  config: RuntimeConfig,
+  options: Pick<LocalRuntimeOptions, 'boundaryBuild'>,
+  signal?: AbortSignal,
+): Promise<void> {
+  const project = await prepareRuntime(config, options, signal);
   await runNodeCommand({
     args: [join(repositoryRoot, 'apps/web/node_modules/vite/bin/vite.js'), 'build'],
     cwd: project,
@@ -378,6 +410,7 @@ async function buildUnlockedRuntime(config: RuntimeConfig): Promise<void> {
     logPath: join(config.artifactDirectory, 'build.log'),
     label: 'ローカルビルド',
     timeoutMs: 120_000,
+    signal,
   });
 }
 
@@ -386,6 +419,7 @@ async function startUnlockedRuntime(
   mode: 'dev' | 'preview',
   options: LocalRuntimeOptions,
   signal?: AbortSignal,
+  timing?: ReturnType<typeof createStartupTiming>,
 ): Promise<LocalRuntime> {
   const aiBindings = localAiEnvironment(
     config.environment,
@@ -393,8 +427,9 @@ async function startUnlockedRuntime(
     process.env,
     options.testAiBindings,
   );
-  const project = await prepareRuntime(config, options, signal, aiBindings);
+  const project = await prepareRuntime(config, options, signal, aiBindings, timing);
   signal?.throwIfAborted();
+  const viteStarted = monotonicMilliseconds();
   const child = spawn(
     process.execPath,
     [
@@ -409,18 +444,23 @@ async function startUnlockedRuntime(
     {
       cwd: project,
       env: runtimeEnvironment(config, aiBindings),
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: options.profileVite ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
       detached: true,
     },
   );
+  timing?.mark('spawnMs');
   const outputContext = {
     output: '',
     stopping: false,
     finishCoverage: undefined as (() => Promise<void>) | undefined,
   };
   const closed = new Promise<{ exitCode: 0 | 1 }>((resolve) => {
-    child.once('exit', () => resolve({ exitCode: outputContext.stopping ? 0 : 1 }));
-    child.once('error', () => resolve({ exitCode: 1 }));
+    child.once('exit', () => {
+      resolve({ exitCode: outputContext.stopping ? 0 : 1 });
+    });
+    child.once('error', () => {
+      resolve({ exitCode: 1 });
+    });
   });
   async function stop(): Promise<void> {
     outputContext.stopping = true;
@@ -431,10 +471,9 @@ async function startUnlockedRuntime(
   }
   try {
     const { promise: ready, resolve, reject } = Promise.withResolvers<string>();
-    const timeout = setTimeout(
-      () => reject(new Error('ローカル起動が45秒以内に完了しませんでした。')),
-      45_000,
-    );
+    const timeout = setTimeout(() => {
+      reject(new Error('ローカル起動が45秒以内に完了しませんでした。'));
+    }, 45_000);
     const onAbort = () => {
       clearTimeout(timeout);
       reject(new Error('ローカル起動を中断しました。'));
@@ -445,14 +484,14 @@ async function startUnlockedRuntime(
     }
     const collect = (chunk: Buffer) => {
       outputContext.output += chunk.toString();
-      const found = outputContext.output.match(/http:\/\/127\.0\.0\.1:\d+/u);
+      const found = /http:\/\/127\.0\.0\.1:\d+/u.exec(outputContext.output);
       if (found) {
         clearTimeout(timeout);
         resolve(found[0]);
       }
     };
-    child.stdout.on('data', collect);
-    child.stderr.on('data', collect);
+    requireValue(child.stdout).on('data', collect);
+    requireValue(child.stderr).on('data', collect);
     child.once('error', (error) => {
       clearTimeout(timeout);
       reject(error);
@@ -466,14 +505,28 @@ async function startUnlockedRuntime(
       );
     });
     const baseUrl = await ready.finally(() => signal?.removeEventListener('abort', onAbort));
+    const viteUrl = monotonicMilliseconds();
+    timing?.mark('urlReadyMs');
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
     await confirmHttpReady(baseUrl, 45_000, signal);
+    const viteHttp = monotonicMilliseconds();
+    timing?.mark('httpReadyMs');
+    if (options.profileVite) {
+      await requestViteSnapshot(child, viteStarted, viteUrl, viteHttp, signal);
+    }
     if (process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test') {
       const { startRuntimeCapture } = await import('../../coverage/src/runtime-capture.ts');
       outputContext.finishCoverage = await startRuntimeCapture(
-        child.pid!,
+        requireValue(child.pid),
         baseUrl,
         Object.values(config.workers),
+      );
+    }
+    timing?.mark('coverageMs');
+    if (timing) {
+      await writeFile(
+        join(config.artifactDirectory, 'startup-timing.json'),
+        JSON.stringify(timing.finish()),
       );
     }
     signal?.throwIfAborted();
@@ -485,16 +538,21 @@ async function startUnlockedRuntime(
     try {
       await stop();
     } catch {
-      throw new PendingRuntimeCleanup(stop);
+      throw new PendingRuntimeCleanupError(stop);
     }
     throw error;
   }
 }
 
-export async function buildRuntime(config: RuntimeConfig): Promise<void> {
+export async function buildRuntime(
+  config: RuntimeConfig,
+  options: Pick<LocalRuntimeOptions, 'boundaryBuild'> = {},
+  signal?: AbortSignal,
+): Promise<void> {
+  signal?.throwIfAborted();
   const release = await lockEnvironment(config);
   try {
-    await buildUnlockedRuntime(config);
+    await buildUnlockedRuntime(config, options, signal);
   } finally {
     release();
   }
@@ -507,13 +565,36 @@ export async function startRuntimeInProcess(
   signal?: AbortSignal,
 ): Promise<LocalRuntime> {
   signal?.throwIfAborted();
+  if ((options.profileStartup || options.profileVite) && config.environment !== 'test') {
+    throw new Error('起動計測は独立test環境だけで利用できます。');
+  }
+  if (options.profileVite && mode !== 'dev') {
+    throw new Error('Vite詳細計測はdev起動だけで利用できます。');
+  }
+  if (
+    options.boundaryBundle &&
+    (config.environment !== 'test' ||
+      mode !== 'preview' ||
+      options.profileVite ||
+      options.boundaryBuild ||
+      options.materialAnalysisMock ||
+      options.interviewVoiceMock ||
+      options.interviewEvaluationMock ||
+      options.checkObjectProbe ||
+      options.holdEvaluationBeforeConsume ||
+      options.stopAfterResultBeforeAck ||
+      options.testAiBindings)
+  ) {
+    throw new Error('事前ビルドの起動設定が不正です。');
+  }
+  const timing = options.profileStartup ? createStartupTiming() : undefined;
   if (
     mode === 'preview' &&
     (options.materialAnalysisMock ||
       options.interviewVoiceMock ||
       options.interviewEvaluationMock ||
-      options.manualDiagnostics ||
-      options.probeOnlyEvaluation ||
+      (options.manualDiagnostics && !options.boundaryBundle) ||
+      (options.probeOnlyEvaluation && !options.boundaryBundle) ||
       options.checkObjectProbe ||
       options.holdEvaluationBeforeConsume ||
       options.stopAfterResultBeforeAck)
@@ -521,8 +602,9 @@ export async function startRuntimeInProcess(
     throw new Error('ビルド済みWorkerは自動初期化で検証してください。');
   }
   const release = await lockEnvironment(config);
+  timing?.mark('lockMs');
   try {
-    const runtime = await startUnlockedRuntime(config, mode, options, signal);
+    const runtime = await startUnlockedRuntime(config, mode, options, signal, timing);
     return {
       ...runtime,
       async stop() {
@@ -531,7 +613,7 @@ export async function startRuntimeInProcess(
       },
     };
   } catch (error) {
-    if (error instanceof PendingRuntimeCleanup) {
+    if (error instanceof PendingRuntimeCleanupError) {
       const retry = error.cleanup;
       error.cleanup = async () => {
         await retry();

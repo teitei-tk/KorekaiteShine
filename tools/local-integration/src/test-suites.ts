@@ -1,5 +1,11 @@
 const integrationGroups = [
-  ['restart'],
+  [
+    'restart-response-loss',
+    'restart-after-acceptance',
+    'restart-after-do-save',
+    'restart-after-queue-send',
+    'restart-after-result-before-ack',
+  ],
   ['cli-recovery', 'isolation'],
   [
     'end-to-end',
@@ -24,6 +30,11 @@ const boundaryGroups = [
     'migrations',
     'ci-selection',
     'test-suites',
+    'runtime-timing',
+    'startup-timing',
+    'boundary-bundle',
+    'built-boundary-runtime',
+    'vite-profile',
     'run-test-suite',
   ],
   [
@@ -82,7 +93,7 @@ export function selectTestFiles(suite: string, shard?: number): readonly string[
     if (!Number.isInteger(shard) || shard < 1 || shard > groups.length) {
       throw new Error('分割番号が範囲外です。');
     }
-    return paths(groups[shard - 1]!);
+    return paths(groups[shard - 1]);
   }
   if (shard !== undefined) {
     throw new Error('この検査には分割番号を指定できません。');

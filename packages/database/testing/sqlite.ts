@@ -1,5 +1,7 @@
+import { parseJournal } from './journal.ts';
 import { readFileSync } from 'node:fs';
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+import { DatabaseSync } from 'node:sqlite';
+import type { SQLInputValue } from 'node:sqlite';
 import type { D1Database, D1PreparedStatement, D1Result } from '@cloudflare/workers-types';
 import { createPrimaryDb } from '../src/connection.ts';
 
@@ -7,23 +9,26 @@ import { createPrimaryDb } from '../src/connection.ts';
 export function createTestDatabase() {
   const sqlite = new DatabaseSync(':memory:');
   const directory = new URL('../db/migrations/', import.meta.url);
-  const journal: { entries: { tag: string }[] } = JSON.parse(
-    readFileSync(new URL('meta/_journal.json', directory), 'utf8'),
-  );
+  const journal = parseJournal(readFileSync(new URL('meta/_journal.json', directory), 'utf8'));
   for (const entry of journal.entries) {
     sqlite.exec(readFileSync(new URL(`${entry.tag}.sql`, directory), 'utf8'));
   }
   class Statement implements D1PreparedStatement {
-    constructor(
-      private query: string,
-      private values: SQLInputValue[] = [],
-    ) {}
+    private readonly query: string;
+    private readonly values: SQLInputValue[];
+    constructor(query: string, values: SQLInputValue[] = []) {
+      this.query = query;
+      this.values = values;
+    }
     bind(...parameters: SQLInputValue[]): Statement {
       return new Statement(this.query, parameters);
     }
     execute<T>(): D1Result<T> {
       const results = sqlite.prepare(this.query).all(...this.values);
-      const count = sqlite.prepare('SELECT changes() AS count, last_insert_rowid() AS id').get()!;
+      const count = sqlite.prepare('SELECT changes() AS count, last_insert_rowid() AS id').get();
+      if (!count) {
+        throw new Error('SQLite更新件数を取得できません。');
+      }
       return {
         success: true,
         results: results as T[],
@@ -66,7 +71,7 @@ export function createTestDatabase() {
       try {
         const results = statements.map((statement) => {
           if (!(statement instanceof Statement)) {
-            throw new Error('別のDBのstatementは利用できません。');
+            throw new TypeError('別のDBのstatementは利用できません。');
           }
           return statement.execute<T>();
         });
@@ -91,5 +96,12 @@ export function createTestDatabase() {
       throw new Error('dumpは代替しません。');
     },
   };
-  return { sqlite, binding, db: createPrimaryDb(binding), close: () => sqlite.close() };
+  return {
+    sqlite,
+    binding,
+    db: createPrimaryDb(binding),
+    close: () => {
+      sqlite.close();
+    },
+  };
 }

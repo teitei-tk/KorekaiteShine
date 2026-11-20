@@ -1,8 +1,15 @@
+import {
+  readJson,
+  readJsonObject,
+  readInitializationObject,
+  readCheckAccepted,
+} from './helpers/json.ts';
 import { Temporal } from '@js-temporal/polyfill';
 import { randomUUID } from 'node:crypto';
 import { expect, test } from 'vitest';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
-import { runDatabaseCommand, type LocalRuntime } from '../src/runtime.ts';
+import { runDatabaseCommand } from '../src/runtime.ts';
+import type { LocalRuntime } from '../src/runtime.ts';
 import { withDiagnosticRuntime } from './helpers/diagnostic-runtime.ts';
 
 async function accept(runtime: LocalRuntime): Promise<string> {
@@ -12,7 +19,7 @@ async function accept(runtime: LocalRuntime): Promise<string> {
     body: JSON.stringify({ scenario: 'success' }),
   });
   expect(response.status).toBe(202);
-  const body: { jobId: string } = await response.json();
+  const body = await readCheckAccepted(response);
   return body.jobId;
 }
 function initialize(runtime: LocalRuntime, objectId: string, jobId: string) {
@@ -26,7 +33,7 @@ async function readInitialization(runtime: LocalRuntime, objectId: string) {
   const query = new URLSearchParams({ view: 'initialization', objectId });
   const response = await fetch(`${runtime.baseUrl}/api/check-object-test?${query}`);
   expect(response.status).toBe(200);
-  return response.json();
+  return readJson(response);
 }
 async function assertUntouched(config: RuntimeConfig, jobId: string) {
   await runDatabaseCommand(config, [
@@ -47,12 +54,12 @@ test('DO入口は不正UUIDを拒否しstorageとD1を変更しない', async ()
     const jobId = await accept(runtime);
     const response = await initialize(runtime, jobId, 'not-a-uuid');
     expect(response.status).toBe(500);
-    expect((await response.json()).error).toContain('診断ジョブIDが不正です。');
+    expect((await readJsonObject(response)).error).toContain('診断ジョブIDが不正です。');
     expect(await readInitialization(runtime, jobId)).toBeNull();
     await assertUntouched(config, jobId);
     const valid = await initialize(runtime, jobId, jobId);
     expect(valid.status).toBe(200);
-    expect(await readInitialization(runtime, jobId)).toEqual(await valid.json());
+    expect(await readInitialization(runtime, jobId)).toEqual(await readJson(valid));
   });
 }, 60_000);
 
@@ -62,10 +69,10 @@ test('保存済みDOへ別ジョブを渡すと元の値を保持し別ジョブ
       other = await accept(runtime);
     const initialized = await initialize(runtime, first, first);
     expect(initialized.status).toBe(200);
-    const saved = await initialized.json();
+    const saved = await readInitializationObject(initialized);
     const rejected = await initialize(runtime, first, other);
     expect(rejected.status).toBe(500);
-    expect((await rejected.json()).error).toContain('DOとジョブの対応が一致しません。');
+    expect((await readJsonObject(rejected)).error).toContain('DOとジョブの対応が一致しません。');
     expect(await readInitialization(runtime, first)).toEqual(saved);
     expect(await readInitialization(runtime, other)).toBeNull();
     await assertUntouched(config, other);
@@ -89,7 +96,7 @@ test('許可外APP_ENVのDOは保存と通知より前に初期化を拒否す�
       const jobId = await accept(runtime);
       const response = await initialize(runtime, jobId, jobId);
       expect(response.status).toBe(500);
-      expect((await response.json()).error).toContain('診断DOを利用できない環境です。');
+      expect((await readJsonObject(response)).error).toContain('診断DOを利用できない環境です。');
       expect(await readInitialization(runtime, jobId)).toBeNull();
       await assertUntouched(config, jobId);
     },

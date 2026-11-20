@@ -104,15 +104,15 @@ export const playbackReceipts = sqliteTable(
   ],
 );
 
-export interface EvaluationConfiguration {
+export type EvaluationConfiguration = {
   model: string;
   promptVersion: string;
   rubricVersion: string;
   instructions: string;
   rubric: string;
-}
+};
 
-export interface EvaluationSnapshot {
+export type EvaluationSnapshot = {
   schemaVersion: 1;
   interview: Pick<
     typeof interviews.$inferSelect,
@@ -130,7 +130,7 @@ export interface EvaluationSnapshot {
   playback: (typeof playbackReceipts.$inferSelect)[];
   transcriptIncomplete: boolean;
   evaluation: EvaluationConfiguration;
-}
+};
 
 // 固定入力はジョブ単位。手動再評価も元の入力を複製し、原文を再構築しない。
 export const evaluationInputs = sqliteTable(

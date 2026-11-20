@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { jsonObject, parseObject } from './helpers/json';
+import { assert, expect, test } from 'vitest';
 import { buildLiveSession } from '../src/application/live-session.ts';
 
 test('固定材料と会話を指示から分離し、原文を変えずに再開文脈を作る', () => {
@@ -27,7 +28,9 @@ test('固定材料と会話を指示から分離し、原文を変えずに再�
     tools: [],
     tool_choice: 'none',
   });
-  expect(JSON.parse(session.input[0]!.content[0].text)).toMatchObject({
+  expect(
+    parseObject((session.input[0] ?? assert.fail('必須のテスト値がありません。')).content[0].text),
+  ).toMatchObject({
     kind: 'interview_material',
     theme: {
       title: material.themeTitle,
@@ -40,7 +43,7 @@ test('固定材料と会話を指示から分離し、原文を変えずに再�
     { type: 'message', role: 'user', content: [{ type: 'input_text', text: '制約を 比較した。' }] },
     { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '代替案は？' }] },
   ]);
-  expect(history[0]!.content).toBe('制約を');
+  expect((history[0] ?? assert.fail('必須のテスト値がありません。')).content).toBe('制約を');
   expect(() =>
     buildLiveSession(material, [{ speaker: 'user', generation: 1, content: 'あ'.repeat(3000) }], {
       responsesModel: 'test-model',
@@ -62,12 +65,14 @@ test('長い日本語の背景でも初回と再開を準備し、原本を保�
   const history = [{ speaker: 'user' as const, generation: 1, content: '負荷を測りました。' }];
   for (const fragments of [[], history]) {
     const session = buildLiveSession(material, fragments, settings);
-    const data = JSON.parse(session.input[0]!.content[0].text);
-    expect(data.theme.excerpt).toBe(material.themeExcerpt);
+    const data = parseObject(
+      (session.input[0] ?? assert.fail('必須のテスト値がありません。')).content[0].text,
+    );
+    expect(jsonObject(data.theme).excerpt).toBe(material.themeExcerpt);
     expect(data.background).toContain('設計を担当。');
     expect(data.background).toContain('（後略）');
     expect(session.input.at(-1)?.content[0].text).toContain(
-      fragments.length ? '負荷を測りました。' : '設計を担当。',
+      fragments.length > 0 ? '負荷を測りました。' : '設計を担当。',
     );
   }
   // 履歴が入力枠をほぼ使い切る場合は、最小の抜粋でも再開できない。
@@ -102,7 +107,9 @@ test('再開時は直前の質問の世代の再生確認と欠落を渡し、�
       playback.push({ generation: 3, audioOffsetMs: confirmedMs });
     }
     const session = buildLiveSession(material, history, settings, playback);
-    const data = JSON.parse(session.input[0]!.content[0].text);
+    const data = parseObject(
+      (session.input[0] ?? assert.fail('必須のテスト値がありません。')).content[0].text,
+    );
     expect(data.resume).toEqual({
       transcriptIncomplete: true,
       pendingQuestionOperation: null,
@@ -128,9 +135,13 @@ test.each(['rephrase', 'skip'] as const)(
       pendingQuestionOperation: operation,
     };
     const session = buildLiveSession(material, [], { responsesModel: 'model', voice: 'marin' });
-    expect(JSON.parse(session.input[0]!.content[0].text).resume.pendingQuestionOperation).toBe(
-      operation,
-    );
+    expect(
+      jsonObject(
+        parseObject(
+          (session.input[0] ?? assert.fail('必須のテスト値がありません。')).content[0].text,
+        ).resume,
+      ).pendingQuestionOperation,
+    ).toBe(operation);
     expect(session.instructions).toContain('別の観点');
     expect(session.instructions).toContain('論点を保って');
   },

@@ -283,3 +283,25 @@ test.each([
   expect(report.exitCode).toBe(0);
   expect(vi.getTimerCount()).toBe(0);
 });
+
+test('起動と終了の時間を検査・待機の時間から分離する', async () => {
+  const fixture = scenarioFixture();
+  vi.mocked(startRuntime).mockImplementation(async () => {
+    await fixture.advance(100);
+    return fixture.runtime;
+  });
+  vi.mocked(fixture.runtime.stop).mockImplementation(async () => {
+    await fixture.advance(30);
+  });
+  const { report } = await fixture.run();
+  expect(report.timings).toMatchObject({ startupMs: 100, restartMs: 0, cleanupMs: 30 });
+  expect(Object.values(report.timings).reduce((sum, value) => sum + value, 0)).toBe(
+    report.durationMs,
+  );
+});
+
+test('Queue観測の名前が文字列でなければ配送成功として扱わない', async () => {
+  const fixture = scenarioFixture('success');
+  fixture.replies.receipt = () => Response.json({ ...fixture.receipt, queue: null });
+  await fixture.fails('QUEUE_RECEIPT_MISMATCH');
+});

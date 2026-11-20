@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { comments, githubApi, target, type Api } from './github.ts';
+import { comments, githubApi, target } from './github.ts';
+import type { Api } from './github.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -23,7 +24,7 @@ it('GitHub HTTPエラーに応答本文やトークンを含めない', async ()
     'fetch',
     vi.fn().mockResolvedValue(new Response('private response', { status: 403 })),
   );
-  await expect(githubApi('private-token')('issues/1')).rejects.toThrow(/^GitHub API HTTP 403$/);
+  await expect(githubApi('private-token')('issues/1')).rejects.toThrow(/^GitHub API HTTP 403$/u);
 });
 
 it('GitHub GraphQLの要求本文をJSONとして送る', async () => {

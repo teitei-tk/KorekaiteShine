@@ -1,11 +1,7 @@
 import { EventEmitter } from 'node:events';
-import { afterEach, expect, test, vi } from 'vitest';
-import {
-  buildRuntime,
-  runDatabaseCommand,
-  startRuntime,
-  type LocalRuntime,
-} from '../src/runtime.ts';
+import { assert, afterEach, expect, test, vi } from 'vitest';
+import { buildRuntime, runDatabaseCommand, startRuntime } from '../src/runtime.ts';
+import type { LocalRuntime } from '../src/runtime.ts';
 
 vi.mock('../src/runtime.ts', () => ({
   buildRuntime: vi.fn(),
@@ -37,11 +33,17 @@ async function cliFixture(args: string[], env: NodeJS.ProcessEnv = {}) {
     stop: vi.fn(async () => {
       close({ exitCode: 0 });
     }),
-    runScheduled: vi.fn(async () => {}),
+    runScheduled: vi.fn(async () => {
+      /* この実装では追加の処理を行わない。 */
+    }),
   };
   vi.mocked(startRuntime).mockResolvedValue(runtime);
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.stubGlobal('process', channel);
   await import('../src/run.ts');
   await vi.advanceTimersByTimeAsync(0);
@@ -132,7 +134,13 @@ test('停止に伴う周期回復の中断は一時失敗として報告しな�
   vi.mocked(fixture.runtime.runScheduled).mockImplementation(
     (signal) =>
       new Promise((_resolve, reject) => {
-        signal!.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        (signal ?? assert.fail('必須のテスト値がありません。')).addEventListener(
+          'abort',
+          () => {
+            reject(new Error('aborted'));
+          },
+          { once: true },
+        );
       }),
   );
   await vi.advanceTimersByTimeAsync(60_000);
@@ -167,4 +175,11 @@ test('追加引数をローカル操作へ渡さず拒否する', async () => {
   expect(fixture.channel.exitCode).toBe(1);
   expect(fixture.error).toHaveBeenCalledWith(expect.stringContaining('追加引数'));
   expect(startRuntime).not.toHaveBeenCalled();
+});
+
+test('CLIは非Error例外も文字列化して失敗終了する', async () => {
+  vi.mocked(buildRuntime).mockRejectedValue('build rejected');
+  const fixture = await cliFixture(['build']);
+  expect(fixture.channel.exitCode).toBe(1);
+  expect(fixture.error).toHaveBeenCalledWith('build rejected');
 });

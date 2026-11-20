@@ -1,3 +1,4 @@
+import { readMeasurement } from '../src/schema.ts';
 import { spawnSync } from 'node:child_process';
 import {
   mkdtempSync,
@@ -61,14 +62,14 @@ test.each([true, false])(
             KOREKAITE_COVERAGE_RUN: config,
             KOREKAITE_COVERAGE_SUITE: 'unit',
           },
-          timeout: 30000,
+          timeout: 30_000,
         },
       );
       closeSync(output);
       expect(child.status, readFileSync(outputPath, 'utf8')).toBe(0);
       const records = readdirSync(directory)
         .filter((name) => name.endsWith('.json'))
-        .map((name) => JSON.parse(readFileSync(join(directory, name), 'utf8')));
+        .map((name) => readMeasurement(readFileSync(join(directory, name), 'utf8')));
       expect(records).toHaveLength(1);
       expect(records[0].status).toBe('complete');
       if (loaded) {

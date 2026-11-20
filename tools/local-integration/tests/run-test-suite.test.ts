@@ -1,3 +1,5 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { stringArray } from './helpers/config-json.ts';
 import { expect, test } from 'vitest';
 import { runTestProcess } from '../src/run-test-suite.ts';
 
@@ -45,8 +47,15 @@ async function executeSuite(args: string[], mode = 'success') {
   try {
     writeFileSync(
       bootstrap,
-      `import cp from 'node:child_process'; import { EventEmitter } from 'node:events'; import { writeFileSync } from 'node:fs'; import { syncBuiltinESMExports } from 'node:module';
+      `import cp from 'node:child_process'; import { EventEmitter } from 'node:events'; import { writeFileSync } from 'node:fs'; import { syncBuiltinESMExports, registerHooks } from 'node:module';
+if (${JSON.stringify(mode)} === 'bundle') registerHooks({ load(url, context, next) {
+ if (!url.endsWith('/boundary-bundle.ts')) return next(url, context);
+ return { format: 'module', shortCircuit: true, source: \`import { writeFileSync, rmSync } from 'node:fs';
+ export const boundaryTestFile = file => file.endsWith('check-object.test.ts');
+ export async function createBoundaryBundle() { writeFileSync(${JSON.stringify(join(root, 'bundle-created'))}, 'created'); return { directory: ${JSON.stringify(root)}, dispose: async () => { writeFileSync(${JSON.stringify(join(root, 'bundle-disposed'))}, 'disposed'); } }; }\` };
+} });
 cp.spawn = (program,args) => {
+ if (${JSON.stringify(mode)} === 'non-error') throw 'fixture failure';
  if(program !== process.execPath) throw new Error('unexpected program');
  writeFileSync(${JSON.stringify(output)}, JSON.stringify(args));
  const child = new EventEmitter(); child.exitCode = 0; child.signalCode = null;
@@ -66,11 +75,17 @@ cp.spawn = (program,args) => {
         fileURLToPath(new URL('../src/run-test-suite.ts', import.meta.url)),
         ...args,
       ],
-      { encoding: 'utf8', timeout: 30000 },
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        env: { ...process.env, KOREKAITE_BOUNDARY_BUNDLE: mode === 'bundle' ? '' : root },
+      },
     );
     return {
       ...result,
-      selected: existsSync(output) ? (JSON.parse(readFileSync(output, 'utf8')) as string[]) : [],
+      bundleCreated: existsSync(join(root, 'bundle-created')),
+      bundleDisposed: existsSync(join(root, 'bundle-disposed')),
+      selected: existsSync(output) ? stringArray(parseJson(readFileSync(output, 'utf8'))) : [],
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -114,4 +129,17 @@ test('起動失敗と終了理由の欠落を正常終了へ変換しない', as
 test('検査CLIへのSIGINTを子へ伝え130で終了する', async () => {
   const result = await executeSuite(['boundary'], 'interrupt');
   expect(result.status, result.stderr).toBe(130);
+});
+
+test('共有成果物を用意して検査終了後に解放する', async () => {
+  const result = await executeSuite(['boundary'], 'bundle');
+  expect(result.status, result.stderr).toBe(0);
+  expect(result.bundleCreated).toBe(true);
+  expect(result.bundleDisposed).toBe(true);
+});
+
+test('検査起動の非Error例外を表示して失敗終了する', async () => {
+  const result = await executeSuite(['boundary'], 'non-error');
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('fixture failure');
 });

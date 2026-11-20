@@ -1,8 +1,15 @@
+import {
+  readJson,
+  readJsonObject,
+  readCheckAccepted,
+  readCheckStatus,
+  jsonObject,
+} from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -24,7 +31,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
@@ -36,7 +43,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
       }),
     });
     expect(acquire.status).toBe(200);
-    const lease = await acquire.json();
+    const lease = await readJsonObject(acquire);
     expect(lease).toMatchObject({ jobId: accepted.jobId, attemptNumber: 1 });
     const renew = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
@@ -44,7 +51,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
       body: JSON.stringify({ operation: 'renew', lease, now: startedAt + 30_000 }),
     });
     expect(renew.status).toBe(200);
-    expect(await renew.json()).toBe(true);
+    expect(await readJson(renew)).toBe(true);
     await runDatabaseCommand(config, [
       'execute',
       `
@@ -59,7 +66,7 @@ test('実行権の更新は本人枠と一体で行い、取得から180秒の�
       body: JSON.stringify({ operation: 'complete', lease, now: startedAt + 179_999 }),
     });
     expect(complete.status).toBe(200);
-    expect(await complete.json()).toBe(true);
+    expect(await readJson(complete)).toBe(true);
   } finally {
     await runtime.stop();
   }
@@ -83,7 +90,7 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
@@ -95,7 +102,7 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
       }),
     });
     expect(acquire.status).toBe(200);
-    const lease = await acquire.json();
+    const lease = await readJsonObject(acquire);
     expect(lease).toMatchObject({ jobId: accepted.jobId, attemptNumber: 1 });
     for (const elapsed of [180_000, 180_001]) {
       for (const operation of ['renew', 'complete']) {
@@ -105,7 +112,7 @@ test('期限ちょうどから実行権の更新と結果保存を拒否し、�
           body: JSON.stringify({ operation, lease, now: startedAt + elapsed }),
         });
         expect(response.status).toBe(200);
-        expect(await response.json()).toBe(false);
+        expect(await readJson(response)).toBe(false);
       }
     }
     await runDatabaseCommand(config, [
@@ -141,7 +148,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
@@ -153,7 +160,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
       }),
     });
     expect(acquire.status).toBe(200);
-    const lease = await acquire.json();
+    const lease = await readJsonObject(acquire);
     expect(lease).toMatchObject({ jobId: accepted.jobId, attemptNumber: 1 });
     const newOwner = randomUUID();
     // 回復処理とは独立して、保存時のフェンシング条件を検証する。
@@ -173,7 +180,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
         body: JSON.stringify({ operation, lease, now: startedAt + 30_000 }),
       });
       expect(response.status).toBe(200);
-      expect(await response.json()).toBe(false);
+      expect(await readJson(response)).toBe(false);
     }
     await runDatabaseCommand(config, [
       'execute',
@@ -194,7 +201,7 @@ test('所有者が新しい世代へ交代した後は古い実行権の更新�
       }),
     });
     expect(complete.status).toBe(200);
-    expect(await complete.json()).toBe(true);
+    expect(await readJson(complete)).toBe(true);
   } finally {
     await runtime.stop();
   }
@@ -218,7 +225,7 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
       body: '{"scenario":"success"}',
     });
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const startedAt = Temporal.Instant.from(accepted.acceptedAt).epochMilliseconds;
     const notification = { schemaVersion: 1, jobId: accepted.jobId };
     const acquire = await fetch(`${runtime.baseUrl}/api/lease-test`, {
@@ -227,7 +234,7 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
       body: JSON.stringify({ operation: 'acquire', notification, now: startedAt }),
     });
     expect(acquire.status).toBe(200);
-    const lease = await acquire.json();
+    const lease = await readJsonObject(acquire);
     const call = async (operation: string, now: number, owner = lease) => {
       const response = await fetch(`${runtime.baseUrl}/api/lease-test`, {
         method: 'POST',
@@ -235,14 +242,14 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
         body: JSON.stringify({ operation, notification, lease: owner, now }),
       });
       expect(response.status).toBe(200);
-      return response.json();
+      return readJson(response);
     };
     expect(await call('recover', startedAt + 209_999)).toBe(false);
     expect(await call('recover', startedAt + 210_000)).toBe(true);
     expect(await call('recover', startedAt + 210_000)).toBe(false);
-    const status = await (
-      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
+    const status = await readCheckStatus(
+      await fetch(`${runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
     expect(status).toMatchObject({
       status: 'retry_wait',
       attemptCount: 1,
@@ -262,9 +269,9 @@ test('期限から30秒の猶予後に一度だけ再試行待ちへ回復し、
     `,
     ]);
     expect(await call('acquire', startedAt + 239_999)).toBeNull();
-    const successor = await call('acquire', startedAt + 240_000);
+    const successor = jsonObject(await call('acquire', startedAt + 240_000));
     expect(successor).toMatchObject({ jobId: accepted.jobId, attemptNumber: 2, generation: 2 });
-    expect(successor.ownerToken).not.toBe(lease.ownerToken);
+    expect(jsonObject(successor).ownerToken).not.toBe(lease.ownerToken);
     expect(await call('complete', startedAt + 240_000)).toBe(false);
     expect(await call('complete', startedAt + 240_000, successor)).toBe(true);
   } finally {
@@ -294,7 +301,7 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       },
     );
     expect(acceptedResponse.status).toBe(202);
-    const accepted = await acceptedResponse.json();
+    const accepted = await readCheckAccepted(acceptedResponse);
     const acquire = await fetch(`${runtimeContext.runtime.baseUrl}/api/lease-test`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -305,7 +312,7 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       }),
     });
     expect(acquire.status).toBe(200);
-    expect(await acquire.json()).toMatchObject({ attemptNumber: 1 });
+    expect(await readJson(acquire)).toMatchObject({ attemptNumber: 1 });
     await runtimeContext.runtime.stop();
     // 待機時間を短縮し、停止中に期限と猶予が経過した状態を作る。
     const expiredAt = Temporal.Now.instant().epochMilliseconds - 31_000;
@@ -321,9 +328,9 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
       runtimeContext.runtime.runScheduled(),
       runtimeContext.runtime.runScheduled(),
     ]);
-    const status = await (
-      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
+    const status = await readCheckStatus(
+      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
     expect(status).toMatchObject({
       status: 'retry_wait',
       attemptCount: 1,
@@ -331,11 +338,11 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     });
     await runtimeContext.runtime.runScheduled();
     expect(
-      await (
+      await readCheckStatus(
         await fetch(
           `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
-        )
-      ).json(),
+        ),
+      ),
     ).toEqual(status);
     await runDatabaseCommand(config, [
       'execute',
@@ -350,19 +357,23 @@ test('停止した評価の期限切れ実行権を、再起動後のscheduled�
     await expect
       .poll(
         async () =>
-          (
+          readCheckStatus(
             await fetch(
               `${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`,
-            )
-          ).json(),
+            ),
+          ),
         { timeout: 40_000, interval: 250 },
       )
       .toMatchObject({ status: 'completed', attemptCount: 2 });
-    const completed = await (
-      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`)
-    ).json();
-    expect(Temporal.Instant.from(completed.finishedAt).epochMilliseconds).toBeGreaterThanOrEqual(
-      Temporal.Instant.from(status.nextAttemptAt).epochMilliseconds,
+    const completed = await readCheckStatus(
+      await fetch(`${runtimeContext.runtime.baseUrl}/api/diagnostics/check-jobs/${accepted.jobId}`),
+    );
+    expect(
+      Temporal.Instant.from(completed.finishedAt ?? assert.fail('必要な日時がありません。'))
+        .epochMilliseconds,
+    ).toBeGreaterThanOrEqual(
+      Temporal.Instant.from(status.nextAttemptAt ?? assert.fail('必要な日時がありません。'))
+        .epochMilliseconds,
     );
   } finally {
     await runtimeContext.runtime.stop();

@@ -5,7 +5,7 @@
   "scripts": {
     "check": "node check.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsrs --fast --noEmit",
     "check:node": "node check-node.ts"
   },
   "devDependencies": {

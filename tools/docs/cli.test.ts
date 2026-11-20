@@ -96,7 +96,7 @@ test('Node版とengineの不整合はCLIで失敗する', async () => {
 test('通常の文書CLI入口は既定のリポジトリを検査する', () => {
   const result = invoke('./check.ts');
   expect(result.status, result.stderr).toBe(0);
-  expect(result.stdout).toMatch(/文書検査成功: Markdown \d+件/);
+  expect(result.stdout).toMatch(/文書検査成功: Markdown \d+件/u);
   expect(result.stderr).toBe('');
 });
 
@@ -151,7 +151,7 @@ syncBuiltinESMExports();
   );
   const result = spawnSync(
     process.execPath,
-    ['--import', preload, fileURLToPath(new URL('./check-node.ts', import.meta.url))],
+    ['--import', preload, fileURLToPath(new URL('check-node.ts', import.meta.url))],
     { encoding: 'utf8', timeout: 10_000 },
   );
   if (result.error) {
@@ -160,4 +160,24 @@ syncBuiltinESMExports();
   expect(result.status, result.stderr).toBe(1);
   expect(result.stderr.trim()).toBe('fixture failure');
   expect(result.stdout).toBe('');
+});
+
+test('文書CLIはError以外の読み取り失敗も報告して失敗する', async () => {
+  const root = await fixture();
+  const preload = join(root, 'read-doc-failure.mjs');
+  await writeFile(
+    preload,
+    `import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
+const original = fs.readFile;
+fs.readFile = (...args) => String(args[0]).endsWith('/README.md') ? Promise.reject('fixture document failure') : original(...args);
+syncBuiltinESMExports();`,
+  );
+  const result = spawnSync(
+    process.execPath,
+    ['--import', preload, fileURLToPath(new URL('check.ts', import.meta.url))],
+    { encoding: 'utf8', timeout: 10_000 },
+  );
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('文書検査失敗: fixture document failure');
 });

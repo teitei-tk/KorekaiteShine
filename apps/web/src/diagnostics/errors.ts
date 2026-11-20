@@ -51,7 +51,7 @@ export function bodyValidationDetails(
   errors: ErrorObject[] | null | undefined,
 ): ValidationDetail[] {
   return (errors ?? []).map((error): ValidationDetail => {
-    const property =
+    const property: unknown =
       error.keyword === 'required'
         ? error.params.missingProperty
         : error.keyword === 'additionalProperties'

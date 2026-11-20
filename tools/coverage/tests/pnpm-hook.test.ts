@@ -1,3 +1,4 @@
+import { parse } from '../src/schema.ts';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -10,10 +11,10 @@ function readPackage(name: string, version: string) {
       '-e',
       `const {hooks}=require(${JSON.stringify(path)}); console.log(JSON.stringify(hooks.readPackage(${JSON.stringify(pkg)})));`,
     ],
-    { encoding: 'utf8', timeout: 10000 },
+    { encoding: 'utf8', timeout: 10_000 },
   );
   expect(child.status, child.stderr).toBe(0);
-  return JSON.parse(child.stdout);
+  return parse(child.stdout);
 }
 test('固定版の型生成器だけCompiler APIを5系へ分離する', () => {
   expect(readPackage('openapi-typescript', '7.13.0')).toMatchObject({
@@ -26,7 +27,7 @@ test('別パッケージと別バージョンのCompiler API指定は変更し�
     ['other', '7.13.0'],
     ['openapi-typescript', '8.0.0'],
   ]) {
-    expect(readPackage(name!, version!)).toMatchObject({
+    expect(readPackage(name, version)).toMatchObject({
       peerDependencies: { typescript: '*' },
       dependencies: {},
     });

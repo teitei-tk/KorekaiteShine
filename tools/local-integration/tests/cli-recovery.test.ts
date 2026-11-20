@@ -1,9 +1,10 @@
+import { readJob, readCheckStatus } from './helpers/json.ts';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import type { RuntimeConfig } from '@korekaite/runtime-config';
 import { buildRuntime, runDatabaseCommand } from '../src/runtime.ts';
@@ -33,8 +34,12 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
   });
   child.stderr.resume();
   const closed = new Promise<number>((resolve) => {
-    child.once('exit', (code) => resolve(code ?? 1));
-    child.once('error', () => resolve(1));
+    child.once('exit', (code) => {
+      resolve(code ?? 1);
+    });
+    child.once('error', () => {
+      resolve(1);
+    });
   });
   return {
     async ready(): Promise<string> {
@@ -42,15 +47,15 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
       await expect
         .poll(
           () => {
-            baseUrlState.baseUrl = outputState.output.match(
-              /ローカルWeb: (http:\/\/127\.0\.0\.1:\d+)/u,
+            baseUrlState.baseUrl = /ローカルWeb: (?<url>http:\/\/127\.0\.0\.1:\d+)/u.exec(
+              outputState.output,
             )?.[1];
             return baseUrlState.baseUrl !== undefined;
           },
           { timeout: 60_000, interval: 100 },
         )
         .toBe(true);
-      return baseUrlState.baseUrl!;
+      return baseUrlState.baseUrl ?? assert.fail('必須のテスト値がありません。');
     },
     async stop(): Promise<number> {
       if (child.exitCode === null && child.signalCode === null) {
@@ -60,11 +65,10 @@ function launchCli(config: RuntimeConfig, runId: string, slot: number, mode: 'de
       try {
         return await Promise.race([
           closed,
-          new Promise<never>((_, reject) => {
-            timerState.timer = setTimeout(
-              () => reject(new Error('CLIの停止期限を超過しました。')),
-              15_000,
-            );
+          new Promise<never>((_resolve, reject) => {
+            timerState.timer = setTimeout(() => {
+              reject(new Error('CLIの停止期限を超過しました。'));
+            }, 15_000);
           }),
         ]);
       } catch (error) {
@@ -101,7 +105,10 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
           if (!passed) {
             return;
           }
-          await rm(config.stateDirectory!, { recursive: true, force: true });
+          await rm(config.stateDirectory ?? assert.fail('必須のテスト値がありません。'), {
+            recursive: true,
+            force: true,
+          });
           await rm(config.artifactDirectory, { recursive: true, force: true });
         });
         const cliState = { cli: undefined as ReturnType<typeof launchCli> | undefined };
@@ -120,13 +127,13 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
           signal: AbortSignal.timeout(10_000),
         });
         expect(accepted.status).toBe(202);
-        const { jobId } = await accepted.json();
+        const { jobId } = await readJob(accepted);
         const status = async () =>
-          (
+          readCheckStatus(
             await fetch(`${baseUrlState.baseUrl}/api/diagnostics/check-jobs/${jobId}`, {
               signal: AbortSignal.timeout(10_000),
-            })
-          ).json();
+            }),
+          );
         await expect.poll(status, { timeout: 20_000, interval: 100 }).toMatchObject({
           status: 'retry_wait',
           attemptCount: 1,
@@ -144,7 +151,10 @@ test('通常CLIの開発・ビルド済み起動は再起動後も60秒周期で
         expect(
           Temporal.Now.instant().epochMilliseconds,
           '予約済み再試行の配送前に停止する',
-        ).toBeLessThan(Temporal.Instant.from(before.nextAttemptAt).epochMilliseconds);
+        ).toBeLessThan(
+          Temporal.Instant.from(before.nextAttemptAt ?? assert.fail('必要な日時がありません。'))
+            .epochMilliseconds,
+        );
         evidence.observe({
           beforeRestart: {
             status: before.status,

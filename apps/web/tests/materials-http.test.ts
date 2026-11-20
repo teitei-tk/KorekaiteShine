@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { expect, test, vi } from 'vitest';
 import { analyzeMaterialRequest } from '../src/server/materials';
 
@@ -26,7 +27,7 @@ test('分析結果の永続化を待って保存IDを返し、保存失敗を成
     );
     expect(saveAnalysis).toHaveBeenCalledWith(input.markdown, result);
     expect(response.status).toBe(succeeds ? 200 : 503);
-    expect(await response.json()).toEqual(
+    expect(parseJson(await response.text())).toEqual(
       succeeds
         ? { ...result, analysisId: 'analysis-1' }
         : {
@@ -59,7 +60,7 @@ test('材料分析HTTPは認可・送信確認・容量・利用枠を通過し�
     [
       true,
       'application/json',
-      JSON.stringify({ ...input, markdown: 'あ'.repeat(10923) }),
+      JSON.stringify({ ...input, markdown: 'あ'.repeat(10_923) }),
       true,
       413,
       'MATERIAL_TOO_LARGE',
@@ -81,10 +82,13 @@ test('材料分析HTTPは認可・送信確認・容量・利用枠を通過し�
     expect(response.status).toBe(status);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     if (status === 200) {
-      expect(await response.json()).toEqual({ themes: [theme], analysisId: 'analysis-1' });
+      expect(parseJson(await response.text())).toEqual({
+        themes: [theme],
+        analysisId: 'analysis-1',
+      });
       expect(analyze).toHaveBeenCalledTimes(1);
     } else {
-      expect(await response.json()).toMatchObject({ error: { code } });
+      expect(parseJson(await response.text())).toMatchObject({ error: { code } });
       expect(analyze).not.toHaveBeenCalled();
     }
     expect(saveAnalysis).toHaveBeenCalledTimes(status === 200 ? 1 : 0);
@@ -98,12 +102,12 @@ test('本文サイズを申告ヘッダーに依存せず制限し、超過ス�
   const sentState = { sent: false };
   const body = new ReadableStream({
     pull(controller) {
-      if (!sentState.sent) {
-        sentState.sent = true;
-        controller.enqueue(encoder.encode(' '.repeat(200_001)));
-      } else {
+      if (sentState.sent) {
         controller.enqueue(encoder.encode('{"markdown":"資料","confirmed":true}'));
         controller.close();
+      } else {
+        sentState.sent = true;
+        controller.enqueue(encoder.encode(' '.repeat(200_001)));
       }
     },
     cancel,

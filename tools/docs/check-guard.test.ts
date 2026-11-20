@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
-import { checkGuard, type CommandRunner } from './check-guard.ts';
+import { checkGuard } from './check-guard.ts';
+import type { CommandRunner } from './check-guard.ts';
 
 // 外部npm/pnpmコマンドだけを置き換え、判定・一時領域の管理は実装を通す。
 const registry = 'https://npm.flatt.tech/';
@@ -19,7 +20,9 @@ const runner: CommandRunner = (program, args) => {
 };
 
 it('正常なパッケージを取得でき、Guardが明示的に拒否した場合だけ遮断確認を成功にする', () => {
-  expect(() => checkGuard('download', runner)).not.toThrow();
+  expect(() => {
+    checkGuard('download', runner);
+  }).not.toThrow();
 });
 
 it('正常なパッケージも取得できない場合は遮断確認を成功にしない', () => {
@@ -27,7 +30,9 @@ it('正常なパッケージも取得できない場合は遮断確認を成功�
     args[0] === 'pack' && args[1] === 'is-number@7.0.0'
       ? { status: 1, stdout: '', stderr: 'npm error code ENOTFOUND' }
       : runner(program, args, cwd);
-  expect(() => checkGuard('download', unavailable)).toThrow('正常なパッケージを取得できません');
+  expect(() => {
+    checkGuard('download', unavailable);
+  }).toThrow('正常なパッケージを取得できません');
 });
 
 it('遮断確認用パッケージを取得できた場合は失敗する', () => {
@@ -35,9 +40,9 @@ it('遮断確認用パッケージを取得できた場合は失敗する', () =
     args[0] === 'pack' && args[1] === '@panda-guard/test-malicious'
       ? { status: 0, stdout: '[]', stderr: '' }
       : runner(program, args, cwd);
-  expect(() => checkGuard('download', allowed)).toThrow(
-    '遮断確認用パッケージを取得できてしまいました',
-  );
+  expect(() => {
+    checkGuard('download', allowed);
+  }).toThrow('遮断確認用パッケージを取得できてしまいました');
 });
 
 it('通信障害や一般的な403をGuardの明示的な拒否と区別する', () => {
@@ -52,7 +57,9 @@ it('通信障害や一般的な403をGuardの明示的な拒否と区別する',
       args[0] === 'pack' && args[1] === '@panda-guard/test-malicious'
         ? result
         : runner(program, args, cwd);
-    expect(() => checkGuard('download', unavailable)).toThrow('Guardによる拒否を確認できません');
+    expect(() => {
+      checkGuard('download', unavailable);
+    }).toThrow('Guardによる拒否を確認できません');
   }
 });
 
@@ -65,7 +72,9 @@ it('npmまたはpnpmのregistryが異なる場合や設定確認に失敗した�
     ]) {
       const wrongRegistry: CommandRunner = (command, args, cwd) =>
         command === program ? result : runner(command, args, cwd);
-      expect(() => checkGuard('registry', wrongRegistry)).toThrow(`${program}のregistry`);
+      expect(() => {
+        checkGuard('registry', wrongRegistry);
+      }).toThrow(`${program}のregistry`);
     }
   }
 });
@@ -77,7 +86,9 @@ it('registryだけの確認ではパッケージを取得しない', () => {
     }
     return runner(program, args, cwd);
   };
-  expect(() => checkGuard('registry', configOnly)).not.toThrow();
+  expect(() => {
+    checkGuard('registry', configOnly);
+  }).not.toThrow();
 });
 
 it('確認用の取得場所と空のキャッシュは成功時も失敗時も削除する', () => {
@@ -95,7 +106,9 @@ it('確認用の取得場所と空のキャッシュは成功時も失敗時も�
       return runner(program, args, cwd);
     };
     if (fail) {
-      expect(() => checkGuard('download', probe)).toThrow('command failed');
+      expect(() => {
+        checkGuard('download', probe);
+      }).toThrow('command failed');
     } else {
       checkGuard('download', probe);
     }

@@ -20,7 +20,9 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
       return {
         baseUrl: 'http://127.0.0.1:1',
         closed: Promise.resolve({ exitCode: 0 }),
-        async runScheduled() {},
+        async runScheduled() {
+          /* この実装では追加の処理を行わない。 */
+        },
         async stop() {
           evidenceContext.stops++;
           if (stage === 'stop') {
@@ -52,11 +54,7 @@ test.each(['start', 'case', 'cleanup', 'stop'] as const)(
           throw original;
         }
       });
-      if (stage === 'stop') {
-        await run;
-      } else {
-        await expect(run).rejects.toBe(original);
-      }
+      await (stage === 'stop' ? run : expect(run).rejects.toBe(original));
     }
     if (stage === 'stop') {
       await expect(suite.stop()).rejects.toBe(original);
@@ -87,7 +85,9 @@ test('起動待ちの間に停止しても、後から起動したWorkerを停�
     return {
       baseUrl: 'http://127.0.0.1:1',
       closed: Promise.resolve({ exitCode: 0 }),
-      async runScheduled() {},
+      async runScheduled() {
+        /* この実装では追加の処理を行わない。 */
+      },
       async stop() {
         evidenceContext.stops++;
       },
@@ -113,7 +113,14 @@ test('起動待ちの間に停止しても、後から起動したWorkerを停�
 test.each(['stop', 'abort'] as const)(
   '清掃待ち中の%s後に完了しても環境を再開しない',
   async (ending) => {
-    const releaseContext = { release: () => {}, entered: () => {} };
+    const releaseContext = {
+      release: () => {
+        /* この実装では追加の処理を行わない。 */
+      },
+      entered: () => {
+        /* この実装では追加の処理を行わない。 */
+      },
+    };
     const cleaning = new Promise<void>((resolve) => {
       releaseContext.entered = resolve;
     });
@@ -128,8 +135,12 @@ test.each(['stop', 'abort'] as const)(
       return {
         baseUrl: 'http://127.0.0.1:1',
         closed: Promise.resolve({ exitCode: 0 }),
-        async runScheduled() {},
-        async stop() {},
+        async runScheduled() {
+          /* この実装では追加の処理を行わない。 */
+        },
+        async stop() {
+          /* この実装では追加の処理を行わない。 */
+        },
       };
     });
     const database = vi

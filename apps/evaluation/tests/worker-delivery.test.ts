@@ -20,7 +20,9 @@ import type { JobNotification } from '@korekaite/api-contracts/messages';
 
 function environment() {
   const fixture = createTestDatabase();
-  onTestFinished(() => fixture.close());
+  onTestFinished(() => {
+    fixture.close();
+  });
   const queue = () => ({
     send: vi.fn(async () => ({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } })),
     sendBatch: vi.fn(),
@@ -44,12 +46,12 @@ function environment() {
 function batch(
   queue: string,
   jobId: string,
-  body: { schemaVersion?: number; jobId?: string } | null = { schemaVersion: 1, jobId },
+  body?: { schemaVersion?: number; jobId?: string } | null,
   id = crypto.randomUUID(),
 ) {
   const message = {
     id,
-    body: body as JobNotification,
+    body: (body === undefined ? { schemaVersion: 1, jobId } : body) as JobNotification,
     ack: vi.fn(),
     retry: vi.fn(),
     attempts: 1,
@@ -182,9 +184,9 @@ test('実行権を更新し、同じ利用者の後続ジョブを延期して�
   }
   expect(await db.select().from(jobOutbox)).toMatchObject([{ operation: 'notify' }]);
   expect(await recoverExpiredExecution(db, id, 'evaluation', 'early', 500)).toBe(false);
-  expect(await recoverExpiredExecution(db, id, 'evaluation', 'late', lease.deadline + 100000)).toBe(
-    true,
-  );
+  expect(
+    await recoverExpiredExecution(db, id, 'evaluation', 'late', lease.deadline + 100_000),
+  ).toBe(true);
 });
 
 test('診断の再試行と期限切れの初期化を回復し、目的別のQueueへ配送する', async () => {

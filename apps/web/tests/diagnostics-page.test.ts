@@ -8,10 +8,10 @@ test('初期化前はシナリオ選択と全操作を無効にし、表示と�
   expect(html).toContain('value="success"');
   expect(html).toContain('value="retry_then_success"');
   expect(html).toContain('value="exhaust_retries"');
-  expect(html).toMatch(/<select[^>]*disabled=""/);
-  expect(html).toMatch(/<button type="button" disabled="">新しい実行を開始<\/button>/);
-  expect(html).toMatch(/<button type="button" disabled="">同じ実行を再送<\/button>/);
-  expect(html).toMatch(/<button type="button" disabled="">状態を再取得<\/button>/);
+  expect(html).toMatch(/<select[^>]*disabled=""/u);
+  expect(html).toMatch(/<button type="button" disabled="">新しい実行を開始<\/button>/u);
+  expect(html).toMatch(/<button type="button" disabled="">同じ実行を再送<\/button>/u);
+  expect(html).toMatch(/<button type="button" disabled="">状態を再取得<\/button>/u);
 });
 
 test('失敗確定後もDLQの受信を待ち、3つの観測結果を独立して表示する', () => {
@@ -36,8 +36,8 @@ test('失敗確定後もDLQの受信を待ち、3つの観測結果を独立し�
     }),
   );
   expect(html).toContain('ジョブ失敗');
-  expect(html).toMatch(/DO保存<\/dt><dd>確認済み/);
-  expect(html).toMatch(/Consumer正常完了<\/dt><dd>対象外/);
-  expect(html).toMatch(/DLQ受信<\/dt><dd>未確認/);
+  expect(html).toMatch(/DO保存<\/dt><dd>確認済み/u);
+  expect(html).toMatch(/Consumer正常完了<\/dt><dd>対象外/u);
+  expect(html).toMatch(/DLQ受信<\/dt><dd>未確認/u);
   expect(html).not.toContain('role="alert"');
 });

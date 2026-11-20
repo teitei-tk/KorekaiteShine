@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { expect, test } from 'vitest';
 import { interviews } from '@korekaite/database/interviews';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
@@ -59,7 +60,9 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
               ready: Promise.resolve('upstream'),
               closed,
               request: () => true,
-              abort: () => {},
+              abort: () => {
+                /* このテストでは呼出しに副作用を持たせない。 */
+              },
               sendAudio: (bytes) => {
                 heard.push(bytes.byteLength);
                 return true;
@@ -77,16 +80,25 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
           },
         }),
     });
-    await expect(room.attach('retry', { send: () => {}, close: () => {} })).rejects.toThrow(
-      '一時的な保存失敗',
-    );
+    await expect(
+      room.attach('retry', {
+        send: () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
+        close: () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
+      }),
+    ).rejects.toThrow('一時的な保存失敗');
     await room.attach('first', {
       send: (data) => {
         if (typeof data === 'string') {
           first.push(data);
         }
       },
-      close: () => {},
+      close: () => {
+        /* このテストでは呼出しに副作用を持たせない。 */
+      },
     });
     await room.attach('second', {
       send: (data) => {
@@ -94,7 +106,9 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
           second.push(data);
         }
       },
-      close: () => {},
+      close: () => {
+        /* このテストでは呼出しに副作用を持たせない。 */
+      },
     });
     await room.receive(
       'first',
@@ -116,7 +130,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
     await handlers[1].onReady('two');
     await room.receive('first', frame(1));
     await room.receive('first', JSON.stringify({ type: 'pause', commandId: 'old', generation: 3 }));
-    expect(first.map((data) => JSON.parse(data))).toContainEqual({
+    expect(first.map((data) => parseJson(data))).toContainEqual({
       type: 'error',
       commandId: 'old',
       code: 'NOT_OWNER',
@@ -137,7 +151,7 @@ test('操作するタブを引き継ぎ、古いタブの音声と操作を拒�
       'first',
       JSON.stringify({ type: 'finish', commandId: 'end', generation: 5 }),
     );
-    expect(first.map((data) => JSON.parse(data))).toContainEqual(
+    expect(first.map((data) => parseJson(data))).toContainEqual(
       expect.objectContaining({
         type: 'state',
         status: 'ended',

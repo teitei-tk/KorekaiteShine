@@ -29,11 +29,15 @@ test('再試行不可の失敗には次回待機を返さない', () => {
 });
 
 test('Retry-Afterが10000msなら待機は30000ms', () => {
-  expect(retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: 10000 })).toBe(30000);
+  expect(retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: 10_000 })).toBe(
+    30_000,
+  );
 });
 
 test('Retry-Afterが60000msなら待機は60000ms', () => {
-  expect(retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: 60000 })).toBe(60000);
+  expect(retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: 60_000 })).toBe(
+    60_000,
+  );
 });
 
 test('再試行可能な失敗でもRetry-Afterが-1なら拒否する', () => {
@@ -43,9 +47,9 @@ test('再試行可能な失敗でもRetry-Afterが-1なら拒否する', () => {
 });
 
 test('再試行可能な失敗でもRetry-AfterがNaNなら拒否する', () => {
-  expect(() => retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: NaN })).toThrow(
-    '再試行時刻が不正です。',
-  );
+  expect(() =>
+    retryDelayMs(1, { code: 'THROTTLED', retryable: true, retryAfterMs: Number.NaN }),
+  ).toThrow('再試行時刻が不正です。');
 });
 
 test('再試行可能な失敗でもRetry-AfterがInfinityなら拒否する', () => {

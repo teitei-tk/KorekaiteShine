@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import type { components } from '@korekaite/api-contracts/http';
 import {
   validateLocalSession,
@@ -17,7 +18,7 @@ import {
 
 export async function sessionToken(signal?: AbortSignal) {
   const session = await fetch('/api/local-session', { cache: 'no-store', signal });
-  const access = await session.json();
+  const access = parseJson(await session.text());
   if (!session.ok || !validateLocalSession(access)) {
     throw new Error('ローカル接続を確認してください。');
   }
@@ -30,7 +31,7 @@ async function post(path: string, body: object) {
     headers: { 'Content-Type': 'application/json', 'X-Interview-Token': token },
     body: JSON.stringify(body),
   });
-  const result = await response.json();
+  const result = parseJson(await response.text());
   if (!response.ok) {
     if (
       validateMaterialErrorBody(result) ||
@@ -61,7 +62,7 @@ export async function prepareInterview(request: components['schemas']['CreateInt
 async function read(path: string, signal: AbortSignal) {
   await sessionToken(signal);
   const response = await fetch(path, { cache: 'no-store', signal });
-  const value = await response.json();
+  const value = parseJson(await response.text());
   if (!response.ok) {
     throw new Error(
       validateApplicationError(value) ? value.error.message : '記録を取得できませんでした。',
@@ -74,20 +75,19 @@ export async function readHistory(
   signal: AbortSignal,
 ) {
   const query = cursor
-    ? '?' +
-      new URLSearchParams({
+    ? `?${new URLSearchParams({
         beforeCreatedAt: String(cursor.createdAt),
         beforeId: cursor.interviewId,
-      })
+      })}`
     : '';
-  const value = await read('/api/interview-history' + query, signal);
+  const value = await read(`/api/interview-history${query}`, signal);
   if (!validateInterviewHistory(value)) {
     throw new Error('履歴を読み取れませんでした。');
   }
   return value;
 }
 export async function readDetail(id: string, signal: AbortSignal) {
-  const value = await read('/api/interviews/' + encodeURIComponent(id), signal);
+  const value = await read(`/api/interviews/${encodeURIComponent(id)}`, signal);
   if (!validateInterviewDetail(value)) {
     throw new Error('面接の記録を読み取れませんでした。');
   }

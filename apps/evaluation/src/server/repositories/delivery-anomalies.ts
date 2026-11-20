@@ -4,12 +4,12 @@ import type { createPrimaryDb } from '@korekaite/database/connection';
 import type { DeliveryContext } from '../../application/consume-job';
 import type { JobPurpose } from './job-execution';
 
-export interface AnomalyDetails {
+export type AnomalyDetails = {
   code: string;
   schemaVersion: number | null;
   jobId: string | null;
   observedPurpose: JobPurpose | null;
-}
+};
 export async function recordDeliveryAnomaly(
   db: ReturnType<typeof createPrimaryDb>,
   context: DeliveryContext,

@@ -9,20 +9,21 @@ import { applicationFailure } from './application-response';
 
 export async function interviewHistoryRequest(
   request: Request,
-  deps: { db: ReturnType<typeof createPrimaryDb>; actor(request: Request): string | null },
+  deps: { db: ReturnType<typeof createPrimaryDb>; actor: (request: Request) => string | null },
 ): Promise<Response> {
   const actorId = deps.actor(request);
   if (!actorId) {
     return applicationFailure('FORBIDDEN');
   }
   const parameters = new URL(request.url).searchParams;
-  const query: Record<string, string | number> = Object.create(null);
+  const query: Record<string, string | number> = {};
+  Object.setPrototypeOf(query, null);
   for (const [name, value] of parameters) {
     if (Object.hasOwn(query, name)) {
       return applicationFailure('INVALID_REQUEST');
     }
     if (name === 'beforeCreatedAt') {
-      if (!/^(0|[1-9][0-9]*)$/u.test(value) || !Number.isSafeInteger(Number(value))) {
+      if (!/^(?:0|[1-9][0-9]*)$/u.test(value) || !Number.isSafeInteger(Number(value))) {
         return applicationFailure('INVALID_REQUEST');
       }
       query[name] = Number(value);
@@ -38,13 +39,13 @@ export async function interviewHistoryRequest(
   }
   try {
     const cursor =
-      query.beforeCreatedAt === undefined
+      query.beforeCreatedAt === undefined || query.beforeId === undefined
         ? undefined
         : or(
             lt(interviews.createdAt, query.beforeCreatedAt),
             and(
               eq(interviews.createdAt, query.beforeCreatedAt),
-              lt(interviews.interviewId, query.beforeId!),
+              lt(interviews.interviewId, query.beforeId),
             ),
           );
     const rows = await deps.db

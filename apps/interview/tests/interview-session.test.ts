@@ -1,8 +1,8 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { createLiveConnection } from '../src/server/live-connection.ts';
-
 import { audioUsagePeriods, usageReservations } from '@korekaite/database/usage';
 import { createEvaluationWorker } from '../../evaluation/src/worker.ts';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { Temporal } from '@js-temporal/polyfill';
 import { interviews, evaluationInputs, transcriptFragments } from '@korekaite/database';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
@@ -62,7 +62,9 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
           closed,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => {
             closesState.closes += 1;
             void callbacks
@@ -73,21 +75,22 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
                 end_ms: 1000,
                 delta: '最後の回答です。',
               })
-              .then(() =>
+              .then(() => {
                 resolveClosed({
                   complete: true,
                   reason: 'confirmed',
                   upstreamReason: 'close_requested',
                   usageSeconds: 1,
-                }),
-              );
+                });
+                return null;
+              });
             return closed;
           },
         };
       },
     });
     expect((await session.start()).status).toBe('connecting');
-    const [handlers] = onConnect.mock.lastCall!;
+    const [handlers] = onConnect.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
     await handlers.onReady('upstream');
     expect((await session.state()).status).toBe('active');
     nowState.now = 1010;
@@ -162,8 +165,10 @@ test('モック音声接続で開始し、終了中の最後の発言を保存�
     await worker.queue({ queue: 'evaluation', messages: [{ ...message, id: 'redelivery' }] }, env);
     expect(acknowledgementsContext.acknowledgements).toBe(2);
     expect(evaluationsState.evaluations).toBe(1);
-    const attempt = database.sqlite.prepare('SELECT result_json FROM job_attempts').get()!;
-    expect(JSON.parse(String(attempt.result_json))).toEqual(report);
+    const attempt =
+      database.sqlite.prepare('SELECT result_json FROM job_attempts').get() ??
+      assert.fail('必須のテスト値がありません。');
+    expect(parseJson(String(attempt.result_json))).toEqual(report);
     expect(database.sqlite.prepare('SELECT status FROM jobs').get()).toEqual({
       status: 'completed',
     });
@@ -188,7 +193,7 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
       generation: 1,
       streamGeneration: 1,
       activeSince: 10,
-      deadline: 1200010,
+      deadline: 1_200_010,
       createdAt: 0,
       updatedAt: 10,
     });
@@ -209,11 +214,11 @@ test('再起動で失われた接続は欠落を保存し、元の待機期限�
     expect(await createInterviewSession(options).recover()).toMatchObject({
       status: 'reconnecting',
       activeMs: 0,
-      deadline: 60010,
+      deadline: 60_010,
       transcriptIncomplete: true,
       streamGeneration: null,
     });
-    nowState.now = 60010;
+    nowState.now = 60_010;
     expect(await createInterviewSession(options).recover()).toMatchObject({ status: 'ended' });
     const [input] = await database.db.select().from(evaluationInputs);
     expect(input.inputJson.transcriptIncomplete).toBe(true);
@@ -261,7 +266,9 @@ test('一時停止で上流を閉じ、保存済み原文で再開して古い�
           closed,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => {
             resolve({
               complete: true,
@@ -355,7 +362,9 @@ test('面接の期限到達をアラームで処理し、ブラウザなしで�
           closed,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => {
             closesState.closes += 1;
             resolve({
@@ -370,13 +379,13 @@ test('面接の期限到達をアラームで処理し、ブラウザなしで�
       },
     });
     await session.start();
-    const [handlers] = onConnect.mock.lastCall!;
+    const [handlers] = onConnect.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
     await handlers.onReady('upstream');
-    nowState.now = 1200009;
+    nowState.now = 1_200_009;
     expect((await session.tick()).status).toBe('active');
     expect(closesState.closes).toBe(0);
-    nowState.now = 1200020;
-    expect(await session.tick()).toMatchObject({ status: 'ended', activeMs: 1200000 });
+    nowState.now = 1_200_020;
+    expect(await session.tick()).toMatchObject({ status: 'ended', activeMs: 1_200_000 });
     expect(closesState.closes).toBe(1);
     expect(await database.db.select().from(evaluationInputs)).toHaveLength(1);
   } finally {
@@ -397,7 +406,7 @@ test('再開する文脈が上限を超えたら接続せず原文を固定し�
       background: '',
       status: 'paused',
       generation: 2,
-      deadline: 300000,
+      deadline: 300_000,
       createdAt: 0,
       updatedAt: 0,
     });
@@ -483,7 +492,9 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
           closed,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => {
             resolveClosed({
               complete: true,
@@ -498,15 +509,15 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
     });
     await session.start();
     nowState.now = 4000;
-    const [handlers] = onConnect.mock.lastCall!;
+    const [handlers] = onConnect.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
     await handlers.onReady('upstream');
-    expect((await session.state()).deadline).toBe(34000);
+    expect((await session.state()).deadline).toBe(34_000);
     await handlers.onUsage(100, false);
     expect((await session.state()).status).toBe('active');
-    nowState.now = 35000;
+    nowState.now = 35_000;
     expect((await session.tick()).status).toBe('ended');
     expect(await database.db.select().from(audioUsagePeriods)).toMatchObject([
-      { startedAt: 4000, endedAt: 34000 },
+      { startedAt: 4000, endedAt: 34_000 },
     ]);
   } finally {
     database.close();
@@ -516,8 +527,8 @@ test('日次上限は面接中の時刻で止まり、接続準備とAIの通知
 test('深夜を越える前日残量は新日の面接を早期終了させない', async () => {
   const db = createTestDatabase();
   const midnight = Temporal.Instant.from('2026-11-11T00:00:00+09:00').epochMilliseconds;
-  const clock = { now: midnight - 30000 };
-  const stream = {} as { handlers: LiveHandlers };
+  const clock = { now: midnight - 30_000 };
+  const stream: { handlers?: LiveHandlers } = {};
   try {
     await db.db.insert(usageReservations).values({
       reservationId: 'previous',
@@ -553,20 +564,29 @@ test('深夜を越える前日残量は新日の面接を早期終了させな�
         stream.handlers = callbacks;
         return {
           ready: Promise.resolve('upstream'),
-          closed: new Promise<LiveClosed>(() => {}),
+          closed: new Promise<LiveClosed>(() => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          }),
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
-          close: () => new Promise<LiveClosed>(() => {}),
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
+          close: () =>
+            new Promise<LiveClosed>(() => {
+              /* このテストでは呼出しに副作用を持たせない。 */
+            }),
         };
       },
     });
     await session.start();
-    await stream.handlers.onReady('upstream');
-    expect((await session.state()).deadline).toBe(clock.now + 1200000);
-    clock.now = midnight + 60000;
+    await (stream.handlers ?? assert.fail('上流接続前にhandlerは利用できません。')).onReady(
+      'upstream',
+    );
+    expect((await session.state()).deadline).toBe(clock.now + 1_200_000);
+    clock.now = midnight + 60_000;
     expect((await session.tick()).status).toBe('active');
-    expect(await remainingAudioMs(db.db, 'actor', clock.now)).toBe(3540000);
+    expect(await remainingAudioMs(db.db, 'actor', clock.now)).toBe(3_540_000);
   } finally {
     db.close();
   }
@@ -575,7 +595,7 @@ test('深夜を越える前日残量は新日の面接を早期終了させな�
 test('稼働確認が途絶えた面接を再起動しても停止9分を利用枠に計上せず再接続待ちを延長しない', async () => {
   const db = createTestDatabase();
   const start = Temporal.Instant.from('2026-11-11T12:00:00+09:00').epochMilliseconds;
-  const now = start + 600000;
+  const now = start + 600_000;
   try {
     await db.db.insert(interviews).values({
       interviewId: 'lost',
@@ -590,10 +610,10 @@ test('稼働確認が途絶えた面接を再起動しても停止9分を利用�
       streamGeneration: 1,
       activeSince: start,
       createdAt: start,
-      updatedAt: start + 60000,
-      deadline: start + 1200000,
+      updatedAt: start + 60_000,
+      deadline: start + 1_200_000,
     });
-    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3540000);
+    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3_540_000);
     const session = createInterviewSession({
       db: db.db,
       interviewId: 'lost',
@@ -605,10 +625,10 @@ test('稼働確認が途絶えた面接を再起動しても停止9分を利用�
       evaluation,
       newJobId: () => '00000000-0000-4000-8000-000000000001',
     });
-    expect(await session.recover()).toMatchObject({ status: 'ended', activeMs: 60000 });
-    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3540000);
+    expect(await session.recover()).toMatchObject({ status: 'ended', activeMs: 60_000 });
+    expect(await remainingAudioMs(db.db, 'actor', now)).toBe(3_540_000);
     expect(await db.db.select().from(audioUsagePeriods)).toMatchObject([
-      { startedAt: start, endedAt: start + 60000 },
+      { startedAt: start, endedAt: start + 60_000 },
     ]);
   } finally {
     db.close();
@@ -659,7 +679,9 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
           closed: ended,
           sendAudio: () => true,
           request: () => true,
-          abort: () => {},
+          abort: () => {
+            /* このテストでは呼出しに副作用を持たせない。 */
+          },
           close: () => {
             closed({
               complete: true,
@@ -673,7 +695,7 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
       },
     });
     await session.start();
-    const [handlers] = onConnect.mock.lastCall!;
+    const [handlers] = onConnect.mock.lastCall ?? assert.fail('必須のテスト値がありません。');
     await handlers.onReady('mock');
     const failed = vi.fn();
     void handlers
@@ -688,7 +710,7 @@ test('保存の応答が途絶えても欠落を示して終了し、遅れた�
     await vi.advanceTimersByTimeAsync(0);
     expect(delayed).toHaveBeenCalledTimes(1);
     const finished = session.finish();
-    await vi.advanceTimersByTimeAsync(15000);
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(failed).toHaveBeenCalledTimes(1);
     await finished;
     release();
@@ -750,7 +772,7 @@ test('開始前に音声枠が尽きたら面接を開始前のまま保ち、�
 
 test('上流Upgrade失敗は音声枠を消費せず、同じ面接を開始前に戻す', async () => {
   const database = createTestDatabase();
-  const failure = vi.fn();
+  const failure = vi.fn<() => void>();
   try {
     await database.db.insert(interviews).values({
       interviewId: 'dial',
@@ -821,7 +843,7 @@ async function lifecycleFixture() {
 
   const { promise: closed, resolve: close } = Promise.withResolvers<LiveClosed>();
   const handlers: LiveHandlers[] = [];
-  const abort = vi.fn();
+  const abort = vi.fn<() => void>();
   const session = createInterviewSession({
     ...options,
     connect: (_, hooks) => {
@@ -836,7 +858,7 @@ async function lifecycleFixture() {
       };
     },
   });
-  return { database, session, options, close: close, handlers, abort };
+  return { database, session, options, close, handlers, abort };
 }
 
 test('接続準備中の再起動は稼働時間を増やさず元の接続期限内で復帰する', async () => {
@@ -966,9 +988,9 @@ test('既定の音声接続でUpgradeが拒否された場合に開始前へ戻�
   try {
     const session = createInterviewSession(options);
     await session.start();
-    await vi.waitFor(async () =>
-      expect(await session.state()).toMatchObject({ status: 'ready', streamGeneration: null }),
-    );
+    await vi.waitFor(async () => {
+      expect(await session.state()).toMatchObject({ status: 'ready', streamGeneration: null });
+    });
   } finally {
     vi.unstubAllGlobals();
     database.close();
@@ -980,7 +1002,9 @@ test('上流の終了待ちで面接が削除された場合は終了要求へ�
   try {
     await session.start();
     const finishing = session.finish();
-    await vi.waitFor(async () => expect(await session.state()).toMatchObject({ status: 'ending' }));
+    await vi.waitFor(async () => {
+      expect(await session.state()).toMatchObject({ status: 'ending' });
+    });
     await database.db.delete(interviews);
     close({
       complete: true,
@@ -999,7 +1023,7 @@ test('質問操作で旧接続を終了し、遅れた発言は元世代に保�
   const { database, options } = await lifecycleFixture();
   const handlers: LiveHandlers[] = [];
   const closing: ((value: LiveClosed) => void)[] = [];
-  const audio = vi.fn();
+  const audio = vi.fn<(generation: number, bytes: Uint8Array, endOffsetMs: number) => void>();
   const request = vi.fn();
   const sendAudio = vi.fn(() => true);
   const session = createInterviewSession({
@@ -1007,13 +1031,17 @@ test('質問操作で旧接続を終了し、遅れた発言は元世代に保�
     onAudio: audio,
     connect: (_options, hooks) => {
       handlers.push(hooks);
-      const closed = new Promise<LiveClosed>((resolve) => closing.push(resolve));
+      const closed = new Promise<LiveClosed>((resolve) => {
+        closing.push(resolve);
+      });
       return {
         ready: Promise.resolve('stream'),
         closed,
         sendAudio,
         request,
-        abort: () => {},
+        abort: () => {
+          /* このテストでは呼出しに副作用を持たせない。 */
+        },
         close: () => closed,
       };
     },
@@ -1029,12 +1057,12 @@ test('質問操作で旧接続を終了し、遅れた発言は元世代に保�
     const first = await session.start();
     await handlers[0].onReady('old');
     const switching = session.request(first.generation, 'skip');
-    await vi.waitFor(async () =>
+    await vi.waitFor(async () => {
       expect(await session.state()).toMatchObject({
         status: 'reconnecting',
         pendingQuestionOperation: 'skip',
-      }),
-    );
+      });
+    });
     expect(await session.request(first.generation, 'rephrase')).toBe(false);
     await handlers[0].onTranscript(text('tail', '古い質問の末尾'));
     closing[0]({
@@ -1056,14 +1084,14 @@ test('質問操作で旧接続を終了し、遅れた発言は元世代に保�
       { generation: next.generation, content: '新しい質問', startsQuestion: true },
     ]);
     expect((await session.state()).pendingQuestionOperation).toBe('skip');
-    handlers[1].onAudio(new Uint8Array(12000), 250);
+    handlers[1].onAudio(new Uint8Array(12_000), 250);
     expect(await session.playback(next.generation, 250)).toBe(true);
     expect((await session.state()).pendingQuestionOperation).toBe('skip');
     expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);
     expect(sendAudio).not.toHaveBeenCalled();
-    handlers[1].onAudio(new Uint8Array(12000).fill(23), 500);
+    handlers[1].onAudio(new Uint8Array(12_000).fill(23), 500);
     // 続く音声が届いても、最初の可聴区間の再生確認だけで回答を解放できる。
-    handlers[1].onAudio(new Uint8Array(12000).fill(23), 750);
+    handlers[1].onAudio(new Uint8Array(12_000).fill(23), 750);
     expect(await session.playback(next.generation, 500)).toBe(true);
     expect((await session.state()).pendingQuestionOperation).toBeNull();
     expect(await session.sendAudio(next.generation, new Uint8Array(960))).toBe(true);
@@ -1079,7 +1107,7 @@ test('見送り再開で音声が先に再生されても空白の文字だけ�
     await database.db.update(interviews).set({ pendingQuestionOperation: 'skip' });
     const active = await session.start();
     await handlers[0].onReady('resume');
-    handlers[0].onAudio(new Uint8Array(12000).fill(20), 250);
+    handlers[0].onAudio(new Uint8Array(12_000).fill(20), 250);
     expect(await session.playback(active.generation, 250)).toBe(true);
     await handlers[0].onTranscript({
       type: 'session.output_transcript.delta',

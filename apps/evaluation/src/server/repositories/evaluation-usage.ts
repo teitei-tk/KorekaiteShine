@@ -23,10 +23,12 @@ export async function reserveEvaluation(
     ) < ${usageLimits.evaluationsPerDay}
     ON CONFLICT DO NOTHING
   `);
-  const [saved] = await db
-    .select()
-    .from(usageReservations)
-    .where(eq(usageReservations.reservationId, reservationId));
+  const saved = (
+    await db
+      .select()
+      .from(usageReservations)
+      .where(eq(usageReservations.reservationId, reservationId))
+  ).at(0);
   // 再試行は初回の予約を引き継ぐ。翌日の新規枠をもう一度消費しない。
   return Boolean(
     saved && saved.actorId === input.actorId && saved.kind === 'evaluation' && saved.amount === 1,

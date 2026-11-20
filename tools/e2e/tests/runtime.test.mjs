@@ -23,6 +23,14 @@ async function fixture() {
   }
   await writeFile(join(source, 'tools/local-integration/package.json'), '{"type":"module"}');
   await writeFile(
+    join(source, 'tools/local-integration/tsconfig.json'),
+    '{"compilerOptions":{"target":"ES2022"}}',
+  );
+  await writeFile(
+    join(source, 'tools/local-integration/fixtures/tsconfig.json'),
+    '{"extends":"../tsconfig.json"}',
+  );
+  await writeFile(
     join(source, 'packages/runtime-config/src/resources.ts'),
     'export const resolveRuntime = value => value;',
   );
@@ -51,6 +59,7 @@ test.each(['pr', 'live'])(
       extendNextOpening: vi.fn(),
       omitNextOpening: vi.fn(),
       muteReplies: vi.fn(),
+      restoreResponses: vi.fn(),
       silenceCurrentConnections: vi.fn(),
       holdNextQuestion: vi.fn(() => held),
     };
@@ -58,6 +67,13 @@ test.each(['pr', 'live'])(
     try {
       const runtime = await startVoiceRuntime({ profile });
       const root = await readFile(join(source, 'root.txt'), 'utf8');
+      const fixtureConfig = JSON.parse(
+        await readFile(join(root, 'tools/local-integration/fixtures/tsconfig.json'), 'utf8'),
+      );
+      const parentConfig = join(root, 'tools/local-integration/fixtures', fixtureConfig.extends);
+      expect(await readFile(parentConfig, 'utf8')).toBe(
+        await readFile(join(source, 'tools/local-integration/tsconfig.json'), 'utf8'),
+      );
       const recorded = () => readFile(join(root, 'call.json'), 'utf8').then(JSON.parse);
       const start = await recorded();
       expect(start.config.appEnv).toBe(profile === 'pr' ? 'test' : 'development');
@@ -69,6 +85,7 @@ test.each(['pr', 'live'])(
           'extendNextOpening',
           'omitNextOpening',
           'muteReplies',
+          'restoreResponses',
           'silenceCurrentConnections',
         ]) {
           runtime[operation]();
@@ -82,7 +99,7 @@ test.each(['pr', 'live'])(
       }
       await runtime.restart();
       expect((await recorded()).options.port).toBe(4321);
-      await runtime.stop();
+      await runtime.stop({ diagnostics: true });
       await expect(access(root)).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
       await rm(source, { recursive: true, force: true });
@@ -105,4 +122,39 @@ test('不明なプロファイルとルート欠落を起動前に拒否する',
   vi.stubEnv('E2E_APP_ROOT', '');
   await expect(startVoiceRuntime({ profile: 'pr' })).rejects.toThrow('E2E_APP_ROOT');
   await expect(startVoiceRuntime({ profile: 'unknown' })).rejects.toThrow('プロファイル');
+});
+
+test('PRの停止時は診断ログの集計を出力し、サービスと保存先を解放する', async () => {
+  const source = await fixture();
+  const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  const provider = { url: 'http://example.test', stop: vi.fn() };
+  startProvider.mockResolvedValue(provider);
+  try {
+    await writeFile(
+      join(source, 'packages/runtime-config/src/resources.ts'),
+      "export const resolveRuntime = value => ({ ...value, artifactDirectory: value.repositoryRoot + '/artifacts' });",
+    );
+    const runtime = await startVoiceRuntime({ profile: 'pr' });
+    const root = await readFile(join(source, 'root.txt'), 'utf8');
+    await mkdir(join(root, 'artifacts'));
+    await writeFile(
+      join(root, 'artifacts/runtime.log'),
+      'interview_input_backpressure Error error Error',
+    );
+    await runtime.stop({ diagnostics: true });
+    expect(output).toHaveBeenCalledWith(
+      'PR用ランタイムの診断:',
+      expect.objectContaining({
+        interview_input_backpressure: 1,
+        Error: 2,
+        error: 1,
+        'server restarted': 0,
+      }),
+    );
+    expect(provider.stop).toHaveBeenCalledOnce();
+    await expect(access(root)).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally {
+    output.mockRestore();
+    await rm(source, { recursive: true, force: true });
+  }
 });

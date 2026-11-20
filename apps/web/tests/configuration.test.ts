@@ -37,3 +37,28 @@ test('Void設定は追加の配置先やbindingを宣言せず既定構成を返
   expect(factories.defineVoid).toHaveBeenCalledExactlyOnceWith({});
   expect(config).toEqual({});
 });
+
+test('ルート生成スクリプトはWebルートを基準に設定を読み、生成完了を待つ', async () => {
+  const run = vi.fn(async () => undefined);
+  const config = { routesDirectory: './src/routes' };
+  const getConfig = vi.fn(() => config);
+  const construct = vi.fn();
+  vi.doMock('@tanstack/router-generator', () => ({
+    getConfig,
+    Generator: class {
+      constructor(options: object) {
+        construct(options);
+      }
+      run = run;
+    },
+  }));
+  try {
+    await import('../scripts/generate-routes.ts');
+    const root = new URL('../', import.meta.url).pathname;
+    expect(getConfig).toHaveBeenCalledExactlyOnceWith({}, root);
+    expect(construct).toHaveBeenCalledExactlyOnceWith({ config, root });
+    expect(run).toHaveBeenCalledOnce();
+  } finally {
+    vi.doUnmock('@tanstack/router-generator');
+  }
+});

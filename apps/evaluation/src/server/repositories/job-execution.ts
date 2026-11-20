@@ -15,13 +15,13 @@ import { executionTiming } from '../../domain/lease';
 
 type Database = ReturnType<typeof createPrimaryDb>;
 export type JobPurpose = typeof jobs.$inferSelect.purpose;
-export interface ExecutionLease {
+export type ExecutionLease = {
   jobId: string;
   ownerToken: string;
   generation: number;
   attemptNumber: number;
   deadline: number;
-}
+};
 
 export async function acquireExecution(
   db: Database,
@@ -98,13 +98,16 @@ export async function acquireExecution(
       )
       .returning({ attemptNumber: jobAttempts.attemptNumber }),
   ]);
-  if (!attempts[0]) {
+  const attempt = attempts.at(0);
+  if (!attempt) {
     return null;
   }
-  const [job] = await db
-    .select({ generation: jobs.generation })
-    .from(jobs)
-    .where(and(eq(jobs.jobId, jobId), eq(jobs.ownerToken, ownerToken)));
+  const job = (
+    await db
+      .select({ generation: jobs.generation })
+      .from(jobs)
+      .where(and(eq(jobs.jobId, jobId), eq(jobs.ownerToken, ownerToken)))
+  ).at(0);
   if (!job) {
     return null;
   }
@@ -112,7 +115,7 @@ export async function acquireExecution(
     jobId,
     ownerToken,
     generation: job.generation,
-    attemptNumber: attempts[0].attemptNumber,
+    attemptNumber: attempt.attemptNumber,
     deadline,
   };
 }
@@ -199,7 +202,10 @@ export async function completeExecution(
       ),
     ),
   ]);
-  const completed = results[1 + extra.length] as { jobId: string }[];
+  const completed: unknown = results[1 + extra.length];
+  if (!Array.isArray(completed)) {
+    throw new TypeError('D1更新結果が配列ではありません。');
+  }
   return completed.length === 1;
 }
 
@@ -208,16 +214,18 @@ export async function isTerminalJob(
   jobId: string,
   purpose: JobPurpose,
 ): Promise<boolean> {
-  const [job] = await db
-    .select({ jobId: jobs.jobId })
-    .from(jobs)
-    .where(
-      and(
-        eq(jobs.jobId, jobId),
-        eq(jobs.purpose, purpose),
-        inArray(jobs.status, terminalJobStates),
-      ),
-    );
+  const job = (
+    await db
+      .select({ jobId: jobs.jobId })
+      .from(jobs)
+      .where(
+        and(
+          eq(jobs.jobId, jobId),
+          eq(jobs.purpose, purpose),
+          inArray(jobs.status, terminalJobStates),
+        ),
+      )
+  ).at(0);
   return Boolean(job);
 }
 
@@ -227,29 +235,31 @@ export async function hasActiveExecution(
   purpose: JobPurpose,
   now: number,
 ): Promise<boolean> {
-  const [job] = await db
-    .select({ jobId: jobs.jobId })
-    .from(jobs)
-    .innerJoin(
-      executionSlots,
-      and(
-        eq(executionSlots.actorId, jobs.actorId),
-        eq(executionSlots.jobId, jobs.jobId),
-        eq(executionSlots.ownerToken, jobs.ownerToken),
-        eq(executionSlots.generation, jobs.generation),
-      ),
-    )
-    .where(
-      and(
-        eq(jobs.jobId, jobId),
-        eq(jobs.purpose, purpose),
-        eq(jobs.status, 'running'),
-        gt(jobs.leaseUntil, now),
-        gt(jobs.attemptDeadline, now),
-        gt(executionSlots.leaseUntil, now),
-        notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
-      ),
-    );
+  const job = (
+    await db
+      .select({ jobId: jobs.jobId })
+      .from(jobs)
+      .innerJoin(
+        executionSlots,
+        and(
+          eq(executionSlots.actorId, jobs.actorId),
+          eq(executionSlots.jobId, jobs.jobId),
+          eq(executionSlots.ownerToken, jobs.ownerToken),
+          eq(executionSlots.generation, jobs.generation),
+        ),
+      )
+      .where(
+        and(
+          eq(jobs.jobId, jobId),
+          eq(jobs.purpose, purpose),
+          eq(jobs.status, 'running'),
+          gt(jobs.leaseUntil, now),
+          gt(jobs.attemptDeadline, now),
+          gt(executionSlots.leaseUntil, now),
+          notExists(db.select().from(deletedJobs).where(eq(deletedJobs.jobId, jobs.jobId))),
+        ),
+      )
+  ).at(0);
   return Boolean(job);
 }
 
@@ -302,20 +312,22 @@ export async function deferForBusySlot(
       )
       .onConflictDoNothing(),
   ]);
-  const [scheduled] = await db
-    .select({ jobId: jobs.jobId })
-    .from(jobs)
-    .innerJoin(
-      jobOutbox,
-      and(
-        eq(jobOutbox.jobId, jobs.jobId),
-        eq(jobOutbox.purpose, jobs.purpose),
-        eq(jobOutbox.operation, 'notify'),
-        eq(jobOutbox.generation, jobs.generation),
-        eq(jobOutbox.scheduledAt, jobs.nextAttemptAt),
-      ),
-    )
-    .where(and(pending, gt(jobs.nextAttemptAt, now)));
+  const scheduled = (
+    await db
+      .select({ jobId: jobs.jobId })
+      .from(jobs)
+      .innerJoin(
+        jobOutbox,
+        and(
+          eq(jobOutbox.jobId, jobs.jobId),
+          eq(jobOutbox.purpose, jobs.purpose),
+          eq(jobOutbox.operation, 'notify'),
+          eq(jobOutbox.generation, jobs.generation),
+          eq(jobOutbox.scheduledAt, jobs.nextAttemptAt),
+        ),
+      )
+      .where(and(pending, gt(jobs.nextAttemptAt, now)))
+  ).at(0);
   return Boolean(scheduled);
 }
 
@@ -469,7 +481,7 @@ export async function recoverExpiredExecution(
         ),
     ),
   );
-  const [job] = await db.select().from(jobs).where(expired);
+  const job = (await db.select().from(jobs).where(expired)).at(0);
   if (!job || job.ownerToken === null || job.leaseUntil === null || job.attemptDeadline === null) {
     return false;
   }

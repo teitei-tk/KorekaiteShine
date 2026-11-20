@@ -1,3 +1,4 @@
+import { parseJson } from '@korekaite/api-contracts/json';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
@@ -32,13 +33,15 @@ test('診断HTTPのContent-Type欠落を契約違反にし調査用の成果物�
   expect(fixture.stop).toHaveBeenCalledTimes(1);
   expect(await readFile(join(fixture.directory(), 'evidence.txt'), 'utf8')).toBe('retain');
   expect(
-    JSON.parse(await readFile(join(dirname(fixture.directory()), 'results.json'), 'utf8')),
+    parseJson(await readFile(join(dirname(fixture.directory()), 'results.json'), 'utf8')),
   ).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
 });
 
 async function failureFixture() {
   const directoryState = { directory: '' };
-  const stop = vi.fn(async () => {});
+  const stop = vi.fn(async () => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.mocked(startRuntime).mockImplementation(async (config) => {
     directoryState.directory = config.artifactDirectory;
     onTestFinished(() =>
@@ -50,7 +53,9 @@ async function failureFixture() {
       baseUrl: 'http://contract.invalid',
       stop,
       closed: Promise.resolve({ exitCode: 0 }),
-      runScheduled: async () => {},
+      runScheduled: async () => {
+        /* この実装では追加の処理を行わない。 */
+      },
     };
   });
   return { stop, directory: () => directoryState.directory };

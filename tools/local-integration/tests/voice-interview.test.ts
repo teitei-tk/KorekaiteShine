@@ -1,8 +1,10 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import { readJson, readBootstrap, readAnalysis } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rm } from 'node:fs/promises';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import type { InterviewServerEvent } from '@korekaite/api-contracts/events/interview-server';
 import { validateInterviewServerEvent } from '@korekaite/api-contracts/events/validators';
@@ -25,8 +27,10 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
   try {
     const bootstrap = await fetch(`${runtime.baseUrl}/api/local-session`);
     expect(bootstrap.status).toBe(200);
-    const cookie = bootstrap.headers.get('Set-Cookie')!.split(';')[0];
-    const { operationToken } = await bootstrap.json();
+    const [cookie] = (
+      bootstrap.headers.get('Set-Cookie') ?? assert.fail('必須のテスト値がありません。')
+    ).split(';');
+    const { operationToken } = await readBootstrap(bootstrap);
     const headers = {
       Cookie: cookie,
       Origin: runtime.baseUrl,
@@ -39,7 +43,7 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
       body: JSON.stringify({ confirmed: true, markdown: '架空の経験' }),
     });
     expect(analysis.status).toBe(200);
-    const { analysisId } = await analysis.json();
+    const { analysisId } = await readAnalysis(analysis);
     const creation = await fetch(`${runtime.baseUrl}/api/interviews`, {
       method: 'POST',
       headers,
@@ -56,14 +60,14 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     const LocalSocket = WebSocket as typeof WebSocket & {
       new (url: string, init: { headers: Record<string, string> }): WebSocket;
     };
-    async function openPeer() {
+    const openPeer = async () => {
       const peer = new LocalSocket(
         `${runtime.baseUrl.replace('http:', 'ws:')}/api/interviews/voice-fixture/live`,
         { headers: { Cookie: cookie, Origin: runtime.baseUrl } },
       );
       peer.addEventListener('message', (message) => {
         if (typeof message.data === 'string') {
-          const event = JSON.parse(message.data);
+          const event = parseJson(message.data);
           if (validateInterviewServerEvent(event)) {
             events.push(event);
             if (event.type === 'deleted') {
@@ -73,20 +77,32 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
         }
       });
       await new Promise<void>((resolve, reject) => {
-        peer.addEventListener('open', () => resolve(), { once: true });
-        peer.addEventListener('error', () => reject(new Error('面接WebSocketに接続できません。')), {
-          once: true,
-        });
+        peer.addEventListener(
+          'open',
+          () => {
+            resolve();
+          },
+          { once: true },
+        );
+        peer.addEventListener(
+          'error',
+          () => {
+            reject(new Error('面接WebSocketに接続できません。'));
+          },
+          {
+            once: true,
+          },
+        );
       });
       return peer;
-    }
+    };
     succeededContext.socket = await openPeer();
     succeededContext.socket.send(
       JSON.stringify({ type: 'start', commandId: 'start', generation: 0 }),
     );
     await expect
       .poll(() => events.some((event) => event.type === 'state' && event.status === 'active'), {
-        timeout: 10000,
+        timeout: 10_000,
       })
       .toBe(true);
     const audio = new ArrayBuffer(10);
@@ -94,19 +110,23 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     succeededContext.socket.send(audio);
     await expect
       .poll(() => events.filter((event) => event.type !== 'state'), {
-        timeout: 10000,
+        timeout: 10_000,
       })
       .toContainEqual(expect.objectContaining({ type: 'transcript', speaker: 'user' }));
-    const closed = new Promise<void>((resolve) =>
-      succeededContext.socket!.addEventListener('close', () => resolve(), { once: true }),
-    );
+    const closed = new Promise<void>((resolve) => {
+      (succeededContext.socket ?? assert.fail('必須のテスト値がありません。')).addEventListener(
+        'close',
+        () => resolve(),
+        { once: true },
+      );
+    });
     succeededContext.socket.close();
     await closed;
     events.length = 0;
     succeededContext.socket = await openPeer();
     await expect
       .poll(() => events.some((e) => e.type === 'state' && e.status === 'reconnecting'), {
-        timeout: 10000,
+        timeout: 10_000,
       })
       .toBe(true);
     succeededContext.socket.send(
@@ -115,14 +135,14 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     await expect
       .poll(
         () => events.some((e) => e.type === 'state' && e.status === 'active' && e.generation === 3),
-        { timeout: 10000 },
+        { timeout: 10_000 },
       )
       .toBe(true);
     new DataView(audio).setFloat64(0, 3);
     succeededContext.socket.send(audio);
     await expect
       .poll(() => events.some((e) => e.type === 'transcript' && e.generation === 3), {
-        timeout: 10000,
+        timeout: 10_000,
       })
       .toBe(true);
     succeededContext.socket.send(
@@ -130,25 +150,25 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     );
     await expect
       .poll(() => events.some((event) => event.type === 'state' && event.status === 'ended'), {
-        timeout: 10000,
+        timeout: 10_000,
       })
       .toBe(true);
     const ended = events
       .filter((event) => event.type === 'state' && event.status === 'ended')
       .at(-1);
-    if (!ended || ended.type !== 'state' || !ended.evaluationJobId) {
+    if (ended?.type !== 'state' || !ended.evaluationJobId) {
       throw new Error('終了受付のジョブがありません。');
     }
     await runtime.runScheduled();
     await expect
       .poll(
         async () =>
-          (
+          readJson(
             await fetch(`${runtime.baseUrl}/api/interviews/voice-fixture`, {
               headers: { Cookie: cookie },
-            })
-          ).json(),
-        { timeout: 30000, interval: 200 },
+            }),
+          ),
+        { timeout: 30_000, interval: 200 },
       )
       .toMatchObject({
         session: { status: 'ended' },
@@ -198,7 +218,7 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
             return false;
           }
         },
-        { timeout: 30000, interval: 500 },
+        { timeout: 30_000, interval: 500 },
       )
       .toBe(true);
     expect(
@@ -217,5 +237,8 @@ test('実DOの音声面接をモックAIで開始・終了し、実Queueの評�
     await runtime.stop();
   }
 
-  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-}, 90000);
+  await rm(dirname(config.stateDirectory ?? assert.fail('必須のテスト値がありません。')), {
+    recursive: true,
+    force: true,
+  });
+}, 90_000);

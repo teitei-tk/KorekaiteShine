@@ -1,3 +1,5 @@
+import type { JsonValue } from '@korekaite/api-contracts/json';
+import { parseJson } from '@korekaite/api-contracts/json';
 import { Temporal } from '@js-temporal/polyfill';
 import { usageLimits } from '@korekaite/runtime-config/limits';
 import { usedAudioMs } from '@korekaite/database/audio-periods';
@@ -19,7 +21,7 @@ import { applicationFailure } from './application-response';
 export async function interviewDetailRequest(
   request: Request,
   interviewId: string,
-  deps: { db: ReturnType<typeof createPrimaryDb>; actor(request: Request): string | null },
+  deps: { db: ReturnType<typeof createPrimaryDb>; actor: (request: Request) => string | null },
 ): Promise<Response> {
   const actorId = deps.actor(request);
   if (!actorId) {
@@ -29,10 +31,12 @@ export async function interviewDetailRequest(
     return applicationFailure('INVALID_REQUEST');
   }
   try {
-    const [row] = await deps.db
-      .select()
-      .from(interviews)
-      .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)));
+    const row = (
+      await deps.db
+        .select()
+        .from(interviews)
+        .where(and(eq(interviews.interviewId, interviewId), eq(interviews.actorId, actorId)))
+    ).at(0);
     if (!row) {
       return applicationFailure('NOT_FOUND');
     }
@@ -59,37 +63,41 @@ export async function interviewDetailRequest(
       .from(playbackReceipts)
       .where(eq(playbackReceipts.interviewId, interviewId))
       .orderBy(asc(playbackReceipts.generation));
-    const [job] = await deps.db
-      .select({
-        jobId: jobs.jobId,
-        status: jobs.status,
-        attemptCount: jobs.attemptCount,
-        nextAttemptAt: jobs.nextAttemptAt,
-        lastErrorCode: jobs.lastErrorCode,
-      })
-      .from(evaluationInputs)
-      .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
-      .where(
-        and(
-          eq(evaluationInputs.interviewId, interviewId),
-          eq(jobs.actorId, actorId),
-          eq(jobs.purpose, 'evaluation'),
-        ),
-      )
-      .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
-      .limit(1);
-    const resultState = { result: null as object | null };
-    if (job?.status === 'completed') {
-      const [attempt] = await deps.db
-        .select({ resultJson: jobAttempts.resultJson })
-        .from(jobAttempts)
+    const job = (
+      await deps.db
+        .select({
+          jobId: jobs.jobId,
+          status: jobs.status,
+          attemptCount: jobs.attemptCount,
+          nextAttemptAt: jobs.nextAttemptAt,
+          lastErrorCode: jobs.lastErrorCode,
+        })
+        .from(evaluationInputs)
+        .innerJoin(jobs, eq(jobs.jobId, evaluationInputs.jobId))
         .where(
-          and(eq(jobAttempts.jobId, job.jobId), eq(jobAttempts.attemptNumber, job.attemptCount)),
-        );
+          and(
+            eq(evaluationInputs.interviewId, interviewId),
+            eq(jobs.actorId, actorId),
+            eq(jobs.purpose, 'evaluation'),
+          ),
+        )
+        .orderBy(desc(evaluationInputs.createdAt), desc(evaluationInputs.jobId))
+        .limit(1)
+    ).at(0);
+    const resultState = { result: null as JsonValue };
+    if (job?.status === 'completed') {
+      const attempt = (
+        await deps.db
+          .select({ resultJson: jobAttempts.resultJson })
+          .from(jobAttempts)
+          .where(
+            and(eq(jobAttempts.jobId, job.jobId), eq(jobAttempts.attemptNumber, job.attemptCount)),
+          )
+      ).at(0);
       if (!attempt?.resultJson) {
         return applicationFailure('UNAVAILABLE');
       }
-      resultState.result = JSON.parse(attempt.resultJson);
+      resultState.result = parseJson(attempt.resultJson);
     }
     const now = Temporal.Now.instant().epochMilliseconds;
     const start = Temporal.Instant.fromEpochMilliseconds(now)

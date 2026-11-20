@@ -1,3 +1,4 @@
+import { readCoverageConfig, required } from './schema.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { registerHooks } from 'node:module';
@@ -7,13 +8,14 @@ import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
 import { createCounterJournal } from './journal.ts';
 import { startCapture } from './capture.ts';
 import { instrumentSource } from './instrument.ts';
-import type { CoverageRun } from './merge.ts';
 
 const config = process.env.KOREKAITE_COVERAGE_RUN;
 if (config) {
-  const { root, directory, run }: { root: string; directory: string; run: CoverageRun } =
-    JSON.parse(readFileSync(config, 'utf8'));
-  const suite = process.env.KOREKAITE_COVERAGE_SUITE!;
+  const settings = readCoverageConfig(readFileSync(config, 'utf8'));
+  const { run } = settings;
+  const root = required(settings.root, 'root');
+  const directory = required(settings.directory, 'directory');
+  const suite = required(process.env.KOREKAITE_COVERAGE_SUITE, 'KOREKAITE_COVERAGE_SUITE');
   const capture = startCapture(run, suite, directory);
   const global = globalThis as typeof globalThis & {
     __coverage__?: Record<string, SourceCoverageData>;

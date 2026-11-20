@@ -1,11 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { PracticeHistory, PracticeRecord } from '../components/practice-record';
 import { PracticePreparation } from '../components/practice-preparation';
 
 export const Route = createFileRoute('/practice')({ component: PracticePage });
 export function PracticePage() {
   const [id, setId] = useState<string | null>(null);
+  const clear = useCallback(() => {
+    setId(null);
+  }, []);
+  const created = useCallback((session: { interviewId: string }) => {
+    setId(session.interviewId);
+  }, []);
   return (
     <main
       style={{
@@ -19,12 +25,19 @@ export function PracticePage() {
       <h1>技術面接の練習</h1>
       {id ? (
         <>
-          <button onClick={() => setId(null)}>準備と履歴へ戻る</button>
-          <PracticeRecord key={id} id={id} onDeleted={() => setId(null)} />
+          <button
+            type="button"
+            onClick={() => {
+              setId(null);
+            }}
+          >
+            準備と履歴へ戻る
+          </button>
+          <PracticeRecord key={id} id={id} onDeleted={clear} />
         </>
       ) : (
         <>
-          <PracticePreparation onCreated={(session) => setId(session.interviewId)} />
+          <PracticePreparation onCreated={created} />
           <PracticeHistory onOpen={setId} />
         </>
       )}

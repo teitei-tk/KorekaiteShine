@@ -1,13 +1,19 @@
 // @vitest-environment jsdom
-// @vitest-environment-options {"url":"http://localhost:4327"}
 import './helpers/dom';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { InterviewPage } from '../src/routes/index';
 
+// @vitest-environment-options {"url":"http://localhost:4327"}
+
 test('一覧の初回取得中は読み込み状態を表示する', () => {
-  const fetcher = vi.fn(() => new Promise<Response>(() => {}));
+  const fetcher = vi.fn(
+    () =>
+      new Promise<Response>(() => {
+        /* このテストでは呼出しに副作用を持たせない。 */
+      }),
+  );
   vi.stubGlobal('fetch', fetcher);
   render(<InterviewPage />);
   expect(screen.getByRole('status').textContent).toBe('読み込み中…');
@@ -50,8 +56,8 @@ test('取得した2件の内容と日本時間・材料・評価状態を表示�
   expect(rows).toHaveLength(3);
   expect(rows[1].textContent).toBe('2026/11/4 0:00:00Queueを選んだ判断コード15分評価待ち');
   expect(rows[2].textContent).toBe('2026/11/3 23:00:00DOで状態を保持経験Markdown10分評価失敗');
-  const request = fetcher.mock.calls[0]?.[0];
-  expect(new Request(request!).url).toBe('http://localhost:4327/api/interviews');
+  const [[request]] = fetcher.mock.calls;
+  expect(new Request(request).url).toBe('http://localhost:4327/api/interviews');
 });
 
 test('空の一覧では0件を表示し、データ行やエラーを表示しない', async () => {
@@ -88,7 +94,9 @@ test('再取得中は前の一覧を消し、完了後は新しい一覧を表�
   await userEvent.click(screen.getByRole('button', { name: '再取得' }));
   expect(screen.getByRole('status').textContent).toBe('読み込み中…');
   expect(screen.queryByRole('table')).toBeNull();
-  await act(async () => pending.resolve(Response.json({ items: [] })));
+  await act(async () => {
+    pending.resolve(Response.json({ items: [] }));
+  });
   await screen.findByText('0件の面接');
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
@@ -119,7 +127,9 @@ test('古い成功応答は再取得した最新の一覧を上書きしない',
   render(<InterviewPage />);
   await userEvent.click(screen.getByRole('button', { name: '再取得' }));
   await screen.findByText('0件の面接');
-  await act(async () => old.resolve(Response.json(interviewList)));
+  await act(async () => {
+    old.resolve(Response.json(interviewList));
+  });
   expect(screen.getByRole('status').textContent).toBe('0件の面接');
   expect(screen.queryByText('Queueを選んだ判断')).toBeNull();
 });
@@ -136,7 +146,9 @@ test('古い失敗応答は再取得した最新の成功をエラーに戻さ�
   render(<InterviewPage />);
   await userEvent.click(screen.getByRole('button', { name: '再取得' }));
   await screen.findByText('2件の面接');
-  await act(async () => old.reject(new TypeError('古い要求の通信失敗')));
+  await act(async () => {
+    old.reject(new TypeError('古い要求の通信失敗'));
+  });
   expect(screen.getByRole('status').textContent).toBe('2件の面接');
   expect(screen.queryByRole('alert')).toBeNull();
 });
@@ -153,7 +165,9 @@ test('古い成功応答は最新の取得失敗表示を消さない', async ()
   render(<InterviewPage />);
   await userEvent.click(screen.getByRole('button', { name: '再取得' }));
   await screen.findByRole('alert');
-  await act(async () => old.resolve(Response.json(interviewList)));
+  await act(async () => {
+    old.resolve(Response.json(interviewList));
+  });
   expect(screen.getByRole('alert').textContent).toBe('面接一覧を取得できませんでした。');
   expect(screen.queryByRole('table')).toBeNull();
 });
@@ -171,7 +185,9 @@ test('アンマウントした画面の応答は新しく表示した画面へ�
   first.unmount();
   render(<InterviewPage />);
   await screen.findByText('0件の面接');
-  await act(async () => old.resolve(Response.json(interviewList)));
+  await act(async () => {
+    old.resolve(Response.json(interviewList));
+  });
   expect(screen.getByRole('status').textContent).toBe('0件の面接');
   expect(screen.getAllByRole('table')).toHaveLength(1);
 });

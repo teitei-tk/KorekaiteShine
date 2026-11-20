@@ -1,3 +1,4 @@
+import type * as LintTypeModule0 from 'node:fs/promises';
 import { mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -5,7 +6,7 @@ import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { checkLinks, checkCommands } from './check.ts';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  const actual = await importOriginal<typeof LintTypeModule0>();
   return { ...actual, realpath: vi.fn(actual.realpath) };
 });
 afterEach(() => vi.resetAllMocks());

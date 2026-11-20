@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import { expect, test, vi } from 'vitest';
-import WebSocket from 'ws';
+import { WebSocket } from 'ws';
 import { startProvider } from '../runtime-provider.mjs';
 
 test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上流セッションを維持する', async () => {
@@ -20,7 +20,12 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
     await once(client, 'open');
     const send = (type, extra = {}) => client.send(JSON.stringify({ type, ...extra }));
     send('session.start');
-    await vi.waitFor(() => expect(events).toHaveLength(3), { timeout: 30000 });
+    await vi.waitFor(
+      () => {
+        expect(events).toHaveLength(3);
+      },
+      { timeout: 30_000 },
+    );
     const voice = Buffer.alloc(4802);
     voice.fill(Buffer.from([0xff, 0x03]));
     for (const buf of [voice, Buffer.alloc(9600), voice]) {
@@ -28,7 +33,12 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
     }
     send('ignored');
     send('session.close');
-    await vi.waitFor(() => expect(events.at(-1)?.type).toBe('session.closed'), { timeout: 30000 });
+    await vi.waitFor(
+      () => {
+        expect(events.at(-1)?.type).toBe('session.closed');
+      },
+      { timeout: 30_000 },
+    );
     expect(events.filter((e) => e.type === 'session.input_transcript.delta')).toHaveLength(2);
     expect(events.filter((e) => e.type === 'session.output_audio.delta')).toHaveLength(3);
     // RFC 6455の予約ビットを立てたフレームでサーバー側errorを発生させる。
@@ -40,7 +50,7 @@ test('模擬AIは発話と無音の境界で応答し、閉じるまで同じ上
   } finally {
     await provider.stop();
   }
-}, 120000);
+}, 120_000);
 
 test('リスナーの終了失敗を呼び出し側に返す', async () => {
   const provider = await startProvider();
@@ -55,12 +65,19 @@ async function openPeer(provider) {
   await once(socket, 'open');
   return {
     events,
+    async flush() {
+      const pong = once(socket, 'pong');
+      socket.ping();
+      await pong;
+    },
     send(type, fields = {}) {
       socket.send(JSON.stringify({ type, ...fields }));
     },
     async finish() {
       socket.send(JSON.stringify({ type: 'session.close' }));
-      await vi.waitFor(() => expect(events.at(-1)?.type).toBe('session.closed'));
+      await vi.waitFor(() => {
+        expect(events.at(-1)?.type).toBe('session.closed');
+      });
     },
   };
 }
@@ -80,8 +97,9 @@ test('初回質問の無音と延長は各1回だけ適用し、返答案の消�
     await extended.finish();
     expect(audio(extended)).toHaveLength(9);
     const muted = await openPeer(provider);
-    provider.muteReplies();
     muted.send('session.start');
+    await muted.flush();
+    provider.muteReplies();
     muted.send('session.instructions.append', { content: '言い換え' });
     await muted.finish();
     const [opening, reply] = audio(muted).map((e) => Buffer.from(e.delta, 'base64'));
@@ -148,18 +166,69 @@ test.each(['rephrase', 'skip'])(
   },
 );
 
-test('無応答にした既存の接続は終了通知も返さず、新しい接続は応答する', async () => {
+test('会話の無応答は再接続でも続き、明示的な復旧後は既存と新規接続が応答する', async () => {
   const provider = await startProvider();
   try {
-    const unavailable = await openPeer(provider);
-    unavailable.send('session.start');
-    await vi.waitFor(() => expect(unavailable.events).toHaveLength(3));
+    const old = await openPeer(provider);
+    old.send('session.start');
+    await old.flush();
+    expect(old.events).toHaveLength(3);
     provider.silenceCurrentConnections();
-    unavailable.send('session.close');
+    old.send('session.close');
+    await old.flush();
+    expect(old.events).toHaveLength(3);
     const next = await openPeer(provider);
     next.send('session.start');
+    next.send('session.instructions.append', { content: '言い換え' });
+    next.send('session.close');
+    await next.flush();
+    expect(next.events.map((event) => event.type)).toEqual(['session.started']);
+    provider.restoreResponses();
+    next.send('session.instructions.append', { content: '言い換え' });
     await next.finish();
-    expect(unavailable.events).toHaveLength(3);
+    expect(next.events.map((event) => event.type)).toEqual([
+      'session.started',
+      'session.output_transcript.delta',
+      'session.output_audio.delta',
+      'session.closed',
+    ]);
+    const restored = await openPeer(provider);
+    restored.send('session.start');
+    await restored.finish();
+    expect(restored.events).toHaveLength(4);
+  } finally {
+    await provider.stop();
+  }
+});
+
+test('消音は自動再接続の質問と回答にも続き、明示的な復旧後は音声を返す', async () => {
+  const provider = await startProvider();
+  try {
+    const old = await openPeer(provider);
+    old.send('session.start');
+    await vi.waitFor(() => expect(old.events).toHaveLength(3));
+    provider.muteReplies();
+    old.send('session.instructions.append', { content: '言い換え' });
+    await old.finish();
+    const next = await openPeer(provider);
+    next.send('session.start');
+    next.send('session.instructions.append', { content: '言い換え' });
+    await next.finish();
+    const audio = (peer) =>
+      peer.events
+        .filter((e) => e.type === 'session.output_audio.delta')
+        .map((e) => Buffer.from(e.delta, 'base64'));
+    expect(audio(old)[0].some((byte) => byte !== 0)).toBe(true);
+    expect(audio(old)[1].every((byte) => byte === 0)).toBe(true);
+    expect(audio(next)).toHaveLength(2);
+    expect(audio(next).every((pcm) => pcm.every((byte) => byte === 0))).toBe(true);
+    provider.restoreResponses();
+    const restored = await openPeer(provider);
+    restored.send('session.start');
+    restored.send('session.instructions.append', { content: '言い換え' });
+    await restored.finish();
+    expect(audio(restored)).toHaveLength(2);
+    expect(audio(restored).every((pcm) => pcm.some((byte) => byte !== 0))).toBe(true);
   } finally {
     await provider.stop();
   }

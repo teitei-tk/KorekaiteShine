@@ -34,7 +34,7 @@ pnpm --dir apps/web verify:http http://127.0.0.1:4328
 
 一覧APIの入力境界と応答契約は既存試作から保持しています。`limit`の不正表記・重複・未知キーなど28ケースを、単体テストと実HTTPで共用します。ブラウザでは日時降順の2件と「再取得」を確認します。
 
-`dev / build`は共有契約を事前生成します。通常のテストはルートの`pnpm test`を使い、共有契約を依存順に一度生成してから各パッケージを検査します。単独の`test`実行前には`pnpm --dir apps/web generate`が必要です。`typecheck`はルート型生成のためビルド後に型検査します。APIの型生成だけTypeScript 5.9.3、アプリの型検査は7.0.2を使用します。生成物は編集せず、Gitにも含めません。
+`dev / build`は共有契約を事前生成します。通常の検査はルートの`pnpm typecheck`・`pnpm test`を使います。`pnpm prepare:checks`が共有契約とrouteTreeを生成し、型検査・単体テストのためのビルドは不要です。アプリ単独の検査前にもルートでこの生成を実行してください。API生成器のCompiler APIはTypeScript 5.9.3、型検査はtsrsを使用します。生成物は編集せず、Gitにも含めません。
 
 ## 移行時の確認
 

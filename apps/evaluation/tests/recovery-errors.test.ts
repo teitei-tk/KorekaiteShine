@@ -29,7 +29,9 @@ test('実行回復に失敗したジョブを保留し、既定の時計で後�
   vi.spyOn(Temporal.Now, 'instant').mockReturnValue(
     Temporal.Instant.fromEpochMilliseconds(300_000),
   );
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   boundary.orderBy.mockResolvedValue([
     { jobId: 'failed', purpose: 'evaluation' },
     { jobId: 'next', purpose: 'diagnostics' },
@@ -53,9 +55,15 @@ test('初期化に失敗しても後続ジョブを初期化し、失敗の内�
   const clock = vi
     .spyOn(Temporal.Now, 'instant')
     .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(300_000));
-  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {
+    /* このテストでは呼出しに副作用を持たせない。 */
+  });
   boundary.orderBy.mockResolvedValue([{ jobId: 'failed' }, { jobId: 'next' }]);
-  const initialize = vi.fn(async () => {}).mockRejectedValueOnce(new Error('private details'));
+  const initialize = vi
+    .fn(async () => {
+      /* このテストでは呼出しに副作用を持たせない。 */
+    })
+    .mockRejectedValueOnce(new Error('private details'));
   await recoverInitializations({} as D1Database, initialize);
   expect(clock).toHaveBeenCalledTimes(1);
   expect(initialize.mock.calls).toEqual([['failed'], ['next']]);

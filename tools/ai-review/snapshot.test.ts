@@ -1,5 +1,7 @@
-import { expect, it } from 'vitest';
-import { comments, reviewComments, type Api } from './github.ts';
+import { parseJson } from './json.ts';
+import { assert, expect, it } from 'vitest';
+import { comments, reviewComments } from './github.ts';
+import type { Api } from './github.ts';
 import { normalizeSnapshot, snapshotRevision, loadSnapshot } from './snapshot.ts';
 const user = { id: 1, login: 'human', type: 'User' };
 const root = {
@@ -18,7 +20,7 @@ const input = {
   threads: [{ id: 'T1', root: 1, resolved: false }],
 };
 it('保存済み履歴の外形と更新日時を検査する', () => {
-  expect(() => normalizeSnapshot(JSON.parse('{}'))).toThrow('履歴スナップショットが不正');
+  expect(() => normalizeSnapshot(parseJson('{}'))).toThrow('履歴スナップショットが不正');
   const withTimestamp = {
     ...input,
     issues: [{ ...input.issues[0], updated_at: '2026-11-08T00:00:00Z' }],
@@ -26,15 +28,13 @@ it('保存済み履歴の外形と更新日時を検査する', () => {
   expect(normalizeSnapshot(withTimestamp).issues[0].updated_at).toBe('2026-11-08T00:00:00Z');
   expect(() =>
     normalizeSnapshot(
-      JSON.parse(
-        JSON.stringify({ ...withTimestamp, issues: [{ ...input.issues[0], updated_at: 42 }] }),
-      ),
+      structuredClone({ ...withTimestamp, issues: [{ ...input.issues[0], updated_at: 42 }] }),
     ),
   ).toThrow('履歴コメントが不正');
 });
 it.each([1000, 1001])('通常・行コメント%s件を打ち切らない', async (count) => {
   const api: Api = async <T>(path: string) => {
-    const page = Number(new URL('https://example.invalid/' + path).searchParams.get('page'));
+    const page = Number(new URL(`https://example.invalid/${path}`).searchParams.get('page'));
     return Array.from({ length: Math.max(0, Math.min(100, count - (page - 1) * 100)) }, (_, i) => ({
       id: (page - 1) * 100 + i + 1,
     })) as T;
@@ -81,7 +81,7 @@ it('21返信・16KiB本文・128KiB履歴を切り捨てない', () => {
       ...root,
       id: i + 2,
       in_reply_to_id: 1,
-      body: 'x'.repeat(20000),
+      body: 'x'.repeat(20_000),
     })),
   ];
   const value = normalizeSnapshot({ ...input, inline });
@@ -117,7 +117,15 @@ it('スレッドを次ページまで取得し、取得順に依存せず履歴�
   const cursors: (string | null)[] = [];
   const api: Api = async <T>(path: string, _method?: string, body?: object) => {
     if (path === 'graphql') {
-      const cursor = (body as { variables: { cursor: string | null } }).variables.cursor;
+      assert.ok(
+        body !== undefined &&
+          'variables' in body &&
+          typeof body.variables === 'object' &&
+          body.variables !== null &&
+          'cursor' in body.variables,
+      );
+      const { cursor } = body.variables;
+      assert.ok(cursor === null || typeof cursor === 'string');
       cursors.push(cursor);
       return {
         data: {
@@ -175,23 +183,20 @@ it('次ページのカーソルが同じなら部分履歴を返さず停止す�
 });
 
 it('元コメントを持たないスレッドを拒否する', async () => {
-  const api: Api = async <T>(path: string) => {
-    return (
-      path === 'graphql'
-        ? {
-            data: {
-              repository: {
-                pullRequest: {
-                  reviewThreads: {
-                    nodes: [{ id: 'T1', isResolved: false, comments: { nodes: [] } }],
-                    pageInfo: { hasNextPage: false, endCursor: null },
-                  },
+  const api: Api = async <T>(path: string) =>
+    (path === 'graphql'
+      ? {
+          data: {
+            repository: {
+              pullRequest: {
+                reviewThreads: {
+                  nodes: [{ id: 'T1', isResolved: false, comments: { nodes: [] } }],
+                  pageInfo: { hasNextPage: false, endCursor: null },
                 },
               },
             },
-          }
-        : []
-    ) as T;
-  };
+          },
+        }
+      : []) as T;
   await expect(loadSnapshot(api, 7)).rejects.toThrow('スレッド元が不明です');
 });

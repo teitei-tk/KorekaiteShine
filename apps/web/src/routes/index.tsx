@@ -12,7 +12,7 @@ export function InterviewPage() {
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     const activeState = { active: true };
-    getInterviews(window.location.origin).then(
+    getInterviews(globalThis.location.origin).then(
       (data) => {
         if (activeState.active) {
           setResult(data);
@@ -60,11 +60,11 @@ export function InterviewPage() {
       </button>
       {error ? (
         <p role="alert">{error}</p>
-      ) : !result ? (
-        <p role="status">読み込み中…</p>
-      ) : (
+      ) : result ? (
         <>
-          <p role="status">{result.items.length}件の面接</p>
+          <output style={{ display: 'block', marginBlock: '1em' }}>
+            {result.items.length}件の面接
+          </output>
           <table cellPadding={12}>
             <thead>
               <tr>
@@ -88,6 +88,8 @@ export function InterviewPage() {
             </tbody>
           </table>
         </>
+      ) : (
+        <output style={{ display: 'block', marginBlock: '1em' }}>読み込み中…</output>
       )}
     </main>
   );

@@ -1,4 +1,5 @@
-import { expect, test } from 'vitest';
+import { parseObject } from './helpers/json';
+import { assert, expect, test } from 'vitest';
 import { createTestDatabase } from '../../../packages/database/testing/sqlite.ts';
 import { retryEvaluationRequest } from '../src/server/retry-evaluation';
 import { interviews, evaluationInputs } from '@korekaite/database/interviews';
@@ -88,7 +89,8 @@ test('失敗した本人の評価を同じ固定入力で一度だけ再受付�
       retryEvaluationRequest(request(), 'one', deps),
     ]);
     expect(result.map((r) => r.status)).toEqual([202, 202]);
-    const [first, second] = await Promise.all(result.map((r) => r.json()));
+    const [first, second] = await Promise.all(result.map(async (r) => parseObject(await r.text())));
+    assert.ok(typeof first.jobId === 'string');
     expect(first).toEqual(second);
     expect(first.jobId).not.toBe(parent);
     const [copy] = await database.db

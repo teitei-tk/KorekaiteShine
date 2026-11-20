@@ -3,11 +3,15 @@ import type { exists } from 'void/db';
 
 type Database = ReturnType<typeof createPrimaryDb>;
 export type TransactionStatement = Parameters<Database['batch']>[0][number];
-export interface JobTransactionEffects {
-  completed?(guard: ReturnType<typeof exists>, jobId: string, now: number): TransactionStatement[];
-  dlqReceived?(
+export type JobTransactionEffects = {
+  completed?: (
     guard: ReturnType<typeof exists>,
     jobId: string,
     now: number,
-  ): TransactionStatement[];
-}
+  ) => TransactionStatement[];
+  dlqReceived?: (
+    guard: ReturnType<typeof exists>,
+    jobId: string,
+    now: number,
+  ) => TransactionStatement[];
+};

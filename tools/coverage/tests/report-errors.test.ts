@@ -23,3 +23,11 @@ test('ソースマップ変換が実行可能なファイルを失った場合�
   ).rejects.toThrow('元ソースへの変換でファイルが失われました');
   store.dispose();
 });
+
+test('nullのsource map sourceを任意のファイルへ変換しない', async () => {
+  const { coverage } = instrumentSource('value.ts', 'export const value = 1;');
+  coverage.inputSourceMap = { version: 3, names: [], sources: [null], mappings: '' };
+  await expect(
+    writeReports(createCoverageMap({ 'value.ts': coverage }), '/unused'),
+  ).rejects.toThrow('source map source');
+});

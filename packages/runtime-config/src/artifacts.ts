@@ -13,7 +13,7 @@ export async function claimArtifactDirectory(runtime: RuntimeConfig): Promise<st
       throw error;
     }
     if ((await readFile(path, 'utf8')) !== identity) {
-      throw new Error('別環境または古い接続設定の生成物を再利用できません。');
+      throw new Error('別環境または古い接続設定の生成物を再利用できません。', { cause: error });
     }
   }
   return runtime.artifactDirectory;

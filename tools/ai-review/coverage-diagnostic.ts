@@ -1,5 +1,7 @@
+import { isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
 import { createHash } from 'node:crypto';
-export interface CoverageDiagnostic {
+export type CoverageDiagnostic = {
   arrayValid: boolean;
   expected: number;
   received: number;
@@ -10,9 +12,9 @@ export interface CoverageDiagnostic {
   missingIds: string[];
   duplicateIds: string[];
   foreignHashes: string[];
-}
+};
 const sample = 4;
-export function coverageDiagnostic(expected: string[], received: string[]): CoverageDiagnostic {
+export function coverageDiagnostic(expected: string[], received: JsonInput): CoverageDiagnostic {
   const arrayValid = Array.isArray(received);
   const values = arrayValid ? received : [];
   const counts = new Map<string, number>();
@@ -42,13 +44,11 @@ export function coverageDiagnostic(expected: string[], received: string[]): Cove
       .map((id) => createHash('sha256').update(id).digest('hex')),
   };
 }
-export function validCoverage(
-  value: Partial<CoverageDiagnostic> | null | undefined,
-): value is CoverageDiagnostic {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+export function validCoverage(value: JsonInput): value is CoverageDiagnostic {
+  if (!isJsonObject(value)) {
     return false;
   }
-  const keys = [
+  const keys = new Set([
     'arrayValid',
     'expected',
     'received',
@@ -59,47 +59,50 @@ export function validCoverage(
     'missingIds',
     'duplicateIds',
     'foreignHashes',
-  ];
-  if (Object.keys(value).some((k) => !keys.includes(k)) || typeof value.arrayValid !== 'boolean') {
+  ]);
+  if (Object.keys(value).some((k) => !keys.has(k)) || typeof value.arrayValid !== 'boolean') {
     return false;
   }
-  const counts = [
-    value.expected,
-    value.received,
-    value.missing,
-    value.duplicates,
-    value.foreign,
-    value.invalid,
-  ];
+  const {
+    expected,
+    received,
+    missing,
+    duplicates,
+    foreign,
+    invalid,
+    missingIds,
+    duplicateIds,
+    foreignHashes,
+  } = value;
+  const count = (n: JsonInput): n is number =>
+    typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 1_000_000_000;
   if (
-    !counts.every(
-      (n) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 1_000_000_000,
-    )
+    !count(expected) ||
+    !count(received) ||
+    !count(missing) ||
+    !count(duplicates) ||
+    !count(foreign) ||
+    !count(invalid)
   ) {
     return false;
   }
-  const ids = (values: string[] | undefined, pattern: RegExp, limit: number) =>
+  const ids = (values: JsonInput, pattern: RegExp, limit: number): values is string[] =>
     Array.isArray(values) &&
     values.length <= limit &&
     new Set(values).size === values.length &&
     values.every((id) => typeof id === 'string' && pattern.test(id));
   return (
-    value.missing! <= value.expected! &&
-    (value.duplicates === 0 || value.expected! - value.missing! + value.foreign! > 0) &&
-    value.received ===
-      value.expected! - value.missing! + value.duplicates! + value.foreign! + value.invalid! &&
-    (value.arrayValid || value.received === 0) &&
-    ids(value.missingIds, /^[a-f0-9]{16}$/, Math.min(sample, value.missing!)) &&
-    value.missingIds!.length === Math.min(sample, value.missing!) &&
-    ids(
-      value.duplicateIds,
-      /^[a-f0-9]{16}$/,
-      Math.min(sample, value.duplicates!, value.expected! - value.missing!),
-    ) &&
-    (value.duplicates === 0 || value.foreign! > 0 || value.duplicateIds!.length > 0) &&
-    !value.duplicateIds!.some((id) => value.missingIds!.includes(id)) &&
-    ids(value.foreignHashes, /^[a-f0-9]{64}$/, Math.min(sample, value.foreign!)) &&
-    value.foreignHashes!.length === Math.min(sample, value.foreign!)
+    missing <= expected &&
+    (duplicates === 0 || expected - missing + foreign > 0) &&
+    received === expected - missing + duplicates + foreign + invalid &&
+    (value.arrayValid || received === 0) &&
+    ids(missingIds, /^[a-f0-9]{16}$/u, Math.min(sample, missing)) &&
+    missingIds.length === Math.min(sample, missing) &&
+    ids(duplicateIds, /^[a-f0-9]{16}$/u, Math.min(sample, duplicates, expected - missing)) &&
+    (duplicates === 0 || foreign > 0 || duplicateIds.length > 0) &&
+    !duplicateIds.some((id) => missingIds.includes(id)) &&
+    ids(foreignHashes, /^[a-f0-9]{64}$/u, Math.min(sample, foreign)) &&
+    foreignHashes.length === Math.min(sample, foreign)
   );
 }
 export function renderCoverage(value: CoverageDiagnostic): string {

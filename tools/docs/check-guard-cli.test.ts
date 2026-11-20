@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { expect, onTestFinished, test } from 'vitest';
 function execute(args: string[], failure = false) {
   const root = mkdtempSync(join(tmpdir(), 'guard-cli-'));
-  onTestFinished(() => rmSync(root, { recursive: true, force: true }));
+  onTestFinished(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
   const bootstrap = join(root, 'bootstrap.mjs');
   writeFileSync(
     bootstrap,
@@ -22,8 +24,8 @@ cp.spawnSync = (program, args) => {
   );
   return spawnSync(
     process.execPath,
-    ['--import', bootstrap, fileURLToPath(new URL('./check-guard.ts', import.meta.url)), ...args],
-    { encoding: 'utf8', timeout: 10000 },
+    ['--import', bootstrap, fileURLToPath(new URL('check-guard.ts', import.meta.url)), ...args],
+    { encoding: 'utf8', timeout: 10_000 },
   );
 }
 test('Guard CLIは既定で正常取得と明示的遮断の両方を確認する', () => {

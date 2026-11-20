@@ -1,3 +1,5 @@
+import { isJsonObject } from './json.ts';
+import type { JsonInput } from './json.ts';
 import { validCoverage, renderCoverage } from './coverage-diagnostic.ts';
 import type { CoverageDiagnostic } from './coverage-diagnostic.ts';
 
@@ -38,33 +40,33 @@ export const missingKinds = [
 ] as const;
 export type Subcode = (typeof subcodes)[number];
 export type MissingKind = (typeof missingKinds)[number];
-export interface FailureDetail {
+export type FailureDetail = {
   subcode: Subcode;
   missing: MissingKind[];
   coverage?: CoverageDiagnostic;
-}
-export interface DetailInput {
+};
+export type DetailInput = {
   subcode?: string;
   missing?: string[];
   coverage?: Partial<CoverageDiagnostic>;
-}
-interface SourceRange {
+};
+type SourceRange = {
   id: string;
   start: number;
   end: number;
   revisions: ('head' | 'base' | 'ancestor')[];
-}
-export interface TaskScope {
+};
+export type TaskScope = {
   kind: 'unit' | 'boundary' | 'history' | 'reconcile';
   sourceCount: number;
   obligationCount: number;
   sources: SourceRange[];
   obligations: string[];
-}
-export interface Diagnostic extends FailureDetail {
+};
+export type Diagnostic = {
   scope?: TaskScope;
-}
-export interface DiagnosticInput extends DetailInput {
+} & FailureDetail;
+export type DiagnosticInput = {
   scope?: {
     kind?: string;
     sourceCount?: number;
@@ -72,14 +74,14 @@ export interface DiagnosticInput extends DetailInput {
     sources?: { id?: string; start?: number; end?: number; revisions?: string[] }[];
     obligations?: string[];
   };
-}
+} & DetailInput;
 const only = (value: object, keys: string[]) =>
   !Array.isArray(value) && Object.keys(value).every((key) => keys.includes(key));
-const count = (n: number | undefined): n is number =>
+const count = (n: JsonInput): n is number =>
   typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 && n <= 1_000_000_000;
-const id = (value: string | undefined): value is string =>
-  typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
-function classification(value: DetailInput): boolean {
+const id = (value: JsonInput): value is string =>
+  typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
+function classification(value: Record<string, JsonInput>): boolean {
   return (
     (value.coverage === undefined ||
       (value.subcode === 'COVERAGE_MISMATCH' && validCoverage(value.coverage))) &&
@@ -90,12 +92,9 @@ function classification(value: DetailInput): boolean {
     value.missing.every((kind) => missingKinds.some((allowed) => allowed === kind))
   );
 }
-export function validDetail(value: DetailInput | null | undefined): value is FailureDetail {
+export function validDetail(value: JsonInput): value is FailureDetail {
   return (
-    !!value &&
-    typeof value === 'object' &&
-    only(value, ['subcode', 'missing', 'coverage']) &&
-    classification(value)
+    isJsonObject(value) && only(value, ['subcode', 'missing', 'coverage']) && classification(value)
   );
 }
 export function detail(
@@ -109,24 +108,23 @@ export function detail(
   }
   return value;
 }
-export function validDiagnostic(value: DiagnosticInput | null | undefined): value is Diagnostic {
+export function validDiagnostic(value: JsonInput): value is Diagnostic {
   if (
-    !value ||
-    typeof value !== 'object' ||
+    !isJsonObject(value) ||
     !only(value, ['subcode', 'missing', 'scope', 'coverage']) ||
     !classification(value)
   ) {
     return false;
   }
-  const scope = value.scope;
+  const { scope } = value;
   if (scope === undefined) {
     return true;
   }
   if (
-    !scope ||
-    typeof scope !== 'object' ||
+    !isJsonObject(scope) ||
     !only(scope, ['kind', 'sourceCount', 'obligationCount', 'sources', 'obligations']) ||
-    !['unit', 'boundary', 'history', 'reconcile'].includes(scope.kind ?? '') ||
+    typeof scope.kind !== 'string' ||
+    !['unit', 'boundary', 'history', 'reconcile'].includes(scope.kind) ||
     !count(scope.sourceCount) ||
     !count(scope.obligationCount) ||
     !Array.isArray(scope.sources) ||
@@ -134,17 +132,17 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
     !Array.isArray(scope.obligations) ||
     scope.obligations.length !== Math.min(8, scope.obligationCount) ||
     !scope.obligations.every(
-      (value) => typeof value === 'string' && /^[a-f0-9]{16}$/.test(value),
+      (value) => typeof value === 'string' && /^[a-f0-9]{16}$/u.test(value),
     ) ||
     new Set(scope.obligations).size !== scope.obligations.length ||
-    new Set(scope.sources.map((s) => s?.id)).size !== scope.sources.length
+    new Set(scope.sources.map((s) => (isJsonObject(s) ? s.id : undefined))).size !==
+      scope.sources.length
   ) {
     return false;
   }
   return scope.sources.every(
     (s) =>
-      !!s &&
-      typeof s === 'object' &&
+      isJsonObject(s) &&
       only(s, ['id', 'start', 'end', 'revisions']) &&
       id(s.id) &&
       count(s.start) &&
@@ -155,7 +153,7 @@ export function validDiagnostic(value: DiagnosticInput | null | undefined): valu
       s.revisions.length > 0 &&
       s.revisions.length <= 3 &&
       new Set(s.revisions).size === s.revisions.length &&
-      s.revisions.every((r) => ['head', 'base', 'ancestor'].includes(r)),
+      s.revisions.every((r) => typeof r === 'string' && ['head', 'base', 'ancestor'].includes(r)),
   );
 }
 export function renderDiagnostic(value: DiagnosticInput): string {
@@ -172,14 +170,12 @@ export function renderDiagnostic(value: DiagnosticInput): string {
     const s = value.scope;
     lines.push(
       `作業種別: ${s.kind}。資料: ${s.sources.length}/${s.sourceCount}件、確認対象: ${s.obligations.length}/${s.obligationCount}件を表示。`,
-    );
-    lines.push(
       ...s.sources.map(
         (source) =>
           `資料ID: ${source.id}、行: ${source.start}-${source.end}、版: ${source.revisions.join(', ')}。`,
       ),
+      ...s.obligations.map((obligation) => `確認対象ID: ${obligation}。`),
     );
-    lines.push(...s.obligations.map((obligation) => `確認対象ID: ${obligation}。`));
   }
   return lines.join('\n\n');
 }

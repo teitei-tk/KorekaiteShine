@@ -78,3 +78,18 @@ test('setup-nodeのwith自体が欠けた場合もNode版の参照漏れとし�
     '.github/workflows/check.yml (check): setup-nodeはnode-versionを併記せずnode-version-file: .node-versionを参照してください',
   ]);
 });
+
+test('manifestのNode設定が文字列でなければ形式エラーとして拒否する', async () => {
+  await expect(inspect({ 'package.json': '{"engines":{"node":26}}' })).rejects.toThrow(
+    'engines.node',
+  );
+});
+
+test('workflowのstepsが配列でない場合は検査を拒否する', async () => {
+  await expect(
+    inspect({ '.github/workflows/invalid.yml': 'jobs:\n  check:\n    steps: invalid\n' }),
+  ).rejects.toThrow('stepsは配列');
+});
+test('manifestがオブジェクトでない場合はラベル付きで拒否する', async () => {
+  await expect(inspect({ 'package.json': '[]' })).rejects.toThrow('オブジェクトが必要');
+});

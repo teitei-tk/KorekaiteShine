@@ -9,7 +9,7 @@ export class DiagnosticDatabaseError extends Error {
 export async function databaseOperation<T>(operation: () => Promise<T>): Promise<T> {
   try {
     return await operation();
-  } catch (cause) {
-    throw new DiagnosticDatabaseError(cause);
+  } catch (error) {
+    throw new DiagnosticDatabaseError(error);
   }
 }

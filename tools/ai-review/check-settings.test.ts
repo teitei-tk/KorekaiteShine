@@ -26,7 +26,7 @@ it('CLI経由でもghの標準出力・エラー出力を漏らさず、終了�
     for (const code of ['0', '1']) {
       const result = spawnSync(
         process.execPath,
-        [fileURLToPath(new URL('./check-settings.ts', import.meta.url))],
+        [fileURLToPath(new URL('check-settings.ts', import.meta.url))],
         {
           encoding: 'utf8',
           timeout: 5000,
@@ -41,7 +41,7 @@ it('CLI経由でもghの標準出力・エラー出力を漏らさず、終了�
       );
       expect(result.status).toBe(Number(code));
       expect(result.stderr).toBe('');
-      expect(result.stdout).not.toMatch(/fixture|https:\/\/api/);
+      expect(result.stdout).not.toMatch(/fixture|https:\/\/api/u);
       if (code === '0') {
         expect(result.stdout).toContain('OPENAI_SERVICE_ACCOUNT_ID: 一致');
       }
@@ -67,7 +67,7 @@ it('期待値との一致と不一致を、どちらの値も出さずに報告�
   const bad = checkSettings(read(variables), { OPENAI_SERVICE_ACCOUNT_ID: 'user-different789' });
   expect(bad.ok).toBe(false);
   expect(bad.output).toContain('OPENAI_SERVICE_ACCOUNT_ID: 不一致');
-  expect(bad.output).not.toMatch(/fixture456|different789/);
+  expect(bad.output).not.toMatch(/fixture456|different789/u);
 });
 
 it('誤登録したキー・改行・未知の変数名を出力しない', () => {
@@ -81,19 +81,19 @@ it('誤登録したキー・改行・未知の変数名を出力しない', () =
   const result = checkSettings(read(input));
   expect(result.ok).toBe(false);
   expect(result.output).toContain('OPENAI_SERVICE_ACCOUNT_ID: 形式不正');
-  expect(result.output).not.toMatch(/privateFixture|warning|leak/);
+  expect(result.output).not.toMatch(/privateFixture|warning|leak/u);
 });
 
 it('欠落・空値・重複・不正なAudience・モードを拒否する', () => {
   for (const input of [
     variables.slice(1),
-    variables.map((item) => ({ ...item, value: '' })),
+    variables.map((item) => ({ name: item.name, value: '' })),
     [...variables, variables[0]],
     variables.map((item) =>
-      item.name === 'OPENAI_WIF_AUDIENCE' ? { ...item, value: 'https://wrong.test' } : item,
+      item.name === 'OPENAI_WIF_AUDIENCE' ? { name: item.name, value: 'https://wrong.test' } : item,
     ),
     variables.map((item) =>
-      item.name === 'AI_REVIEW_MODE' ? { ...item, value: 'unexpected-mode' } : item,
+      item.name === 'AI_REVIEW_MODE' ? { name: item.name, value: 'unexpected-mode' } : item,
     ),
   ]) {
     expect(checkSettings(read(input)).ok).toBe(false);

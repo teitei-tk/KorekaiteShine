@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { assert, expect, it } from 'vitest';
 import { checkRun, runSnapshot } from './check-run.ts';
 const raw = (status = 'in_progress', conclusion = '') =>
   JSON.stringify({
@@ -21,8 +21,10 @@ it('状態変化だけ表示し成功時に監視を終える', async () => {
     await checkRun(
       '123',
       true,
-      () => values.shift()!,
-      (s) => output.push(s),
+      () => values.shift() ?? assert.fail('必須のテスト値がありません。'),
+      (s) => {
+        output.push(s);
+      },
       async () => {
         waitsState.waits++;
       },
@@ -51,7 +53,9 @@ it('失敗箇所は固定ラベルで示し未知の名前・外部エラーを�
       '123',
       false,
       () => JSON.stringify(response),
-      (s) => output.push(s),
+      (s) => {
+        output.push(s);
+      },
     ),
   ).toBe(1);
   expect(output.join('\n')).toContain('step 1');
@@ -62,7 +66,9 @@ it('失敗箇所は固定ラベルで示し未知の名前・外部エラーを�
     () => {
       throw new Error('SECRET stderr');
     },
-    (s) => output.push(s),
+    (s) => {
+      output.push(s);
+    },
   );
   expect(output.join('\n')).not.toContain('SECRET');
 });
@@ -80,7 +86,9 @@ it('不正な状態・応答・IDを拒否する', async () => {
         calledState.called = true;
         return raw();
       },
-      (s) => output.push(s),
+      (s) => {
+        output.push(s);
+      },
     ),
   ).toBe(2);
   expect(calledState.called).toBe(false);
@@ -97,7 +105,9 @@ it('監視上限で停止し、単発確認は待たない', async () => {
         readsContext.reads++;
         return raw();
       },
-      (s) => output.push(s),
+      (s) => {
+        output.push(s);
+      },
       async () => {
         readsContext.waits++;
       },
@@ -111,7 +121,9 @@ it('監視上限で停止し、単発確認は待たない', async () => {
       '123',
       false,
       () => raw(),
-      () => {},
+      () => {
+        /* この実装では追加の処理を行わない。 */
+      },
       async () => {
         throw new Error('wait');
       },
@@ -129,7 +141,7 @@ it('CLIでghのstderrを表示せず、失敗を終了コードで返す', async
     writeFileSync(join(directory, 'gh'), '#!/bin/sh\necho SECRET >&2\nexit 1\n', { mode: 0o700 });
     const result = spawnSync(
       process.execPath,
-      [new URL('./check-run.ts', import.meta.url).pathname, '123'],
+      [new URL('check-run.ts', import.meta.url).pathname, '123'],
       { encoding: 'utf8', env: { ...process.env, PATH: directory + delimiter + process.env.PATH } },
     );
     expect(result.status).toBe(2);
@@ -153,7 +165,9 @@ it('期待コミットを含まない実行では成功の状態確認へ進ま�
         checkedState.checked = true;
         return 0;
       },
-      (s) => output.push(s),
+      (s) => {
+        output.push(s);
+      },
     ),
   ).toBe(3);
   expect(checkedState.checked).toBe(false);
@@ -169,7 +183,9 @@ it('実行版の取得失敗を成功扱いせず、外部エラーを出力し�
         throw new Error('SECRET');
       },
       async () => 0,
-      (s) => output.push(s),
+      (s) => {
+        output.push(s);
+      },
     ),
   ).toBe(2);
   expect(output.join('\n')).not.toContain('SECRET');

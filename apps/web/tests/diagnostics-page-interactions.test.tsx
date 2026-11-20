@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-// @vitest-environment-options {"url":"http://localhost:4327"}
+import { parseJson } from '@korekaite/api-contracts/json';
 import './helpers/dom';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { assert, expect, test, vi } from 'vitest';
 import { DiagnosticPage } from '../src/diagnostics/page';
+
+// @vitest-environment-options {"url":"http://localhost:4327"}
 
 const jobId = 'de82593e-01ef-4871-80e2-a8b8ba46ae95';
 const accepted = { jobId, scenario: 'success', acceptedAt: '2026-11-03T00:00:00.000Z' };
@@ -48,10 +50,12 @@ test('選択したシナリオを送信し、受付結果を表示する', async
   const section = await screen.findByRole('region', { name: '受付結果' });
   expect(section.textContent).toContain(jobId);
   expect(section.textContent).toContain('一度失敗してから成功');
-  const request = new Request(fetcher.mock.calls[0]![0]);
+  const request = new Request(
+    (fetcher.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0],
+  );
   expect(request.method).toBe('POST');
   expect(request.url).toBe('http://localhost:4327/api/diagnostics/check-jobs');
-  expect(await request.json()).toEqual({ scenario: 'retry_then_success' });
+  expect(parseJson(await request.text())).toEqual({ scenario: 'retry_then_success' });
   expect(request.headers.get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/u);
   expect(refresh().disabled).toBe(false);
   expect(resend().disabled).toBe(true);
@@ -71,10 +75,16 @@ test('応答消失後の再送は選択変更前のシナリオとキーを保�
   await screen.findByRole('region', { name: '受付結果' });
   const requests = fetcher.mock.calls.map(([input]) => new Request(input));
   expect(requests).toHaveLength(2);
-  expect(await requests[0]!.json()).toEqual({ scenario: 'success' });
-  expect(await requests[1]!.json()).toEqual({ scenario: 'success' });
-  expect(requests[1]!.headers.get('Idempotency-Key')).toBe(
-    requests[0]!.headers.get('Idempotency-Key'),
+  expect(await (requests[0] ?? assert.fail('必須のテスト値がありません。')).json()).toEqual({
+    scenario: 'success',
+  });
+  expect(await (requests[1] ?? assert.fail('必須のテスト値がありません。')).json()).toEqual({
+    scenario: 'success',
+  });
+  expect(
+    (requests[1] ?? assert.fail('必須のテスト値がありません。')).headers.get('Idempotency-Key'),
+  ).toBe(
+    (requests[0] ?? assert.fail('必須のテスト値がありません。')).headers.get('Idempotency-Key'),
   );
   expect(screen.queryByRole('alert')).toBeNull();
 });
@@ -95,9 +105,13 @@ test('新しい実行は変更後のシナリオと別の冪等キーを送る',
   await screen.findByRole('region', { name: '受付結果' });
   const requests = fetcher.mock.calls.map(([input]) => new Request(input));
   expect(requests).toHaveLength(2);
-  expect(await requests[1]!.json()).toEqual({ scenario: 'exhaust_retries' });
-  expect(requests[1]!.headers.get('Idempotency-Key')).not.toBe(
-    requests[0]!.headers.get('Idempotency-Key'),
+  expect(await (requests[1] ?? assert.fail('必須のテスト値がありません。')).json()).toEqual({
+    scenario: 'exhaust_retries',
+  });
+  expect(
+    (requests[1] ?? assert.fail('必須のテスト値がありません。')).headers.get('Idempotency-Key'),
+  ).not.toBe(
+    (requests[0] ?? assert.fail('必須のテスト値がありません。')).headers.get('Idempotency-Key'),
   );
 });
 
@@ -116,7 +130,9 @@ test('送信中の操作を無効にし、再描画前の連打でも要求を�
   expect(refresh().disabled).toBe(true);
   expect(screen.getByRole<HTMLSelectElement>('combobox').disabled).toBe(true);
   expect(screen.getByRole('status').textContent).toBe('通信中…');
-  await act(async () => pending.resolve(Response.json(accepted, { status: 202 })));
+  await act(async () => {
+    pending.resolve(Response.json(accepted, { status: 202 }));
+  });
   expect(start().disabled).toBe(false);
 });
 
@@ -135,14 +151,18 @@ test('状態取得は受付したjobIdへ一度だけ送信し、取得中の操
     refresh().click();
   });
   expect(fetcher).toHaveBeenCalledTimes(2);
-  const request = new Request(fetcher.mock.calls[1]![0]);
+  const request = new Request(
+    (fetcher.mock.calls[1] ?? assert.fail('必須のテスト値がありません。'))[0],
+  );
   expect(request.method).toBe('GET');
   expect(request.url).toBe(`http://localhost:4327/api/diagnostics/check-jobs/${jobId}`);
   expect(start().disabled).toBe(true);
   expect(refresh().disabled).toBe(true);
   expect(resend().disabled).toBe(true);
   expect(screen.getByRole<HTMLSelectElement>('combobox').disabled).toBe(true);
-  await act(async () => pending.resolve(Response.json(completed)));
+  await act(async () => {
+    pending.resolve(Response.json(completed));
+  });
   expect(
     within(screen.getByRole('region', { name: '診断結果' })).getByRole('status').textContent,
   ).toBe('正常完了');
@@ -261,7 +281,9 @@ test('新規開始中は前回の受付と診断結果を消す', async () => {
   await userEvent.click(start());
   expect(screen.queryByRole('region', { name: '受付結果' })).toBeNull();
   expect(screen.queryByRole('region', { name: '診断結果' })).toBeNull();
-  await act(async () => pending.resolve(Response.json(accepted, { status: 202 })));
+  await act(async () => {
+    pending.resolve(Response.json(accepted, { status: 202 }));
+  });
   expect(screen.queryByRole('region', { name: '診断結果' })).toBeNull();
 });
 
@@ -278,7 +300,11 @@ test('許可外のシナリオ変更を受けても最後の有効な選択だ�
   await userEvent.click(start());
   await screen.findByRole('region', { name: '受付結果' });
   expect(fetcher).toHaveBeenCalledOnce();
-  expect(await new Request(fetcher.mock.calls[0]![0]).json()).toEqual({
+  expect(
+    await new Request(
+      (fetcher.mock.calls[0] ?? assert.fail('必須のテスト値がありません。'))[0],
+    ).json(),
+  ).toEqual({
     scenario: 'retry_then_success',
   });
 });

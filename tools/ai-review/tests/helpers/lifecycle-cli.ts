@@ -17,6 +17,7 @@ files.set(home + '/20.json', JSON.stringify({ pid: 32102, port: 43210 }));
 files.set(root + '/upstream-report.json', JSON.stringify({ count: 1, authOk: true }));
 files.set(root + '/lifecycle.json', JSON.stringify({ proxy: { pid: 32102, start: '99' }, backend: { pid: 32101, start: '99' }, infoPath: home + '/20.json', configHash: digest('trusted config'), startedAt: '0' }));
 if (scenario === 'changed-config') files.set(home + '/config.toml', 'changed');
+if (scenario === 'invalid-report') files.set(root + '/upstream-report.json', JSON.stringify({ count: '1', authOk: true }));
 if (scenario === 'missing-report') files.delete(root + '/upstream-report.json');
 Object.defineProperty(process, 'platform', { value: 'linux' });
 process.getuid = () => 0;
@@ -67,6 +68,8 @@ cp.spawnSync = (command, args) => {
  const input = JSON.parse(files.get('/opt/ai-review-probe/input.json'));
  const checks = ['uid', 'groups', 'credential-environment', 'protected-file-0', 'parent-environ', 'parent-mem', 'read-only-file-0', 'read-only-file-1', 'sudo', ...input.protectedProcesses.flatMap((_, i) => ['runner-process-' + i + '-environ', 'runner-process-' + i + '-mem'])].map(name => ({ name, passed: true }));
  if (scenario === 'outside-error') return { status: null, stdout: '', stderr: '' };
+ if (scenario === 'invalid-checks') return { status: 0, stdout: JSON.stringify({ checks: null }), stderr: '' };
+ if (scenario === 'invalid-check') checks[0] = { name: 'uid', passed: 'true' };
  if (scenario === 'bad-isolation') checks[0].passed = false;
  if (scenario === 'inside-error' && args.includes('sandbox')) return { status: 1, stdout: '', stderr: '' };
  if (scenario === 'probe-stops-proxy') alive.delete(32102);

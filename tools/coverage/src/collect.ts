@@ -1,3 +1,4 @@
+import { saveShard } from './shards.ts';
 import { createNodePreload } from './preload.ts';
 import { spawn } from 'node:child_process';
 import { closeSync, mkdirSync, openSync, writeFileSync } from 'node:fs';
@@ -7,17 +8,18 @@ import { mergeMeasurements } from './merge.ts';
 import { prepareRun } from './prepare.ts';
 import { writeReports } from './report.ts';
 
-export interface CoverageCommand {
+export type CoverageCommand = {
   suite: string;
   command: string;
   args: readonly string[];
-}
+};
 
 export async function collectCoverage(options: {
   root: string;
   paths: readonly string[];
   revision: string;
   commands: readonly CoverageCommand[];
+  shard?: number;
 }) {
   const { root, paths, revision, commands } = options;
   const { run, entries } = prepareRun(root, paths, revision, [
@@ -34,6 +36,8 @@ export async function collectCoverage(options: {
   );
   const preload = createNodePreload(root, run, join(root, 'coverage', 'runs', run.runId));
   for (const command of commands) {
+    const started = performance.now();
+    console.log(`[coverage] start ${command.suite}`);
     const capture = startCapture(run, command.suite, directory);
     const logPath = join(root, 'coverage', 'runs', run.runId, `${command.suite}.log`);
     const output = openSync(logPath, 'w');
@@ -50,12 +54,21 @@ export async function collectCoverage(options: {
       });
       child.once('error', reject);
       child.once('close', resolve);
-    }).finally(() => closeSync(output));
+    }).finally(() => {
+      closeSync(output);
+    });
+    console.log(
+      `[coverage] end ${command.suite}: ${Math.round(performance.now() - started)}ms (exit ${status})`,
+    );
     capture.finish({}, status === 0 ? 'complete' : 'failed');
     if (status !== 0) {
       throw new Error(`計測suiteが失敗しました: ${command.suite} (${logPath})`);
     }
   }
   const records = readCaptures(directory);
-  return writeReports(mergeMeasurements(run, records), join(root, 'coverage', 'combined'), root);
+  const combined = mergeMeasurements(run, records);
+  if (options.shard !== undefined) {
+    saveShard(root, options.shard, run, records);
+  }
+  return writeReports(combined, join(root, 'coverage', 'combined'), root);
 }

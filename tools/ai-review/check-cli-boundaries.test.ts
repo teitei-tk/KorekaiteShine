@@ -27,7 +27,11 @@ it('レビュー監視の既定時計は15秒待機後に対象変更を検出�
 });
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
-vi.mock('node:timers/promises', () => ({ setTimeout: vi.fn(async () => {}) }));
+vi.mock('node:timers/promises', () => ({
+  setTimeout: vi.fn(async () => {
+    /* この実装では追加の処理を行わない。 */
+  }),
+}));
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
@@ -71,7 +75,9 @@ it('ジョブ一覧の要素にsteps配列がなければ応答を拒否する',
 });
 
 it('監視は既定の15秒間隔で状態を再取得し完了したら待機を終える', async () => {
-  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {
+    /* この実装では追加の処理を行わない。 */
+  });
   const readsState = { reads: 0 };
   const read = () =>
     JSON.stringify({

@@ -9,19 +9,19 @@ const head = 'a'.repeat(40),
   base = 'b'.repeat(40);
 const pr = {
   number: 7,
-  user: { id: 1324680, type: 'User' },
+  user: { id: 1_324_680, type: 'User' },
   state: 'open',
   draft: false,
-  head: { sha: head, repo: { id: 1426899426 } },
-  base: { sha: base, ref: 'main', repo: { id: 1426899426 } },
+  head: { sha: head, repo: { id: 1_426_899_426 } },
+  base: { sha: base, ref: 'main', repo: { id: 1_426_899_426 } },
 };
 const run = {
   event: 'pull_request',
   conclusion: 'success',
   path: '.github/workflows/docs.yml',
   head_sha: head,
-  repository: { id: 1426899426 },
-  head_repository: { id: 1426899426 },
+  repository: { id: 1_426_899_426 },
+  head_repository: { id: 1_426_899_426 },
   pull_requests: [{ number: 7, head: { sha: head }, base: { sha: base } }],
 };
 const api: Api = async <T>(path: string) => {
@@ -56,7 +56,7 @@ it('CLI失敗は非ゼロ終了し、生成器に到達しなくても概要を�
     const output = join(directory, 'output');
     const child = spawnSync(
       process.execPath,
-      [fileURLToPath(new URL('./prepare.ts', import.meta.url)), 'collect'],
+      [fileURLToPath(new URL('prepare.ts', import.meta.url)), 'collect'],
       {
         env: {
           GITHUB_STEP_SUMMARY: summary,
@@ -65,7 +65,7 @@ it('CLI失敗は非ゼロ終了し、生成器に到達しなくても概要を�
           AI_REVIEW_MODE: 'review',
         },
         encoding: 'utf8',
-        timeout: 10000,
+        timeout: 10_000,
       },
     );
     expect(child.status).toBe(1);

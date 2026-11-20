@@ -1,4 +1,5 @@
 import type { EvaluationSnapshot } from '@korekaite/database';
+
 export const snapshot: EvaluationSnapshot = {
   schemaVersion: 1,
   interview: {

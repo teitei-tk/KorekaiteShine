@@ -1,3 +1,4 @@
+import type * as LintTypeModule0 from 'node:fs';
 import { SystemError } from '../../testing/system-error.mts';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -41,7 +42,7 @@ test.each(['linux', 'darwin'] as const)(
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('node:os', () => ({ platform: vi.fn() }));
 vi.mock('node:fs', async (original) => ({
-  ...(await original<typeof import('node:fs')>()),
+  ...(await original<typeof LintTypeModule0>()),
   readFileSync: vi.fn(),
   readlinkSync: vi.fn(),
   readdirSync: vi.fn(),
@@ -49,9 +50,8 @@ vi.mock('node:fs', async (original) => ({
 beforeEach(() => {
   vi.mocked(platform).mockReturnValue('linux');
   vi.mocked(execFileSync).mockReturnValue('200 100 node\n300 200 workerd\n400 99 workerd');
-  vi.mocked(readdirSync).mockReturnValue(['1', '2', '3'] as object as ReturnType<
-    typeof readdirSync
-  >);
+  const readDirectory: (path: string) => string[] = readdirSync;
+  vi.mocked(readDirectory).mockReturnValue(['1', '2', '3']);
   vi.mocked(readlinkSync).mockImplementation((path) => {
     if (String(path).endsWith('/1')) {
       return 'socket:[123]';
@@ -62,14 +62,13 @@ beforeEach(() => {
     throw new SystemError('disappeared', 'ENOENT');
   });
   vi.mocked(readFileSync).mockReturnValue(
-    'header\n' +
-      [10001, 10002]
-        .map((port) =>
-          ['0:', '0100007F:' + port.toString(16), '0:0', '0A', '0', '0', '0', '0', '0', '123'].join(
-            ' ',
-          ),
-        )
-        .join('\n'),
+    `header\n${[10_001, 10_002]
+      .map((port) =>
+        ['0:', `0100007F:${port.toString(16)}`, '0:0', '0A', '0', '0', '0', '0', '0', '123'].join(
+          ' ',
+        ),
+      )
+      .join('\n')}`,
   );
   vi.stubGlobal(
     'fetch',

@@ -1,13 +1,14 @@
+import type * as LintTypeModule0 from 'node:child_process';
 import { ChildProcess, spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
+import { assert, afterEach, expect, onTestFinished, test, vi } from 'vitest';
 import { runNodeCommand } from '../src/process.ts';
 
 vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:child_process')>()),
+  ...(await importOriginal<typeof LintTypeModule0>()),
   spawn: vi.fn(),
 }));
 afterEach(() => vi.resetAllMocks());
@@ -17,7 +18,10 @@ test('正常終了の出力もclose後に保存して成功を返す', async () 
   vi.mocked(spawn).mockImplementation(() => {
     const child = childProcess();
     queueMicrotask(() => {
-      child.stdout!.emit('data', Buffer.from('completed'));
+      (child.stdout ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('completed'),
+      );
       child.emit('exit', 0);
       child.emit('close', 0);
     });
@@ -47,8 +51,14 @@ test('非ゼロ終了でも標準出力と標準エラーを停止後のログ�
   vi.mocked(spawn).mockImplementation(() => {
     const child = childProcess();
     queueMicrotask(() => {
-      child.stdout!.emit('data', Buffer.from('out'));
-      child.stderr!.emit('data', Buffer.from('err'));
+      (child.stdout ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('out'),
+      );
+      (child.stderr ?? assert.fail('必須のテスト値がありません。')).emit(
+        'data',
+        Buffer.from('err'),
+      );
       child.emit('exit', 2);
       child.emit('close', 2);
     });
@@ -91,7 +101,9 @@ test('生成直後の中断も取りこぼさずcloseを確認してログを保
   vi.mocked(spawn).mockImplementation(() => {
     const child = childProcess();
     controller.abort();
-    queueMicrotask(() => child.emit('close', null));
+    queueMicrotask(() => {
+      child.emit('close', null);
+    });
     return child;
   });
   await expect(runNodeCommand({ ...input, signal: controller.signal })).rejects.toThrow('中断');

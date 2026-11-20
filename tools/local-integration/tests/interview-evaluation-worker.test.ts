@@ -1,9 +1,10 @@
+import { readJob, readJson, readBootstrap } from './helpers/json.ts';
 import { randomUUID } from 'node:crypto';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rm } from 'node:fs/promises';
 import { Temporal } from '@js-temporal/polyfill';
-import { expect, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 import { resolveRuntime } from '@korekaite/runtime-config';
 import { startRuntime, runDatabaseCommand } from '../src/runtime.ts';
 
@@ -53,8 +54,10 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
     `,
     ]);
     const bootstrap = await fetch(`${runtime.baseUrl}/api/local-session`);
-    const cookie = bootstrap.headers.get('Set-Cookie')!.split(';')[0];
-    const { operationToken } = await bootstrap.json();
+    const [cookie] = (
+      bootstrap.headers.get('Set-Cookie') ?? assert.fail('必須のテスト値がありません。')
+    ).split(';');
+    const { operationToken } = await readBootstrap(bootstrap);
     const retry = () =>
       fetch(`${runtime.baseUrl}/api/interviews/fixture/retry`, {
         method: 'POST',
@@ -68,7 +71,7 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
       });
     const responses = await Promise.all([retry(), retry()]);
     expect(responses.map((response) => response.status)).toEqual([202, 202]);
-    const [{ jobId }, replay] = await Promise.all(responses.map((response) => response.json()));
+    const [{ jobId }, replay] = await Promise.all(responses.map((response) => readJob(response)));
     expect(replay.jobId).toBe(jobId);
     expect(jobId).not.toBe(failedJobId);
     await runtime.runScheduled();
@@ -76,9 +79,9 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
       .poll(
         async () => {
           const response = await fetch(`${runtime.baseUrl}/api/formal-queue-test?jobId=${jobId}`);
-          return response.json();
+          return readJson(response);
         },
-        { timeout: 30000, interval: 200 },
+        { timeout: 30_000, interval: 200 },
       )
       .toMatchObject({ status: 'completed', attemptCount: 1 });
     await runDatabaseCommand(config, [
@@ -94,5 +97,8 @@ test('失敗評価を正式HTTPから再実行し、実Queue経由で無回答�
     await runtime.stop();
   }
 
-  await rm(dirname(config.stateDirectory!), { recursive: true, force: true });
-}, 90000);
+  await rm(dirname(config.stateDirectory ?? assert.fail('必須のテスト値がありません。')), {
+    recursive: true,
+    force: true,
+  });
+}, 90_000);

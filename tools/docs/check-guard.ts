@@ -49,7 +49,7 @@ export function checkGuard(mode: 'registry' | 'download', run: CommandRunner = r
     }
     if (
       blocked.status === null ||
-      !/^npm (?:error|ERR!) 403 403 Forbidden - GET https:\/\/npm\.flatt\.tech\/@panda-guard%2ftest-malicious - Package blocked by security policy\r?$/im.test(
+      !/^npm (?:error|ERR!) 403 403 Forbidden - GET https:\/\/npm\.flatt\.tech\/@panda-guard%2ftest-malicious - Package blocked by security policy\r?$/imu.test(
         blocked.stderr,
       )
     ) {

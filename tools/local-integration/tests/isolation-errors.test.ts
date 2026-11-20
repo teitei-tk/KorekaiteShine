@@ -1,3 +1,5 @@
+import { parseJson } from '@korekaite/api-contracts/json';
+import type * as LintTypeModule0 from 'node:fs/promises';
 import { readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
@@ -11,14 +13,16 @@ vi.mock('../src/development-snapshot.ts', () => ({
   readDevelopmentSnapshot: async () => ({ tables: {}, sentinelCount: 1, sentinelMatches: true }),
 }));
 vi.mock('node:fs/promises', async (importOriginal) => {
-  const original = await importOriginal<typeof import('node:fs/promises')>();
+  const original = await importOriginal<typeof LintTypeModule0>();
   return {
     ...original,
     readFile: async (
       path: Parameters<typeof readFile>[0],
       options?: Parameters<typeof readFile>[1],
     ) =>
-      String(path).endsWith('/isolation-output.txt')
+      (typeof path === 'string' ? path : path instanceof URL ? path.pathname : '').endsWith(
+        '/isolation-output.txt',
+      )
         ? 'development-retained-v1'
         : original.readFile(path, options ?? null),
   };
@@ -27,7 +31,9 @@ afterEach(() => vi.resetAllMocks());
 
 test('並列起動の片方が失敗しても成功した側を停止し検査失敗を記録する', async () => {
   const runDirectoryContext = { runDirectory: '', starts: 0 };
-  const stop = vi.fn(async () => {});
+  const stop = vi.fn(async () => {
+    /* この実装では追加の処理を行わない。 */
+  });
   vi.mocked(startRuntime).mockImplementation(async (config) => {
     runDirectoryContext.runDirectory = dirname(dirname(config.artifactDirectory));
     onTestFinished(() => rm(runDirectoryContext.runDirectory, { recursive: true, force: true }));
@@ -38,12 +44,14 @@ test('並列起動の片方が失敗しても成功した側を停止し検査�
       baseUrl: 'http://isolation.invalid',
       stop,
       closed: Promise.resolve({ exitCode: 0 }),
-      runScheduled: async () => {},
+      runScheduled: async () => {
+        /* この実装では追加の処理を行わない。 */
+      },
     };
   });
   await expect(runIsolationIntegration()).rejects.toThrow('private details');
   expect(stop).toHaveBeenCalledTimes(1);
   const report = await readFile(join(runDirectoryContext.runDirectory, '2/results.json'), 'utf8');
   expect(report).not.toContain('private details');
-  expect(JSON.parse(report)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
+  expect(parseJson(report)).toMatchObject({ exitCode: 1, failureCode: 'CASE_FAILED' });
 });

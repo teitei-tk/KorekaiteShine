@@ -6,6 +6,18 @@ import { completedOutcome } from './check-status.ts';
 import type { ReviewRun } from './check-status.ts';
 import type { Api } from './github.ts';
 
+const run: ReviewRun = {
+  id: 20,
+  run_attempt: 1,
+  event: 'workflow_run',
+  path: '.github/workflows/ai-review.yml',
+  display_title: 'AI review / source run 10 attempt 1 / review',
+  status: 'completed',
+  conclusion: 'success',
+  repository: { id: 1_426_899_426 },
+  head_repository: { id: 1_426_899_426 },
+};
+
 it('失敗ジョブを特定できなくても元実行の失敗をworkflowとして返す', async () => {
   const read: Api = async <T>() => ({ jobs: [{ name: 'generate', conclusion: null }] }) as T;
   expect(await completedOutcome(read, { ...run, conclusion: 'failure' })).toEqual({
@@ -15,17 +27,6 @@ it('失敗ジョブを特定できなくても元実行の失敗をworkflowと�
   });
 });
 
-const run: ReviewRun = {
-  id: 20,
-  run_attempt: 1,
-  event: 'workflow_run',
-  path: '.github/workflows/ai-review.yml',
-  display_title: 'AI review / source run 10 attempt 1 / review',
-  status: 'completed',
-  conclusion: 'success',
-  repository: { id: 1426899426 },
-  head_repository: { id: 1426899426 },
-};
 const api: Api = async <T>() => ({ jobs: [{ name: 'publish', conclusion: 'failure' }] }) as T;
 async function report(value: object, work: (directory: string) => Promise<void>) {
   const directory = mkdtempSync(join(tmpdir(), 'review-outcome-'));

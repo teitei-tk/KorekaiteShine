@@ -11,7 +11,7 @@ function detect(): boolean {
   }
   const base = process.env.BASE_SHA ?? '';
   const head = process.env.HEAD_SHA ?? '';
-  if (![base, head].every((sha) => /^[a-f0-9]{40}$/.test(sha))) {
+  if (![base, head].every((sha) => /^[a-f0-9]{40}$/u.test(sha))) {
     return true;
   }
   try {
@@ -41,7 +41,7 @@ if (import.meta.main) {
     const code = realtimeExitCode(required, result);
     const status =
       required === false ? '対象外（文書のみ、または変更なし）' : `対象: ${result || '結果なし'}`;
-    const summary = `長時間検査: ${status}\n\nPR head: ${process.env.HEAD_SHA || '対象外'}\n\n実行commit: ${process.env.GITHUB_SHA ?? '不明'}\n\n通常CIとは独立した結果です。\n`;
+    const summary = `長時間検査: ${status}\n\nPR head: ${process.env.HEAD_SHA ?? '対象外'}\n\n実行commit: ${process.env.GITHUB_SHA ?? '不明'}\n\n通常CIとは独立した結果です。\n`;
     console.log(summary);
     if (process.env.GITHUB_STEP_SUMMARY) {
       appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);

@@ -40,7 +40,7 @@ export async function productionFixture() {
     const worker = environment === 'client' || environment === 'ssr' ? 'web' : environment;
     const directory = join(
       project,
-      '.cloudflare/output/v0/workers',
+      '.cloudflare/output/v1/workers',
       worker === 'web' ? 'default' : production.workers[worker],
     );
     const outputDirectory = join(directory, environment === 'client' ? 'assets' : 'bundle');

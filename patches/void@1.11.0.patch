@@ -1,0 +1,9 @@
+diff --git a/dist/runtime/db/index.d.mts b/dist/runtime/db/index.d.mts
+--- a/dist/runtime/db/index.d.mts
++++ b/dist/runtime/db/index.d.mts
+@@ -1,4 +1,4 @@
+-/// <reference types="@cloudflare/workers-types" />
++import type { D1Database, D1SessionBookmark } from "@cloudflare/workers-types";
+ import { r as DbSessionStart } from "../../session-DgNrdNh_.mjs";
+ import { DrizzleD1Database, DrizzleD1Database as DrizzleD1Database$1 } from "drizzle-orm/d1";
+ import { AnyColumn, SQL, SQLWrapper, and, asc, avg, between, count, desc, eq, exists, gt, gte, ilike, inArray, isNotNull, isNull, like, lt, lte, max, min, ne, not, notBetween, notExists, notInArray, notLike, or, sql, sum } from "drizzle-orm";

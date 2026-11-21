@@ -114,7 +114,7 @@ test('ケース側のコード・フラグ・保存先を分離し共有ビル�
   const a = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 1 });
   const b = resolveRuntime({ repositoryRoot, appEnv: 'test', runId, parallelIndex: 2 });
   const directory = join(build.artifactDirectory, 'web');
-  const output = '.cloudflare/output/v0';
+  const output = '.cloudflare/output/v1';
   try {
     for (const name of Object.values(build.workers)) {
       const worker = join(directory, output, 'workers', name);
@@ -291,7 +291,7 @@ test('共有ビルドは埋込み接続先と計測設定の途中変更を拒�
     const log = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     vi.mocked(buildRuntime).mockImplementation(async (config, _options, signal) => {
       state.directory = config.artifactDirectory;
-      const output = join(config.artifactDirectory, 'web/.cloudflare/output/v0');
+      const output = join(config.artifactDirectory, 'web/.cloudflare/output/v1');
       await mkdir(output, { recursive: true });
       await writeFile(
         join(output, 'worker.js'),

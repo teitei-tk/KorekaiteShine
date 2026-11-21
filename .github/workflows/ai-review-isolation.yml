@@ -57,7 +57,7 @@ jobs:
         id: full
         continue-on-error: true
         timeout-minutes: 3
-        uses: openai/codex-action@v1.13
+        uses: openai/codex-action@v1.14
         with:
           codex-version: 0.164.0
           openai-api-key: ''

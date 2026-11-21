@@ -1368,6 +1368,41 @@
       "rules": {
         "no-extra-boolean-cast": "off"
       }
+    },
+    {
+      "files": [
+        "tools/e2e/bombadil/observe.ts",
+        "tools/e2e/bombadil/history-observe.ts",
+        "tools/e2e/bombadil/preparation-actions.ts",
+        "tools/e2e/bombadil/history-actions.ts",
+        "tools/e2e/bombadil/preparation.spec.ts",
+        "tools/e2e/bombadil/history.spec.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    },
+    {
+      "files": [
+        "tools/e2e/bombadil/observe.ts",
+        "tools/e2e/bombadil/history-observe.ts",
+        "tools/e2e/bombadil/preparation-actions.ts"
+      ],
+      "rules": {
+        "typescript/unbound-method": "off"
+      }
+    },
+    {
+      "files": ["tools/e2e/bombadil/environment.ts"],
+      "rules": {
+        "typescript/strict-void-return": "off"
+      }
+    },
+    {
+      "files": ["tools/e2e/tests/bombadil-lifecycle.test.ts"],
+      "rules": {
+        "typescript/no-restricted-types": "off"
+      }
     }
   ]
 }

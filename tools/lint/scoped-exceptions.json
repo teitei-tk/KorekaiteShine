@@ -1194,5 +1194,44 @@
       "max-classes-per-file": "off"
     },
     "reason": "Worker RPCの診断用instance classを一つの入口に配置する。"
+  },
+  {
+    "files": [
+      "tools/e2e/bombadil/observe.ts",
+      "tools/e2e/bombadil/history-observe.ts",
+      "tools/e2e/bombadil/preparation-actions.ts",
+      "tools/e2e/bombadil/history-actions.ts",
+      "tools/e2e/bombadil/preparation.spec.ts",
+      "tools/e2e/bombadil/history.spec.ts"
+    ],
+    "rules": {
+      "typescript/no-unsafe-type-assertion": "off"
+    },
+    "reason": "Bombadilが関数本体を別のブラウザrealmへ直列化するため、共通parseJsonを実行時importできない。局所JSON.parseの成功値にJSON文法だけの型を付け、業務型へは断定せず使用フィールドを検査する。"
+  },
+  {
+    "files": [
+      "tools/e2e/bombadil/observe.ts",
+      "tools/e2e/bombadil/history-observe.ts",
+      "tools/e2e/bombadil/preparation-actions.ts"
+    ],
+    "rules": {
+      "typescript/unbound-method": "off"
+    },
+    "reason": "fetchを元の参照のまま保存・復元し、取得したfetchとDOM setterはcallで明示した元のreceiverへ束縛して実行する。"
+  },
+  {
+    "files": ["tools/e2e/bombadil/environment.ts"],
+    "rules": {
+      "typescript/strict-void-return": "off"
+    },
+    "reason": "Node execFileはpromisify対応のoverloadを公開する標準API。"
+  },
+  {
+    "files": ["tools/e2e/tests/bombadil-lifecycle.test.ts"],
+    "rules": {
+      "typescript/no-restricted-types": "off"
+    },
+    "reason": "テストが生成したESMを動的importする境界ではunknownで受け、namespaceとexportの存在を確認し、fixtureの正規化検査を通す。"
   }
 ]

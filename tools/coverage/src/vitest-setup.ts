@@ -1,8 +1,16 @@
-import { readCoverageConfig, required } from './schema.ts';
 import { readFileSync } from 'node:fs';
 import { afterAll } from 'vitest';
 import type { SourceCoverageData } from '@vitest/istanbul-lib-instrument';
-import { startCapture } from './capture.ts';
+
+const host = globalThis as typeof globalThis & {
+  __coverage__?: Record<string, SourceCoverageData>;
+};
+// 台帳検証を含め、Vitestでは同期journalを使わず終了フックで回収する。
+// 計測済みモジュールは初期化時のカウンターを保持するため、importより先に切り替える。
+const inherited = host.__coverage__;
+host.__coverage__ = {};
+const { readCoverageConfig, required } = await import('./schema.ts');
+const { startCapture } = await import('./capture.ts');
 
 const settings = readCoverageConfig(
   readFileSync(required(process.env.KOREKAITE_COVERAGE_RUN, 'KOREKAITE_COVERAGE_RUN'), 'utf8'),
@@ -14,13 +22,6 @@ const capture = startCapture(
   required(process.env.KOREKAITE_COVERAGE_SUITE, 'KOREKAITE_COVERAGE_SUITE'),
   directory,
 );
-const host = globalThis as typeof globalThis & {
-  __coverage__?: Record<string, SourceCoverageData>;
-};
-// Vitest はファイルごとに終了フックで回収する。Node 子プロセスの強制終了用
-// journal と同じカウンターに書くと、PCM の各サンプル処理まで同期 I/O になる。
-const inherited = host.__coverage__;
-host.__coverage__ = {};
 
 afterAll(() => {
   try {

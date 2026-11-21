@@ -2,6 +2,7 @@ import { readMeasurement } from '../src/schema.ts';
 import { spawnSync } from 'node:child_process';
 import {
   mkdtempSync,
+  mkdirSync,
   openSync,
   closeSync,
   readFileSync,
@@ -18,11 +19,19 @@ import { prepareRun } from '../src/prepare.ts';
 
 const require = createRequire(import.meta.url);
 
-test.each([true, false])(
+test.each([true, false, 'native-spec'])(
   'Vitestの実プロセスで対象の読込有無%sに応じた計測片を保存する',
   (loaded) => {
     const root = mkdtempSync(join(tmpdir(), 'coverage-vitest-'));
+    const isLoaded = loaded !== false;
     try {
+      if (loaded === 'native-spec') {
+        mkdirSync(join(root, 'bombadil'));
+        writeFileSync(
+          join(root, 'bombadil', 'history.spec.ts'),
+          "throw new Error('Bombadilの仕様はVitestでは実行しない');",
+        );
+      }
       writeFileSync(
         join(root, 'choose.ts'),
         'export function choose(value: boolean) { if(value) return 1; return 2; }',
@@ -33,7 +42,7 @@ test.each([true, false])(
       writeFileSync(config, JSON.stringify({ root, directory, run }));
       writeFileSync(
         join(root, 'choose.test.mjs'),
-        loaded
+        isLoaded
           ? `import { test, expect } from ${JSON.stringify(join(dirname(require.resolve('vitest/package.json')), 'dist/index.js'))}; import { choose } from './choose.ts'; test('choose', () => expect(choose(false)).toBe(2));`
           : `import { test, expect } from ${JSON.stringify(join(dirname(require.resolve('vitest/package.json')), 'dist/index.js'))}; test('empty', () => expect(1).toBe(1));`,
       );
@@ -72,7 +81,7 @@ test.each([true, false])(
         .map((name) => readMeasurement(readFileSync(join(directory, name), 'utf8')));
       expect(records).toHaveLength(1);
       expect(records[0].status).toBe('complete');
-      if (loaded) {
+      if (isLoaded) {
         expect(records[0].files[0].coverage.b['0']).toEqual([0, 1]);
       } else {
         expect(records[0].files).toEqual([]);

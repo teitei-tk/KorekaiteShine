@@ -3,11 +3,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsrs --fast --noEmit"
   },
   "devDependencies": {
+    "@antithesishq/bombadil": "0.7.10",
     "@cucumber/cucumber": "13.3.0",
+    "@korekaite/api-contracts": "workspace:*",
+    "@korekaite/database": "workspace:*",
+    "@types/node": "26.6.6",
+    "jsdom": "31.0.1",
     "playwright": "1.65.1",
+    "typescript": "7.0.2",
     "ws": "8.23.0"
   }
 }

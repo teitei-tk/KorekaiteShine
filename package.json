@@ -28,6 +28,8 @@
     "test:realtime": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter @korekaite/local-integration test:realtime",
     "test:coverage:node": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-api-codegen test && vitest run --config vitest.coverage.config.mts --coverage",
     "test:e2e": "node tools/e2e/run.mjs pr",
+    "test:exploration": "node tools/e2e/bombadil/run.ts",
+    "test:exploration:reproduce": "node tools/e2e/bombadil/run.ts reproduce",
     "test:e2e:live": "node tools/e2e/run.mjs live",
     "prepare:checks": "pnpm --filter @korekaite/api-contracts generate && pnpm --filter korekaite-shine-web generate:routes"
   },

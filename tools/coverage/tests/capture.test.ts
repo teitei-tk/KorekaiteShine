@@ -3,7 +3,7 @@ import { readMeasurement } from '../src/schema.ts';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test, vi } from 'vitest';
+import { expect, onTestFinished, test, vi } from 'vitest';
 import { createCounterJournal } from '../src/journal.ts';
 import { startCapture, readCaptures } from '../src/capture.ts';
 import { createMergeFixture } from './fixtures/measurement.ts';
@@ -59,7 +59,10 @@ test('実行中のプロセスのjournalを完了扱いしない', () => {
   try {
     const { run } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'running');
-    createCounterJournal(`${capture.path}.events`, run.targets);
+    const journal = createCounterJournal(`${capture.path}.events`, run.targets);
+    onTestFinished(() => {
+      journal[Symbol.dispose]();
+    });
     expect(readCaptures(directory)[0].status).toBe('incomplete');
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -97,6 +100,9 @@ test('終了済みプロセスの未完了記録だけを同期journalから復�
     const { run, path, target } = createMergeFixture();
     const capture = startCapture(run, 'unit', directory, 'terminated');
     const journal = createCounterJournal(`${capture.path}.events`, run.targets);
+    onTestFinished(() => {
+      journal[Symbol.dispose]();
+    });
     journal[path] = target.coverage;
     vi.spyOn(process, 'kill').mockImplementation(() => {
       throw new SystemError('gone', 'ESRCH');

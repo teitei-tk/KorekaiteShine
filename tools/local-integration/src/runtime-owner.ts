@@ -70,7 +70,9 @@ export async function startOwnedRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview',
   options: LocalRuntimeOptions,
+  signal?: AbortSignal,
 ): Promise<LocalRuntime> {
+  signal?.throwIfAborted();
   const owner = fork(new URL('runtime-owner-host.ts', import.meta.url), [], {
     execArgv: [],
     env: {
@@ -136,8 +138,19 @@ export async function startOwnedRuntime(
       }
     })());
   }
+  const cancelled = Promise.withResolvers<never>();
+  const abort = () => cancelled.reject(new Error('ランタイム起動を中断しました。'));
+  signal?.addEventListener('abort', abort, { once: true });
   try {
-    const baseUrl = await within(ready, 120_000, 'ランタイム起動が120秒以内に完了しませんでした。');
+    if (signal?.aborted) {
+      abort();
+    }
+    const baseUrl = await within(
+      Promise.race([ready, cancelled.promise]),
+      120_000,
+      'ランタイム起動が120秒以内に完了しませんでした。',
+    );
+    signal?.throwIfAborted();
     const completion = closed.then((code): { exitCode: 0 | 1 } => ({
       exitCode: code === 0 && stoppingState.stopping !== undefined ? 0 : 1,
     }));
@@ -147,5 +160,7 @@ export async function startOwnedRuntime(
       /* この実装では追加の処理を行わない。 */
     });
     throw error;
+  } finally {
+    signal?.removeEventListener('abort', abort);
   }
 }

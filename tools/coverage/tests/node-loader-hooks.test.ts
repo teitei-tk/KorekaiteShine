@@ -35,7 +35,10 @@ async function fixture() {
     delete global.__coverage__;
     return { path: join(root, 'record'), finish };
   });
-  vi.mocked(createCounterJournal).mockImplementation(() => saved ?? {});
+  vi.mocked(createCounterJournal).mockImplementation(() => ({
+    ...saved,
+    [Symbol.dispose]: vi.fn<() => void>(),
+  }));
   const callbacks: (() => void)[] = [];
   const once = process.once.bind(process);
   vi.spyOn(process, 'once').mockImplementation((event, listener) => {

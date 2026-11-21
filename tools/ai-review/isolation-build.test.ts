@@ -1,12 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assert, expect, it } from 'vitest';
 
 // prepare.shのコンパイル呼び出しをそのまま実行し、通常の型検査とは別の出力経路を検査する。
-it('隔離用コードをTemporalの型を含めてコンパイルし、出力したJSから待機処理を実行できる', () => {
+it('隔離用コードをコンパイルし、setup.shで配置したJSから依存を解決して待機処理を実行できる', () => {
   const root = fileURLToPath(new URL('../..', import.meta.url));
   const source = readFileSync(new URL('isolation/prepare.sh', import.meta.url), 'utf8');
   const compile = source
@@ -21,7 +21,24 @@ it('隔離用コードをTemporalの型を含めてコンパイルし、出力�
       env: { ...process.env, RUNNER_TEMP: directory },
       stdio: 'pipe',
     });
-    // root側で直接実行する成果物のimportと、Temporalを使う期限処理を確認する。
+    // 特権操作を含まない実際の配置コマンドを、一時ディレクトリで実行する。
+    const opt = join(directory, 'opt');
+    mkdirSync(join(opt, 'ai-review-probe/pr'), { recursive: true });
+    const setup = readFileSync(new URL('isolation/setup.sh', import.meta.url), 'utf8');
+    const copies = setup
+      .split('\n')
+      .filter((line) => line.startsWith('cp '))
+      .join('\n');
+    execFileSync('bash', [
+      '-eu',
+      '-c',
+      copies.replaceAll('/opt/', `${opt}/`),
+      'setup',
+      'unused',
+      join(directory, 'isolation-compiled'),
+    ]);
+    writeFileSync(join(opt, 'package.json'), '{"type":"module"}');
+    // 配置先のroot・Action・PR子プロセスで必要な依存と、Temporalの期限処理を確認する。
     writeFileSync(join(directory, 'info.json'), JSON.stringify({ pid: 123, port: 4567 }));
     const output = execFileSync(
       process.execPath,
@@ -29,7 +46,11 @@ it('隔離用コードをTemporalの型を含めてコンパイルし、出力�
         '--input-type=module',
         '-e',
         `
-      import { readInfo } from ${JSON.stringify(pathToFileURL(join(directory, 'isolation-compiled/isolation/lifecycle.js')).href)};
+      import { readInfo } from ${JSON.stringify(pathToFileURL(join(opt, 'ai-review-probe/lifecycle.js')).href)};
+      import ${JSON.stringify(pathToFileURL(join(opt, 'ai-review-probe/model.js')).href)};
+      import ${JSON.stringify(pathToFileURL(join(opt, 'ai-review-probe/wif.js')).href)};
+      import ${JSON.stringify(pathToFileURL(join(opt, 'ai-review-probe/pr/input.js')).href)};
+      import ${JSON.stringify(pathToFileURL(join(opt, 'ai-review-probe/isolation-probe.js')).href)};
       console.log(JSON.stringify(await readInfo(${JSON.stringify(join(directory, 'info.json'))})));
     `,
       ],

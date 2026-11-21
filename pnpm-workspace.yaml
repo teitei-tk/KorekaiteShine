@@ -25,5 +25,7 @@ trustLockfile: false
 overrides:
   '@babel/core>semver': '7.8.5'
   '@babel/helper-compilation-targets>semver': '7.8.5'
-  # Void 1.5.0のBuild Output仕様に対応する2系の要求版へ固定。
-  'void>@cloudflare/vite-plugin': '2.0.0-beta.v.9'
+
+# D1の型をモジュールから読み込み、WebとNodeのグローバル型を保持する。
+patchedDependencies:
+  void@1.11.0: patches/void@1.11.0.patch

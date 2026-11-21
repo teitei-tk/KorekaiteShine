@@ -196,7 +196,7 @@ function workerOutputDirectory(
 ): string {
   return join(
     project,
-    '.cloudflare/output/v0/workers',
+    '.cloudflare/output/v1/workers',
     environment === 'client' || environment === 'ssr' ? 'default' : production.workers[environment],
   );
 }

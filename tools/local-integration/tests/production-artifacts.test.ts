@@ -39,7 +39,7 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     ]);
     const config = parseObject(
       await readFile(
-        join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
+        join(project, '.cloudflare/output/v1/workers/default/worker.config.json'),
         'utf8',
       ),
     );
@@ -47,7 +47,7 @@ test('本番ビルドの4環境のモジュール・ルート・配信物・Work
     expect(config.name).toBe('korekaite-web-prod');
     const interviewConfigPath = join(
       project,
-      '.cloudflare/output/v0/workers/korekaite-interview-prod/worker.config.json',
+      '.cloudflare/output/v1/workers/korekaite-interview-prod/worker.config.json',
     );
     const interviewConfig = parseObject(await readFile(interviewConfigPath, 'utf8'));
     objectAt(interviewConfig, 'env', 'INTERVIEW_SESSION').exportName = 'UnexpectedObject';
@@ -65,7 +65,7 @@ test('監査記録にない配信ファイルを後から追加した場合も�
 
   try {
     const project = await buildProductionArtifacts(directory);
-    const extra = join(project, '.cloudflare/output/v0/workers/default/assets/extra');
+    const extra = join(project, '.cloudflare/output/v1/workers/default/assets/extra');
     await mkdir(extra);
     await writeFile(join(extra, 'diagnostics.js'), 'export const scenario = "exhaust_retries";');
     await expect(verifyProductionArtifacts(project)).rejects.toThrow('未記録の本番配信物');
@@ -135,7 +135,7 @@ test('本番ビルドの診断HTTPは404で、受付・outbox・確認結果を�
       ]);
       const web = parseObject(
         await readFile(
-          join(project, '.cloudflare/output/v0/workers/default/worker.config.json'),
+          join(project, '.cloudflare/output/v1/workers/default/worker.config.json'),
           'utf8',
         ),
       );

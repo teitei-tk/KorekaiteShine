@@ -161,7 +161,7 @@ export async function createBoundaryBundle(signal?: AbortSignal) {
     const coverage = await boundaryCoverageIdentity();
     const { buildRuntime } = await import('./runtime.ts');
     await buildRuntime(config, { boundaryBuild: true }, combined);
-    const output = join(directory, '.cloudflare/output/v0');
+    const output = join(directory, '.cloudflare/output/v1');
     for (const file of await readdir(output, { recursive: true })) {
       if (!file.endsWith('.js')) {
         continue;
@@ -226,7 +226,7 @@ export async function stageBoundaryBundle(
   ) {
     throw new Error('ビルド元とケースの保存先を分離してください。');
   }
-  for (const entry of await readdir(join(directory, '.cloudflare/output/v0'), {
+  for (const entry of await readdir(join(directory, '.cloudflare/output/v1'), {
     recursive: true,
     withFileTypes: true,
   })) {
@@ -235,10 +235,10 @@ export async function stageBoundaryBundle(
     }
   }
   const project = join(config.artifactDirectory, 'web');
-  const target = join(project, '.cloudflare/output/v0');
+  const target = join(project, '.cloudflare/output/v1');
   await mkdir(project, { recursive: true });
   await rm(target, { recursive: true, force: true });
-  await cp(join(directory, '.cloudflare/output/v0'), target, { recursive: true });
+  await cp(join(directory, '.cloudflare/output/v1'), target, { recursive: true });
   const folders = await readdir(join(target, 'workers'));
   if (folders.length !== 3) {
     throw new Error('境界ビルドの3 Workerが不足しています。');

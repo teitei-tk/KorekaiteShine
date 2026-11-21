@@ -1,0 +1,82 @@
+name: Bombadil exploration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exploration:
+    name: Exploration (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [preparation, history]
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+      options: --init --shm-size=1g
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: flatt-security/setup-takumi-guard-npm@v1.4.0
+      - uses: pnpm/action-setup@v6.1.1
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            package.json
+            apps/*/package.json
+            packages/*/package.json
+            tools/*/package.json
+            .node-version
+            .pnpmfile.cjs
+            tools/ci/src/install-dependencies.ts
+            tools/docs/check-guard.ts
+            .github/workflows/ci.yml
+            .github/workflows/ci-exploration.yml
+      - run: node tools/docs/check-guard.ts --registry-only
+      - name: Install dependencies with fresh policy checks
+        run: node tools/ci/src/install-dependencies.ts
+      - name: Generate contracts and route types
+        run: pnpm prepare:checks
+      - name: Verify preinstalled browser
+        working-directory: tools/e2e
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          import { chromium } from 'playwright';
+          const require = createRequire(import.meta.url);
+          const image = JSON.parse(readFileSync('/ms-playwright/.docker-info', 'utf8'));
+          assert.equal(image.driverVersion, require('playwright/package.json').version);
+          const browser = await chromium.launch();
+          console.log(`Preinstalled Chromium ${browser.version()}`);
+          await browser.close();
+          JS
+      - name: Explore for five minutes
+        env:
+          EXPLORATION_TARGET: ${{ matrix.target }}
+        run: pnpm test:exploration --target "$EXPLORATION_TARGET" --seconds 300
+      - uses: actions/upload-artifact@v7.0.2
+        if: always()
+        with:
+          name: exploration-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .local/bombadil/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

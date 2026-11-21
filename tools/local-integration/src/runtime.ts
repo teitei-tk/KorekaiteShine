@@ -630,6 +630,7 @@ export async function startRuntime(
   config: RuntimeConfig,
   mode: 'dev' | 'preview' = 'dev',
   options: LocalRuntimeOptions = {},
+  signal?: AbortSignal,
 ): Promise<LocalRuntime> {
-  return startOwnedRuntime(config, mode, options);
+  return startOwnedRuntime(config, mode, options, signal);
 }

@@ -23,6 +23,8 @@ AIレビューの正式な動作は[コメントと修正確認の要件](spec/a
 
 テストの行・文・関数・分岐の実測値と、未計測範囲・不足箇所は[カバレッジ調査](research/test-coverage.md)を参照してください。
 
+Bombadilによる材料確認・履歴・削除の画面探索は、[初期導入の実装計画](superpowers/plans/2026-11-17-bombadil.md)にまとめています。既存の音声E2Eを補う方針です。[探索ランナーと運用手順](../tools/e2e/bombadil/README.md)を追加し、2領域の違反検出と再現をmacOS・Linuxで確認しました。通常検査・既存E2E・結合・実時間検査と全体カバレッジ基準は確認済みです。GitHub上の手動実行は未検証です。
+
 計測漏れの解消から領域別のテスト追加・CIの閾値導入までの手順は、[4指標100%への実装計画](superpowers/plans/2026-11-07-full-test-coverage.md)を参照してください。
 
 CIのTakumi Guardは匿名モードで構成しています。[運用手順](../tools/docs/README.md#ciのtakumi-guard)、[検証記録](research/takumi-guard.md)、[実装計画](superpowers/plans/2026-11-07-takumi-guard.md)を参照してください。将来のShisho Cloud連携と、今回の匿名利用を区別しています。

@@ -23,10 +23,12 @@ printf 'Defaults:root env_reset\nDefaults:root !env_keep\nDefaults:root !env_che
 chmod 440 /etc/sudoers.d/ai-review-probe
 visudo -cf /etc/sudoers.d/ai-review-probe
 # コンパイル済みの検査コードだけをコピー。資格情報・ソケットは持ち込まない。
-cp "${2:?compiled directory required}/isolation-probe.js" /opt/isolation-probe.js
+cp "${2:?compiled directory required}"/*.js /opt/
 cp "$2"/isolation/*.js /opt/ai-review-probe/
 cp /opt/isolation-probe.js /opt/ai-review-probe/isolation-probe.js
+cp /opt/json.js /opt/ai-review-probe/json.js
 cp /opt/ai-review-probe/probe-child.js /opt/ai-review-probe/pr/probe-child.js
+cp /opt/ai-review-probe/input.js /opt/ai-review-probe/pr/input.js
 printf '{"type":"module"}\n' > /opt/package.json
 ln -s /opt/ai-review-probe/action-probe.js /opt/ai-review-probe/bin/codex
 chmod 755 /opt/ai-review-probe/action-probe.js

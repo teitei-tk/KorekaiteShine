@@ -93,3 +93,39 @@ test('空の選択を無視し、サイズ超過と読み取り失敗を伝え�
   await user.upload(input, file);
   expect(screen.getByRole('alert').textContent).toMatch(/操作を完了/u);
 });
+
+test('確認済みの32768バイトは送信でき、32769バイトでは分析要求を送らない', async () => {
+  const user = userEvent.setup();
+  const markdown = `${'あ'.repeat(10_922)}ab`;
+  const analyze = vi.fn();
+  const fetcher = vi.fn<typeof fetch>(async (url, init) => {
+    if ((url instanceof Request ? url.url : url.toString()).endsWith('/local-session')) {
+      return Response.json({ operationToken: 'a'.repeat(64) });
+    }
+    assert.ok(typeof init?.body === 'string');
+    analyze(parseJson(init.body));
+    return Response.json({
+      analysisId: 'boundary',
+      themes: [{ title: '境界での判断', heading: '本文', excerpt: markdown.slice(0, 8) }],
+    });
+  });
+  vi.stubGlobal('fetch', fetcher);
+  render(
+    <PracticePreparation
+      onCreated={vi.fn<Parameters<typeof PracticePreparation>[0]['onCreated']>()}
+    />,
+  );
+  const source = screen.getByLabelText('経験Markdownの内容');
+  fireEvent.change(source, { target: { value: markdown } });
+  await user.click(screen.getByRole('checkbox'));
+  const button = screen.getByRole<HTMLButtonElement>('button', { name: 'テーマを分析する' });
+  expect(button.disabled).toBe(false);
+  await user.click(button);
+  await screen.findByRole('radio', { name: '境界での判断' });
+  expect(analyze).toHaveBeenCalledExactlyOnceWith({ markdown, confirmed: true });
+  fireEvent.change(source, { target: { value: `${markdown}c` } });
+  await user.click(screen.getByRole('checkbox'));
+  expect(button.disabled).toBe(true);
+  await user.click(button);
+  expect(analyze).toHaveBeenCalledTimes(1);
+});

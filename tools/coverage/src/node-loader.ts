@@ -21,6 +21,7 @@ if (config) {
     __coverage__?: Record<string, SourceCoverageData>;
   };
   const initial = global.__coverage__ ?? {};
+  // 後続のexitハンドラーも追記するため、記述子はOSによるプロセス終了時の解放まで保持する。
   global.__coverage__ = createCounterJournal(`${capture.path}.events`, run.targets);
   for (const [path, counters] of Object.entries(initial)) {
     global.__coverage__[path] = counters;

@@ -1,4 +1,5 @@
 import { parse } from '../src/schema.ts';
+import { spawnSync } from 'node:child_process';
 import { SystemError } from '../../testing/system-error.mts';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -12,6 +13,26 @@ import {
 } from '../src/journal.ts';
 import { createMergeFixture } from './fixtures/measurement.ts';
 import { instrumentSource } from '../src/instrument.ts';
+
+test('1万回の同期更新をCLIの10秒予算内で保存して全回数を復元する', () => {
+  const file = journalPath();
+  const { run, path, target } = createMergeFixture();
+  const script = `
+import { createCounterJournal } from ${JSON.stringify(new URL('../src/journal.ts', import.meta.url).href)};
+const data = createCounterJournal(${JSON.stringify(file)}, ${JSON.stringify(run.targets)});
+const path = ${JSON.stringify(path)};
+data[path] = ${JSON.stringify(target.coverage)};
+for (let index = 0; index < 10000; index++) data[path].f['0']++;
+`;
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    encoding: 'utf8',
+    env: { ...process.env, NODE_OPTIONS: '' },
+    timeout: 10_000,
+  });
+  expect(child.status, child.error?.message ?? child.stderr).toBe(0);
+  expect(replayCounterJournal(file)[0].coverage.f['0']).toBe(10_000);
+}, 20_000);
+
 test('所有者への権限エラーを終了済みと誤判定しない', () => {
   const path = journalPath();
   writeFileSync(path, `${JSON.stringify({ type: 'start', pid: 12_345 })}\n`);
@@ -39,6 +60,9 @@ function journalPath() {
 test('台帳にないファイルのカウンターをjournalへ混ぜない', () => {
   const { run, target } = createMergeFixture();
   const journal = createCounterJournal(journalPath(), run.targets);
+  onTestFinished(() => {
+    journal[Symbol.dispose]();
+  });
   expect(() => {
     journal['unknown.ts'] = target.coverage;
   }).toThrow('台帳にない計測対象');
@@ -56,6 +80,9 @@ test('終了処理がなくても同期記録した文・関数・分岐の回�
     const { code } = instrumentSource(path, source);
     const file = join(directory, 'events.jsonl');
     const data = createCounterJournal(file, run.targets);
+    onTestFinished(() => {
+      data[Symbol.dispose]();
+    });
     runInNewContext(`${code}\nchoose(true); choose(false);`, { __coverage__: data });
     const recovered = replayCounterJournal(file);
     expect(recovered).toHaveLength(1);

@@ -39,7 +39,11 @@ function ownerFixture() {
   });
   Object.defineProperty(child, 'send', { value: send });
   vi.mocked(fork).mockReturnValue(child);
-  return { child, send, start: () => startOwnedRuntime(config, 'dev', {}) };
+  return {
+    child,
+    send,
+    start: (signal?: AbortSignal) => startOwnedRuntime(config, 'dev', {}, signal),
+  };
 }
 
 test('管理プロセスから通知された起動エラーを保持して停止する', async () => {
@@ -205,5 +209,47 @@ test('停止要求は一度だけ送り管理プロセスの正常終了を共�
   expect(runtime.stop()).toBe(first);
   await first;
   await expect(runtime.closed).resolves.toEqual({ exitCode: 0 });
+  expect(fixture.send.mock.calls.map(([request]) => request.type)).toEqual(['start', 'stop']);
+});
+
+test('中断済みなら所有者を作らず、起動中の中断はreadyと競合しても停止して失敗を返す', async () => {
+  const fixture = ownerFixture();
+  const before = new AbortController();
+  before.abort();
+  await expect(fixture.start(before.signal)).rejects.toThrow();
+  expect(fork).not.toHaveBeenCalled();
+
+  const during = new AbortController();
+  fixture.send.mockImplementation((request, callback) => {
+    callback(null);
+    queueMicrotask(() => {
+      if (request.type === 'start') {
+        during.abort();
+        fixture.child.emit('message', { type: 'ready', baseUrl: 'http://owner.invalid' });
+      } else {
+        fixture.child.emit('close', 0);
+      }
+    });
+    return true;
+  });
+  await expect(fixture.start(during.signal)).rejects.toThrow();
+  expect(fixture.send.mock.calls.map(([request]) => request.type)).toEqual(['start', 'stop']);
+});
+
+test('開始要求の送信中に中断されても通知を取り逃さず所有者の停止を確認する', async () => {
+  const fixture = ownerFixture();
+  const controller = new AbortController();
+  fixture.send.mockImplementation((request, callback) => {
+    callback(null);
+    if (request.type === 'start') {
+      controller.abort();
+    } else {
+      queueMicrotask(() => {
+        fixture.child.emit('close', 0);
+      });
+    }
+    return true;
+  });
+  await expect(fixture.start(controller.signal)).rejects.toThrow('ランタイム起動を中断しました。');
   expect(fixture.send.mock.calls.map(([request]) => request.type)).toEqual(['start', 'stop']);
 });

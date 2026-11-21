@@ -158,3 +158,69 @@ test('PRの停止時は診断ログの集計を出力し、サービスと保存
     await rm(source, { recursive: true, force: true });
   }
 });
+
+test('探索用SQLは稼働中のPR専用DBだけで実行し、liveと停止後は拒否する', async () => {
+  const source = await fixture();
+  const runtimeSource = join(source, 'tools/local-integration/src/runtime.ts');
+  await writeFile(
+    runtimeSource,
+    `${await readFile(runtimeSource, 'utf8')}
+export async function runDatabaseCommand(config,args){
+ await writeFile(config.repositoryRoot+'/sql.json',JSON.stringify({config,args}));
+}`,
+  );
+  startProvider.mockResolvedValue({ url: 'http://127.0.0.1/voice', stop: vi.fn() });
+  try {
+    for (const profile of ['pr', 'live']) {
+      const runtime = await startVoiceRuntime({ profile });
+      const root = await readFile(join(source, 'root.txt'), 'utf8');
+      try {
+        if (profile === 'pr') {
+          await runtime.executeTestSql('SELECT 1');
+          expect(JSON.parse(await readFile(join(root, 'sql.json'), 'utf8'))).toMatchObject({
+            config: { repositoryRoot: root, appEnv: 'test' },
+            args: ['execute', 'SELECT 1'],
+          });
+        } else {
+          await expect(runtime.executeTestSql('SELECT 1')).rejects.toThrow('PRプロファイル');
+          await expect(access(join(root, 'sql.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+        }
+      } finally {
+        await runtime.stop();
+      }
+      await expect(runtime.executeTestSql('SELECT 1')).rejects.toThrow();
+    }
+  } finally {
+    await rm(source, { recursive: true, force: true });
+  }
+});
+
+test('探索の中断を投入中のDBコマンドへ伝え、一時環境を停止できる', async () => {
+  const source = await fixture();
+  const runtimeSource = join(source, 'tools/local-integration/src/runtime.ts');
+  await writeFile(
+    runtimeSource,
+    `${await readFile(runtimeSource, 'utf8')}
+export async function runDatabaseCommand(_config,_args,options={}){
+ if (!options.signal) throw new Error('missing cancellation');
+ await new Promise((resolve,reject)=>{
+  const abort=()=>reject(new Error('database cancelled'));
+  options.signal.addEventListener('abort',abort,{once:true});
+  if(options.signal.aborted) abort();
+ });
+}`,
+  );
+  startProvider.mockResolvedValue({ url: 'http://127.0.0.1/voice', stop: vi.fn() });
+  const runtime = await startVoiceRuntime({ profile: 'pr' });
+  const root = await readFile(join(source, 'root.txt'), 'utf8');
+  try {
+    const controller = new AbortController();
+    const command = runtime.executeTestSql('SELECT 1', controller.signal);
+    controller.abort();
+    await expect(command).rejects.toThrow('database cancelled');
+  } finally {
+    await runtime.stop();
+    await rm(source, { recursive: true, force: true });
+  }
+  await expect(access(root)).rejects.toMatchObject({ code: 'ENOENT' });
+});

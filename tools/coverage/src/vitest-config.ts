@@ -24,7 +24,8 @@ export function vitestCoverageConfig(config: string, projects: readonly string[]
           name: project,
           root: resolve(root, project),
           include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
-          exclude: ['**/node_modules/**', '**/.git/**', '**/.local/**'],
+          // Bombadil専用仕様はnative CLIで実行する。補助コードのテストは収集する。
+          exclude: ['**/node_modules/**', '**/.git/**', '**/.local/**', '**/bombadil/*.spec.ts'],
         },
       })),
     },

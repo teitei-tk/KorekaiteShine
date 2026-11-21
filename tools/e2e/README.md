@@ -1,5 +1,7 @@
 # 音声面接のブラウザE2E
 
+材料確認と履歴・削除の補助探索は[Bombadilの手順](bombadil/README.md)を参照する。
+
 [会話・復帰](features/voice-interview.feature)、[質問操作と割り込み](features/voice-questions.feature)、[タブ間の引き継ぎ](features/voice-takeover.feature)の受け入れ条件をCucumberが直接実行する。シナリオを追加するときは対応するfeatureを先に編集する。PRでは外部の音声AIをローカルのWebSocketサーバーに接続し、開始と手動再接続には同じステップで実AIを使うプロファイルも用意している。
 
 ## 実行

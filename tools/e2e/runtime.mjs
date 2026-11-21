@@ -5,15 +5,23 @@ import { pathToFileURL } from 'node:url';
 import { startProvider } from './runtime-provider.mjs';
 
 // ランナーの生成物・開発用認証・DO・D1はシナリオごとに破棄する。
-export async function startVoiceRuntime({ profile }) {
+/** @param {{ profile: string; signal?: AbortSignal }} options 起動プロファイルと中断信号。 */
+export async function startVoiceRuntime({ profile, signal }) {
+  signal?.throwIfAborted();
   if (!['pr', 'live'].includes(profile) || !process.env.E2E_APP_ROOT) {
     throw new Error('実行プロファイルと E2E_APP_ROOT が必要です。');
   }
   const source = resolve(process.env.E2E_APP_ROOT);
   const root = await mkdtemp(join(tmpdir(), 'voice-e2e-'));
   const local = join(root, 'tools/local-integration');
-  const providerContext = { provider: undefined, runtime: undefined, log: undefined };
+  const providerContext = {
+    provider: undefined,
+    runtime: undefined,
+    log: undefined,
+    stopped: false,
+  };
   async function stop({ diagnostics = false } = {}) {
+    providerContext.stopped = true;
     try {
       await providerContext.runtime?.stop();
       if (diagnostics && profile === 'pr' && providerContext.log) {
@@ -88,7 +96,7 @@ export class MockInterviewObject extends InterviewObject {
     const { resolveRuntime } = await import(
       pathToFileURL(join(source, 'packages/runtime-config/src/resources.ts'))
     );
-    const { startRuntime } = await import(pathToFileURL(runtimePath));
+    const { startRuntime, runDatabaseCommand } = await import(pathToFileURL(runtimePath));
     const config = resolveRuntime({
       repositoryRoot: root,
       appEnv: profile === 'pr' ? 'test' : 'development',
@@ -96,10 +104,23 @@ export class MockInterviewObject extends InterviewObject {
       parallelIndex: 0,
     });
     providerContext.log = config.artifactDirectory && join(config.artifactDirectory, 'runtime.log');
-    providerContext.runtime = await startRuntime(config, 'dev', optionsState.options);
+    providerContext.runtime = await startRuntime(config, 'dev', optionsState.options, signal);
     const url = providerContext.runtime.baseUrl;
     return {
       url,
+      /**
+       * @param {string} sql PR用の一時DBへ投入する検証データ。
+       * @param {AbortSignal} [signal] 探索終了時は投入中の子プロセスも停止する。
+       */
+      async executeTestSql(sql, signal) {
+        if (profile !== 'pr') {
+          throw new Error('探索データの投入はPRプロファイル専用です。');
+        }
+        if (providerContext.stopped) {
+          throw new Error('停止済みのランタイムは操作できません。');
+        }
+        await runDatabaseCommand(config, ['execute', sql], { signal });
+      },
       extendNextOpening() {
         providerContext.provider.extendNextOpening();
       },

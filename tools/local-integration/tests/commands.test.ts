@@ -34,7 +34,10 @@ test('ローカル起動に必要な環境だけを引き継ぎ、AI値は開発
     OTHER_SECRET: 'other',
     VITE_PUBLIC_SECRET: 'public',
   };
-  expect(localProcessEnvironment(source)).toEqual({ PATH: '/bin' });
+  expect(localProcessEnvironment(source)).toEqual({
+    PATH: '/bin',
+    CLOUDFLARE_CF_FETCH_ENABLED: 'false',
+  });
   expect(localAiEnvironment('development', 'dev', source)).toEqual({
     OPENAI_API_KEY: 'fixture-api-key',
     MATERIAL_MODEL: 'fixture-model',

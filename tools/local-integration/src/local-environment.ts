@@ -16,21 +16,25 @@ function pick(source: NodeJS.ProcessEnv, names: readonly string[]) {
   return result;
 }
 export function localProcessEnvironment(source: NodeJS.ProcessEnv = process.env) {
-  return pick(source, [
-    'PATH',
-    'HOME',
-    'TMPDIR',
-    'TEMP',
-    'TMP',
-    'LANG',
-    'LC_ALL',
-    'TZ',
-    'SystemRoot',
-    'USERPROFILE',
-    'XDG_CACHE_HOME',
-    'XDG_CONFIG_HOME',
-    'XDG_DATA_HOME',
-  ]);
+  return {
+    // ローカル検証ではMiniflare同梱のRequest.cfを使い、起動ごとの外部取得を避ける。
+    CLOUDFLARE_CF_FETCH_ENABLED: 'false',
+    ...pick(source, [
+      'PATH',
+      'HOME',
+      'TMPDIR',
+      'TEMP',
+      'TMP',
+      'LANG',
+      'LC_ALL',
+      'TZ',
+      'SystemRoot',
+      'USERPROFILE',
+      'XDG_CACHE_HOME',
+      'XDG_CONFIG_HOME',
+      'XDG_DATA_HOME',
+    ]),
+  };
 }
 export function coverageEnvironment(environment: string) {
   return environment === 'test' && process.env.KOREKAITE_COVERAGE_RUN

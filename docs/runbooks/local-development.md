@@ -2,6 +2,20 @@
 
 開発者がWeb・Interview DO・Evaluationの接続を確認するための手順です。リポジトリルートで、固定版のNode.jsとpnpmを使います。診断やモックを使う検査は、トークンや1Passwordの設定なしで実行できます。ここでいうローカルD1は、MiniflareがSQLiteで動かすD1です。
 
+## コンテナでの起動と検査
+
+リポジトリルートで次を実行します。ホストにはGit、Python 3、go-task、Docker Composeが必要です。CodexのLocal environmentsでは、新規worktreeのSetupが1行目、Actionsの「開発サーバー起動」と「通常検査」がそれぞれ2行目と3行目を呼びます。
+
+```sh
+task deps
+task dev
+task check
+```
+
+ビルドは `task build`、通常CIと同じ結合検査は `task integration:pr` で実行します。実時間を含む結合検査全体は `task integration`、実時間検査の単独実行は `task realtime` を使います。いずれも開発環境のD1を共有せず、検査専用のコンテナで準備から実行します。
+
+依存宣言・lockfile・pnpm設定・パッチを変更したらdepsを再実行します。depsは専用ネットワークのプロキシ経由でTakumi Guardにアクセスし、取得成功後にstoreを切り替えます。devとcheckはstoreを読み取り専用で開き、毎回新しい作業領域にオフライン導入します。開発状態はworktreeごとのvolumeに保存します。devをCtrl+Cで終了しても開発状態は残ります。別のworktreeと同時に起動するときは、片方で `KOREKAITE_WEB_PORT=63287 task dev` を実行し、ブラウザでもそのポートを開きます。通常検査と開発サーバーには実AIの資格情報を渡しません。
+
 ## 起動と停止
 
 ```sh

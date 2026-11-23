@@ -38,6 +38,12 @@
 
 API契約の生成物は手編集・Git管理せず、TypeSpecや生成処理を修正して再生成する。保存形式はDrizzle、HTTP・Queue契約はTypeSpecを原本とし、型やSchemaを二重管理しない。DBマイグレーションのSQL・メタデータは適用履歴として管理し、APIの生成物と区別する。
 
+## Codex の開発環境
+
+Codex デスクトップの Local environments を使い、プロジェクトの設定はルートの `.codex/` 配下で共有する。Codex の新規 worktree は、[コンテナ化計画](docs/superpowers/plans/2026-11-23-container-development-ci.md)に沿ってセットアップする。共通の起動手順が実装された段階で、セットアップから依存取得用の `task deps` を呼び出し、検査は `task check`、3 Workers のローカル起動は `task dev` で行う。セットアップだけで開発サーバーを常駐させない。Docker が利用できない場合は原因を報告し、ホストへの依存導入に自動で切り替えない。
+
+移行中は実装済みの入口を確認し、コンテナで実行できた検査と従来手順で実行した検査を区別して報告する。
+
 ## 開発の進め方
 
 開発は Red/Green TDD で進める。以下をリポジトリルートで実行し、テストを1つずつ追加する。

@@ -1,0 +1,46 @@
+name: Container checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out container configuration
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          persist-credentials: false
+          path: control
+      - name: Check out source for verification
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          path: candidate
+      - name: Install go-task
+        working-directory: control
+        run: go install github.com/go-task/task/v3/cmd/task@v3.54.0
+      - name: Install dependencies through Guard
+        working-directory: candidate
+        run: |
+          "$(go env GOPATH)/bin/task" --taskfile ../control/Taskfile.yml deps
+      - name: Build Workers and review tools offline
+        working-directory: candidate
+        run: |
+          "$(go env GOPATH)/bin/task" --taskfile ../control/Taskfile.yml build
+      - name: Run offline checks
+        working-directory: candidate
+        run: |
+          "$(go env GOPATH)/bin/task" --taskfile ../control/Taskfile.yml check
+      - name: Run worker integration checks
+        working-directory: candidate
+        run: |
+          "$(go env GOPATH)/bin/task" --taskfile ../control/Taskfile.yml integration:pr

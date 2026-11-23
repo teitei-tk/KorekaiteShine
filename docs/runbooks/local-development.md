@@ -14,6 +14,8 @@ task check
 
 ビルドは `task build`、通常CIと同じ結合検査は `task integration:pr` で実行します。実時間を含む結合検査全体は `task integration`、実時間検査の単独実行は `task realtime` を使います。いずれも開発環境のD1を共有せず、検査専用のコンテナで準備から実行します。
 
+各アプリの `Dockerfile` は共通イメージを継承します。`task dev` はWeb、Interview、Evaluationを別コンテナで起動し、Webだけをホストのループバックに公開します。各Workerのプロセス・作業領域・生成物は独立しています。Miniflareが別プロセスのDOとQueueを見つけられるように、3つのコンテナはネットワーク名前空間と開発レジストリを共有します。各Workerから他のWorkerのループバック待受に接続できます。開発データは共有D1を含むworktree専用volumeに保存し、マイグレーションはWeb、定期回復はEvaluationが担当します。
+
 依存宣言・lockfile・pnpm設定・パッチを変更したらdepsを再実行します。depsは専用ネットワークのプロキシ経由でTakumi Guardにアクセスし、取得成功後にstoreを切り替えます。devとcheckはstoreを読み取り専用で開き、毎回新しい作業領域にオフライン導入します。開発状態はworktreeごとのvolumeに保存します。devをCtrl+Cで終了しても開発状態は残ります。別のworktreeと同時に起動するときは、片方で `KOREKAITE_WEB_PORT=63287 task dev` を実行し、ブラウザでもそのポートを開きます。通常検査と開発サーバーには実AIの資格情報を渡しません。
 
 ## 起動と停止

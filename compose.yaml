@@ -14,6 +14,16 @@ x-runtime: &runtime
     - /work:exec,uid=1000,gid=1000,mode=0750
   entrypoint: [/bin/sh, /opt/containers/entrypoint.sh]
 
+x-worker: &worker
+  <<: *runtime
+  entrypoint: null
+  network_mode: service:worker-network
+  volumes:
+    - '${CONTAINER_INPUT:?}:/input:ro'
+    - dependencies:/store:ro
+    - development-state:/work/.local
+    - worker-registry:/registry
+
 services:
   registry-proxy:
     <<: *runtime
@@ -27,21 +37,26 @@ services:
       - '${CONTAINER_INPUT:?}:/input:ro'
       - dependencies:/store
     networks: [fetch]
-  dev:
+  worker-network:
     <<: *runtime
+    entrypoint: [sleep, infinity]
+    networks: [development]
+  web:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-web
     environment:
       <<: *environment
       KOREKAITE_CONTAINER_DEV: '1'
-    command: [pnpm, dev:local]
-    networks: [development]
-    volumes:
-      - '${CONTAINER_INPUT:?}:/input:ro'
-      - dependencies:/store:ro
-      - development-state:/work/.local
+  interview:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-interview
+  evaluation:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-evaluation
   web-port:
     <<: *runtime
-    entrypoint: [socat, 'TCP-LISTEN:63286,fork,reuseaddr', 'TCP:dev:63286']
-    depends_on: [dev]
+    entrypoint: [socat, 'TCP-LISTEN:63286,fork,reuseaddr', 'TCP:worker-network:63286']
+    depends_on: [web]
     networks: [development, frontend]
     ports: ['127.0.0.1:${KOREKAITE_WEB_PORT:-63286}:63286']
   check:
@@ -62,3 +77,4 @@ networks:
 volumes:
   dependencies: {}
   development-state: {}
+  worker-registry: {}

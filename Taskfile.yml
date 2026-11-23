@@ -74,7 +74,13 @@ tasks:
             docker build -t "$DEV_IMAGE" "$CONTROL/tools/containers"
             docker compose run --rm deps
             ;;
-          dev) docker compose up --abort-on-container-exit --exit-code-from dev dev web-port ;;
+          dev)
+            for worker in web interview evaluation; do
+              docker build --build-arg DEV_IMAGE="$DEV_IMAGE" -t "$DEV_IMAGE-$worker" - < "$CONTROL/apps/$worker/Dockerfile"
+            done
+            trap 'docker compose stop web-port web interview evaluation worker-network; rm -rf "$stage"' EXIT
+            docker compose up --abort-on-container-exit web interview evaluation web-port
+            ;;
           check) docker compose run --rm check ;;
           build) docker compose run --rm check sh -ec 'pnpm prepare:checks && pnpm --filter korekaite-shine-web build:app && pnpm --filter korekaite-shine-ai-review build:isolation --outDir ../../.ci/isolation-build' ;;
           integration) docker compose run --rm check sh -ec 'pnpm prepare:integration && pnpm test:integration --maxWorkers=2' ;;

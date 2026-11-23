@@ -5,7 +5,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && npm install --global --ignore-scripts --registry=https://npm.flatt.tech/ pnpm@12.15.0 \
     && test "$(pnpm --version)" = 12.15.0 \
-    && install -d -o node -g node /work /store /work/.local
+    && install -d -o node -g node /work /store /work/.local /registry
 
 USER node
 WORKDIR /work

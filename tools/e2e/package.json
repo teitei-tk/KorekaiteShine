@@ -7,7 +7,7 @@
     "typecheck": "tsrs --fast --noEmit"
   },
   "devDependencies": {
-    "@antithesishq/bombadil": "0.7.10",
+    "@antithesishq/bombadil": "0.8.0",
     "@cucumber/cucumber": "13.3.0",
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",

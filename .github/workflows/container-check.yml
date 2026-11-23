@@ -20,6 +20,14 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha || github.sha }}
           persist-credentials: false
           path: control
+      # ベースに設定がまだ存在しない初回導入時だけ、検証済みの固定版を使う。
+      - name: Bootstrap trusted container configuration
+        if: github.event_name == 'pull_request' && hashFiles('control/Taskfile.yml') == ''
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: 25b2bf78455706b2308978316a065753814f7541
+          persist-credentials: false
+          path: control
       - name: Check out source for verification
         uses: actions/checkout@v7.0.1
         with:

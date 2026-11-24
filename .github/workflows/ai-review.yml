@@ -90,7 +90,7 @@ jobs:
           allow-users: ${{ github.actor }}
           prompt: 'Return exactly {"status":"ok"} for this connection test. Do not use tools or read files.'
           output-schema-file: /opt/ai-review-probe/pr/schema.json
-          model: gpt-6-luna
+          model: gpt-6.2-sol
           effort: medium
           working-directory: /opt/ai-review-probe/pr
           codex-home: /home/ai-review/.codex
@@ -239,7 +239,7 @@ jobs:
           prompt-file: /opt/ai-review/context/prompt.md
           output-schema-file: /opt/ai-review/context/schema.json
           output-file: /home/ai-review/.codex/tmp/review.json
-          model: gpt-6-luna
+          model: gpt-6.2-sol
           effort: medium
           working-directory: /opt/ai-review/pr
           codex-home: /home/ai-review/.codex

@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { authenticate } from '../wif.ts';
+import { REVIEW_EFFORT, REVIEW_MODEL } from '../review-model.ts';
 import { wifProxyArgs } from './wif.ts';
 import {
   identity,
@@ -57,8 +58,10 @@ export function verifyModelEvidence(
   const body = isJsonObject(request) && isJsonObject(request.body) ? request.body : null;
   const text = body !== null && isJsonObject(body.text) ? body.text : null;
   const format = text && isJsonObject(text.format) ? text.format : null;
+  const reasoning = body !== null && isJsonObject(body.reasoning) ? body.reasoning : null;
   if (
-    body?.model !== 'gpt-6-luna' ||
+    body?.model !== REVIEW_MODEL ||
+    reasoning?.effort !== REVIEW_EFFORT ||
     format?.type !== 'json_schema' ||
     !isDeepStrictEqual(format.schema, schema) ||
     !isJsonObject(response) ||
@@ -171,7 +174,7 @@ async function prepare(runId: string): Promise<void> {
     }
     chmodSync(infoPath, 0o444);
     writeFileSync(schemaPath, JSON.stringify(schema), { mode: 0o444 });
-    configureProxy(info.port, 'gpt-6-luna');
+    configureProxy(info.port, REVIEW_MODEL);
     const value: State = {
       proxy,
       infoPath,

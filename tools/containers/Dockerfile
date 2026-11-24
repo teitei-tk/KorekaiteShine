@@ -28,4 +28,4 @@ RUN apk add --no-cache bash ca-certificates coreutils git procps-ng python3 soca
 USER node
 WORKDIR /work
 
-COPY registry-proxy.mjs check-registry.mjs entrypoint.sh /opt/containers/
+COPY registry-proxy.mjs check-registry.mjs entrypoint.sh prepare-store.sh /opt/containers/

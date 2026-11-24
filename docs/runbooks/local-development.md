@@ -16,7 +16,7 @@ task check
 
 各アプリの `Dockerfile` は共通イメージを継承します。`task dev` はWeb、Interview、Evaluationを別コンテナで起動し、Webだけをホストのループバックに公開します。各Workerのプロセス・作業領域・生成物は独立しています。Miniflareが別プロセスのDOとQueueを見つけられるように、3つのコンテナはネットワーク名前空間と開発レジストリを共有します。各Workerから他のWorkerのループバック待受に接続できます。開発データは共有D1を含むworktree専用volumeに保存し、マイグレーションはWeb、定期回復はEvaluationが担当します。
 
-依存宣言・lockfile・pnpm設定・パッチを変更したらdepsを再実行します。depsは専用ネットワークのプロキシ経由でTakumi Guardにアクセスし、取得成功後にstoreを切り替えます。devとcheckはstoreを読み取り専用で開き、毎回新しい作業領域にオフライン導入します。開発状態はworktreeごとのvolumeに保存します。devをCtrl+Cで終了しても開発状態は残ります。別のworktreeと同時に起動するときは、片方で `KOREKAITE_WEB_PORT=63287 task dev` を実行し、ブラウザでもそのポートを開きます。通常検査と開発サーバーには実AIの資格情報を渡しません。
+依存宣言・lockfile・pnpm設定・パッチを変更したらdepsを再実行します。depsは専用ネットワークのプロキシ経由でTakumi Guardにアクセスし、毎回空のstoreに依存を取得します。成功時だけstoreを切り替え、拒否・失敗時は直前の世代を保持します。devとcheckはstoreを読み取り専用で開き、毎回新しい作業領域にオフライン導入します。開発状態はworktreeごとのvolumeに保存します。devをCtrl+Cで終了しても開発状態は残ります。別のworktreeと同時に起動するときは、片方で `KOREKAITE_WEB_PORT=63287 task dev` を実行し、ブラウザでもそのポートを開きます。通常検査と開発サーバーには実AIの資格情報を渡しません。
 
 ## 起動と停止
 

@@ -3,3 +3,4 @@
 !entrypoint.sh
 !registry-proxy.mjs
 !check-registry.mjs
+!prepare-store.sh

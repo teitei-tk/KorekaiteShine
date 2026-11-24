@@ -1,6 +1,14 @@
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readlinkSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { expect, test } from 'vitest';
@@ -146,6 +154,33 @@ test('同じcheckoutとstoreを再利用しても現在のregistry拒否を確�
     expect(() => installDependencies(run)).toThrow(/依存/u);
     expect(entries()).toContain(`/${packageName}`);
     expect(existsSync(installed)).toBe(false);
+
+    const generations = join(root, 'generations');
+    mkdirSync(generations);
+    const prepareStore = () =>
+      spawnSync(
+        'sh',
+        [
+          new URL('../../containers/prepare-store.sh', import.meta.url).pathname,
+          generations,
+          registry,
+        ],
+        {
+          cwd: project,
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+    reset('allow');
+    const first = prepareStore();
+    expect(first.status, first.stderr + first.stdout).toBe(0);
+    const current = join(generations, 'current');
+    const published = readlinkSync(current);
+    reset('deny-tarball');
+    const second = prepareStore();
+    expect(second.status).toBe(1);
+    expect(entries()).toContain(`/${packageName}/-/fixture.tgz`);
+    expect(readlinkSync(current)).toBe(published);
   } finally {
     if (server.exitCode === null) {
       const closed = new Promise<void>((resolve) => {

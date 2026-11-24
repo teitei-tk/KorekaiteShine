@@ -1,8 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { REVIEW_EFFORT, REVIEW_MODEL } from './review-model.ts';
 
 const workflow = (name: string) =>
   readFileSync(new URL(`../../.github/workflows/${name}.yml`, import.meta.url), 'utf8');
+
+it('通常レビューとWIFモデル検証はGPT-6.2 Solのmediumで実行する', () => {
+  const backend = workflow('ai-review');
+  for (const job of ['generate', 'wif-validation']) {
+    const [definition] = backend.split(`\n  ${job}:`)[1].split(/\n {2}[a-z-]+:/u);
+    expect(definition).toContain(`model: ${REVIEW_MODEL}\n          effort: ${REVIEW_EFFORT}`);
+  }
+});
 it('AIレビュー表示を通常CIから独立したPR Workflowにする', () => {
   const monitor = workflow('ai-review-check');
   expect(monitor).toMatch(/^name: AI review\n/u);

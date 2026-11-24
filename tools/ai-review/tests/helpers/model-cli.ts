@@ -30,7 +30,7 @@ files.set(modelDir + '/state.json', JSON.stringify({ proxy: { pid: 32102, start:
 if (scenario === 'finish-pid') files.set(home + '/20.json', JSON.stringify({ pid: 1, port: 43210 }));
 const infoRead = fs.readFileSync;
 fs.readFileSync = (path, ...args) => { const value = infoRead(path, ...args); if (scenario === 'expired-proxy' && path === home + '/20.json') alive.delete(32102); return value; };
-files.set(dumpDir + '/2-request.json', JSON.stringify({ body: { model: 'gpt-6-luna', text: { format: { type: 'json_schema', schema: modelSchema } } } }));
+files.set(dumpDir + '/2-request.json', JSON.stringify({ body: { model: 'gpt-6.2-sol', reasoning: { effort: 'medium' }, text: { format: { type: 'json_schema', schema: modelSchema } } } }));
 files.set(dumpDir + '/2-response.json', JSON.stringify({ status: 200, body: 'data: ' + JSON.stringify({ type: 'response.completed', response: { status: 'completed', output: [{ content: [{ type: 'output_text', text: '{"status":"ok"}' }] }], usage: { input_tokens: 1, output_tokens: 2, total_tokens: 3 } } }) + '\\n' }));
 let elapsedNs = process.argv[2] === 'wait' ? 0n : 3660000000000n;
 process.hrtime.bigint = () => elapsedNs;

@@ -56,7 +56,7 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 
 1. 可能ならレビュー専用のProjectを作り、名前を`KorekaiteShine AI Review`にします。既存の適切なProjectを使っても構いません。
 2. Projectのサービスアカウント管理から、`korekaite-ai-review`を作成します。後述のWIFマッピング画面から作成できる場合は、そこで作成しても構いません。
-3. このProjectでモデル`gpt-6-luna`が利用可能か確認します。モデルの利用制限、請求設定、残高・利用枠も確認します。チャットの契約だけでAPIの利用枠があるとは判断しません。
+3. このProjectでモデル`gpt-6.2-sol`が利用可能か確認します。モデルの利用制限、請求設定、残高・利用枠も確認します。チャットの契約だけでAPIの利用枠があるとは判断しません。
 4. サービスアカウントにはレビューに必要なモデル実行権限だけを付与します。管理APIやアプリ本番の権限は付けません。
 
 サービスアカウント作成時にAPIキーが表示されても、このWorkflowには登録しません。WIFが利用できない場合も、長期キー方式に切り替えず設定可否を確認します。
@@ -100,7 +100,7 @@ refがmainなのは、PRコードではなくmainにある後続Workflowで認�
 | `OPENAI_IDENTITY_PROVIDER_ID` | 手順4で作成したProviderのID           |
 | `OPENAI_SERVICE_ACCOUNT_ID`   | 手順5で選択したサービスアカウントのID |
 
-設定を確認後、`AI_REVIEW_MODE`を`claims`から`review`へ変更します。これ以降、対象PRの通常CI成功後に有料のモデル呼び出しが実行されます。モデルは`gpt-6-luna`、推論強度は`medium`です。
+設定を確認後、`AI_REVIEW_MODE`を`claims`から`review`へ変更します。これ以降、対象PRの通常CI成功後に有料のモデル呼び出しが実行されます。モデルは`gpt-6.2-sol`、推論強度は`medium`です。
 
 小さなPRを更新するか、そのPRの`CI`を再実行します。`AI review`で以下を順に確認してください。
 
@@ -211,7 +211,7 @@ Actions上のArtifactは7日保持のため、[証跡アーカイブ](../evidenc
 
 - [OpenAIのGitHub Actions向けWIF](https://developers.openai.com/api/docs/guides/workload-identity-federation/github-actions)
 - [トークン交換と有効期限](https://developers.openai.com/api/reference/workload-identity-federation)
-- [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)
+- [GPT-6.2 Sol](https://developers.openai.com/api/docs/models/gpt-6.2-sol)
 - [公式OpenAI Node SDK](https://github.com/openai/openai-node)
 - [レビュー指示](../../tools/ai-review/prompt.md)と[導入設計](../research/ai-code-review.md)
 
@@ -273,13 +273,21 @@ AIレビュー終了後のAI review failure notificationが、同じPRの現在�
 
 利用者はこの検証に必要な最小限の有料呼び出しを承認しました。通常レビューは`AI_REVIEW_MODE=off`のままにします。前節と同じmain・Workflow・ソースCI・SHA条件を使い、`AI_REVIEW_WIF_MODEL_RUN`へ指定したCI実行IDを設定します。認証専用の`AI_REVIEW_WIF_PROBE_RUN`は削除しておきます。CIを再実行すると`wif-validation`がモデル検証経路へ進みます。成否を確認したら`AI_REVIEW_WIF_MODEL_RUN`も削除します。
 
-固定版公式プロキシの[最大TTLは3600秒](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/responses-api-proxy/src/auth.rs)です。初期交換後、同じプロセスを単調時計で61分維持します。OS時計・トークン期限・公式バイナリの変更は行いません。待機後にrootの外向き通信を一時拒否し、空のローカル要求に対する502と、上流応答が存在しないことを確認します。規則を除去して公式backoffを待った後、公式Actionの`unprivileged-user`・読み取り専用環境から`gpt-6-luna`へ小さなSchemaを指定します。Schemaはroot所有・読取専用ファイルとして配置し、公式`output-schema-file`へ渡します。固定版Actionのinline入力は、runnerが別UID所有の一時ディレクトリへ書き込もうとして失敗するため使いません。
+固定版公式プロキシの[最大TTLは3600秒](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/responses-api-proxy/src/auth.rs)です。初期交換後、同じプロセスを単調時計で61分維持します。OS時計・トークン期限・公式バイナリの変更は行いません。待機後にrootの外向き通信を一時拒否し、空のローカル要求に対する502と、上流応答が存在しないことを確認します。規則を除去して公式backoffを待った後、公式Actionの`unprivileged-user`・読み取り専用環境から`gpt-6.2-sol`へ小さなSchemaを指定します。Schemaはroot所有・読取専用ファイルとして配置し、公式`output-schema-file`へ渡します。固定版Actionのinline入力は、runnerが別UID所有の一時ディレクトリへ書き込もうとして失敗するため使いません。
 
 期待する有料要求は1回です。プロバイダーの要求・ストリーム再試行を0にし、Actionを3分で打ち切ります。公式のrequest/response dumpをroot専用ディレクトリへ保存し、失敗注入1件・モデル要求1件・成功応答1件であることを事後検査します。独自の課金遮断プロキシや再試行器は追加しません。想定外の要求数や利用量欠損では不合格とし、自動再実行しません。
 
-Schema指定、APIの完了状態、`{"status":"ok"}`だけの出力、Actionの結果、入力・出力・合計token数を照合します。生のdump・ヘッダー・本文はログやArtifactへ出さず、固定の合否と利用量だけを表示します。料金そのものは未取得（`null`）であり、ゼロと扱いません。期限超過後に同じプロキシで応答が成功することを、公式実装による新しいJWT取得・トークン交換の証拠とします。更新失敗時の期限切れトークン不使用も確認します。
+要求のモデルと推論強度`medium`、Schema指定、APIの完了状態、`{"status":"ok"}`だけの出力、Actionの結果、入力・出力・合計token数を照合します。生のdump・ヘッダー・本文はログやArtifactへ出さず、固定の合否と利用量だけを表示します。料金そのものは未取得（`null`）であり、ゼロと扱いません。期限超過後に同じプロキシで応答が成功することを、公式実装による新しいJWT取得・トークン交換の証拠とします。更新失敗時の期限切れトークン不使用も確認します。
 
 検証の前後で、資格情報の環境非継承・プロキシと親procへのアクセス拒否・書込み拒否・sandbox内の通信拒否と設定不変を検査し、最後に公式shutdownで停止します。公式Actionを起動するrunnerとrootの両方へsudoの環境初期化を適用します。PR由来のコードや資料は持ち込まず、初期交換から終了まで約70分を見込みます。この成功は通常レビューの有効化や履歴・投稿処理の移行完了を意味しません。
+
+## GPT-6.2 Solへの切替検証
+
+通常レビューを`off`にしてから、変更を含むmainのCI実行IDで[限定検証](#期限更新モデル権限schema出力の限定検証)を1回行います。固定版のCLIがSolの要求を送信し、WIF経由でSchema出力が成功することを確認します。Pro特典を利用する場合は、実行の前後で対象API OrganizationのUsageとCredit grantsを照合します。確認できない利用額やクレジット消化は不明と記録します。
+
+品質比較には、修正が後続コミットで確認できる過去PRを2〜3件選びます。欠陥を含むheadとbase、当時の履歴とPR本文のスナップショット、レビュー用プロンプト、Schemaを固定します。当時の履歴を確定できない場合は、両モデルに同じ評価用の履歴を渡し、その条件を記録します。修正内容は採点用に控え、モデルに渡す資料から外します。
+
+同じCodex CLIと読み取り専用環境で、`gpt-6-luna`と`gpt-6.2-sol`をそれぞれ推論強度`medium`で実行します。結果はローカルのJSONに保存し、投稿ジョブは使いません。既知の欠陥を正しい箇所と根拠で検出できたか、誤指摘数、15分以内の完走、利用量と実費をPRごとに記録します。結果を確認してから通常レビューを`review`に戻します。課金を止める場合は`off`に切り替え、Lunaへ戻す場合はモデル変更のコミットをrevertします。
 
 ## 公式方式への切替記録
 

@@ -46,6 +46,7 @@ it('整合する利用量と修正確認省略を受理し完了サマリーを�
   expect(artifact.usage).toEqual({ input: 1, output: 2, total: 3 });
   expect(artifact.operations).toHaveLength(1);
   expect(artifact.operations[0].kind).toBe('summary');
+  expect(artifact.operations[0].body).toContain('モデル: gpt-6.2-sol。');
 });
 
 it('使用量の合計が入力と出力の和に一致しなければ拒否する', () => {

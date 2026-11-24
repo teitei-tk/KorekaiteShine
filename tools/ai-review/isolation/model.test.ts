@@ -13,7 +13,8 @@ it('最大TTLを超える61分後だけを期限更新検証とする', () => {
 });
 const request = {
   body: {
-    model: 'gpt-6-luna',
+    model: 'gpt-6.2-sol',
+    reasoning: { effort: 'medium' },
     text: {
       format: {
         type: 'json_schema',
@@ -73,7 +74,9 @@ it('最終出力項目にtextがなければ成功扱いしない', () => {
   ).toThrow();
 });
 it.each([
-  [{ body: { model: 'other' } }, response, '{"status":"ok"}'],
+  [{ body: { ...request.body, model: 'gpt-6-luna' } }, response, '{"status":"ok"}'],
+  [{ body: { ...request.body, reasoning: { effort: 'low' } } }, response, '{"status":"ok"}'],
+  [{ body: { ...request.body, reasoning: null } }, response, '{"status":"ok"}'],
   [request, { ...response, status: 403 }, '{"status":"ok"}'],
   [request, { ...response, body: 'data: {"type":"response.failed"}\n\n' }, '{"status":"ok"}'],
   [

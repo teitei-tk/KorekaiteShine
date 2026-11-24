@@ -3,6 +3,7 @@ import type { JsonInput } from './json.ts';
 import { ReviewFailure } from './failure.ts';
 import { detail } from './diagnostics.ts';
 import type { PriorFinding } from './history.ts';
+import { REVIEW_MODEL } from './review-model.ts';
 export const REPOSITORY = 'teitei-tk/KorekaiteShine';
 export const REPOSITORY_ID = 1_426_899_426;
 export const OWNER_ID = 1_324_680;
@@ -203,7 +204,7 @@ export function renderReview(r: Review, head: string, base: string): string {
     revisionMarker(head, base),
     `### AIレビュー（${r.status === 'complete' ? '完了' : '未完了'}）`,
     `対象: \`${head}\` / base: \`${base}\``,
-    'モデル: gpt-6-luna。参考情報であり、マージ判定ではありません。',
+    `モデル: ${REVIEW_MODEL}。マージの可否は人が判断します。`,
     safe(r.summary),
   ];
   for (const f of r.findings) {

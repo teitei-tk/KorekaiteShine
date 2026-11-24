@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { requireIsolationReport } from '../isolation-probe.ts';
 import type { IsolationInput } from '../isolation-probe.ts';
+import type { REVIEW_MODEL } from '../review-model.ts';
 
 const home = '/home/ai-review/.codex';
 const privateDir = '/opt/ai-review-probe/private';
@@ -180,7 +181,10 @@ async function serve(mode: string): Promise<void> {
   );
 }
 
-export function configureProxy(port: number, model: 'isolation-fixture' | 'gpt-6-luna'): void {
+export function configureProxy(
+  port: number,
+  model: 'isolation-fixture' | typeof REVIEW_MODEL,
+): void {
   writeFileSync(
     `${home}/config.toml`,
     `model = "${model}"

@@ -1,5 +1,6 @@
 import { parseJson, isJsonObject } from './json.ts';
 import { requireValue } from './required.ts';
+import { REVIEW_MODEL } from './review-model.ts';
 // 公式Actionの準備・プロキシの起動/終了・成果物検証だけを担当する。モデル実行はActionに任せる。
 import {
   cpSync,
@@ -239,7 +240,7 @@ async function begin(mark: Mark): Promise<void> {
     chmodSync(infoPath, 0o444);
     writeFileSync(
       `${home}/config.toml`,
-      `model = "gpt-6-luna"\nmodel_provider = "official-proxy"\napproval_policy = "never"\nsandbox_mode = "read-only"\nsqlite_home = "${home}/tmp"\nlog_dir = "${home}/tmp"\n[model_providers.official-proxy]\nname = "Official WIF proxy"\nbase_url = "http://127.0.0.1:${info.port}/v1"\nwire_api = "responses"\nrequires_openai_auth = false\nrequest_max_retries = 0\nstream_max_retries = 0\n[projects."${worktree}"]\ntrust_level = "untrusted"\n`,
+      `model = "${REVIEW_MODEL}"\nmodel_provider = "official-proxy"\napproval_policy = "never"\nsandbox_mode = "read-only"\nsqlite_home = "${home}/tmp"\nlog_dir = "${home}/tmp"\n[model_providers.official-proxy]\nname = "Official WIF proxy"\nbase_url = "http://127.0.0.1:${info.port}/v1"\nwire_api = "responses"\nrequires_openai_auth = false\nrequest_max_retries = 0\nstream_max_retries = 0\n[projects."${worktree}"]\ntrust_level = "untrusted"\n`,
     );
     const state: State = {
       proxy,

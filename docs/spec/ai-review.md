@@ -61,7 +61,7 @@ PR更新後、通常CIの成功を受けて再レビューするときに、過�
 
 ## 公式Actionによる生成
 
-公式Codex Action v1.13、Codex 0.164.0、gpt-6-luna、mediumを使う。信頼済みmainから用意したプロンプトとSchemaをファイルで渡し、PR headのcheckout、baseとmerge-base、差分行、PR本文と全履歴を読み取り専用で参照する。PR内の指示・設定を信頼せず、公式unprivileged-userとsandboxの内側だけでPRコード実行を許容する。ルート所有の設定・文脈と、OIDCを保持する公式プロキシ・runnerの資格情報を専用UIDから隔離する。生成前後に境界を検査し、失敗時は成果物を公開しない。
+公式Codex Action v1.13、Codex 0.164.0、`gpt-6.2-sol`、推論強度`medium`を使う。信頼済みmainから用意したプロンプトとSchemaをファイルで渡し、PR headのcheckout、baseとmerge-base、差分行、PR本文と全履歴を読み取り専用で参照する。PR内の指示・設定を信頼せず、公式unprivileged-userとsandboxの内側だけでPRコード実行を許容する。ルート所有の設定・文脈と、OIDCを保持する公式プロキシ・runnerの資格情報を専用UIDから隔離する。生成前後に境界を検査し、失敗時は成果物を公開しない。
 
 静的分割・独自SDK実行・候補整理・費用予約・自動再生成は使わない。任意の規模の完走や全ファイル閲覧は保証しない。Actionが成功し、全過去指摘への判定と差分内の新規指摘をSchemaと既存検証器で確認できた場合だけ投稿する。モデル実行は15分、生成ジョブは25分までとする。未完了は部分投稿に変換しない。
 

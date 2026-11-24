@@ -25,7 +25,7 @@ jobs:
         if: github.event_name == 'pull_request' && hashFiles('control/Taskfile.yml') == ''
         uses: actions/checkout@v7.0.1
         with:
-          ref: 04aa4f6f6008afb49c93effed4b54a8a3aa3ccfa
+          ref: e0bcedb63cb2920ddad72f2171362e56e9e3ffe2
           persist-credentials: false
           path: control
       - name: Check out source for verification

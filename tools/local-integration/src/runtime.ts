@@ -31,6 +31,7 @@ export type LocalRuntime = {
 };
 
 export type LocalRuntimeOptions = {
+  containerWorker?: 'web' | 'interview' | 'evaluation';
   boundaryBuild?: boolean;
   boundaryBundle?: string;
   profileStartup?: boolean;
@@ -92,7 +93,9 @@ async function prepareRuntime(
   }
   await claimArtifactDirectory(config);
   timing?.mark('artifactMs');
-  await runDatabaseCommand(config, ['migrate'], { signal });
+  if (!options.containerWorker || options.containerWorker === 'web') {
+    await runDatabaseCommand(config, ['migrate'], { signal });
+  }
   timing?.mark('databaseMs');
   if (options.boundaryBundle) {
     const { stageBoundaryBundle } = await import('./boundary-bundle.ts');
@@ -358,6 +361,64 @@ export default {
       ],
     },
   };
+  if (options.containerWorker && options.containerWorker !== 'web') {
+    const worker = options.containerWorker === 'interview' ? interview : evaluation;
+    const env = Object.fromEntries<Record<string, string>>([
+      ['DB', { type: 'd1', ...config.d1 }],
+      ...Object.entries(worker.vars).map(
+        ([name, value]) => [name, { type: 'text', value }] as const,
+      ),
+      ...worker.queues.producers.map(
+        ({ binding, queue }) => [binding, { type: 'queue', name: queue }] as const,
+      ),
+      ...worker.durable_objects.bindings.map(
+        ({ name, class_name }) =>
+          [
+            name,
+            { type: 'durable-object', worker: config.doOwner, exportName: class_name },
+          ] as const,
+      ),
+    ]);
+    const native = {
+      name: worker.name,
+      entrypoint: worker.main,
+      compatibilityDate: common.compatibility_date,
+      compatibilityFlags: common.compatibility_flags,
+      env,
+      exports:
+        options.containerWorker === 'interview'
+          ? Object.fromEntries(
+              interview.durable_objects.bindings.map(({ class_name }) => [
+                class_name,
+                { type: 'durable-object', storage: 'sqlite' },
+              ]),
+            )
+          : {},
+      triggers:
+        options.containerWorker === 'evaluation'
+          ? [
+              ...evaluation.queues.consumers.map((consumer) => ({
+                type: 'queue',
+                name: consumer.queue,
+                maxBatchSize: consumer.max_batch_size,
+                maxBatchTimeout: consumer.max_batch_timeout,
+                maxRetries: consumer.max_retries,
+                retryDelay: consumer.retry_delay,
+                deadLetterQueue: consumer.dead_letter_queue,
+              })),
+              ...evaluation.triggers.crons.map((schedule) => ({ type: 'scheduled', schedule })),
+            ]
+          : [],
+    };
+    await writeFile(
+      join(project, 'vite.config.ts'),
+      `import { cloudflare } from '@cloudflare/vite-plugin';
+export default { server: { ws: false }, plugins: [cloudflare({
+  config: () => ({ worker: ${JSON.stringify(native)} }), inspectorPort: false, persistState: { path: ${JSON.stringify(config.stateDirectory)} }
+})] };`,
+    );
+    return project;
+  }
   await writeFile(
     join(project, 'void.config.ts'),
     `export default ${JSON.stringify({ worker: { compatibility_date: common.compatibility_date }, cloudflare: web })};\n`,
@@ -373,10 +434,14 @@ ${options.profileVite ? `import { profileVitePlugins } from ${JSON.stringify(joi
 ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `import { runtimeCoveragePlugin } from ${JSON.stringify(join(repositoryRoot, 'tools/coverage/src/runtime-plugin.ts'))};` : ''}
 export default defineConfig({ server: { ws: false }, cacheDir: ${JSON.stringify(join(config.artifactDirectory, 'vite-cache'))}, plugins: ${options.profileVite ? 'await profileVitePlugins(' : ''}[
   ${process.env.KOREKAITE_COVERAGE_RUN && config.environment === 'test' ? `runtimeCoveragePlugin(${JSON.stringify(project)}),` : ''}
-  voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: [
+  voidPlugin({ persistTo: ${JSON.stringify(config.stateDirectory)}, auxiliaryWorkers: ${
+    options.containerWorker
+      ? '[]'
+      : `[
     { config: ${JSON.stringify(interview)}, viteEnvironment: { name: 'interview' } },
     { config: ${JSON.stringify(evaluation)}, viteEnvironment: { name: 'evaluation' } },
-  ] }), tanstackStart(), react(),
+  ]`
+  } }), tanstackStart(), react(),
 ]${options.profileVite ? `, ${JSON.stringify(join(config.artifactDirectory, 'vite-profile.json'))})` : ''} });
 `,
   );
@@ -443,7 +508,10 @@ async function startUnlockedRuntime(
     ],
     {
       cwd: project,
-      env: runtimeEnvironment(config, aiBindings),
+      env: {
+        ...runtimeEnvironment(config, aiBindings),
+        ...(options.containerWorker ? { CLOUDFLARE_DEV_REGISTRY_PATH: '/registry' } : {}),
+      },
       stdio: options.profileVite ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
       detached: true,
     },
@@ -483,6 +551,9 @@ async function startUnlockedRuntime(
       onAbort();
     }
     const collect = (chunk: Buffer) => {
+      if (options.containerWorker) {
+        process.stderr.write(chunk);
+      }
       outputContext.output += chunk.toString();
       const found = /http:\/\/127\.0\.0\.1:\d+/u.exec(outputContext.output);
       if (found) {
@@ -508,7 +579,9 @@ async function startUnlockedRuntime(
     const viteUrl = monotonicMilliseconds();
     timing?.mark('urlReadyMs');
     // HTTPが利用可能になるまで待ち、起動ログだけで成功にしない。
-    await confirmHttpReady(baseUrl, 45_000, signal);
+    if (!options.containerWorker || options.containerWorker === 'web') {
+      await confirmHttpReady(baseUrl, 45_000, signal);
+    }
     const viteHttp = monotonicMilliseconds();
     timing?.mark('httpReadyMs');
     if (options.profileVite) {

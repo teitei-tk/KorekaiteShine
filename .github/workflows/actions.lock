@@ -45,6 +45,8 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
         - 'pnpm/action-setup@v6.1.1'
+    '.github/workflows/container-check.yml':
+        - 'actions/checkout@v7.0.1'
 dependencies:
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'

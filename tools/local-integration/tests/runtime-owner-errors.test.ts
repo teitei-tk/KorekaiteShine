@@ -41,6 +41,7 @@ function ownerFixture() {
   vi.mocked(fork).mockReturnValue(child);
   return {
     child,
+    config,
     send,
     start: (signal?: AbortSignal) => startOwnedRuntime(config, 'dev', {}, signal),
   };
@@ -252,4 +253,12 @@ test('開始要求の送信中に中断されても通知を取り逃さず所�
   });
   await expect(fixture.start(controller.signal)).rejects.toThrow('ランタイム起動を中断しました。');
   expect(fixture.send.mock.calls.map(([request]) => request.type)).toEqual(['start', 'stop']);
+});
+
+test('コンテナではWorkerのログを標準エラーに渡す', async () => {
+  const { config, child } = ownerFixture();
+  const pipe = vi.spyOn(child.stderr ?? assert.fail('stderrが必要です'), 'pipe');
+  const runtime = await startOwnedRuntime(config, 'dev', { containerWorker: 'web' });
+  expect(pipe).toHaveBeenCalledWith(process.stderr, { end: false });
+  await runtime.stop();
 });

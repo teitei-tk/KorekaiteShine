@@ -1,0 +1,80 @@
+x-runtime: &runtime
+  image: ${DEV_IMAGE:-korekaite-dev:local}
+  pull_policy: never
+  init: true
+  user: '1000:1000'
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ['no-new-privileges:true']
+  environment: &environment
+    npm_config_registry: http://registry-proxy:3128/
+    CI: 'true'
+  tmpfs:
+    - /tmp:exec,uid=1000,gid=1000,mode=1777
+    - /work:exec,uid=1000,gid=1000,mode=0750
+  entrypoint: [/bin/sh, /opt/containers/entrypoint.sh]
+
+x-worker: &worker
+  <<: *runtime
+  entrypoint: null
+  network_mode: service:worker-network
+  volumes:
+    - '${CONTAINER_INPUT:?}:/input:ro'
+    - dependencies:/store:ro
+    - development-state:/work/.local
+    - worker-registry:/registry
+
+services:
+  registry-proxy:
+    <<: *runtime
+    entrypoint: [node, /opt/containers/registry-proxy.mjs]
+    networks: [fetch, outbound]
+  deps:
+    <<: *runtime
+    depends_on: [registry-proxy]
+    command: [deps]
+    volumes:
+      - '${CONTAINER_INPUT:?}:/input:ro'
+      - dependencies:/store
+    networks: [fetch]
+  worker-network:
+    <<: *runtime
+    entrypoint: [sleep, infinity]
+    networks: [development]
+  web:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-web
+    environment:
+      <<: *environment
+      KOREKAITE_CONTAINER_DEV: '1'
+  interview:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-interview
+  evaluation:
+    <<: *worker
+    image: ${DEV_IMAGE:-korekaite-dev:local}-evaluation
+  web-port:
+    <<: *runtime
+    entrypoint: [socat, 'TCP-LISTEN:63286,fork,reuseaddr', 'TCP:worker-network:63286']
+    depends_on: [web]
+    networks: [development, frontend]
+    ports: ['127.0.0.1:${KOREKAITE_WEB_PORT:-63286}:63286']
+  check:
+    <<: *runtime
+    command: [pnpm, check]
+    network_mode: none
+    volumes:
+      - '${CONTAINER_INPUT:?}:/input:ro'
+      - dependencies:/store:ro
+
+networks:
+  fetch:
+    internal: true
+  development:
+    internal: true
+  frontend: {}
+  outbound: {}
+volumes:
+  dependencies: {}
+  development-state: {}
+  worker-registry: {}

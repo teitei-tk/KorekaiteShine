@@ -26,7 +26,7 @@ const server = createServer((request, response) => {
   const mode = readFileSync(config.mode, 'utf8');
   const path = request.url ?? '/';
   appendFileSync(config.requests, `${JSON.stringify({ mode, path })}\n`);
-  if (mode === 'deny') {
+  if (mode === 'deny' || (mode === 'deny-tarball' && path.startsWith(`/${config.name}/-/`))) {
     response.writeHead(403, { 'Content-Type': 'application/json' });
     response.end('{"error":"fixture registry denied"}');
     return;

@@ -1,0 +1,89 @@
+version: '3'
+
+tasks:
+  deps:
+    desc: Guard 経由で依存を取得する
+    cmds:
+      - task: compose
+        vars: { SERVICE: deps, INPUT: deps }
+
+  dev:
+    desc: ローカルの3 Workersを起動する
+    cmds:
+      - task: compose
+        vars: { SERVICE: dev, INPUT: source }
+
+  check:
+    desc: 外部通信を閉じて通常検査を実行する
+    cmds:
+      - task: compose
+        vars: { SERVICE: check, INPUT: source }
+
+  hooks:install:
+    desc: ホストのLefthookでGitフックを登録する
+    cmds:
+      - lefthook install
+
+  build:
+    desc: WebとAIレビューの隔離用ビルドをコンテナ内で検査する
+    cmds:
+      - task: compose
+        vars: { SERVICE: build, INPUT: source }
+
+  integration:
+    desc: 3 Workersの結合検査を実行する
+    cmds:
+      - task: compose
+        vars: { SERVICE: integration, INPUT: source }
+
+  integration:pr:
+    desc: 実時間検査を除く通常結合検査を2ワーカーで実行する
+    cmds:
+      - task: compose
+        vars: { SERVICE: integration-pr, INPUT: source }
+
+  realtime:
+    desc: 3 Workersの実時間検査を実行する
+    cmds:
+      - task: compose
+        vars: { SERVICE: realtime, INPUT: source }
+
+  compose:
+    internal: true
+    dir: '{{.ROOT_DIR}}'
+    env:
+      CONTROL: '{{.ROOT_DIR}}'
+      CANDIDATE: '{{.USER_WORKING_DIR}}'
+      SERVICE: '{{.SERVICE}}'
+      INPUT: '{{.INPUT}}'
+    cmds:
+      - |
+        set -eu
+        root=$(git -C "$CANDIDATE" rev-parse --show-toplevel)
+        project=$(printf %s "$root" | shasum -a 256 | cut -c1-16)
+        export COMPOSE_PROJECT_NAME="korekaite-$project"
+        export DEV_IMAGE="korekaite-dev:$project"
+        export COMPOSE_FILE="$CONTROL/compose.yaml"
+        stage=$(mktemp -d)
+        trap 'rm -rf "$stage"' EXIT
+        export CONTAINER_INPUT="$stage/input"
+        python3 "$CONTROL/tools/containers/prepare-input.py" "$INPUT" "$root" "$CONTAINER_INPUT"
+        chmod 755 "$CONTAINER_INPUT"
+        case "$SERVICE" in
+          deps)
+            docker build -t "$DEV_IMAGE" "$CONTROL/tools/containers"
+            docker compose run --rm deps
+            ;;
+          dev)
+            for worker in web interview evaluation; do
+              docker build --build-arg DEV_IMAGE="$DEV_IMAGE" -t "$DEV_IMAGE-$worker" - < "$CONTROL/apps/$worker/Dockerfile"
+            done
+            trap 'docker compose stop web-port web interview evaluation worker-network; rm -rf "$stage"' EXIT
+            docker compose up --abort-on-container-exit web interview evaluation web-port
+            ;;
+          check) docker compose run --rm check ;;
+          build) docker compose run --rm check sh -ec 'pnpm prepare:checks && pnpm --filter korekaite-shine-web build:app && pnpm --filter korekaite-shine-ai-review build:isolation --outDir ../../.ci/isolation-build' ;;
+          integration) docker compose run --rm check sh -ec 'pnpm prepare:integration && pnpm test:integration --maxWorkers=2' ;;
+          integration-pr) docker compose run --rm check sh -ec 'pnpm prepare:integration && pnpm test:integration:pr --maxWorkers=2' ;;
+          realtime) docker compose run --rm check sh -ec 'pnpm prepare:integration && pnpm test:realtime' ;;
+        esac

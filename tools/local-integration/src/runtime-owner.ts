@@ -82,7 +82,11 @@ export async function startOwnedRuntime(
     },
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
   });
-  requireValue(owner.stderr).resume();
+  if (options.containerWorker) {
+    requireValue(owner.stderr).pipe(process.stderr, { end: false });
+  } else {
+    requireValue(owner.stderr).resume();
+  }
   const failureState = { failure: undefined as string | undefined };
   const closed = new Promise<number | null>((resolve) => {
     owner.once('close', (code) => {

@@ -183,3 +183,26 @@ test('CLIは非Error例外も文字列化して失敗終了する', async () => 
   expect(fixture.channel.exitCode).toBe(1);
   expect(fixture.error).toHaveBeenCalledWith('build rejected');
 });
+
+test.each([
+  ['web', 63_286, 0],
+  ['interview', 63_287, 0],
+  ['evaluation', 63_288, 1],
+] as const)('%sコンテナは担当Workerを起動する', async (worker, port, schedules) => {
+  const fixture = await cliFixture(['dev'], { KOREKAITE_DEV_WORKER: worker });
+  expect(startRuntime).toHaveBeenCalledWith(
+    expect.objectContaining({ artifactDirectory: `/work/.worker-artifacts/${worker}` }),
+    'dev',
+    { containerWorker: worker, port },
+  );
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(fixture.runtime.runScheduled).toHaveBeenCalledTimes(schedules);
+  fixture.events.emit('SIGTERM');
+  await vi.advanceTimersByTimeAsync(0);
+});
+
+test('未定義のWorker名で起動しない', async () => {
+  const fixture = await cliFixture(['dev'], { KOREKAITE_DEV_WORKER: 'other' });
+  expect(fixture.channel.exitCode).toBe(1);
+  expect(startRuntime).not.toHaveBeenCalled();
+});

@@ -23,13 +23,13 @@ pnpmはルートの[package.json](../../package.json)の`packageManager`で固�
 
 ## commit・push前の検査
 
-[Lefthook設定](../../lefthook.yml)で、commit前とpush前の両方に`pnpm lint`、`pnpm format:check`、`pnpm test`を実行します。検査が失敗すると操作を中止します。作業ツリー全体が対象で、整形の自動修正や自動stageは行いません。部分stage時も未stageの内容を含むため、commit対象そのものの検証はCIでも行います。
+[Lefthook設定](../../lefthook.yml)で、commit前とpush前の両方で `task check` を呼び、コンテナ内で通常検査を実行します。検査が失敗すると操作を中止します。作業ツリー全体が対象で、整形の自動修正や自動stageは行いません。部分stage時も未stageの内容を含むため、commit対象そのものの検証はCIでも行います。
 
-clone後は依存をインストールし、フックを明示的に有効化してください。依存のインストールスクリプトは許可しません。
+clone後はホストのPATHにLefthookとgo-taskを用意し、依存取得後にフックを登録してください。登録済みのcloneも新しい起動設定を反映するため再登録します。
 
 ```sh
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm hooks:install
+task deps
+task hooks:install
 ```
 
 既存の秘密値検査を維持するため、pre-commitでは`git secrets --pre_commit_hook`も実行します。`git-secrets`を利用可能にし、既存の検出ルールを維持してください。Lefthook導入時に既存pre-commitは`pre-commit.old`へ退避されますが、検査自体はLefthookのコマンドとして実行します。既存のcommit-msg・prepare-commit-msgフックは変更しません。`git secrets --install --force`でpre-commitを上書きしないでください。
@@ -55,7 +55,7 @@ Lefthookは2.2.1に固定しています。2026年10月24日の導入時、2.2.2
 
 - `minimumReleaseAge: 1440`：公開後24時間待ちます。条件を満たす版がない場合や公開日時を確認できない場合は失敗させます。
 - `strictDepBuilds: true`：通常のインストールで未審査の依存ビルドが見つかったら失敗させます。上記手順とCIの`--ignore-scripts`は別途維持し、インストールスクリプトを実行しません。
-- `allowBuilds.lefthook: false`：Gitフックを自動登録するインストールスクリプトを明示的に拒否します。未審査としてのエラーを防ぎ、フックの登録は`pnpm hooks:install`で行います。
+- `allowBuilds.lefthook: false`：Gitフックを自動登録するインストールスクリプトを明示的に拒否します。未審査としてのエラーを防ぎ、フックの登録は `task hooks:install`で行います。
 - `blockExoticSubdeps: true`：推移依存からの未信頼なGit・tarball URL等を制限します。直接依存の取得元は別途レビューします。
 - `trustPolicy: no-downgrade`：以前の公開版より信頼情報が弱い版を拒否します。すべてのパッケージにprovenanceを要求する設定ではありません。
 - `trustLockfile: false`：ロック済み依存も待機期間・信頼情報の検証対象にします。

@@ -419,3 +419,24 @@ test('共有成果物を独立保存先へ配置してからpreviewを起動す�
   );
   await runtime.stop();
 });
+
+test.each(['web', 'interview', 'evaluation'] as const)(
+  '%sコンテナは単独Worker構成で起動する',
+  async (worker) => {
+    const { config } = await runtimeFixture('development');
+    const runtime = await startRuntimeInProcess(config, 'dev', { containerWorker: worker });
+    try {
+      const vite = await readFile(join(config.artifactDirectory, 'web/vite.config.ts'), 'utf8');
+      if (worker === 'web') {
+        expect(vite).toContain('auxiliaryWorkers: []');
+        expect(runDatabaseCommand).toHaveBeenCalledOnce();
+      } else {
+        expect(vite).toContain(config.workers[worker]);
+        expect(vite).not.toContain('auxiliaryWorkers');
+        expect(runDatabaseCommand).not.toHaveBeenCalled();
+      }
+    } finally {
+      await runtime.stop();
+    }
+  },
+);

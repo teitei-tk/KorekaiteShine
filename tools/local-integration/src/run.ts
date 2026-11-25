@@ -21,6 +21,18 @@ async function main(): Promise<void> {
     parallelIndex:
       process.env.LOCAL_TEST_SLOT === undefined ? undefined : Number(process.env.LOCAL_TEST_SLOT),
   });
+  const worker = process.env.KOREKAITE_DEV_WORKER;
+  if (
+    worker !== undefined &&
+    (config.environment !== 'development' ||
+      command !== 'dev' ||
+      (worker !== 'web' && worker !== 'interview' && worker !== 'evaluation'))
+  ) {
+    throw new Error('開発Workerの指定が不正です。');
+  }
+  if (worker) {
+    config.artifactDirectory = `/work/.worker-artifacts/${worker}`;
+  }
   if (command === 'build') {
     await buildRuntime(config);
   } else if (command === 'db:reset-seed') {
@@ -29,13 +41,25 @@ async function main(): Promise<void> {
     await runDatabaseCommand(config, [command === 'db:generate' ? 'generate' : 'migrate']);
   } else {
     const runtime = await startRuntime(config, command === 'preview' ? 'preview' : 'dev', {
-      port: command === 'dev' && config.environment === 'development' ? 63_286 : 0,
+      containerWorker: worker,
+      port:
+        worker === 'interview'
+          ? 63_287
+          : worker === 'evaluation'
+            ? 63_288
+            : command === 'dev' && config.environment === 'development'
+              ? 63_286
+              : 0,
     });
     const stoppingState = { stopping: false };
     const scheduledAbort = new AbortController();
     const scheduledPendingState = { scheduledPending: undefined as Promise<void> | undefined };
     const scheduledTimer = setInterval(() => {
-      if (stoppingState.stopping || scheduledPendingState.scheduledPending) {
+      if (
+        (worker && worker !== 'evaluation') ||
+        stoppingState.stopping ||
+        scheduledPendingState.scheduledPending
+      ) {
         return;
       }
       scheduledPendingState.scheduledPending = runtime
@@ -54,8 +78,10 @@ async function main(): Promise<void> {
       scheduledAbort.abort();
       await scheduledPendingState.scheduledPending;
     };
-    console.log(`ローカルWeb: ${runtime.baseUrl}`);
-    console.log('定期回復: 60秒周期');
+    console.log(`ローカル${worker ?? 'Web'}: ${runtime.baseUrl}`);
+    if (!worker || worker === 'evaluation') {
+      console.log('定期回復: 60秒周期');
+    }
     const stop = () => {
       if (stoppingState.stopping) {
         return;

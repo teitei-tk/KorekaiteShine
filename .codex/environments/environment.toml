@@ -1,0 +1,15 @@
+version = 1
+name = "KorekaiteShine"
+
+[setup]
+script = "task deps"
+
+[[actions]]
+name = "開発サーバー起動"
+icon = "run"
+command = "task dev"
+
+[[actions]]
+name = "通常検査"
+icon = "test"
+command = "task check"

@@ -11,7 +11,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-node@v7.1.0'
         - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
-        - 'openai/codex-action@v1.13'
+        - 'openai/codex-action@v1.14'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/ai-review-notify.yml':
         - 'actions/checkout@v7.0.1'
@@ -23,7 +23,7 @@ workflows:
         - 'actions/setup-node@v7.1.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'flatt-security/setup-takumi-guard-npm@v1.4.0'
-        - 'openai/codex-action@v1.13'
+        - 'openai/codex-action@v1.14'
         - 'pnpm/action-setup@v6.1.1'
     '.github/workflows/ci-exploration.yml':
         - 'actions/checkout@v7.0.1'
@@ -78,9 +78,9 @@ dependencies:
         commit: 'sha1-14f07d0cbc739b42a1b7c70a04c2b84cd1318ddd'
         owner_id: 88821409
         repo_id: 1160374496
-    'openai/codex-action@v1.13':
-        ref: 'v1.13'
-        commit: 'sha1-bdf19a4a223ec2549a3e2274a0cf61556bc07675'
+    'openai/codex-action@v1.14':
+        ref: 'v1.14'
+        commit: 'sha1-306c6a196a99dcc6582530c396a19d2672d5e9ec'
         owner_id: 14957082
         repo_id: 1068091251
         uses:

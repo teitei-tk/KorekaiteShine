@@ -7,7 +7,7 @@
     "typecheck": "tsrs --fast --noEmit"
   },
   "devDependencies": {
-    "@types/node": "26.6.6",
+    "@types/node": "26.6.10",
     "typescript": "7.0.2",
     "typescript-compiler-api": "npm:typescript@5.9.3",
     "vitest": "5.1.0"

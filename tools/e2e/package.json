@@ -11,7 +11,7 @@
     "@cucumber/cucumber": "13.3.0",
     "@korekaite/api-contracts": "workspace:*",
     "@korekaite/database": "workspace:*",
-    "@types/node": "26.6.6",
+    "@types/node": "26.6.10",
     "jsdom": "31.0.1",
     "playwright": "1.65.1",
     "typescript": "7.0.2",

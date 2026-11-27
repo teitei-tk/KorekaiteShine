@@ -2,6 +2,28 @@
 
 認証設定を確認するとき、大きなツール結果を扱うとき、レビューを委譲するとき、PRを作成・更新した作業を終了するときに参照します。
 
+## Codex セッション終了時に Docker コンテナを削除する
+
+ローカル Codex セッションで使い捨てコンテナを起動する場合は、専用コマンドでセッション ID を Docker ラベルに記録できます。`SessionEnd` が同じラベルのコンテナを削除します。
+
+1. Docker CLI でローカルのコンテキスト名を確認し、`~/.config/korekaite-shine/docker-context` に1行で記載します。OrbStack の例は `orbstack` です。Unix ソケットのコンテキストを指定します。
+2. [フック設定例](../../tools/codex-docker/hooks.example.json)の `SessionEnd` を、リポジトリの `.codex/hooks.json` に登録します。ファイルに既存の定義があれば併合し、Codex CLI の `/hooks` で内容を確認して信頼します。フックから `git`、リポジトリ指定の Node.js、Docker CLI が実行できることを確認してください。[Codex Hooks](https://developers.openai.com/codex/hooks#review-and-trust-hooks)
+3. Codex セッション内で、リポジトリのルートから次のように起動します。`IMAGE` は使うイメージ名に置き換えます。コマンドはバックグラウンドで起動し、コンテナ ID を表示します。
+
+   ```sh
+   node tools/codex-docker/session.mjs run IMAGE sleep 600
+   ```
+
+`SessionEnd` は、正常終了や開いている会話のアーカイブ・削除などで動きます。応答の完了や会話の切り替えで即座にコンテナが消えることはありません。[Codex の SessionEnd](https://developers.openai.com/codex/hooks#sessionend)
+
+手動で再実行できるよう、起動したセッション内で `printenv CODEX_THREAD_ID` の値を控えておきます。強制終了、Docker 停止、フックの3秒制限などでコンテナが残った場合は、終了したセッションの ID を指定して実行します。同じ ID で繰り返し実行できます。
+
+```sh
+node tools/codex-docker/session.mjs cleanup --session SESSION_ID
+```
+
+2026年11月28日、macOS の Codex app-server 0.166.0、Node.js 26.12.1、OrbStack の Docker Engine 29.8.2 で検証しました。ローカルの模擬応答でターンが完了してもコンテナは残り、会話のアーカイブから約0.37秒で、そのセッションの起動中・停止済みコンテナが削除されました。別セッションとラベルなしの対照コンテナは残り、手動削除と再実行も確認しました。
+
 ## 認証設定の確認
 
 AIレビューのRepository Variablesは、ルートから`pnpm check:ai-settings`で確認します。取得値を含む`gh variable list --json name,value`等の直接出力は使わず、[初期設定手順](ai-review.md#登録値を表示せず確認する)に従います。取得失敗は認証切れと断定せず、接続・権限を確認します。ネットワーク制限のあるサンドボックスでは最初から外で実行します。

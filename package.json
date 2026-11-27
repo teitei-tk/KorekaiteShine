@@ -7,7 +7,7 @@
     "check": "pnpm check:node && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm check:docs",
     "check:node": "pnpm --dir tools/docs check:node",
     "typecheck": "pnpm prepare:checks && pnpm -r --workspace-concurrency=1 run typecheck",
-    "test": "pnpm prepare:checks && pnpm -r --workspace-concurrency=1 run test",
+    "test": "node --test tools/codex-docker/session.test.mjs && pnpm prepare:checks && pnpm -r --workspace-concurrency=1 run test",
     "check:docs": "pnpm --dir tools/docs check",
     "check:actions": "gh actions-lock --verify",
     "lint": "pnpm prepare:checks && node tools/lint/check-rule-inventory.mjs && node tools/lint/check-inline-directives.mjs && oxlint --type-aware --deny-warnings .",
